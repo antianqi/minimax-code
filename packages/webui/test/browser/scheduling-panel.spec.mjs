@@ -98,10 +98,24 @@ test.describe("the scheduled-task panel", () => {
 
     // The history holds the run the schedule produced, labelled as such.
     const heldRow = panel.locator('[data-webui-scheduling-task="cron-fixture-held"]');
-    await heldRow.locator('[data-webui-scheduling-history="cron-fixture-held"]').click();
+    const historyToggle = heldRow.locator('[data-webui-scheduling-history="cron-fixture-held"]');
+    await expect(historyToggle).toHaveAttribute("aria-expanded", "false");
+    await historyToggle.click();
+    await expect(historyToggle).toHaveAttribute("aria-expanded", "true");
+    const disclosure = heldRow.locator('[data-webui-scheduling-runs="cron-fixture-held"]');
+    await expect(disclosure).toHaveAttribute("data-webui-motion-state", "expand");
+    await expect.poll(() => disclosure.evaluate((element) => getComputedStyle(element).transitionDuration))
+      .toBe("0.16s");
     const seeded = heldRow.locator('[data-webui-scheduling-run-row="run-fixture-scheduled"]');
     await expect(seeded).toContainText("定时");
     await expect(seeded).toContainText("已完成");
+
+    await historyToggle.click();
+    await expect(historyToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(disclosure).toHaveAttribute("data-webui-motion-state", "collapse");
+    await expect.poll(() => disclosure.evaluate((element) => element.getBoundingClientRect().height))
+      .toBe(0);
+    await historyToggle.click();
 
     // Run now: the run appears in the history with its source, its outcome and its session.
     await heldRow.locator('[data-webui-scheduling-run="cron-fixture-held"]').click();

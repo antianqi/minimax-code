@@ -396,6 +396,9 @@ describe("the run history", () => {
         runs,
       }),
     );
+    expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain('data-webui-motion="disclosure"');
+    expect(markup).toContain('id="webui-scheduling-runs-cron-1"');
     expect(markup).toContain('data-webui-scheduling-runs="cron-1"');
     expect(markup).toContain("手动");
     expect(markup).toContain("已完成");

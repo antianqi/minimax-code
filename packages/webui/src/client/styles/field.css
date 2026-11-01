@@ -235,7 +235,6 @@
     background: var(--opacity_black_1_8);
     padding: 0;
     cursor: pointer;
-    transition: background-color 200ms ease;
   }
   .webui-toggle-switch > span {
     position: absolute;
@@ -247,7 +246,6 @@
     border-radius: var(--radius_full);
     background: #fff;
     box-shadow: none;
-    transition: transform 200ms ease;
   }
   .webui-toggle-switch.is-checked { background: var(--blue_400); }
   .webui-toggle-switch.is-checked > span { transform: translateX(12px); }

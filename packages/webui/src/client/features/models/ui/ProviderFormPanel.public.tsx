@@ -53,6 +53,7 @@ import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
+import { WebuiMotion } from "../../../ui/page.js";
 /** The attachment modalities, in Desktop's own words. */
 const ATTACHMENT_LABELS: Readonly<
   Record<(typeof WEBUI_MODEL_ATTACHMENT_MODALITIES)[number], string>
@@ -429,14 +430,14 @@ function AttachmentField({ value, onChange }: { readonly value: readonly string[
 }
 
 function SortableModelRow({ id, model, onTest, onToggle }: { readonly id: string; readonly model: WebuiModelProviderModelEntry; readonly onTest: () => void; readonly onToggle: (enabled: boolean) => void }): ReactElement {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
   const enabled = model.enabled !== false;
-  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.55 : undefined, position: "relative", zIndex: isDragging ? 1 : undefined }} data-testid={`settings-custom-model-row-${textOf(model.modelId)}`}>
+  return <WebuiMotion ref={setNodeRef} kind="sortable" style={{ transform: CSS.Transform.toString(transform), opacity: isDragging ? 0.55 : undefined, position: "relative", zIndex: isDragging ? 1 : undefined }} data-testid={`settings-custom-model-row-${textOf(model.modelId)}`}>
     <WebuiInline gap="medium" className="overflow-hidden rounded-[12px] py-2 pl-3 pr-3">
       <WebuiIconButton type="button" label={`调整 ${textOf(model.displayName) || textOf(model.modelId)} 顺序`} tone="bare" size="micro" className="shrink-0 touch-none cursor-grab active:cursor-grabbing" {...attributes} {...listeners}><IconGripVertical aria-hidden="true" size={16} stroke={1.7} /></WebuiIconButton>
       <span className={`min-w-0 flex-1 truncate text-[14px] leading-5 text-text_default_primary ${enabled ? "" : "opacity-50"}`}>{textOf(model.displayName) || textOf(model.modelId)}</span>
       <IconButton label="测试模型连通性" onClick={onTest}><RefreshIcon /></IconButton>
       <ToggleSwitch checked={enabled} label={`${enabled ? "禁用" : "启用"} ${textOf(model.displayName) || textOf(model.modelId)}`} onChange={onToggle} />
     </WebuiInline>
-  </div>;
+  </WebuiMotion>;
 }

@@ -31,6 +31,7 @@ import {
   MessageViewportStreamingLoader,
 } from "../../src/client/features/transcript/ui/ActivityIndicator.js";
 import { pickWeightedPhrase, bucketPhrases } from "../../src/client/ui/activity-phrase.js";
+import { shouldPlayWebuiAnimation } from "../../src/client/ui/feedback.js";
 
 describe("ActivityIndicator markup (desktop parity)", () => {
   beforeEach(() => {
@@ -89,6 +90,14 @@ describe("ActivityIndicator markup (desktop parity)", () => {
       createElement(ActivityIndicator, { className: "extra-class" }),
     );
     expect(html).toMatch(/class="[^"]*extra-class/);
+  });
+});
+
+describe("shared Lottie motion policy", () => {
+  it("respects reduced motion and the caller's play state", () => {
+    expect(shouldPlayWebuiAnimation(true, true)).toBe(false);
+    expect(shouldPlayWebuiAnimation(true, false)).toBe(true);
+    expect(shouldPlayWebuiAnimation(false, false)).toBe(false);
   });
 });
 

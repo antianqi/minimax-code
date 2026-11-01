@@ -5,11 +5,13 @@
 // responsibilities). The transcript composes this surface; it does not own the
 // interaction business the answers came from.
 
-import type { ReactElement } from "react";
+import { useId, useState, type ReactElement } from "react";
 
 import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript-view.js";
 import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiButton } from "../../../ui/button.js";
+import { WebuiDisclosure } from "../../../ui/page.js";
 
 /**
  * Historical questionnaire-response projection. Once the user submits a
@@ -26,6 +28,8 @@ export function WebuiQuestionnaireResponse({
   readonly timestamp?: number;
 }): ReactElement {
   const { requestId, answers } = summary;
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const detailsId = useId();
   return (
     <article
       className="webui-questionnaire-history flex w-full max-w-[80%] min-w-0 flex-col gap-3 rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary_elevated p-4 text-text_default_primary"
@@ -85,14 +89,22 @@ export function WebuiQuestionnaireResponse({
           </WebuiStack>
         ))}
       </WebuiStack>
-      <details className="webui-questionnaire-history-details border-t-[0.5px] border-border_default pt-2">
-        <summary className="w-fit cursor-pointer text-size_12 leading-line_height_16 text-text_default_tertiary hover:text-text_default_secondary">
-          查看回答信息
-        </summary>
-        <dl
-          className="webui-questionnaire-history-meta mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-size_12 leading-line_height_16 text-text_default_tertiary"
-          data-testid="questionnaire-history-meta"
+      <section className="webui-questionnaire-history-details border-t-[0.5px] border-border_default pt-2">
+        <WebuiButton
+          variant="plain"
+          size="inline"
+          className="w-fit text-size_12 leading-line_height_16 text-text_default_tertiary hover:text-text_default_secondary"
+          aria-expanded={detailsOpen}
+          aria-controls={detailsId}
+          onClick={() => setDetailsOpen((value) => !value)}
         >
+          查看回答信息
+        </WebuiButton>
+        <WebuiDisclosure id={detailsId} open={detailsOpen} className="mt-2">
+          <dl
+            className="webui-questionnaire-history-meta grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-size_12 leading-line_height_16 text-text_default_tertiary"
+            data-testid="questionnaire-history-meta"
+          >
           <div className="contents" data-testid="questionnaire-history-meta-requestId">
             <dt>requestId</dt>
             <dd className="min-w-0 break-all font-mono">{requestId || "(未提供)"}</dd>
@@ -127,8 +139,9 @@ export function WebuiQuestionnaireResponse({
               <dd className="break-all font-mono">{summary.featureKey}</dd>
             </div>
           ) : null}
-        </dl>
-      </details>
+          </dl>
+        </WebuiDisclosure>
+      </section>
     </article>
   );
 }

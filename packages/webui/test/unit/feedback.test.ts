@@ -27,6 +27,20 @@ describe("determinate and indeterminate are different things", () => {
     expect(html).toContain('aria-valuemax="120"');
     expect(html).toContain('aria-valuetext="25%"');
     expect(html).toContain('aria-label="上传"');
+    expect(html).toContain("webui-motion-progress");
+  });
+
+  it("keeps surface track and fill styling while the shared component owns motion", () => {
+    const html = render(createElement(FeedbackProgress, {
+      label: "5 小时限额",
+      value: 42,
+      className: "w-full",
+      trackClassName: "bg-bg_interaction_tertiary_press",
+      fillClassName: "bg-text_default_primary",
+    }));
+    expect(html).toContain("webui-feedback-progress-track bg-bg_interaction_tertiary_press");
+    expect(html).toContain("webui-feedback-progress-fill webui-motion-progress bg-text_default_primary");
+    expect(html).toContain('aria-valuenow="42"');
   });
 
   it("a busy indicator reports no value at all", () => {

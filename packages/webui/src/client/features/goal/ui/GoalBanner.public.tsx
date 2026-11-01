@@ -19,6 +19,7 @@ import type {
 import type { WebuiGoalCommands } from "../contracts/goal-port.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiDisclosure } from "../../../ui/page.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
 import {
   WebuiIconCommandGoal,
@@ -177,7 +178,7 @@ export function WebuiGoalBanner({
         </div>
         <div className="webui-goal-banner-content-row" data-testid="thread-goal-banner-content-row">
           <div className="webui-goal-banner-objective-group" data-testid="thread-goal-banner-objective-group">
-            <WebuiButton variant="quiet-secondary" size="inline" className="webui-goal-objective" data-testid="thread-goal-banner-objective" aria-expanded={objectiveExpanded} title={goal.objective} onClick={() => setObjectiveExpanded((value) => !value)}>{goal.objective}</WebuiButton>
+            <WebuiButton variant="quiet-secondary" size="inline" className="webui-goal-objective" data-testid="thread-goal-banner-objective" aria-expanded={objectiveExpanded} aria-controls="thread-goal-objective-expanded" title={goal.objective} onClick={() => setObjectiveExpanded((value) => !value)}>{goal.objective}</WebuiButton>
           </div>
           <div className="webui-goal-usage" data-testid="thread-goal-usage">
             <span data-testid="thread-goal-tokens-used">{goal.tokensUsed} tokens</span>
@@ -197,7 +198,9 @@ export function WebuiGoalBanner({
             : <WebuiIconButton tone="bare" className="webui-goal-action" data-testid="thread-goal-banner-clear" label="清除目标" title="清除目标" onClick={() => setConfirmClear(true)} disabled={busy || interactionBlocked}><WebuiIconContextTrash /></WebuiIconButton>}
         </div>
       </div>
-      {objectiveExpanded ? <div className="webui-goal-objective-expanded" data-testid="thread-goal-objective-expanded">{goal.objective}</div> : null}
+      <WebuiDisclosure id="thread-goal-objective-expanded" open={objectiveExpanded} mountOnOpen data-testid="thread-goal-objective-disclosure">
+        <div className="webui-goal-objective-expanded" data-testid="thread-goal-objective-expanded">{goal.objective}</div>
+      </WebuiDisclosure>
       {error && !confirmClear ? <FeedbackError message={error} testId="thread-goal-error" /> : null}
       {clearDialog}
     </section>

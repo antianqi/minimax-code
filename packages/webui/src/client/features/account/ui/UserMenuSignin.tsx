@@ -9,6 +9,7 @@ import { Fragment, useState, type ReactElement } from "react";
 import { IconCheck, IconCoin, IconInfoCircle } from "@tabler/icons-react";
 import {
   SigninDayStatus,
+  SigninPanelScene,
   getCurrentSigninStreak,
   isSigninPanelClaimable,
   isSigninPanelClaimedToday,
@@ -17,6 +18,7 @@ import type { WebuiSigninPanelView } from "../../../../shared/contracts/account.
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { WebuiSkeletonProjection } from "../../../ui/page.js";
 
 export interface SigninState {
   readonly loading: boolean;
@@ -61,7 +63,9 @@ function formatSigninPoints(value: number): string {
 
 export function formatSigninError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return /invalid sign-in/iu.test(message) ? SIGNIN.invalidResponse : SIGNIN.error;
+  return /invalid sign-in/iu.test(message)
+    ? SIGNIN.invalidResponse
+    : SIGNIN.error;
 }
 
 function SigninInfoIcon(): ReactElement {
@@ -70,7 +74,14 @@ function SigninInfoIcon(): ReactElement {
 
 /** Check mark inside a day dot, size 14. */
 function SigninCheckIcon(): ReactElement {
-  return <IconCheck aria-hidden="true" className="signin-day-check" size={14} stroke={1.7} />;
+  return (
+    <IconCheck
+      aria-hidden="true"
+      className="signin-day-check"
+      size={14}
+      stroke={1.7}
+    />
+  );
 }
 
 /** Credits glyph in the claim button / bonus tag. */
@@ -79,10 +90,27 @@ function SigninCreditsIcon({ size }: { readonly size: number }): ReactElement {
 }
 
 /** Dotted connector between day dots. */
-function SigninConnector({ className = "" }: { readonly className?: string }): ReactElement {
+function SigninConnector({
+  className = "",
+}: {
+  readonly className?: string;
+}): ReactElement {
   return (
-    <svg aria-hidden="true" focusable="false" className={`signin-connector ${className}`}>
-      <line x1="0" y1="0.6" x2="100%" y2="0.6" stroke="currentColor" strokeWidth="1.2" strokeDasharray="0 2" strokeLinecap="round" />
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      className={`signin-connector ${className}`}
+    >
+      <line
+        x1="0"
+        y1="0.6"
+        x2="100%"
+        y2="0.6"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeDasharray="0 2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -101,14 +129,21 @@ function SigninArtwork({
   const dark = darkUrl ?? lightUrl;
   return (
     <div className={className} aria-hidden="true">
-      {([["light", lightUrl], ["dark", dark]] as const).map(([mode, url]) =>
+      {(
+        [
+          ["light", lightUrl],
+          ["dark", dark],
+        ] as const
+      ).map(([mode, url]) =>
         !failed.includes(url) ? (
           <img
             key={`${mode}:${url}`}
             src={url}
             alt=""
             draggable={false}
-            className={mode === "light" ? "block dark:hidden" : "hidden dark:block"}
+            className={
+              mode === "light" ? "block dark:hidden" : "hidden dark:block"
+            }
             onError={() => setFailed((list) => [...list, url])}
           />
         ) : null,
@@ -117,26 +152,15 @@ function SigninArtwork({
   );
 }
 
-function SigninSkeleton(): ReactElement {
-  return (
-    <div data-testid="signin-card-skeleton" className="relative animate-pulse">
-      <div className="ml-1 h-5 w-28 rounded bg-bg_default_tertiary" />
-      <div className="ml-1 mt-1 h-4 w-36 rounded bg-bg_default_tertiary" />
-      <div className="signin-progress mt-8">
-        {Array.from({ length: 7 }, (_, index) => (
-          <Fragment key={index}>
-            {index > 0 ? <SigninConnector /> : null}
-            <div className="signin-day">
-              <div className="size-[22px] rounded-full bg-bg_default_tertiary" />
-              <div className="h-[14px] w-6 rounded bg-bg_default_tertiary" />
-            </div>
-          </Fragment>
-        ))}
-      </div>
-      <div className="mt-7 h-8 rounded-lg bg-bg_default_tertiary" />
-    </div>
-  );
-}
+const LOADING_SIGNIN_PANEL: WebuiSigninPanelView = {
+  scene: SigninPanelScene.Unknown,
+  days: Array.from({ length: 7 }, (_, index) => ({
+    day_no: index + 1,
+    points: 0,
+    status: SigninDayStatus.Disabled,
+    is_today: index === 0,
+  })),
+};
 
 /** Seven-day progress row. */
 function SigninProgress({
@@ -155,12 +179,17 @@ function SigninProgress({
           const claimable = day.status === SigninDayStatus.Claimable;
           const previous = index > 0 ? sorted[index - 1] : undefined;
           const connectorActive =
-            previous?.status === SigninDayStatus.Claimed && (claimed || claimable);
+            previous?.status === SigninDayStatus.Claimed &&
+            (claimed || claimable);
           return (
             <Fragment key={day.day_no}>
               {index > 0 ? (
                 <SigninConnector
-                  className={connectorActive ? "text-text_default_accent opacity-50" : "text-border_default"}
+                  className={
+                    connectorActive
+                      ? "text-text_default_accent opacity-50"
+                      : "text-border_default"
+                  }
                 />
               ) : null}
               <div
@@ -203,7 +232,11 @@ function SigninProgress({
 }
 
 /** Title row with the credits-info tooltip trigger. */
-function SigninCreditsInfo({ onNavigateToUsage }: { readonly onNavigateToUsage: () => void }): ReactElement {
+function SigninCreditsInfo({
+  onNavigateToUsage,
+}: {
+  readonly onNavigateToUsage: () => void;
+}): ReactElement {
   const [open, setOpen] = useState(false);
   return (
     <span className="webui-signin-credits-anchor">
@@ -266,130 +299,183 @@ export function SigninCard({
   readonly onRetry: () => void;
   readonly onNavigateToUsage: () => void;
 }): ReactElement {
-  const streak = panel ? getCurrentSigninStreak(panel.days) : 0;
-  const today = panel?.days.find((day) => day.is_today);
+  const displayPanel = panel ?? (loading ? LOADING_SIGNIN_PANEL : undefined);
+  const streak = displayPanel ? getCurrentSigninStreak(displayPanel.days) : 0;
+  const today = displayPanel?.days.find((day) => day.is_today);
   const claimableDay =
-    panel?.days.find((day) => day.is_today && day.status === SigninDayStatus.Claimable) ??
-    panel?.days.find((day) => day.status === SigninDayStatus.Claimable);
-  const claimable = panel ? isSigninPanelClaimable(panel) : false;
-  const claimedToday = panel ? isSigninPanelClaimedToday(panel) : false;
+    displayPanel?.days.find(
+      (day) => day.is_today && day.status === SigninDayStatus.Claimable,
+    ) ??
+    displayPanel?.days.find((day) => day.status === SigninDayStatus.Claimable);
+  const claimable = displayPanel ? isSigninPanelClaimable(displayPanel) : false;
+  const claimedToday = displayPanel
+    ? isSigninPanelClaimedToday(displayPanel)
+    : false;
   const bonus = today?.bonus_points ?? 0;
   const points = formatSigninPoints(claimableDay?.points ?? 0);
   const buttonLabel = claiming
     ? SIGNIN.claiming
     : claimedToday
       ? SIGNIN.claimedToday
-      : panel && !claimable
+      : displayPanel && !claimable
         ? SIGNIN.unavailable
         : `${SIGNIN.claimEarn} ${points}`;
 
   return (
-    <section data-testid="signin-card" aria-label={SIGNIN.title} className="signin-card-container">
-      <div className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
-        <div className="signin-corner-clip" aria-hidden="true">
-          <SigninArtwork
-            lightUrl="/assets/img/corner-light.svg"
-            darkUrl="/assets/img/corner-dark.svg"
-            className="signin-corner-default"
-          />
-        </div>
-        {loading && !panel ? (
-          <SigninSkeleton />
-        ) : panel ? (
-          <>
-            <div className="relative min-h-10 pl-1">
-              <WebuiInline gap="tight" align="start" className="min-h-5 pr-20">
-                <h2 className="m-0 min-w-0 text-sm font-medium leading-5 break-words">
-                  {SIGNIN.title}
-                </h2>
-                <SigninCreditsInfo onNavigateToUsage={onNavigateToUsage} />
-              </WebuiInline>
-              {streak > 0 ? (
-                <p data-testid="signin-streak" className="mb-0 mt-1 text-xs leading-4 text-text_default_secondary">
-                  {SIGNIN.streakBefore}
-                  <span className="text-text_default_accent">{streak}</span>
-                  {SIGNIN.streakAfter}
-                </p>
-              ) : (
-                <p className="mb-0 mt-1 text-xs leading-4 text-text_default_secondary">
-                  {SIGNIN.subtitle}
-                </p>
-              )}
-            </div>
-            <div className="relative mt-8">
-              <SigninProgress days={panel.days} animatedDay={animatedDay} />
-              <div className="relative mt-7">
-                {claimable ? (
-                  <WebuiButton
-                    variant="accent"
-                    size="regular"
-                    className="signin-claim-button h-8 w-full"
-                    disabled={claiming}
-                    aria-label={buttonLabel}
-                    onClick={onClaim}
+    <WebuiSkeletonProjection loading={loading && !panel}>
+      <section
+        data-testid={loading && !panel ? "signin-card-skeleton" : "signin-card"}
+        aria-label={SIGNIN.title}
+        className="signin-card-container"
+      >
+        <div className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
+          <div className="signin-corner-clip" aria-hidden="true">
+            <SigninArtwork
+              lightUrl="/assets/img/corner-light.svg"
+              darkUrl="/assets/img/corner-dark.svg"
+              className="signin-corner-default"
+            />
+          </div>
+          {displayPanel ? (
+            <>
+              <div className="relative min-h-10 pl-1">
+                <WebuiInline
+                  gap="tight"
+                  align="start"
+                  className="min-h-5 pr-20"
+                >
+                  <h2 className="m-0 min-w-0 text-sm font-medium leading-5 break-words">
+                    {SIGNIN.title}
+                  </h2>
+                  <SigninCreditsInfo onNavigateToUsage={onNavigateToUsage} />
+                </WebuiInline>
+                {streak > 0 ? (
+                  <p
+                    data-testid="signin-streak"
+                    className="mb-0 mt-1 text-xs leading-4 text-text_default_secondary"
                   >
-                    {claiming ? (
-                      <WebuiInline as="span" inline justify="center" gap="micro" className="min-w-0 max-w-full">
-                        <span className="webui-signin-claim-spinner" aria-hidden="true" />
-                        <span className="truncate">{SIGNIN.claiming}</span>
-                      </WebuiInline>
-                    ) : (
-                      <WebuiInline as="span" inline justify="center" gap="micro" className="min-w-0 max-w-full">
-                        <span className="truncate">{SIGNIN.claimEarn}</span>
-                        <WebuiInline as="span" inline className="shrink-0" aria-hidden="true">
-                          <SigninCreditsIcon size={16} />
-                        </WebuiInline>
-                        <span className="shrink-0">{points}</span>
-                      </WebuiInline>
-                    )}
-                  </WebuiButton>
+                    {SIGNIN.streakBefore}
+                    <span className="text-text_default_accent">{streak}</span>
+                    {SIGNIN.streakAfter}
+                  </p>
                 ) : (
-                  <WebuiButton
-                    variant="accent"
-                    size="regular"
-                    disabled
-                    aria-label={buttonLabel}
-                    className="signin-claim-button h-8 w-full"
-                  >
-                    {buttonLabel}
-                  </WebuiButton>
+                  <p className="mb-0 mt-1 text-xs leading-4 text-text_default_secondary">
+                    {SIGNIN.subtitle}
+                  </p>
                 )}
-                {bonus > 0 ? (
-                  <span
-                    data-testid="signin-bonus"
-                    className="signin-bonus-tag absolute right-0 top-[-9.5px] inline-flex max-w-full items-center gap-0.5 rounded-t-xl rounded-bl-xl bg-bg_interaction_accent_focus_blue px-2 py-0.5 text-xs font-medium leading-4 text-text_default_inverted_static"
-                  >
-                    <span className="truncate">{SIGNIN.bonusPrefix}</span>
-                    <WebuiInline as="span" inline className="shrink-0" aria-hidden="true">
-                      <SigninCreditsIcon size={12} />
-                    </WebuiInline>
-                    <span className="shrink-0">{formatSigninPoints(bonus)}</span>
-                  </span>
-                ) : null}
               </div>
-            </div>
-            {error ? (
-              <FeedbackError message="error" className="mb-0 mt-2 text-xs text-text_default_secondary" />
-            ) : null}
-          </>
-        ) : (
-          <FeedbackError
-            testId="signin-card-error"
-            className="relative mt-8 flex min-h-[104px] flex-col items-center justify-center gap-2 px-4 text-center"
-            message={<span className="m-0 text-xs leading-4 text-text_default_secondary">{error ?? SIGNIN.error}</span>}
-            action={
-              <WebuiButton
-                variant="plain"
-                size="inline-dense"
-                onClick={onRetry}
-                className="webui-signin-retry"
-              >
-                {SIGNIN.retry}
-              </WebuiButton>
-            }
-          />
-        )}
-      </div>
-    </section>
+              <div className="relative mt-8">
+                <SigninProgress
+                  days={displayPanel.days}
+                  animatedDay={animatedDay}
+                />
+                <div className="relative mt-7">
+                  {claimable ? (
+                    <WebuiButton
+                      variant="accent"
+                      size="regular"
+                      className="signin-claim-button h-8 w-full"
+                      disabled={claiming}
+                      aria-label={buttonLabel}
+                      onClick={onClaim}
+                    >
+                      {claiming ? (
+                        <WebuiInline
+                          as="span"
+                          inline
+                          justify="center"
+                          gap="micro"
+                          className="min-w-0 max-w-full"
+                        >
+                          <span
+                            className="webui-feedback-spinner"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{SIGNIN.claiming}</span>
+                        </WebuiInline>
+                      ) : (
+                        <WebuiInline
+                          as="span"
+                          inline
+                          justify="center"
+                          gap="micro"
+                          className="min-w-0 max-w-full"
+                        >
+                          <span className="truncate">{SIGNIN.claimEarn}</span>
+                          <WebuiInline
+                            as="span"
+                            inline
+                            className="shrink-0"
+                            aria-hidden="true"
+                          >
+                            <SigninCreditsIcon size={16} />
+                          </WebuiInline>
+                          <span className="shrink-0">{points}</span>
+                        </WebuiInline>
+                      )}
+                    </WebuiButton>
+                  ) : (
+                    <WebuiButton
+                      variant="accent"
+                      size="regular"
+                      disabled
+                      aria-label={buttonLabel}
+                      className="signin-claim-button h-8 w-full"
+                    >
+                      {buttonLabel}
+                    </WebuiButton>
+                  )}
+                  {bonus > 0 ? (
+                    <span
+                      data-testid="signin-bonus"
+                      className="signin-bonus-tag absolute right-0 top-[-9.5px] inline-flex max-w-full items-center gap-0.5 rounded-t-xl rounded-bl-xl bg-bg_interaction_accent_focus_blue px-2 py-0.5 text-xs font-medium leading-4 text-text_default_inverted_static"
+                    >
+                      <span className="truncate">{SIGNIN.bonusPrefix}</span>
+                      <WebuiInline
+                        as="span"
+                        inline
+                        className="shrink-0"
+                        aria-hidden="true"
+                      >
+                        <SigninCreditsIcon size={12} />
+                      </WebuiInline>
+                      <span className="shrink-0">
+                        {formatSigninPoints(bonus)}
+                      </span>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              {error ? (
+                <FeedbackError
+                  message="error"
+                  className="mb-0 mt-2 text-xs text-text_default_secondary"
+                />
+              ) : null}
+            </>
+          ) : (
+            <FeedbackError
+              testId="signin-card-error"
+              className="relative mt-8 flex min-h-[104px] flex-col items-center justify-center gap-2 px-4 text-center"
+              message={
+                <span className="m-0 text-xs leading-4 text-text_default_secondary">
+                  {error ?? SIGNIN.error}
+                </span>
+              }
+              action={
+                <WebuiButton
+                  variant="plain"
+                  size="inline-dense"
+                  onClick={onRetry}
+                  className="webui-signin-retry"
+                >
+                  {SIGNIN.retry}
+                </WebuiButton>
+              }
+            />
+          )}
+        </div>
+      </section>
+    </WebuiSkeletonProjection>
   );
 }

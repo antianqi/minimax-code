@@ -15,6 +15,7 @@ import {
 } from "react";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiTextInput } from "../../../ui/field.js";
+import { WebuiDisclosure } from "../../../ui/page.js";
 
 import {
   initialWebuiReviewState,
@@ -217,10 +218,9 @@ export function WebuiReviewWorkspacePicker({ workspaces, selected, loading, erro
   readonly onSelect?: (workspaceDir: string) => void;
 }): ReactElement {
   const state = error ? "error" : loading ? "loading" : workspaces.length ? "ready" : "empty";
-  return <SettingsPage testId="review-workspace-picker" dataAttributes={{ "data-webui-workspace-state": state }}>
+  return <SettingsPage loading={loading} testId="review-workspace-picker" dataAttributes={{ "data-webui-workspace-state": state }}>
     <FeedbackEmpty className="webui-review-empty" title={"选一个工作区来审查它的变更。"} />
     {error ? <FeedbackError message={error} className="webui-review-error" testId="review-workspace-error" /> : null}
-    {loading ? <FeedbackLiveRegion className="webui-review-loading">正在读取可审查的工作区…</FeedbackLiveRegion> : null}
     {!loading && !error && workspaces.length === 0 ? (
       /* Saying why matters more than saying that: an empty list under the same
        * heading reads as the bug this page is fixing. */
@@ -264,7 +264,7 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
 }): ReactElement {
   const rows = visible ?? state.files;
   const filterActive = filtering ?? isWebuiReviewFiltering(state);
-  return <SettingsPage testId="settings-review-page" dataAttributes={{ "data-webui-review-state": state.status, ...(state.reviewSnapshotId ? { "data-webui-review-snapshot": state.reviewSnapshotId } : {}) }}>
+  return <SettingsPage loading={loading} testId="settings-review-page" dataAttributes={{ "data-webui-review-state": state.status, ...(state.reviewSnapshotId ? { "data-webui-review-snapshot": state.reviewSnapshotId } : {}) }}>
     {state.status === "ready" ? <div className="webui-review-totals" data-testid="review-totals">
       <span>{state.totals.files} 个文件</span>
       <span className="webui-diff-add">{`+${state.totals.additions}`}</span>
@@ -283,7 +283,7 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
       />
       {filterActive ? <WebuiButton variant="quiet-secondary" size="inline-tiny" className="webui-review-clear" data-testid="review-search-clear" onClick={() => onClearFilters?.()}>清除</WebuiButton> : null}
     </div> : null}
-    {loading || state.searchPending ? <FeedbackLiveRegion className="webui-review-loading">{loading ? "正在读取待审查的变更…" : "正在搜索…"}</FeedbackLiveRegion> : null}
+    {state.searchPending && !loading ? <FeedbackLiveRegion className="webui-review-loading">正在搜索…</FeedbackLiveRegion> : null}
     {note || state.error ? (
       // A failure is announced; a note is not. The two are different states,
       // so the error one carries the shared feedback family's alert and the
@@ -316,6 +316,7 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
               className="webui-review-file-heading"
               data-testid="review-file-toggle"
               aria-expanded={expanded}
+              aria-controls={`webui-review-file-diff-${file.fileId}`}
               onClick={() => onToggleFile?.(file.fileId, !expanded, file)}
             >
               <span className="webui-review-file-path" title={file.path}>{file.path}</span>
@@ -325,7 +326,14 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
                 {file.deletions > 0 ? <span className="webui-diff-del">{`-${file.deletions}`}</span> : null}
               </span>
             </WebuiButton>
-            {expanded ? <div className="webui-review-file-body" data-testid="review-file-body">
+            <WebuiDisclosure
+              as="div"
+              id={`webui-review-file-diff-${file.fileId}`}
+              open={expanded}
+              mountOnOpen
+              className="webui-review-file-body"
+              data-testid="review-file-body"
+            >
               {/* 读取补丁的进展和结果都要被听到，播报通道交给共享契约。 */}
               {!withinWorkspace ? <FeedbackLiveRegion className="webui-review-file-error" testId="review-file-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</FeedbackLiveRegion> : null}
               {pending ? <FeedbackLiveRegion className="webui-review-loading">正在读取这个文件的补丁…</FeedbackLiveRegion> : null}
@@ -346,7 +354,7 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
                   </li>;
                 })}
               </ol> : null}
-            </div> : null}
+            </WebuiDisclosure>
           </li>;
         })}
       </ul>

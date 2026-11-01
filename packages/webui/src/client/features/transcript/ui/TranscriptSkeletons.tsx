@@ -2,10 +2,8 @@
 // viewport is still loading history: `chat-skeleton` for ongoing sessions and
 // `greeting-skeleton` for fresh / no-history cases.
 //
-// The line widths (8 primary + 4 secondary) are fixed, and the gradient mask
-// lives in `transcript-widgets.css`'s
-// `@keyframes transcript-shimmer` + `.animate-shimmer` rule. Both are pinned
-// by `transcript-skeletons.test.tsx`.
+// The line widths (8 primary + 4 secondary) are fixed. The shared skeleton
+// class owns the shimmer cadence and reduced-motion behavior.
 //
 // The 736px content column below MUST track `.webui-session-layout
 // .message-list`'s `max-width` in `shell.css`. These skeletons stand in for
@@ -13,12 +11,11 @@
 // transcript jump sideways when the real content lands.
 // `webui-w0-css-structure.test.ts` asserts the two stay in lockstep.
 //
-// The shimmer is just a background colour rectangle —
-// `--shimmer-duration` is set by the CSS file at the body level so the
-// animation interval stays in lockstep with the rest of the WebUI shell.
+// The skeleton geometry stays local; loading motion stays shared.
 
 import type { CSSProperties } from "react";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiSkeleton } from "../../../ui/page.js";
 
 /**
  * Matches `.webui-session-layout .message-list`'s `max-width` in `shell.css`.
@@ -45,23 +42,9 @@ const gradientMask: CSSProperties = {
   WebkitMaskImage: "linear-gradient(180deg, black 0%, transparent 100%)",
 };
 
-const shimmerBase = {
-  background: "var(--bg_default_tertiary)",
-};
-
 function ShimmerBar(props: { width: string | number; height: number; rounded?: string }): React.JSX.Element {
   const { width, height, rounded = "0.5rem" } = props;
-  return (
-    <div
-      className="animate-shimmer"
-      style={{
-        ...shimmerBase,
-        width,
-        height,
-        borderRadius: rounded,
-      }}
-    />
-  );
+  return <WebuiSkeleton variant="shape" style={{ width, height, borderRadius: rounded }} />;
 }
 
 export function ChatSkeleton(): React.JSX.Element {

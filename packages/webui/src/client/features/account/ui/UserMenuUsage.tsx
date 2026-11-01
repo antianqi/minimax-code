@@ -14,6 +14,7 @@ import type {
 import { formatUsageResetLabel } from "../projection/usage.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiPage, WebuiSkeleton } from "../../../ui/page.js";
 
 export interface UsageState {
   readonly status: "idle" | "loading" | "ready" | "error";
@@ -22,22 +23,39 @@ export interface UsageState {
 }
 
 function UsageSkeleton({ animated }: { readonly animated?: boolean }): ReactElement {
+  const shouldAnimate = animated === true;
   const bars = () => (
     <>
       <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
-        <span className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--a" />
-        <span className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--b" />
+        <WebuiSkeleton
+          animated={shouldAnimate}
+          variant={shouldAnimate ? "pulse" : "shape"}
+          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--a"
+        />
+        <WebuiSkeleton
+          animated={shouldAnimate}
+          variant={shouldAnimate ? "pulse" : "shape"}
+          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--b"
+        />
       </WebuiInline>
       <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
-        <span className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--c" />
-        <span className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--d" />
+        <WebuiSkeleton
+          animated={shouldAnimate}
+          variant={shouldAnimate ? "pulse" : "shape"}
+          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--c"
+        />
+        <WebuiSkeleton
+          animated={shouldAnimate}
+          variant={shouldAnimate ? "pulse" : "shape"}
+          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--d"
+        />
       </WebuiInline>
     </>
   );
   return (
     <WebuiStack
       gap="small"
-      className={`webui-user-menu-usage-skeleton${animated ? " is-animated" : ""}`}
+      className="webui-user-menu-usage-skeleton"
       data-testid={animated ? "usage-popover-loading" : "usage-popover-pending"}
     >
       <WebuiStack gap="small" className="webui-user-menu-usage-skeleton-row">{bars()}</WebuiStack>
@@ -199,7 +217,7 @@ export function UsagePanel({
     // The shared surface, not the shared skeleton: this panel opens on hover,
     // focus or click and cannot be dismissed from inside itself, so it needs no
     // trigger and no outside-press handling — only the shared look and motion.
-    <div className="webui-user-menu-usage-panel webui-dropdown-surface" role="dialog" aria-label="用量">
+    <WebuiPage as="div" kind="dialog" className="webui-user-menu-usage-panel webui-dropdown-surface" role="dialog" aria-label="用量">
       {state.status === "loading" ? <UsageSkeleton animated /> : null}
       {state.status === "idle" ? <UsageSkeleton /> : null}
       {state.status === "error" ? (
@@ -215,6 +233,6 @@ export function UsagePanel({
         </WebuiStack>
       ) : null}
       {state.status === "ready" ? <UsageReady result={state.result} onLogin={onLogin} /> : null}
-    </div>
+    </WebuiPage>
   );
 }

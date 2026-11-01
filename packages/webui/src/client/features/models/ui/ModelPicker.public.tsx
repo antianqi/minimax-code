@@ -38,6 +38,7 @@ import {
 import { WebuiIconChevronDown, WebuiIconModel } from "../../../shell/icons.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiMotionSlot } from "../../../ui/page.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import type {
   WebuiModelPickerDraft,
@@ -240,6 +241,7 @@ export function WebuiModelPicker({
         <WebuiModelListPanel
           groups={groups}
           selected={selected}
+          animate={isViewTransitioning}
           onSelect={handleSelectModel}
         />
       );
@@ -248,6 +250,7 @@ export function WebuiModelPicker({
       <WebuiModelPanel
         model={selected}
         draft={draft}
+          animate={isViewTransitioning}
         onOpenList={() => {
           setView("list");
           setIsViewTransitioning(true);
@@ -349,6 +352,7 @@ export function WebuiModelPicker({
                   fine, a level word half-clipped is not.
                 */}
                 {triggerLevel ? (
+                  <WebuiMotionSlot kind="feedback">
                   <span
                     className="shrink-0 text-icon_default_tertiary"
                     data-ultra={triggerLevel === "Ultra" ? "true" : "false"}
@@ -356,6 +360,7 @@ export function WebuiModelPicker({
                   >
                     {triggerLevel}
                   </span>
+                  </WebuiMotionSlot>
                 ) : null}
               </WebuiInline>
               <WebuiIconChevronDown className="webui-model-trigger-chevron flex-shrink-0 text-icon_default_tertiary" />

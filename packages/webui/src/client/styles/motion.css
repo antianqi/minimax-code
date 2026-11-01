@@ -46,6 +46,14 @@
     transition-duration: var(--webui-motion-duration-feedback);
     transition-timing-function: var(--webui-motion-ease-standard);
   }
+  .webui-motion-feedback-clip { transition: clip-path var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard); }
+  .webui-motion-feedback-opacity { transition: opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard); }
+  /* Shared progress motion for geometry-driven meters in any feature. */
+  .webui-motion-progress {
+    transition-property: width, stroke-dashoffset;
+    transition-duration: var(--webui-motion-duration-feedback);
+    transition-timing-function: var(--webui-motion-ease-standard);
+  }
   /* surface — a floating surface arrives. The caller names the keyframes, which
    * carry the direction; the family carries the timing so every surface in the
    * client arrives at the same speed. */
@@ -61,15 +69,212 @@
   }
   /* disclosure — a region opens or closes. */
   .webui-motion-disclosure {
-    transition-property: height, max-height, opacity, transform;
+    transition-property: height, max-height, opacity, padding, transform, width;
     transition-duration: var(--webui-motion-duration-disclosure);
     transition-timing-function: var(--webui-motion-ease-standard);
+  }
+  /* Shared semantic motion wrappers. A caller supplies state and direction;
+   * the wrapper owns the visual effect and all timing stays in this file. */
+  .webui-motion[data-webui-motion="surface"][data-webui-motion-state="enter"],
+  .webui-motion[data-webui-motion="surface"][data-webui-motion-state="exit"],
+  .webui-motion[data-webui-motion="card"][data-webui-motion-state="enter"],
+  .webui-motion[data-webui-motion="card"][data-webui-motion-state="exit"],
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="enter"],
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="expand"],
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="collapse"],
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="exit"] {
+    --webui-motion-offset-x: 0px;
+    --webui-motion-offset-y: 0px;
+    animation-duration: var(--webui-motion-duration-surface);
+    animation-timing-function: var(--webui-motion-ease-enter);
+    animation-fill-mode: both;
+  }
+  .webui-motion[data-webui-motion-direction="up"][data-webui-motion-state] { --webui-motion-offset-y: 8px; }
+  .webui-motion[data-webui-motion-direction="down"][data-webui-motion-state] { --webui-motion-offset-y: -8px; }
+  .webui-motion[data-webui-motion-direction="left"][data-webui-motion-state] { --webui-motion-offset-x: 8px; }
+  .webui-motion[data-webui-motion-direction="right"][data-webui-motion-state] { --webui-motion-offset-x: -8px; }
+  .webui-motion[data-webui-motion-direction="none"][data-webui-motion-state] { --webui-motion-offset-x: 0px; --webui-motion-offset-y: 0px; }
+  .webui-motion[data-webui-motion="surface"][data-webui-motion-state="enter"],
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="enter"],
+  .webui-motion[data-webui-motion="card"][data-webui-motion-state="enter"] {
+    animation-name: webui-motion-surface-enter;
+  }
+  .webui-motion[data-webui-motion="card"][data-webui-motion-state="exit"] {
+    animation-name: webui-motion-surface-exit;
+    animation-duration: var(--webui-motion-duration-popup-exit);
+    animation-timing-function: var(--webui-motion-ease-exit);
+    animation-fill-mode: forwards;
+  }
+  .webui-motion[data-webui-motion="surface"][data-webui-motion-state="exit"] {
+    animation-name: webui-motion-surface-exit;
+    animation-duration: var(--webui-motion-duration-popup-exit);
+    animation-timing-function: var(--webui-motion-ease-exit);
+  }
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="expand"] {
+    animation-name: webui-motion-panel-expand;
+  }
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="collapse"] {
+    animation-name: webui-motion-panel-collapse;
+  }
+  .webui-motion[data-webui-motion="panel"][data-webui-motion-state="exit"] {
+    animation-name: webui-motion-panel-exit;
+    animation-timing-function: var(--webui-motion-ease-exit);
+    animation-fill-mode: forwards;
+  }
+  .webui-motion[data-webui-motion="disclosure"] {
+    transition-property: flex-basis, grid-template-rows, height, max-height, opacity, transform, visibility, width;
+    transition-duration: var(--webui-motion-duration-disclosure);
+    transition-timing-function: var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="panel"] {
+    transition-property: flex-basis, width;
+    transition-duration: var(--webui-motion-duration-surface);
+    transition-timing-function: var(--webui-motion-ease-standard);
+  }
+  .webui-motion-panel-layout {
+    transition: padding-inline-end var(--webui-motion-duration-surface) var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="disclosure"][data-webui-disclosure-axis="vertical"] {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: hidden;
+    opacity: 0;
+  }
+  .webui-motion[data-webui-motion="disclosure"][data-webui-disclosure-axis="vertical"][data-webui-motion-state="expand"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .webui-motion[data-webui-motion="disclosure"][data-webui-disclosure-axis="horizontal"] {
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .webui-disclosure-content { min-width: 0; min-height: 0; overflow: hidden; }
+  .webui-motion-disclosure-transform {
+    transition: transform var(--webui-motion-duration-disclosure) var(--webui-motion-ease-standard);
+  }
+  .webui-motion-disclosure-transform.is-rotated-90 { transform: rotate(90deg); }
+  .webui-motion-disclosure-transform.is-rotated-minus-90 { transform: rotate(-90deg); }
+  .webui-motion-disclosure-transform.is-rotated-180 { transform: rotate(180deg); }
+  .webui-motion[data-webui-motion="card"][data-webui-motion-hoverable="true"] {
+    transition: color var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      background-color var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      border-color var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      transform var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      box-shadow var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="card"][data-webui-motion-hoverable="true"]:hover {
+    transform: translateY(-1px);
+  }
+  .webui-motion[data-webui-motion="sortable"] {
+    transition: transform var(--webui-motion-duration-disclosure) var(--webui-motion-ease-standard),
+      opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="range"] {
+    transition-property: background-color, box-shadow, left, opacity, scale, transform, width;
+    transition-duration: var(--webui-motion-duration-feedback);
+    transition-timing-function: var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="range"][data-webui-motion-role="track"]:hover .webui-motion[data-webui-motion="range"][data-webui-motion-role="thumb"] {
+    scale: 1.08;
+    box-shadow: 0 3px 12px rgb(0 0 0 / 20%), 0 0 0 1px rgb(0 0 0 / 6%);
+  }
+  .webui-motion[data-webui-motion="range"][data-webui-motion-role="track"]:active .webui-motion[data-webui-motion="range"][data-webui-motion-role="thumb"] {
+    scale: 1.1;
+  }
+  .webui-motion[data-webui-motion="range"]::after {
+    transition: opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="range"][data-empty="true"] {
+    transition: none;
+  }
+  .webui-motion[data-webui-motion="tooltip"] {
+    opacity: 0;
+    translate: 0 3px;
+    visibility: hidden;
+    transition: opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      translate var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      visibility var(--webui-motion-duration-feedback) step-end;
+  }
+  .webui-motion[data-webui-motion="tooltip"][data-webui-tooltip-visible="true"] {
+    opacity: 1;
+    translate: 0 0;
+    visibility: visible;
+    transition: opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
+      translate var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard), visibility 0s;
   }
   /* loading — work is in progress. */
   .webui-motion-loading {
     animation-duration: var(--webui-motion-duration-loading);
     animation-timing-function: linear;
     animation-iteration-count: infinite;
+  }
+  .webui-motion-loading-pulse {
+    animation: webui-skeleton-pulse var(--webui-motion-duration-loading) ease-in-out infinite;
+  }
+  .webui-skeleton {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    background-color: var(--bg_grouped_tertiary);
+    background-image: linear-gradient(90deg, transparent 0%, var(--bg_grouped_secondary) 48%, transparent 100%);
+    background-size: 200% 100%;
+  }
+  .webui-skeleton--text { height: 12px; border-radius: var(--radius_4); }
+  .webui-skeleton--control { height: 36px; border-radius: var(--radius_8); }
+  .webui-skeleton.webui-motion-loading:not(.webui-skeleton--pulse) {
+    animation-name: webui-skeleton-shimmer;
+  }
+  .webui-skeleton--pulse.webui-motion-loading {
+    background-image: none;
+    animation-name: webui-skeleton-pulse;
+    animation-timing-function: ease-in-out;
+  }
+  .webui-skeleton--rect { min-height: 48px; border-radius: var(--radius_8); }
+  .webui-skeleton--shape { border-radius: var(--radius_4); }
+  .webui-skeleton--circle { width: 32px; height: 32px; border-radius: var(--radius_full); }
+  .webui-skeleton--short { width: 60%; }
+  .webui-skeleton-group { display: flex; min-width: 0; flex-direction: column; gap: var(--spacing_8); }
+  .webui-page { min-width: 0; min-height: 0; color: var(--text_default_primary); }
+  .webui-page-skeleton-node { pointer-events: none !important; color: transparent !important; background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
+  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: var(--bg_grouped_tertiary) !important; background-image: linear-gradient(90deg, transparent 0%, var(--bg_grouped_secondary) 48%, transparent 100%) !important; background-size: 200% 100% !important; animation-name: webui-skeleton-shimmer; }
+  .webui-page-skeleton-shape { display: block !important; pointer-events: none !important; color: transparent !important; background-color: var(--bg_grouped_tertiary) !important; background-image: linear-gradient(90deg, transparent 0%, var(--bg_grouped_secondary) 48%, transparent 100%) !important; background-size: 200% 100% !important; border-color: transparent !important; box-shadow: none !important; }
+  .webui-page-loading-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  @keyframes webui-skeleton-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+  @keyframes webui-skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes webui-motion-surface-enter {
+    from { opacity: 0; translate: var(--webui-motion-offset-x) var(--webui-motion-offset-y); }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes webui-motion-surface-exit {
+    from { opacity: 1; translate: 0 0; }
+    to { opacity: 0; translate: 0 -4px; }
+  }
+  @keyframes webui-motion-panel-expand {
+    from { opacity: .88; translate: -12px 0; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes webui-motion-panel-collapse {
+    from { opacity: .88; translate: 12px 0; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes webui-motion-panel-exit {
+    from { opacity: 1; translate: 0 0; }
+    to { opacity: 0; translate: 8px 0; }
   }
   /*
    * The reduced-motion policy.
@@ -88,7 +293,8 @@
       --webui-motion-duration-loading: 0.01ms;
       --webui-motion-duration-popup-exit: 0.01ms;
     }
-    .webui-motion-loading {
+    .webui-motion-loading,
+    .webui-motion-loading-pulse {
       animation-iteration-count: 1;
     }
   }

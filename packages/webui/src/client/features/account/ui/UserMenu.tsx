@@ -15,9 +15,21 @@
 // motion and its dismissal, so the outside-pointer and Escape listeners this file used to carry
 // are gone. What is left here is the open state and the two panels.
 
-import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
-import { IconCalendarEvent, IconChevronRight, IconSettings, IconSwitchHorizontal, IconUserCircle } from "@tabler/icons-react";
+import {
+  IconCalendarEvent,
+  IconChevronRight,
+  IconSettings,
+  IconSwitchHorizontal,
+  IconUserCircle,
+} from "@tabler/icons-react";
 import { WebuiIconBell, WebuiIconCommandUsage } from "../../../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
 import { SettingsModal } from "../../settings/ui/SettingsModal.public.js";
@@ -28,9 +40,18 @@ import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem, WebuiMenuSeparator } from "../../../ui/menu-item.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../bindings/use-account-workflows.public.js";
-import { SIGNIN, SigninCard, formatSigninError, type SigninState } from "./UserMenuSignin.js";
+import {
+  useWebuiAccountWorkflows,
+  useWebuiAccountWorkflowsState,
+} from "../bindings/use-account-workflows.public.js";
+import {
+  SIGNIN,
+  SigninCard,
+  formatSigninError,
+  type SigninState,
+} from "./UserMenuSignin.js";
 import { UsagePanel, type UsageState } from "./UserMenuUsage.js";
 
 type AccountStatus = Record<string, unknown>;
@@ -54,18 +75,23 @@ interface UserMenuProps {
 
 function objectValue(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : undefined;
 }
 
-function accountString(account: AccountStatus | undefined, key: string): string | undefined {
+function accountString(
+  account: AccountStatus | undefined,
+  key: string,
+): string | undefined {
   const candidates = [
     account?.[key],
     objectValue(account?.account)?.[key],
     objectValue(account?.user)?.[key],
     objectValue(account?.profile)?.[key],
   ];
-  return candidates.find((value): value is string => typeof value === "string" && value.length > 0);
+  return candidates.find(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
 }
 
 function SigninGlyph(): ReactElement {
@@ -98,15 +124,29 @@ function UserMenuAvatar({
       className={`webui-user-menu-avatar ${compact ? "webui-user-menu-avatar-compact" : ""}`}
       aria-hidden="true"
     >
-      {avatarUrl && !failed
-        ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-        : <span>{initial}</span>}
+      {avatarUrl && !failed ? (
+        <img
+          src={avatarUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span>{initial}</span>
+      )}
     </span>
   );
 }
 
 function Chevron(): ReactElement {
-  return <IconChevronRight className="webui-user-menu-chevron" size={16} stroke={1.7} aria-hidden="true" />;
+  return (
+    <IconChevronRight
+      className="webui-user-menu-chevron"
+      size={16}
+      stroke={1.7}
+      aria-hidden="true"
+    />
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -135,19 +175,25 @@ export function UserMenu({
   // thing that can dismiss it. Handing the memory to a conversation moves the
   // user off this surface entirely; leaving the modal parked over the home
   // composer would hide the very composer the hand-off just filled.
-  const handleCreateMemorySession = useCallback((input: MemoryHandoff) => {
-    setSettingsOpen(false);
-    onCreateMemorySession?.(input);
-  }, [onCreateMemorySession]);
+  const handleCreateMemorySession = useCallback(
+    (input: MemoryHandoff) => {
+      setSettingsOpen(false);
+      onCreateMemorySession?.(input);
+    },
+    [onCreateMemorySession],
+  );
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   // Which of the two ways into the login page the menu asked for: a sign-in,
   // or a switch that signs the current account out first.
-  const [loginMode, setLoginMode] = useState<WebuiAccountLoginPageMode>("sign-in");
+  const [loginMode, setLoginMode] =
+    useState<WebuiAccountLoginPageMode>("sign-in");
   const [usageOpen, setUsageOpen] = useState(false);
   const [signinOpen, setSigninOpen] = useState(false);
-  const panelCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const panelCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const [animatedDay, setAnimatedDay] = useState<number | null>(null);
   // Derived from the one owner's snapshot rather than held locally: the menu
   // and the login dialog read the same answer, and neither writes it.
@@ -161,7 +207,9 @@ export function UserMenu({
   const signin: SigninState = {
     loading: accountSnapshot.signin.loading,
     claiming: accountSnapshot.signin.claiming,
-    ...(accountSnapshot.signin.panel ? { panel: accountSnapshot.signin.panel } : {}),
+    ...(accountSnapshot.signin.panel
+      ? { panel: accountSnapshot.signin.panel }
+      : {}),
     // The owner stores the raw failure; the two copy strings are the menu's,
     // exactly as they were when the menu owned the request.
     ...(accountSnapshot.signin.error !== undefined
@@ -240,8 +288,12 @@ export function UserMenu({
     accountString(account, "nickname")?.trim() ||
     accountString(account, "name")?.trim() ||
     "MiniMax Code";
-  const avatarUrl = profile?.avatarUrl?.trim() || profile?.defaultAvatarUrl?.trim();
-  const plan = accountString(account, "plan") ?? accountString(account, "planName") ?? (hostLabel ? `本地 · ${hostLabel}` : "本地");
+  const avatarUrl =
+    profile?.avatarUrl?.trim() || profile?.defaultAvatarUrl?.trim();
+  const plan =
+    accountString(account, "plan") ??
+    accountString(account, "planName") ??
+    (hostLabel ? `本地 · ${hostLabel}` : "本地");
   const identity = objectValue(account?.identity);
   const auth = objectValue(account?.auth);
   const uid =
@@ -261,86 +313,260 @@ export function UserMenu({
       : undefined;
 
   const portalTarget = dom.portalTarget();
-  return <>
-    <div className={`webui-user-menu-anchor ${collapsed ? "webui-user-menu-anchor-collapsed" : ""}`} data-webui-rail-identity="true">
-      <WebuiDropdown
-        open={open}
-        onOpen={() => { setOpen(true); closePanels(); }}
-        onClose={() => { setOpen(false); closePanels(); }}
-        // Managed (ADR 0028 § Overlay coordination): the account menu is a layer
-        // in the client's order, so one Escape closes it and nothing beneath it,
-        // and the popup keeps no listener of its own. `closePanels` still runs on
-        // every close, which is the semantics this menu always had.
-        managed
-        managedLayerId="user-menu"
-        role="menu"
-        side="top"
-        align="start"
-        className="webui-user-menu-popover"
-        trigger={(triggerProps) => {
-          // Every trigger prop is spread onto the button: they are all DOM
-          // attributes, or the ref the skeleton focuses when Escape closes
-          // the menu.
-          const buttonProps = triggerProps;
-          return collapsed
-            ? <WebuiIconButton {...buttonProps} tone="surface" size="panel" className="webui-user-menu-trigger-rail" data-testid="sidebar-user-menu-trigger-rail" label="打开用户菜单">
-                <UserMenuAvatar avatarUrl={avatarUrl} displayName={nickname} compact />
-              </WebuiIconButton>
-            : <WebuiButton variant="selectable-row" size="menu-trigger" {...buttonProps} data-testid="sidebar-user-menu-trigger">
-                {/* The row's own text names the trigger. An `aria-label` that
-                  * restates the nickname and the plan joins two adjacent spans
-                  * with a space the markup does not have, and the rule compares
-                  * the visible text as a substring of the name — so the content
-                  * is the name, and the decorative parts are hidden. */}
-                <span aria-hidden="true"><UserMenuAvatar avatarUrl={avatarUrl} displayName={nickname} /></span>
-                <span className="webui-user-menu-identity"><span>{nickname}</span><small>{plan}</small></span>
-                <span className="webui-user-menu-bell" aria-hidden="true"><WebuiIconBell /></span>
-              </WebuiButton>;
-        }}
+  return (
+    <>
+      <div
+        className={`webui-user-menu-anchor ${collapsed ? "webui-user-menu-anchor-collapsed" : ""}`}
+        data-webui-rail-identity="true"
       >
-        <div className="webui-user-menu-uid" aria-label="用户 ID">UID : {uid ?? "—"}</div>
-        <div className="webui-user-menu-list">
-          <WebuiMenuItem className="webui-user-menu-item" icon={<IconSettings aria-hidden="true" size={18} stroke={1.7} />} trailing={<span className="webui-user-menu-shortcut">Ctrl+,</span>} data-testid="user-menu-settings" onClick={() => { setOpen(false); setSettingsOpen(true); }}>设置</WebuiMenuItem>
-          <WebuiMenuItem className="webui-user-menu-item" icon={<AccountGlyph />} data-testid="user-menu-account-login" onClick={() => { setOpen(false); setLoginMode("sign-in"); setLoginOpen(true); }}>账号与登录</WebuiMenuItem>
-          <WebuiMenuItem className="webui-user-menu-item" icon={<SwitchGlyph />} data-testid="user-menu-switch-account" onClick={() => { setOpen(false); setLoginMode("switch"); setLoginOpen(true); }}>切换账号</WebuiMenuItem>
-          <WebuiMenuSeparator />
-          <div className="webui-user-menu-signin-anchor" onMouseEnter={() => { cancelPanelClose(); loadSignin(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadSignin(); }} onClick={(event) => { event.stopPropagation(); if (!signinOpen) loadSignin(); }}>
-            <WebuiMenuItem className="webui-user-menu-item" icon={<SigninGlyph />} trailing={<Chevron />} aria-haspopup="dialog" aria-expanded={signinOpen} data-testid="user-menu-signin">每日签到</WebuiMenuItem>
-            {signinOpen ? (
-              <div className="webui-user-menu-signin-panel" role="dialog" aria-label={SIGNIN.title}>
-                <SigninCard
-                  panel={signin.panel}
+        <WebuiDropdown
+          open={open}
+          onOpen={() => {
+            setOpen(true);
+            closePanels();
+          }}
+          onClose={() => {
+            setOpen(false);
+            closePanels();
+          }}
+          // Managed (ADR 0028 § Overlay coordination): the account menu is a layer
+          // in the client's order, so one Escape closes it and nothing beneath it,
+          // and the popup keeps no listener of its own. `closePanels` still runs on
+          // every close, which is the semantics this menu always had.
+          managed
+          managedLayerId="user-menu"
+          role="menu"
+          side="top"
+          align="start"
+          className="webui-user-menu-popover"
+          trigger={(triggerProps) => {
+            // Every trigger prop is spread onto the button: they are all DOM
+            // attributes, or the ref the skeleton focuses when Escape closes
+            // the menu.
+            const buttonProps = triggerProps;
+            return collapsed ? (
+              <WebuiIconButton
+                {...buttonProps}
+                tone="surface"
+                size="panel"
+                className="webui-user-menu-trigger-rail"
+                data-testid="sidebar-user-menu-trigger-rail"
+                label="打开用户菜单"
+              >
+                <UserMenuAvatar
+                  avatarUrl={avatarUrl}
+                  displayName={nickname}
+                  compact
+                />
+              </WebuiIconButton>
+            ) : (
+              <WebuiButton
+                variant="selectable-row"
+                size="menu-trigger"
+                {...buttonProps}
+                data-testid="sidebar-user-menu-trigger"
+              >
+                {/* The row's own text names the trigger. An `aria-label` that
+                 * restates the nickname and the plan joins two adjacent spans
+                 * with a space the markup does not have, and the rule compares
+                 * the visible text as a substring of the name — so the content
+                 * is the name, and the decorative parts are hidden. */}
+                <span aria-hidden="true">
+                  <UserMenuAvatar
+                    avatarUrl={avatarUrl}
+                    displayName={nickname}
+                  />
+                </span>
+                <span className="webui-user-menu-identity">
+                  <span>{nickname}</span>
+                  <small>{plan}</small>
+                </span>
+                <span className="webui-user-menu-bell" aria-hidden="true">
+                  <WebuiIconBell />
+                </span>
+              </WebuiButton>
+            );
+          }}
+        >
+          <div className="webui-user-menu-uid" aria-label="用户 ID">
+            UID : {uid ?? "—"}
+          </div>
+          <div className="webui-user-menu-list">
+            <WebuiMenuItem
+              className="webui-user-menu-item"
+              icon={<IconSettings aria-hidden="true" size={18} stroke={1.7} />}
+              trailing={
+                <WebuiMotionSlot kind="feedback-opacity">
+                  <span className="webui-user-menu-shortcut">Ctrl+,</span>
+                </WebuiMotionSlot>
+              }
+              data-testid="user-menu-settings"
+              onClick={() => {
+                setOpen(false);
+                setSettingsOpen(true);
+              }}
+            >
+              设置
+            </WebuiMenuItem>
+            <WebuiMenuItem
+              className="webui-user-menu-item"
+              icon={<AccountGlyph />}
+              data-testid="user-menu-account-login"
+              onClick={() => {
+                setOpen(false);
+                setLoginMode("sign-in");
+                setLoginOpen(true);
+              }}
+            >
+              账号与登录
+            </WebuiMenuItem>
+            <WebuiMenuItem
+              className="webui-user-menu-item"
+              icon={<SwitchGlyph />}
+              data-testid="user-menu-switch-account"
+              onClick={() => {
+                setOpen(false);
+                setLoginMode("switch");
+                setLoginOpen(true);
+              }}
+            >
+              切换账号
+            </WebuiMenuItem>
+            <WebuiMenuSeparator />
+            <div
+              className="webui-user-menu-signin-anchor"
+              onMouseEnter={() => {
+                cancelPanelClose();
+                loadSignin();
+              }}
+              onMouseLeave={schedulePanelClose}
+              onFocus={() => {
+                cancelPanelClose();
+                loadSignin();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!signinOpen) loadSignin();
+              }}
+            >
+              <WebuiMenuItem
+                className="webui-user-menu-item"
+                icon={<SigninGlyph />}
+                trailing={<Chevron />}
+                aria-haspopup="dialog"
+                aria-expanded={signinOpen}
+                data-testid="user-menu-signin"
+              >
+                每日签到
+              </WebuiMenuItem>
+              {signinOpen ? (
+                <WebuiPage
+                  as="div"
+                  kind="dialog"
                   loading={signin.loading}
-                  claiming={signin.claiming}
-                  error={signin.error}
-                  animatedDay={animatedDay}
-                  onClaim={claim}
-                  onRetry={loadSignin}
-                  onNavigateToUsage={() => {
-                    setSigninOpen(false);
-                    loadUsage();
+                  motion={{
+                    kind: "surface",
+                    state: "enter",
+                    direction: "right",
+                  }}
+                  className="webui-user-menu-signin-panel"
+                  role="dialog"
+                  aria-label={SIGNIN.title}
+                >
+                  <SigninCard
+                    panel={signin.panel}
+                    loading={signin.loading}
+                    claiming={signin.claiming}
+                    error={signin.error}
+                    animatedDay={animatedDay}
+                    onClaim={claim}
+                    onRetry={loadSignin}
+                    onNavigateToUsage={() => {
+                      setSigninOpen(false);
+                      loadUsage();
+                    }}
+                  />
+                </WebuiPage>
+              ) : null}
+            </div>
+            <div
+              className="webui-user-menu-usage-anchor"
+              onMouseEnter={() => {
+                cancelPanelClose();
+                loadUsage();
+              }}
+              onMouseLeave={schedulePanelClose}
+              onFocus={() => {
+                cancelPanelClose();
+                loadUsage();
+              }}
+            >
+              <WebuiMenuItem
+                className="webui-user-menu-item"
+                icon={<WebuiIconCommandUsage />}
+                trailing={<Chevron />}
+                aria-haspopup="dialog"
+                aria-expanded={usageOpen}
+                data-testid="user-menu-usage"
+                onClick={() => loadUsage()}
+              >
+                用量
+              </WebuiMenuItem>
+              {usageOpen ? (
+                <UsagePanel
+                  state={usage}
+                  onRetry={() => loadUsage(true)}
+                  onLogin={() => {
+                    setOpen(false);
+                    setLoginMode("sign-in");
+                    setLoginOpen(true);
                   }}
                 />
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
-          <div className="webui-user-menu-usage-anchor" onMouseEnter={() => { cancelPanelClose(); loadUsage(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadUsage(); }}>
-            <WebuiMenuItem className="webui-user-menu-item" icon={<WebuiIconCommandUsage />} trailing={<Chevron />} aria-haspopup="dialog" aria-expanded={usageOpen} data-testid="user-menu-usage" onClick={() => loadUsage()}>用量</WebuiMenuItem>
-            {usageOpen ? <UsagePanel state={usage} onRetry={() => loadUsage(true)} onLogin={() => { setOpen(false); setLoginMode("sign-in"); setLoginOpen(true); }} /> : null}
-          </div>
-        </div>
-      </WebuiDropdown>
-    </div>
-    <AccountLoginPage
-      open={loginOpen}
-      mode={loginMode}
-      scope={accountScope}
-      onClose={() => setLoginOpen(false)}
-      onAuthenticated={() => {
-        loadUsage(true);
-        void accountWorkflows?.loadAccountProfile();
-      }}
-    />
-    {portalTarget ? createPortal(<SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} dataDir={dataDir} version={version} sessionId={sessionId} workspaceDir={workspaceDir} onOpenFileLine={onOpenFileLine} {...(onCreateMemorySession ? { onCreateMemorySession: handleCreateMemorySession } : {})} />, portalTarget) : <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} dataDir={dataDir} version={version} sessionId={sessionId} workspaceDir={workspaceDir} onOpenFileLine={onOpenFileLine} {...(onCreateMemorySession ? { onCreateMemorySession: handleCreateMemorySession } : {})} />}
-  </>;
+        </WebuiDropdown>
+      </div>
+      <AccountLoginPage
+        open={loginOpen}
+        mode={loginMode}
+        scope={accountScope}
+        onClose={() => setLoginOpen(false)}
+        onAuthenticated={() => {
+          loadUsage(true);
+          void accountWorkflows?.loadAccountProfile();
+        }}
+      />
+      {portalTarget ? (
+        createPortal(
+          <SettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            dataDir={dataDir}
+            version={version}
+            sessionId={sessionId}
+            workspaceDir={workspaceDir}
+            onOpenFileLine={onOpenFileLine}
+            {...(onCreateMemorySession
+              ? { onCreateMemorySession: handleCreateMemorySession }
+              : {})}
+          />,
+          portalTarget,
+        )
+      ) : (
+        <SettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          dataDir={dataDir}
+          version={version}
+          sessionId={sessionId}
+          workspaceDir={workspaceDir}
+          onOpenFileLine={onOpenFileLine}
+          {...(onCreateMemorySession
+            ? { onCreateMemorySession: handleCreateMemorySession }
+            : {})}
+        />
+      )}
+    </>
+  );
 }

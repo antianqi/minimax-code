@@ -20,8 +20,9 @@
 // panel. A shared component in a shared layer is the only placement that lets
 // both use it without one business reaching into another's private module.
 
-import type { ReactElement, ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { WebuiButton } from "./button.js";
+import { useWebuiPageLoading, WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
 
 /**
  * The page frame: one centred column, the width every settings page shares.
@@ -33,8 +34,8 @@ import { WebuiButton } from "./button.js";
  * contract — the worktree page marks what it managed to read, for instance.
  * The skeleton does not know what those mean, so it only passes them through.
  */
-export function SettingsPage({ children, testId, dataAttributes }: { readonly children: ReactNode; readonly testId?: string; readonly dataAttributes?: Readonly<Record<string, string>> }): ReactElement {
-  return <div className="webui-settings-page" data-testid={testId} {...dataAttributes}>{children}</div>;
+export function SettingsPage({ children, testId, dataAttributes, loading = false }: { readonly children?: ReactNode; readonly testId?: string; readonly dataAttributes?: Readonly<Record<string, string>>; readonly loading?: boolean }): ReactElement {
+  return <WebuiPage as="div" kind="settings" loading={loading} className="webui-settings-page" data-testid={testId} {...dataAttributes}>{children}</WebuiPage>;
 }
 
 /**
@@ -64,16 +65,19 @@ export function SettingsSection({
   readonly bare?: boolean;
   readonly children: ReactNode;
 }): ReactElement {
+  const loading = useWebuiPageLoading();
   return (
     <section className="webui-settings-section" data-testid={testId}>
       <div className="webui-settings-section-header">
         <div className="webui-settings-section-title">
-          <h3>{title}</h3>
-          {hint ? <InfoHint text={hint} testId={hintTestId ?? "webui-settings-section-hint"} /> : null}
+            {loading ? <WebuiSkeletonProjection>{title}</WebuiSkeletonProjection> : <>
+            <h3>{title}</h3>
+            {hint ? <InfoHint text={hint} testId={hintTestId ?? "webui-settings-section-hint"} /> : null}
+          </>}
         </div>
-        {actions ? <div className="webui-settings-section-actions">{actions}</div> : null}
+        {loading ? (actions ? <WebuiSkeletonProjection>{actions}</WebuiSkeletonProjection> : null) : actions ? <div className="webui-settings-section-actions">{actions}</div> : null}
       </div>
-      <div className={bare ? "webui-settings-card is-bare" : "webui-settings-card"}>{children}</div>
+      <div className={bare ? "webui-settings-card is-bare" : "webui-settings-card"}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
     </section>
   );
 }
@@ -152,14 +156,15 @@ export function SettingsDivider(): ReactElement {
  * of the same sentence.
  */
 export function InfoHint({ text, testId }: { readonly text: string; readonly testId: string }): ReactElement {
+  const [visible, setVisible] = useState(false);
   return (
-    <span className="webui-settings-info-hint-anchor">
+    <span className="webui-settings-info-hint-anchor" onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)} onFocusCapture={() => setVisible(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setVisible(false); }}>
       <WebuiButton variant="plain" size="inline" data-testid={testId} className="webui-settings-info-hint" aria-label={text}>
         i
       </WebuiButton>
-      <span aria-hidden="true" className="webui-settings-info-hint-bubble">
+      <WebuiMotion as="span" kind="tooltip" data-webui-tooltip-visible={visible ? "true" : "false"} aria-hidden="true" className="webui-settings-info-hint-bubble">
         {text}
-      </span>
+      </WebuiMotion>
     </span>
   );
 }

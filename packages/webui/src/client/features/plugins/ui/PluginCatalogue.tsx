@@ -31,6 +31,7 @@ import { MiniAppAppsList } from "../../miniapp/ui/MiniAppAppsList.public.js";
 import { useWebuiMiniAppCatalogueSummary } from "../../miniapp/bindings/use-miniapp-catalogue.public.js";
 import { FeedbackBusy, FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiPage } from "../../../ui/page.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -312,7 +313,10 @@ export function PluginCatalogue({
   };
 
   return (
-    <section
+    <WebuiPage
+      as="section"
+      kind="content"
+      loading={listing.loading}
       className={`webui-plugin-management ${managementOpen ? "is-managing" : "is-marketplace"}`}
       data-testid="plugin-management"
     >
@@ -476,7 +480,7 @@ export function PluginCatalogue({
         <h2 className="webui-plugin-market-heading">插件</h2>
       ) : null}
       {error ? <FeedbackError message={error} testId="plugin-catalogue-error" /> : null}
-      {busy ? (
+      {busy && !listing.loading ? (
         <FeedbackBusy label="加载中…" />
       ) : area === "agents" ? (
         <div className="webui-agent-editor">
@@ -691,6 +695,6 @@ export function PluginCatalogue({
           onClose={detachPluginImportDialog}
         />
       ) : null}
-    </section>
+    </WebuiPage>
   );
 }

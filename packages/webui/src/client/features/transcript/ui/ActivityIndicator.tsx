@@ -9,9 +9,8 @@
 // `prefers-reduced-motion: reduce` is on the Lottie playback halts but the
 // label keeps ticking.
 //
-// The runtime dep is `lottie-web`. The exported
-// `LottiePlayer` wrapper accepts the prop surface this pulse needs
-// (play, loop, speed, name, data, innerClassName, style).
+// Playback, lifecycle and reduced-motion handling belong to shared `WebuiLottie`;
+// this feature supplies its rose-loader asset and thinking-label behavior.
 //
 // Phrase vocabulary defaults to the zh i18n bundle (`message.item.thinking_phrases`)
 // and falls back to the single string `message.item.thinking`, i.e.
@@ -21,74 +20,12 @@
 // without having to load the i18n bundle; the integration session can pass the
 // real one extracted from runtime i18n state.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import lottie from "lottie-web";
+import { useEffect, useMemo, useRef, useState } from "react";
 import streamingRoseLoaderData from "../../../assets/lottie/streaming-rose-loader.json";
-import { bucketPhrases, pickWeightedPhrase, computeThinkingPhraseStartDelay, shouldPlayActivityIndicator } from "../../../ui/activity-phrase.js";
+import { bucketPhrases, pickWeightedPhrase, computeThinkingPhraseStartDelay } from "../../../ui/activity-phrase.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { WebuiLottie } from "../../../ui/feedback.js";
 import type { ThinkingPhraseSet } from "../../../ui/activity-phrase.js";
-
-export interface LottiePlayerProps {
-  play: boolean;
-  loop: boolean;
-  speed: number;
-  name: string;
-  data: unknown;
-  innerClassName?: string;
-  style?: CSSProperties;
-}
-
-export function LottiePlayer(props: LottiePlayerProps): React.JSX.Element {
-  const { play, loop, speed, name, innerClassName, style } = props;
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const animationRef = useRef<ReturnType<typeof lottie.loadAnimation> | null>(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
-    const animation = lottie.loadAnimation({
-      container,
-      renderer: "svg",
-      loop,
-      autoplay: play,
-      // `lottie-web`'s `AnimationConfigWithData` accepts the JSON object
-      // directly; the type union pulls in `path` for the other overload,
-      // which `unknown` covers structurally.
-      animationData: props.data as object,
-      name,
-    });
-    animation.setSpeed(speed);
-    animationRef.current = animation;
-    return () => {
-      animation.destroy();
-      animationRef.current = null;
-    };
-    // We intentionally only run this once: lottie-web's reactive updates are
-    // done through the imperative setters below. The effect mounts the
-    // animation once and toggles play/loop via subsequent prop changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const animation = animationRef.current;
-    if (!animation) return;
-    if (play) animation.play();
-    else animation.pause();
-  }, [play]);
-
-  useEffect(() => {
-    animationRef.current?.setSpeed(speed);
-  }, [speed]);
-
-  return (
-    <div
-      ref={containerRef}
-      className={innerClassName}
-      style={style}
-      data-lottie-name={name}
-    />
-  );
-}
 
 export const DEFAULT_THINKING_PHRASES: ThinkingPhraseSet = {
   basic: [
@@ -245,22 +182,9 @@ export function ActivityIndicator(props: ActivityIndicatorProps): React.JSX.Elem
 
   const innerSize = Math.ceil(iconSizePx * visualScale);
 
-  const [play, setPlay] = useState(true);
-
   const rotated = useThinkingPhrase(showLabel && !label && !labelOverride, {
     ...(phrases ? { phrases } : {}),
   });
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return undefined;
-    }
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setPlay(shouldPlayActivityIndicator(mql.matches));
-    sync();
-    mql.addEventListener("change", sync);
-    return () => mql.removeEventListener("change", sync);
-  }, []);
 
   const resolvedLabel = showLabel ? (labelOverride ?? label ?? rotated ?? phraseFallback) : null;
 
@@ -288,13 +212,13 @@ export function ActivityIndicator(props: ActivityIndicatorProps): React.JSX.Elem
           minHeight: `${containerSize}px`,
         }}
       >
-        <LottiePlayer
-          play={play}
+        <WebuiLottie
+          play
           loop
           speed={0.8}
           name="streaming-rose-loader"
           data={streamingRoseLoaderData}
-          innerClassName="h-full w-full"
+          className="h-full w-full"
           style={{ width: `${innerSize}px`, height: `${innerSize}px` }}
         />
       </WebuiInline>

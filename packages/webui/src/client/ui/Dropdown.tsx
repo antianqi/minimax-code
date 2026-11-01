@@ -42,6 +42,7 @@ import {
 import { createPortal } from "react-dom";
 import { useOverlayLayer } from "./overlay-coordinator.js";
 import { useParentLayerId } from "./overlay-listeners.js";
+import { WebuiPage } from "./page.js";
 
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import {
@@ -499,24 +500,27 @@ export function WebuiDropdown({
     },
   };
 
-  const popup = mounted ? (
-    <div
-      id={popupId}
-      ref={popupRef}
-      {...(managed ? { "data-overlay-layer": layerId } : {})}
-      role={role}
-      {...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel })}
-      {...(labelledBy === undefined ? {} : { "aria-labelledby": labelledBy })}
-      className={`webui-dropdown-popup${leaving ? " is-leaving" : ""}${className ? ` ${className}` : ""}`}
-      data-webui-dropdown-side={openedSide}
-      {...(popupDataAttributes ?? {})}
-      style={{
-        ...applied,
-        "--webui-dropdown-exit-duration": `${WEBUI_DROPDOWN_EXIT_MS}ms`,
-      } as CSSProperties}
-    >
+  const popupAttributes = {
+    id: popupId,
+    ref: popupRef,
+    ...(managed ? { "data-overlay-layer": layerId } : {}),
+    role,
+    ...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel }),
+    ...(labelledBy === undefined ? {} : { "aria-labelledby": labelledBy }),
+    className: `webui-dropdown-popup${leaving ? " is-leaving" : ""}${className ? ` ${className}` : ""}`,
+    "data-webui-dropdown-side": openedSide,
+    ...(popupDataAttributes ?? {}),
+    style: {
+      ...applied,
+      "--webui-dropdown-exit-duration": `${WEBUI_DROPDOWN_EXIT_MS}ms`,
+    } as CSSProperties,
+  };
+  const popup = mounted ? role === "dialog" ? (
+    <WebuiPage as="div" kind="dialog" {...popupAttributes}>
       {children}
-    </div>
+    </WebuiPage>
+  ) : (
+    <div {...popupAttributes}>{children}</div>
   ) : null;
 
   const portalTarget = dom.portalTarget();

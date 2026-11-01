@@ -12,14 +12,16 @@
 // The rendered group is keyed by its first message, so the card asks by turn
 // whenever the group knows one.
 
-import { useState, type ReactElement } from "react";
-import { WebuiIconDiffFile, WebuiIconDiffSummary } from "../../../shell/icons.js";
+import { useId, useState, type ReactElement } from "react";
+import { WebuiIconChevronDown, WebuiIconDiffFile, WebuiIconDiffSummary } from "../../../shell/icons.js";
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiDiffState } from "../../review/contracts/review-view.js";
 import { useWebuiTurnReview } from "../../review/bindings/use-turn-review.public.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
+import type { WebuiDiffFileEntry } from "../../../projection/common/diff-workspace-boundary.js";
 import {
   projectWebuiDiffFiles,
   WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE,
@@ -50,6 +52,9 @@ export function WebuiDiffCard({
   // state are local.
   const [expanded, setExpanded] = useState(initialState?.expanded ?? false);
   const [reviewing, setReviewing] = useState(initialState?.reviewing ?? false);
+  const [reviewMounted, setReviewMounted] = useState(initialState?.reviewing ?? false);
+  const filesDisclosureId = useId();
+  const reviewDisclosureId = useId();
   const { state: reviewState, mutate: runMutation, dismissError } = useWebuiTurnReview(
     sessionId
       ? {
@@ -90,7 +95,8 @@ export function WebuiDiffCard({
   // markup below: a file outside the workspace arrives here without a body, so
   // there is nothing for the renderer to leak even if it forgets to ask.
   const files = projectWebuiDiffFiles(view.fileChanges, workspaceDir);
-  const shown = expanded ? files : files.slice(0, 3);
+  const shown = files.slice(0, 3);
+  const extraFiles = files.slice(3);
   const totalAdded = files.reduce((sum, file) => sum + file.additions, 0);
   const totalDeleted = files.reduce((sum, file) => sum + file.deletions, 0);
   const reverted = view.status === "reverted";
@@ -100,6 +106,16 @@ export function WebuiDiffCard({
     const idx = normalized.lastIndexOf("/");
     return idx === -1 ? normalized : normalized.slice(idx + 1);
   };
+  const renderFileRow = (file: (typeof files)[number]): ReactElement => (
+    <li className="webui-diff-file" key={file.file} data-webui-diff-file="true" data-file-path={file.file} data-webui-diff-outside-workspace={file.withinWorkspace ? undefined : "true"}>
+      <span className="webui-diff-file-icon" data-testid="turn-diff-file-icon"><WebuiIconDiffFile fileName={basenameOf(file.file)} /></span>
+      <WebuiButton variant="plain" size="inline" className="webui-diff-file-name" data-testid="turn-diff-file-name" title={file.file} onClick={() => { if (view) onReview?.({ ...view, fileChanges: files }, file.file); }}>{basenameOf(file.file)}</WebuiButton>
+      <span className="webui-diff-file-stats" data-webui-diff-file-stats="true">
+        <span className="webui-diff-add">{`+${file.additions}`}</span>
+        {file.deletions > 0 ? <span className="webui-diff-del">{`-${file.deletions}`}</span> : null}
+      </span>
+    </li>
+  );
   return (
     <div
       className="webui-diff-card"
@@ -109,6 +125,7 @@ export function WebuiDiffCard({
       data-change-set-id={view.changeSetId}
       data-source-message-id={view.sourceMessageId ?? assistantMessageId}
     >
+      <WebuiMotionSlot kind="feedback">
       <div className="webui-diff-header">
         <div className="webui-diff-summary" data-testid="turn-diff-summary">
           <span className="webui-diff-icon" aria-hidden="true"><WebuiIconDiffSummary /></span>
@@ -134,40 +151,30 @@ export function WebuiDiffCard({
               撤销
             </WebuiButton>
           )}
-          <WebuiButton variant="outline-secondary" size="inline" className="webui-diff-review" data-webui-diff-review="true" data-testid="turn-diff-review" onClick={() => { if (view) onReview?.(view); if (!onReview) setReviewing((open) => !open); }}>
+          <WebuiButton variant="outline-secondary" size="inline" className="webui-diff-review" data-webui-diff-review="true" data-testid="turn-diff-review" aria-expanded={reviewing && !onReview} aria-controls={reviewDisclosureId} onClick={() => { if (view) onReview?.(view); if (!onReview) { setReviewMounted(true); setReviewing((open) => !open); } }}>
             {reviewing ? "关闭 Review" : "Review"}
           </WebuiButton>
         </div>
       </div>
-      <ul className="webui-diff-files">
-        {shown.map((file) => (
-          <li className="webui-diff-file" key={file.file} data-webui-diff-file="true" data-file-path={file.file} data-webui-diff-outside-workspace={file.withinWorkspace ? undefined : "true"}>
-            <span className="webui-diff-file-icon" data-testid="turn-diff-file-icon"><WebuiIconDiffFile fileName={basenameOf(file.file)} /></span>
-            <WebuiButton variant="plain" size="inline" className="webui-diff-file-name" data-testid="turn-diff-file-name" title={file.file} onClick={() => { if (view) onReview?.({ ...view, fileChanges: files }, file.file); }}>{basenameOf(file.file)}</WebuiButton>
-            <span className="webui-diff-file-stats" data-webui-diff-file-stats="true">
-              <span className="webui-diff-add">{`+${file.additions}`}</span>
-              {file.deletions > 0 ? <span className="webui-diff-del">{`-${file.deletions}`}</span> : null}
-            </span>
-          </li>
-        ))}
-      </ul>
+      </WebuiMotionSlot>
+      <ul className="webui-diff-files">{shown.map(renderFileRow)}</ul>
+      <WebuiDisclosure id={filesDisclosureId} open={expanded} className="webui-diff-expanded-files">
+        <ul className="webui-diff-files webui-diff-files-expanded">{extraFiles.map(renderFileRow)}</ul>
+      </WebuiDisclosure>
       {files.length > 3 ? (
-        <WebuiButton variant="plain" size="inline" className="webui-diff-expand" data-webui-diff-expand="true" data-testid="turn-diff-show-more" onClick={() => setExpanded((open) => !open)}>
+        <WebuiButton variant="plain" size="inline" className="webui-diff-expand" data-webui-diff-expand="true" data-testid="turn-diff-show-more" aria-expanded={expanded} aria-controls={filesDisclosureId} onClick={() => setExpanded((open) => !open)}>
           {expanded ? "收起" : `展开其余 ${files.length - 3} 个`}
         </WebuiButton>
       ) : null}
-      {reviewing && !onReview ? (
-        <WebuiStack gap="small" className="webui-diff-review-panel" data-webui-diff-review-panel="true">
-          {files.map((file) => (
-            <details key={`${file.file}-review`} open>
-              <summary>{file.file}</summary>
-              {file.withinWorkspace
-                ? file.diff ? <pre>{file.diff}</pre> : file.patch ? <pre>{JSON.stringify(file.patch, null, 2)}</pre> : <p>当前运行时没有提供该文件的 patch 预览。</p>
-                : <p data-testid="turn-diff-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>}
-            </details>
-          ))}
-        </WebuiStack>
-      ) : null}
+      <WebuiDisclosure id={reviewDisclosureId} open={reviewing && !onReview}>
+        {reviewMounted ? (
+          <WebuiStack gap="small" className="webui-diff-review-panel" data-webui-diff-review-panel="true">
+            {files.map((file) => (
+              <WebuiDiffFileReview key={`${file.file}-review`} file={file} />
+            ))}
+          </WebuiStack>
+        ) : null}
+      </WebuiDisclosure>
       {mutationError ? (
         /* `role="alert"` because this replaces what used to be no feedback at
          * all: the operation did nothing, and the file list above is now known
@@ -190,5 +197,32 @@ export function WebuiDiffCard({
         />
       ) : null}
     </div>
+  );
+}
+
+function WebuiDiffFileReview({ file }: { readonly file: WebuiDiffFileEntry }): ReactElement {
+  const [expanded, setExpanded] = useState(true);
+  const disclosureId = useId();
+  return (
+    <section className="webui-diff-file-review">
+      <WebuiButton
+        variant="plain"
+        size="inline"
+        className="webui-diff-file-review-toggle"
+        aria-expanded={expanded}
+        aria-controls={disclosureId}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <span>{file.file}</span>
+        <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 180 : 0}>
+          <WebuiIconChevronDown aria-hidden="true" />
+        </WebuiMotionSlot>
+      </WebuiButton>
+      <WebuiDisclosure id={disclosureId} open={expanded}>
+        {file.withinWorkspace
+          ? file.diff ? <pre>{file.diff}</pre> : file.patch ? <pre>{JSON.stringify(file.patch, null, 2)}</pre> : <p>当前运行时没有提供该文件的 patch 预览。</p>
+          : <p data-testid="turn-diff-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>}
+      </WebuiDisclosure>
+    </section>
   );
 }

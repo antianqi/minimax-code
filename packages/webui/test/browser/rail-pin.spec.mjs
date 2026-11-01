@@ -296,9 +296,12 @@ test("repeatedly collapsing the pinned section keeps the session page mounted", 
 test("a child row becomes visible once its parent is expanded", async ({ page }) => {
   await openApp(page, "#session=A");
 
-  // Closed first: the child row stays mounted for its collapse transition but
-  // is hidden and inert until its parent is expanded.
-  await expect(sessionRow(page, "C")).toBeHidden();
+  // Closed first: the disclosure stays mounted for its collapse transition,
+  // but the shared owner removes it from accessibility and interaction.
+  const childDisclosure = page.locator('[data-webui-project-child-sessions="A"]').locator("xpath=../..");
+  await expect(childDisclosure).toHaveAttribute("aria-hidden", "true");
+  await expect(childDisclosure).toHaveAttribute("inert", "");
+  await expect.poll(() => childDisclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 
   await page.locator(".webui-session-disclosure").first().click();
 
@@ -311,10 +314,10 @@ test("left rail expanders share the pinned animation and parent rows keep their 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openApp(page, "#session=A");
 
-  const pinnedContent = page.locator('[data-webui-pinned-section="true"]').locator("xpath=..");
-  const projectContent = page.locator('[data-webui-project-sessions="/synthetic/workspace"]').locator("xpath=..");
+  const pinnedContent = page.locator('[data-webui-pinned-section="true"]').locator("xpath=../..");
+  const projectContent = page.locator('[data-webui-project-sessions="/synthetic/workspace"]').locator("xpath=../..");
   const childDisclosure = page.locator(".webui-session-disclosure").first();
-  const childContent = page.locator('[data-webui-project-child-sessions="A"]').locator("xpath=..");
+  const childContent = page.locator('[data-webui-project-child-sessions="A"]').locator("xpath=../..");
 
   const pinnedTransition = await pinnedContent.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -338,12 +341,12 @@ test("left rail expanders share the pinned animation and parent rows keep their 
   expect(await disclosure.getAttribute("fill")).toBe("currentColor");
 
   await childDisclosure.click();
-  await expect(childContent).toHaveAttribute("aria-hidden", "false");
+  await expect(childContent).not.toHaveAttribute("aria-hidden", "true");
   await expect(page.locator('[data-webui-session-link="C"]')).toBeVisible();
 
   await childDisclosure.click();
   await expect(childContent).toHaveAttribute("aria-hidden", "true");
-  await expect(page.locator('[data-webui-session-link="C"]')).toBeHidden();
+  await expect.poll(() => childContent.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });
 
 test("projects show six rows initially and reveal the next batch with 更多", async ({ page }) => {

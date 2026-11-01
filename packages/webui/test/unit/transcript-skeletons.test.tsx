@@ -27,14 +27,15 @@ describe("TranscriptSkeletons", () => {
     // cannot drift back to a hard-coded value.
     expect(html).toContain(`max-width:${SKELETON_CONTENT_MAX_WIDTH_PX}px`);
     expect(html).toContain("mx-auto");
-    expect(html).toContain("animate-shimmer");
+    expect(html).toContain("webui-skeleton--shape");
+    expect(html).toContain("webui-motion-loading");
   });
 
   it("ChatSkeleton uses the desktop line widths (8 primary + 4 secondary)", () => {
     const html = renderToStaticMarkup(createElement(ChatSkeleton));
     // Eight 22px bars in the primary block, four 24px bars in the secondary
     // block (8 primary entries, 4 secondary).
-    expect(countByClass(html, "animate-shimmer")).toBe(13);
+    expect(countByClass(html, "webui-motion-loading")).toBe(13);
     expect((html.match(/height:22px/g) ?? []).length).toBe(8);
     expect((html.match(/height:24px/g) ?? []).length).toBe(4);
   });

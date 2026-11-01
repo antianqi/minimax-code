@@ -1,6 +1,12 @@
-import { Component, type ErrorInfo, type ReactElement, type ReactNode } from "react";
+import {
+  Component,
+  type ErrorInfo,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { describeWebuiBoundaryError } from "../features/shell/application/boundary-error.js";
 import { WebuiButton } from "../ui/button.js";
+import { WebuiPage } from "../ui/page.js";
 
 /** Why the boundary holds the `Error` rather than a boolean: the fallback shows
  *  its message, and the same value is what reaches the console. A boolean would
@@ -56,7 +62,9 @@ export function WebuiErrorBoundaryFallback({
 }): ReactElement {
   const page = presentation === "page";
   return (
-    <section
+    <WebuiPage
+      as="section"
+      kind={page ? "content" : "panel"}
       role="alert"
       data-testid="webui-error-boundary"
       className={
@@ -65,8 +73,18 @@ export function WebuiErrorBoundaryFallback({
           : "flex h-full min-h-0 w-full flex-col items-center justify-center gap-spacing_4 overflow-auto p-spacing_8 text-center"
       }
     >
-      <h1 data-testid="webui-error-boundary-title" className={page ? "text-2xl font-semibold" : "text-base font-medium"}>{title}</h1>
-      <p data-testid="webui-error-boundary-detail" className="text-text_default_secondary">{detail}</p>
+      <h1
+        data-testid="webui-error-boundary-title"
+        className={page ? "text-2xl font-semibold" : "text-base font-medium"}
+      >
+        {title}
+      </h1>
+      <p
+        data-testid="webui-error-boundary-detail"
+        className="text-text_default_secondary"
+      >
+        {detail}
+      </p>
       {/* The message is shown, not just logged: a user who cannot describe the
           failure to support has nothing to report, and this is the only place
           the cause survives the unmount of the tree that threw. */}
@@ -76,12 +94,15 @@ export function WebuiErrorBoundaryFallback({
       >
         {error.message}
       </p>
-      <WebuiButton variant="grouped" size="pill" data-testid="webui-error-boundary-retry"
+      <WebuiButton
+        variant="grouped"
+        size="pill"
+        data-testid="webui-error-boundary-retry"
         onClick={onRetry}
       >
         {retryLabel}
       </WebuiButton>
-    </section>
+    </WebuiPage>
   );
 }
 

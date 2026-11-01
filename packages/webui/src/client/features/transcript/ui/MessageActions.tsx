@@ -35,6 +35,7 @@ import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js"
 import { toggleWebuiFeedback, copyWebuiMessageText, scheduleWebuiCopiedReset } from "../application/message-feedback.js";
 import type { WebuiCopyDependencies } from "../application/message-feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiMotionSlot } from "../../../ui/page.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 
@@ -147,6 +148,7 @@ export function WebuiMessageActions({
   const timestampLabel = formatWebuiMessageTimestamp(timestamp);
   const copyIcon = copied ? <WebuiIconMessageCopied size={18} /> : <WebuiIconMessageCopy size={18} />;
   return (
+    <WebuiMotionSlot kind="feedback-opacity">
     <div
       className={`webui-message-actions ${role === "user" ? "webui-user-message-actions" : ""}`}
       data-testid={role === "user" ? "user-message-actions" : "message-actions"}
@@ -186,6 +188,7 @@ export function WebuiMessageActions({
         </>
       )}
     </div>
+    </WebuiMotionSlot>
   );
 }
 

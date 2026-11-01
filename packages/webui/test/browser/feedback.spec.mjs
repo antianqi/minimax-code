@@ -17,6 +17,16 @@ test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => console.error("BROWSER_PAGE_ERROR", error.stack ?? error.message));
   await configureFixture(page, () => {
     window.__fixture.setResponse("getMemorySettings", { enabled: true, proactive: false });
+    window.__fixture.setUsageQuotaResult({
+      signedIn: true,
+      hasTokenPlan: false,
+      subscriptionType: "mplan",
+      planName: "M Plan 标准版",
+      quota: {
+        fiveHour: { usedPercent: 87, totalPercent: 100, resetAtMs: 1_800_000_000_000, unlimited: false },
+        weekly: { usedPercent: 42, totalPercent: 100, resetAtMs: 1_800_000_000_000, unlimited: false },
+      },
+    });
   });
   await openApp(page, "#session=A");
 });
@@ -82,6 +92,51 @@ test("a determinate bar carries a value while a busy indicator carries none", as
 
   // And nothing in the composer claims to be loading a share of anything.
   await expect(page.locator('[role="status"][aria-valuenow]')).toHaveCount(0);
+});
+
+test("the usage quota bars use the shared progress transition", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openSettingsPage(page, "usage");
+
+  const limits = page.getByTestId("settings-usage-limits");
+  await expect(limits).toBeVisible();
+  const bars = limits.getByRole("progressbar");
+  await expect(bars).toHaveCount(2);
+  const firstBar = bars.first();
+  await expect(firstBar).toHaveAttribute("aria-valuenow", "87");
+
+  const fill = firstBar.locator(".webui-feedback-progress-fill");
+  await expect(fill).toHaveClass(/webui-motion-progress/u);
+  await expect.poll(() => fill.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { property: style.transitionProperty, duration: style.transitionDuration };
+  })).toEqual({ property: "width, stroke-dashoffset", duration: "0.12s" });
+});
+
+test("the usage model-source menu uses the shared dropdown entrance and exit", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openSettingsPage(page, "usage");
+
+  const labelTrigger = page.getByTestId("settings-usage-source-tab");
+  await labelTrigger.click();
+  const menu = page.getByRole("menu", { name: "选择模型来源" });
+  await expect(menu).toBeVisible();
+  await expect.poll(() => menu.evaluate((element) => getComputedStyle(element).animationName))
+    .toBe("webui-dropdown-in");
+  await expect(menu.getByRole("menuitem")).toHaveCount(2);
+
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveClass(/is-leaving/u);
+  await expect.poll(() => menu.evaluate((element) => getComputedStyle(element).animationName))
+    .toBe("webui-dropdown-out");
+  await expect(menu).toHaveCount(0);
+
+  await page.getByRole("button", { name: "选择模型来源" }).click();
+  const reopenedMenu = page.getByRole("menu", { name: "选择模型来源" });
+  await expect(reopenedMenu).toBeVisible();
+  await reopenedMenu.getByRole("menuitem", { name: "MiniMax API" }).click();
+  await expect(reopenedMenu).toHaveCount(0);
+  await expect(labelTrigger).toContainText("MiniMax API");
 });
 
 test("the plugin panel reports activity as a status, never as a progressbar", async ({ page }) => {

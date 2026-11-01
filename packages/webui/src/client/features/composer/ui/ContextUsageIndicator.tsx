@@ -25,6 +25,7 @@ import { formatUsageResetLabel } from "../../account/projection/usage.public.js"
 import { WebuiDropdown, type WebuiDropdownPlacementArgs } from "../../../ui/Dropdown.js";
 import { FeedbackProgress } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot } from "../../../ui/page.js";
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
 export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
@@ -164,16 +165,18 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
           >
             <svg viewBox="0 0 18 18" aria-hidden="true">
               <circle className="webui-context-usage-track" cx="9" cy="9" r="7" />
-              <circle
-                className="webui-context-usage-value"
-                cx="9"
-                cy="9"
-                r="7"
-                style={{
-                  strokeDasharray: circumference,
-                  strokeDashoffset: circumference * (1 - percent / 100),
-                }}
-              />
+              <WebuiMotionSlot kind="progress">
+                <circle
+                  className="webui-context-usage-value"
+                  cx="9"
+                  cy="9"
+                  r="7"
+                  style={{
+                    strokeDasharray: circumference,
+                    strokeDashoffset: circumference * (1 - percent / 100),
+                  }}
+                />
+              </WebuiMotionSlot>
             </svg>
           </WebuiButton>
         )}
@@ -203,12 +206,14 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
             <span>上下文窗口</span>
             <span className="webui-context-usage-heading-value">
               {windowKnown ? `${percent}%` : "—"}
-              <span
-                aria-hidden="true"
-                className={`webui-context-usage-chevron${breakdownOpen ? " is-open" : ""}`}
+              <WebuiMotionSlot
+                kind="disclosure-transform"
+                rotation={breakdownOpen ? 180 : 0}
               >
-                <IconChevronDown aria-hidden="true" size={16} stroke={1.7} />
-              </span>
+                <span aria-hidden="true" className="webui-context-usage-chevron">
+                  <IconChevronDown aria-hidden="true" size={16} stroke={1.7} />
+                </span>
+              </WebuiMotionSlot>
             </span>
           </WebuiButton>
           <FeedbackProgress
@@ -220,12 +225,17 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
             indeterminate={!windowKnown}
           >
             {componentsTotal > 0 ? drawableRows.map((row) => (
-              <span
-                key={row.kind}
-                className="webui-context-usage-bar-segment"
-                style={{ width: `${breakdownSegmentPercent(row, limit ?? 0)}%`, ...breakdownSwatchStyle(row) }}
-              />
-            )) : <span style={{ width: `${percent}%` }} />}
+              <WebuiMotionSlot key={row.kind} kind="progress">
+                <span
+                  className="webui-context-usage-bar-segment"
+                  style={{ width: `${breakdownSegmentPercent(row, limit ?? 0)}%`, ...breakdownSwatchStyle(row) }}
+                />
+              </WebuiMotionSlot>
+            )) : (
+              <WebuiMotionSlot kind="progress">
+                <span style={{ width: `${percent}%` }} />
+              </WebuiMotionSlot>
+            )}
           </FeedbackProgress>
           <div className="webui-context-usage-tokens">
             {windowKnown
@@ -234,35 +244,35 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
           </div>
           {/*
             Hidden rather than unmounted, so the bar's segment widths above and
-            the panel's height do not both jump on the first open. `hidden` is
-            also what keeps the six rows out of the tab order and out of the
-            accessibility tree while they are folded.
+            the panel's height do not both jump on the first open. The shared
+            disclosure keeps the folded rows out of the tab order and tree.
           */}
-          <div
+          <WebuiDisclosure
             id="webui-context-usage-breakdown"
-            className="webui-context-usage-components"
             aria-label="上下文构成"
             data-webui-context-breakdown={breakdownOpen ? "open" : "closed"}
-            hidden={!breakdownOpen}
+            open={breakdownOpen}
           >
-            {breakdownRows.map((row) => (
-              <div
-                className="webui-context-usage-component"
-                key={row.kind}
-                data-webui-context-category={row.kind}
-                data-webui-context-reported={row.tokens === null ? "false" : "true"}
-              >
-                <span className="webui-context-usage-component-label">
-                  <span
-                    className="webui-context-usage-swatch"
-                    style={breakdownSwatchStyle(row)}
-                  />
-                  {row.label}
-                </span>
-                <span>{breakdownShareLabel(row)}</span>
-              </div>
-            ))}
-          </div>
+            <div className="webui-context-usage-components">
+              {breakdownRows.map((row) => (
+                <div
+                  className="webui-context-usage-component"
+                  key={row.kind}
+                  data-webui-context-category={row.kind}
+                  data-webui-context-reported={row.tokens === null ? "false" : "true"}
+                >
+                  <span className="webui-context-usage-component-label">
+                    <span
+                      className="webui-context-usage-swatch"
+                      style={breakdownSwatchStyle(row)}
+                    />
+                    {row.label}
+                  </span>
+                  <span>{breakdownShareLabel(row)}</span>
+                </div>
+              ))}
+            </div>
+          </WebuiDisclosure>
           {quotaResult ? (
             <>
               <div className="webui-context-usage-divider" />
@@ -284,7 +294,11 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
                 return (
                   <div className="webui-context-usage-quota" key={quotaLabel}>
                     <div className="webui-context-usage-heading"><span>{quotaLabel}</span><span>{value}</span></div>
-                    <div className="webui-context-usage-quota-bar"><span style={{ width: `${Math.max(0, Math.min(100, progress ?? 0))}%` }} /></div>
+                    <div className="webui-context-usage-quota-bar">
+                      <WebuiMotionSlot kind="progress">
+                        <span style={{ width: `${Math.max(0, Math.min(100, progress ?? 0))}%` }} />
+                      </WebuiMotionSlot>
+                    </div>
                     {reset ? <div className="webui-context-usage-reset">{reset}</div> : null}
                   </div>
                 );
@@ -305,13 +319,14 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
         because the button's own label already announces it, and a bubble that
         duplicates what assistive technology was just told is read twice.
       */}
-      <span
+      <WebuiMotion as="span" kind="tooltip"
         className="webui-context-usage-label"
         aria-hidden="true"
         data-webui-context-usage-label={hovered && !open ? "true" : "false"}
+        data-webui-tooltip-visible={hovered && !open ? "true" : "false"}
       >
         上下文窗口
-      </span>
+      </WebuiMotion>
     </div>
   );
 }

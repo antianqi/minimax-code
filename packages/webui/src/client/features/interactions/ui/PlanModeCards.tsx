@@ -18,6 +18,7 @@ import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiMotion, WebuiMotionSlot } from "../../../ui/page.js";
 
 import {
   WEBUI_PLAN_COPY,
@@ -82,7 +83,10 @@ export function WebuiPlanReviewDecision({
   };
 
   return (
-    <section
+    <WebuiMotion
+      as="section"
+      kind="card"
+      state="enter"
       className="webui-plan-review-decision"
       data-testid="plan-review-decision"
       data-request-id={request.id}
@@ -112,6 +116,7 @@ export function WebuiPlanReviewDecision({
           <span className="webui-plan-review-approve-badge" aria-hidden="true">A</span>
           <span className="webui-plan-review-approve-label">{WEBUI_PLAN_COPY.reviewApprove}</span>
         </WebuiButton>
+        <WebuiMotionSlot kind="feedback">
         <div
           className="webui-plan-review-feedback-option"
           data-testid="plan-review-feedback-option"
@@ -174,11 +179,12 @@ export function WebuiPlanReviewDecision({
             )}
           </div>
         </div>
+        </WebuiMotionSlot>
       </div>
       {chrome?.error ? (
         <FeedbackError message={chrome.error} className="webui-plan-card-error" />
       ) : null}
-    </section>
+    </WebuiMotion>
   );
 }
 
@@ -195,13 +201,14 @@ export function WebuiPlanEnterConfirmation({
   const busy = chrome?.busy === true;
   const options = webuiPlanEnterOptions(request);
   return (
-    <WebuiStack
-      as="section"
-      gap="small"
-      className="webui-plan-enter-confirmation"
-      data-testid="plan-enter-confirmation"
-      data-request-id={request.id}
-    >
+    <WebuiMotion as="div" kind="card" state="enter">
+      <WebuiStack
+        as="section"
+        gap="small"
+        className="webui-plan-enter-confirmation"
+        data-testid="plan-enter-confirmation"
+        data-request-id={request.id}
+      >
       <div className="webui-plan-enter-body">
         <h4 className="webui-plan-enter-title">{WEBUI_PLAN_COPY.enterTitle}</h4>
         <p className="webui-plan-enter-description">{WEBUI_PLAN_COPY.enterDescription}</p>
@@ -233,7 +240,8 @@ export function WebuiPlanEnterConfirmation({
       {chrome?.error ? (
         <FeedbackError message={chrome.error} className="webui-plan-card-error" />
       ) : null}
-    </WebuiStack>
+      </WebuiStack>
+    </WebuiMotion>
   );
 }
 

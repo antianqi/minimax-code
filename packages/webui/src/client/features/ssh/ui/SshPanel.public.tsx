@@ -77,6 +77,7 @@ export function SshPanelView(props: SshPanelViewProps): ReactElement {
 
   return (
     <ContentPage
+      loading={props.snapshot.status === "loading" && hostRows.length === 0}
       ariaLabel="SSH"
       dataAttributes={{ "data-webui-component": "ssh-panel" }}
       title="SSH"

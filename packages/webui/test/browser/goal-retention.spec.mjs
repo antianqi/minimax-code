@@ -100,4 +100,15 @@ test("a session switch keeps the retained goal while its re-read is unanswered",
   });
   await openSession(page, "B");
   await expect.poll(() => bannerText(page)).toContain("B 的保留目标");
+
+  const objective = page.getByTestId("thread-goal-banner-objective");
+  const disclosure = page.getByTestId("thread-goal-objective-disclosure");
+  await objective.click();
+  await expect(disclosure).toHaveAttribute("data-webui-motion", "disclosure");
+  await expect(disclosure).toHaveAttribute("data-webui-motion-state", "expand");
+  await expect(page.getByTestId("thread-goal-objective-expanded")).toBeVisible();
+  await objective.click();
+  await expect(disclosure).toHaveAttribute("aria-hidden", "true");
+  await expect(disclosure).toHaveAttribute("inert", "");
+  await expect.poll(() => disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });

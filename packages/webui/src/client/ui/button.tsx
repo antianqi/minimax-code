@@ -21,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import type { WebuiLayoutGap } from "./layout-primitives.js";
+import { useWebuiPageLoading, WebuiSkeletonProjection } from "./page.js";
 
 /**
  * The variants the client's callers need today.
@@ -163,7 +164,7 @@ const SIZE_CLASS: Record<WebuiButtonSize, string> = {
  * them the same control rather than two controls that agree today.
  */
 function buttonClasses(variant: WebuiButtonVariant, size: WebuiButtonSize, className?: string, contentGap?: Exclude<WebuiLayoutGap, "none">): string {
-  return ["webui-mavis-button", VARIANT_CLASS[variant], SIZE_CLASS[size], contentGap ? `webui-mavis-button--content-gap-${contentGap}` : "", className]
+  return ["webui-mavis-button", "webui-motion-feedback", VARIANT_CLASS[variant], SIZE_CLASS[size], contentGap ? `webui-mavis-button--content-gap-${contentGap}` : "", className]
     .filter((entry) => Boolean(entry && entry.length > 0))
     .join(" ");
 }
@@ -192,6 +193,9 @@ export const WebuiButton = forwardRef<HTMLButtonElement, WebuiButtonProps>(funct
   ref,
 ): ReactElement {
   const classes = buttonClasses(variant, size, className, contentGap);
+  if (useWebuiPageLoading()) {
+    return <WebuiSkeletonProjection><button type={type} className={classes} style={rest.style}>{children}</button></WebuiSkeletonProjection>;
+  }
   return (
     <button ref={ref} type={type} className={classes} {...rest}>
       {children}
@@ -220,6 +224,9 @@ export interface WebuiButtonLinkProps
  */
 export const WebuiButtonLink = forwardRef<HTMLAnchorElement, WebuiButtonLinkProps>(
   function WebuiButtonLink({ variant, size = "regular", contentGap, className, children, ...rest }, ref): ReactElement {
+    if (useWebuiPageLoading()) {
+      return <WebuiSkeletonProjection><a className={buttonClasses(variant, size, className, contentGap)} style={rest.style}>{children}</a></WebuiSkeletonProjection>;
+    }
     return (
       <a ref={ref} className={buttonClasses(variant, size, className, contentGap)} {...rest}>
         {children}
@@ -256,6 +263,7 @@ export const WebuiIconButton = forwardRef<HTMLButtonElement, WebuiIconButtonProp
   ): ReactElement {
     const classes = [
       "webui-icon-button",
+      "webui-motion-feedback",
       tone === "bare" ? "webui-icon-button--bare" : "",
       tone === "inverse" ? "webui-icon-button--inverse" : "",
       size === "compact" ? "webui-icon-button--compact" : "",
@@ -266,6 +274,9 @@ export const WebuiIconButton = forwardRef<HTMLButtonElement, WebuiIconButtonProp
     ]
       .filter(Boolean)
       .join(" ");
+    if (useWebuiPageLoading()) {
+      return <WebuiSkeletonProjection><button type={type} className={classes} style={rest.style}>{children}</button></WebuiSkeletonProjection>;
+    }
     return (
       <button ref={ref} type={type} className={classes} aria-label={label} {...rest}>
         {children}

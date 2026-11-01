@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactElement } from "react";
+import { useWebuiPageLoading, WebuiSkeletonProjection } from "./page.js";
 
 type ToggleSwitchProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -20,6 +21,9 @@ export function ToggleSwitch({
   disabled = false,
   ...buttonProps
 }: ToggleSwitchProps): ReactElement {
+  if (useWebuiPageLoading()) {
+    return <WebuiSkeletonProjection><button type="button" className={`webui-toggle-switch${checked ? " is-checked" : ""}${className ? ` ${className}` : ""}`} style={buttonProps.style}><span aria-hidden="true" /></button></WebuiSkeletonProjection>;
+  }
   return (
     <button
       {...buttonProps}
@@ -29,10 +33,10 @@ export function ToggleSwitch({
       aria-label={label}
       data-testid={testId}
       disabled={disabled}
-      className={`webui-toggle-switch${checked ? " is-checked" : ""}${className ? ` ${className}` : ""}`}
+      className={`webui-toggle-switch webui-motion-feedback${checked ? " is-checked" : ""}${className ? ` ${className}` : ""}`}
       onClick={() => onChange?.(!checked)}
     >
-      <span aria-hidden="true" />
+      <span aria-hidden="true" className="webui-motion-feedback" />
     </button>
   );
 }

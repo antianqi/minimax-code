@@ -45,8 +45,9 @@ import { WebuiZoneBoundary } from "../../../shell/WebuiZoneBoundary.js";
 import { WebuiWorktreePanel } from "./SettingsModal.js";
 import { ManagedOverlayBoundary, useDialogLayer } from "../../../ui/overlay-listeners.js";
 import { useOverlayCoordinator } from "../../../ui/overlay-coordinator.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiMotion, WebuiPage } from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 const ICONS = {
@@ -226,9 +227,9 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
     }
   };
   return (
-    <div className="webui-settings-mask" ref={maskRef}>
+    <WebuiMotion as="div" kind="surface" state="enter" direction="none" className="webui-settings-mask" ref={maskRef}>
       <ManagedOverlayBoundary layerId={layerId}>
-        <section ref={surfaceRef} tabIndex={-1} className="webui-settings-modal" data-overlay-layer={layerId} role="dialog" aria-modal="true" aria-label="设置">
+        <WebuiPage as="section" kind="dialog" motion={{ kind: "surface", state: "enter", direction: "none" }} ref={surfaceRef} tabIndex={-1} className="webui-settings-modal" data-overlay-layer={layerId} role="dialog" aria-modal="true" aria-label="设置">
           <aside className="webui-settings-sidebar">
             <WebuiButton variant="quiet-secondary" size="header" type="button" className="webui-settings-back" onClick={onClose}>
               <Icon name="back" />
@@ -263,7 +264,7 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
               )}
             </nav>
           </aside>
-          <main className="webui-settings-content" key={active}>
+          <WebuiPage as="main" kind="settings" motion={{ kind: "surface", state: "enter", direction: "left" }} className="webui-settings-content" key={active}>
             <header className="webui-settings-content-header">
               <h2>{label}</h2>
               {active === "archived" ? (
@@ -301,10 +302,10 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
               {active !== "desktop" && active !== "usage" && active !== "account" && active !== "archived" && active !== "coding" && active !== "worktree" && active !== "custom-instructions" && active !== "browser" && active !== "shortcuts" && active !== "connection" ? <div className="webui-settings-empty-panel" aria-label="空设置面板" /> : null}
               {active === "desktop" && dataDir ? <p className="webui-settings-data-dir">{dataDir}</p> : null}
             </WebuiZoneBoundary>
-          </main>
-        </section>
+          </WebuiPage>
+        </WebuiPage>
       </ManagedOverlayBoundary>
-    </div>
+    </WebuiMotion>
   );
 }
 
@@ -429,10 +430,7 @@ function SettingsWorktreePage(): ReactElement {
   }
   if (catalog.flat.loading && sessions.length === 0) {
     return (
-      <SettingsPage testId="settings-worktree-page" dataAttributes={{ "data-webui-worktree-state": "loading" }}>
-        {/* 读取工作树是播报通道，不是业务自己写的 role，交给共享契约。 */}
-        <FeedbackLiveRegion className="webui-review-loading">正在读取工作树…</FeedbackLiveRegion>
-      </SettingsPage>
+      <SettingsPage loading testId="settings-worktree-page" dataAttributes={{ "data-webui-worktree-state": "loading" }} />
     );
   }
   return <WebuiWorktreePanel workspaces={workspaces} worktrees={worktrees} primary={primary} />;

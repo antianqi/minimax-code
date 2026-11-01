@@ -23,6 +23,7 @@ import {
   effortStopRatio,
   type WebuiEffortScale,
 } from "../projection/effort-scale.js";
+import { WebuiMotion } from "../../../ui/page.js";
 
 export interface WebuiModelEffortSliderProps {
   readonly scale: WebuiEffortScale;
@@ -150,7 +151,7 @@ export function WebuiModelEffortSlider({
       data-disabled={scale.disabled ? "true" : "false"}
       data-binary={binary ? "true" : "false"}
     >
-      <div
+      <WebuiMotion as="div" kind="range" motionRole="track"
         ref={railRef}
         className="webui-model-effort-rail"
         onPointerDown={handlePointerDown}
@@ -159,25 +160,29 @@ export function WebuiModelEffortSlider({
         onPointerCancel={handlePointerCancel}
       >
         <div className="webui-model-effort-track" />
-        <div
+        <WebuiMotion as="div" kind="range"
           className="webui-model-effort-fill"
           data-empty={ratio === 0 ? "true" : "false"}
-          data-ultra={ratio === 1 ? "true" : "false"}
           style={{ width: fillWidth }}
-        />
+        >
+          <WebuiMotion as="span" kind="range"
+            className="webui-model-effort-ultra-fill"
+            data-ultra={ratio === 1 ? "true" : "false"}
+          />
+        </WebuiMotion>
         {scale.stops.map((stop, at) => (
-          <span
+          <WebuiMotion as="span" kind="range"
             key={stop.value}
             className="webui-model-effort-dot"
             data-passed={at <= index ? "true" : "false"}
             style={{ left: `${TRAVEL} ${effortStopRatio(at, total)})` }}
           />
         ))}
-        <span
+        <WebuiMotion as="span" kind="range" motionRole="thumb"
           className="webui-model-effort-thumb"
           style={{ left: position }}
         />
-      </div>
+      </WebuiMotion>
     </div>
   );
 }

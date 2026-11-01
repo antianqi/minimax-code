@@ -248,7 +248,6 @@
 
 .webui-plan-review-feedback-option {
   border-radius: 10px;
-  transition: background-color 120ms ease;
 }
 
 .webui-plan-review-feedback-option[data-selected="true"],

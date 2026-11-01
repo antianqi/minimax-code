@@ -190,15 +190,6 @@
     background: transparent;
   }
 
-  /* Controls share one quiet response curve; component utilities can still
-   * override the properties they need for a particular interaction. */
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]) {
-    transition: color 120ms ease-out, background-color 120ms ease-out,
-      border-color 120ms ease-out, opacity 120ms ease-out,
-      box-shadow 120ms ease-out;
-  }
-
   @media (prefers-reduced-motion: reduce) {
     [data-webui-shell],
     [data-webui-shell] *,

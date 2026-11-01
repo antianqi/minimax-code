@@ -364,7 +364,28 @@ export function createWebuiPluginWorkflows(deps: {
       }));
       return;
     }
-    set((current) => ({ ...current, listing: { selection, rows: [], loading: true } }));
+    set((current) => {
+      const retained = sameSelection(current.listing.selection, selection)
+        ? current.listing
+        : undefined;
+      return {
+        ...current,
+        listing: {
+          selection,
+          rows: retained?.rows ?? [],
+          ...(retained?.pluginTotal !== undefined
+            ? { pluginTotal: retained.pluginTotal }
+            : {}),
+          ...(retained?.tagDefinitions !== undefined
+            ? { tagDefinitions: retained.tagDefinitions }
+            : {}),
+          ...(retained?.skillTotal !== undefined
+            ? { skillTotal: retained.skillTotal }
+            : {}),
+          loading: true,
+        },
+      };
+    });
     try {
       const composed = await composeListing(selection);
       if (!isCurrent("listing", version) || !sameSelection(state.listing.selection, selection)) return;

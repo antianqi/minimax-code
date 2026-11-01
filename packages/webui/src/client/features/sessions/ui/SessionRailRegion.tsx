@@ -5,12 +5,15 @@ import { WebuiIconBrand, WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlug
 import { WebuiFileInput, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiPage } from "../../../ui/page.js";
 
 type ProjectListProps = ComponentProps<typeof WebuiProjectList>;
 
 /** Rail content composed from session presentation state and named navigation commands. */
 export function SessionRailRegion(props: {
   readonly collapsed: boolean;
+  readonly drawer?: boolean;
+  readonly drawerOpen?: boolean;
   readonly homeMode: boolean;
   readonly pluginManagementOpen: boolean;
   /** The scheduled-task panel is the surface (ADR 0027). */
@@ -35,7 +38,13 @@ export function SessionRailRegion(props: {
   readonly footer?: ReactNode;
 }): ReactElement {
   return (
-    <aside
+    <WebuiPage
+      as="aside"
+      kind={props.drawer ? "drawer" : "panel"}
+      loading={props.projectList.loading}
+      motion={{ kind: "disclosure" }}
+      aria-hidden={props.drawer && !props.drawerOpen ? true : undefined}
+      ref={(element) => element?.toggleAttribute("inert", Boolean(props.drawer && !props.drawerOpen))}
       aria-label="Primary navigation"
       data-webui-shell-region="rail"
       data-webui-rail-width={props.collapsed ? "64" : "240"}
@@ -106,6 +115,6 @@ export function SessionRailRegion(props: {
         </div>
       </> : null}
       {props.footer}
-    </aside>
+    </WebuiPage>
   );
 }

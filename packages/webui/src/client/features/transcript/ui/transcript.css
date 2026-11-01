@@ -25,12 +25,11 @@
    * number would only hide where it came from. The live width on this shape is
    * the 250 on `.webui-settings-info-hint-bubble` and
    * `.webui-signin-credits-tooltip`, which is antd's `Tooltip` `maxWidth`. */
-  .webui-context-usage-label { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 60; width: max-content; max-width: 220px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%) translateY(3px); transform-origin: bottom center; background: rgb(0 0 0 / 85%); color: #fff; font-size: var(--size_12); line-height: 16px; white-space: nowrap; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 120ms ease, transform 120ms ease, visibility 120ms step-end; }
+  .webui-context-usage-label { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 60; width: max-content; max-width: 220px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%); transform-origin: bottom center; background: rgb(0 0 0 / 85%); color: #fff; font-size: var(--size_12); line-height: 16px; white-space: nowrap; pointer-events: none; }
   .webui-context-usage-label::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
-  .webui-context-usage-label[data-webui-context-usage-label="true"] { opacity: 1; transform: translateX(-50%) translateY(0); visibility: visible; transition: opacity 120ms ease, transform 120ms ease, visibility 0s; }
   .webui-context-usage-track, .webui-context-usage-value { fill: none; stroke-width: 2; }
   .webui-context-usage-track { stroke: var(--border_light); }
-  .webui-context-usage-value { stroke: var(--text_default_accent); stroke-linecap: round; transition: stroke-dashoffset 180ms ease; }
+  .webui-context-usage-value { stroke: var(--text_default_accent); stroke-linecap: round; }
   /* The panel is a dropdown now: the shared layer places it against the ring
    * in viewport coordinates and gives it the surface and the motion, so this
    * rule says only what the panel itself needs. What it must NOT say is a
@@ -54,20 +53,12 @@
   .webui-context-usage-heading-value { display: inline-flex; align-items: center; gap: var(--spacing_4); }
   /* A rotation rather than two glyphs: the same arrow is both the promise that
    * there is more below and the report that there now is. */
-  .webui-context-usage-chevron { display: inline-flex; width: 16px; height: 16px; color: var(--icon_default_tertiary); transform: rotate(0deg); transition: transform 150ms cubic-bezier(.2, .7, .2, 1); }
+  .webui-context-usage-chevron { display: inline-flex; width: 16px; height: 16px; color: var(--icon_default_tertiary); }
   .webui-context-usage-chevron svg { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-  .webui-context-usage-chevron.is-open { transform: rotate(180deg); }
   .webui-context-usage-bar { display: flex; height: 4px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: var(--border_light); }
-  .webui-context-usage-bar span { display: block; height: 100%; flex: 0 0 auto; background: var(--text_default_accent); transition: width 180ms ease; }
+  .webui-context-usage-bar span { display: block; height: 100%; flex: 0 0 auto; background: var(--text_default_accent); }
   .webui-context-usage-tokens { margin-top: 8px; color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 16px; }
   .webui-context-usage-components { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
-  /* The folded state, stated to the cascade rather than assumed from it.
-   * `hidden` is what keeps the six rows out of the tab order and out of the
-   * accessibility tree, and it carries `display: none` from the UA stylesheet —
-   * which the `display: flex` above outranks, because an author rule beats a
-   * UA rule at equal specificity. Without this line the rows stayed in the
-   * accessibility tree AND on screen, folded in the markup only. */
-  .webui-context-usage-components[hidden] { display: none; }
   .webui-context-usage-component, .webui-context-usage-component-label { display: flex; align-items: center; }
   .webui-context-usage-component { justify-content: space-between; gap: var(--spacing_12); font-size: var(--size_14); line-height: 20px; }
   .webui-context-usage-component-label { min-width: 0; gap: 7px; }
@@ -77,14 +68,9 @@
   .webui-context-usage-quota { display: flex; flex-direction: column; gap: var(--spacing_6); padding: 7px 0; }
   .webui-context-usage-quota .webui-context-usage-heading { font-size: var(--size_14); }
   .webui-context-usage-quota-bar { height: 4px; overflow: hidden; border-radius: 999px; background: var(--border_light); }
-  .webui-context-usage-quota-bar span { display: block; height: 100%; border-radius: inherit; background: var(--text_default_accent); transition: width 180ms ease; }
+  .webui-context-usage-quota-bar span { display: block; height: 100%; border-radius: inherit; background: var(--text_default_accent); }
   .webui-context-usage-reset { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 16px; }
-  /* The popover's own motion is the shared dropdown surface's now, and the
-   * shared surface's own reduced-motion override covers it; what is left here
-   * is what still transitions in this surface's own rules. */
-  @media (prefers-reduced-motion: reduce) { .webui-context-usage-chevron, .webui-context-usage-label, .webui-context-usage-bar span, .webui-context-usage-quota-bar span { transition: none; } }
-
-  @media (prefers-reduced-motion: reduce) { .webui-thinking-label { transition: none; } }
+  /* Popover and tooltip motion use the shared surface and tooltip families. */
 
   /* The approval trigger. A pill with the current mode's own glyph, its label,
    * and a chevron — the same three-part affordance the model picker uses, so
@@ -118,9 +104,13 @@
     margin-bottom: var(--spacing_16);
   }
 
-  /* Message-item animation: message-appear .18s ease-out both. */
+  /* Transcript-specific message entrance; its cadence is recorded in the motion inventory. */
   .message-animate-in {
     animation: message-appear 0.18s ease-out both;
+  }
+  @keyframes message-appear {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   @media (prefers-reduced-motion: reduce) {
     .message-animate-in { animation: none; }
@@ -154,7 +144,6 @@
     min-height: 0;
     min-width: 0;
     width: 100%;
-    transition: padding-right 180ms cubic-bezier(.2, .7, .2, 1);
   }
   .webui-session-layout .webui-session-scroll-viewport {
     min-width: 0;
@@ -288,14 +277,6 @@
   .webui-thinking-block {
     min-width: 0;
   }
-  .webui-thinking-block > summary,
-  .webui-tool-row > summary {
-    list-style: none;
-  }
-  .webui-thinking-block > summary::-webkit-details-marker,
-  .webui-tool-row > summary::-webkit-details-marker {
-    display: none;
-  }
   .webui-thinking-summary {
     display: flex;
     min-height: 28px;
@@ -307,6 +288,10 @@
     font-size: var(--size_14);
     font-weight: 400;
     line-height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
   }
   .webui-thinking-summary .webui-tool-icon { color: var(--text_default_tertiary); }
   .webui-thinking-summary:hover,
@@ -318,10 +303,6 @@
     min-width: 0;
     color: var(--text_default_tertiary);
   }
-  .activity-group > summary {
-    list-style: none;
-  }
-  .activity-group > summary::-webkit-details-marker { display: none; }
   .activity-group-header {
     display: flex;
     min-width: 0;
@@ -332,7 +313,11 @@
     color: var(--text_default_secondary);
     font-size: var(--size_14);
     line-height: 22px;
-    transition: color 120ms ease;
+    font-weight: 400;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
   }
   /* The category glyph is a viewBox-only <svg> with no width/height, so this
    * wrapper collapses to a 0x0 box and paints nothing — the title carries
@@ -349,10 +334,7 @@
     width: 16px;
     height: 16px;
     color: var(--text_default_tertiary);
-    transition: transform 200ms ease-out;
   }
-  /* Rotate the disclosure chevron while the activity details are open. */
-  .activity-group[open] .activity-group-chevron { transform: rotate(90deg); }
   .activity-group-body {
     position: relative;
     margin-top: var(--spacing_8);
@@ -394,11 +376,6 @@
     width: 14px;
     height: 14px;
     color: var(--text_default_tertiary);
-    transition: transform 160ms ease;
-  }
-  .webui-thinking-block[open] .webui-thinking-chevron,
-  .webui-tool-row[open] .webui-tool-chevron {
-    transform: rotate(180deg);
   }
   .webui-thinking-detail {
     position: relative;
@@ -490,6 +467,10 @@
     gap: var(--spacing_8);
     color: var(--text_default_tertiary);
     text-align: left;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
   }
   .webui-tool-icon {
     display: inline-flex;
@@ -521,8 +502,7 @@
   .webui-agent-activity-title { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 16px; }
   .webui-agent-joined-group { width: 100%; max-width: 524px; max-height: 240px; overflow: hidden; border: 0.5px solid var(--border_default); border-radius: 16px; padding: 12px 8px; }
   .webui-agent-joined-toggle { display: flex; width: 100%; height: 20px; align-items: center; border-radius: 8px; padding: 0 10px; color: var(--text_default_primary); text-align: left; font-size: var(--size_14); line-height: 20px; }
-  .webui-agent-joined-chevron { margin-left: auto; color: var(--icon_default_tertiary); font-size: var(--size_16); line-height: 16px; transition: transform 200ms ease-out; }
-  .webui-agent-joined-chevron.is-collapsed { transform: rotate(-90deg); }
+  .webui-agent-joined-chevron { margin-left: auto; color: var(--icon_default_tertiary); font-size: var(--size_16); line-height: 16px; }
   .webui-agent-joined-list { display: flex; max-height: 188px; flex-direction: column; gap: var(--spacing_8); overflow-y: auto; margin-top: 8px; padding-right: 8px; }
   .webui-agent-joined-row { display: flex; width: 100%; min-width: 0; flex-direction: column; gap: var(--spacing_2); border-radius: 12px; background: var(--bg_default_scrim); padding: 10px; text-align: left; }
   .webui-agent-joined-avatar { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 999px; background: var(--bg_grouped_secondary); color: var(--text_default_secondary); font-size: var(--size_12); line-height: 16px; }
@@ -914,7 +894,6 @@
     gap: var(--spacing_12);
     min-height: 70px;
     padding: 12px 16px;
-    transition: background-color 120ms ease;
   }
 
   .webui-diff-header:hover {
@@ -983,6 +962,7 @@
     border-top: 0.5px solid var(--border_default);
     list-style: none;
   }
+  .webui-diff-files-expanded { border-top: 0; }
 
   .webui-diff-file {
     display: flex;
@@ -1071,6 +1051,14 @@
     font-size: var(--size_12);
   }
 
+  .webui-diff-file-review-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+  }
+
   .webui-diff-review-panel pre {
     max-height: 240px;
     margin: 6px 0 0;
@@ -1132,7 +1120,6 @@
     font-size: 13px;
     line-height: 19.5px;
     opacity: 0;
-    transition: opacity 120ms ease;
   }
 
   .webui-message-action svg {
@@ -1173,7 +1160,6 @@
     color: inherit;
     font-size: var(--size_12);
     cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease;
   }
 
   .webui-message-action:hover:not(:disabled) {
@@ -1222,9 +1208,4 @@
     font-size: var(--size_12);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .webui-message-actions {
-      transition: none;
-    }
-  }
 }

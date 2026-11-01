@@ -25,7 +25,6 @@
     background: var(--bg_status_blue);
     padding: 0 var(--spacing_12);
     text-align: left;
-    transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
   }
   .webui-brand-create-button:hover {
     border-color: var(--border_accent);
@@ -126,12 +125,6 @@
     border: 2px solid var(--icon_default_accent);
     border-top-color: transparent;
     border-radius: 50%;
-    animation: webui-signin-claim-spin 0.6s linear infinite;
-  }
-  /* Stopped, not hidden: the ring still reads as "busy" for a reader who asked
-   * for less motion, which is the one fact the row is there to convey. */
-  @media (prefers-reduced-motion: reduce) {
-    .webui-rail-spinner { animation: none; }
   }
 
   /* The home rail is project-first. A project row uses the same quiet
@@ -147,7 +140,6 @@
     min-height: 36px;
     align-items: center;
     border-radius: var(--radius_8);
-    transition: background-color 120ms ease;
   }
   .webui-pinned-session-row:hover,
   .webui-pinned-session-row:has(:focus-visible),
@@ -165,11 +157,9 @@
     padding: 0 var(--spacing_8);
     font-size: var(--size_14);
     line-height: var(--line_height_20);
-    transition: color 120ms ease;
   }
   .webui-pinned-session-card > span:first-of-type {
     clip-path: inset(0 0 0 0);
-    transition: clip-path 160ms cubic-bezier(0.2, 0, 0, 1);
   }
   .webui-pinned-session-card:hover,
   .webui-pinned-session-row:hover .webui-pinned-session-card {
@@ -179,21 +169,8 @@
   .webui-pinned-session-row:has(:focus-visible) .webui-pinned-session-card > span:first-of-type {
     clip-path: inset(0 88px 0 0);
   }
-  .webui-project-section-content {
-    display: grid;
-    grid-template-rows: 0fr;
-    opacity: 0;
-    visibility: hidden;
-    transition: grid-template-rows 180ms ease, opacity 140ms ease, visibility 180ms linear;
-  }
-  .webui-project-section-content[data-webui-section-expanded="true"] {
-    grid-template-rows: 1fr;
-    opacity: 1;
-    visibility: visible;
-  }
-  .webui-project-section-content[data-webui-section-expanded="false"] { pointer-events: none; }
-  .webui-project-section-content-inner,
-  .webui-project-section-content > * { min-height: 0; overflow: hidden; }
+  .webui-project-section-content { min-width: 0; }
+  .webui-project-section-content-inner { min-height: 0; overflow: hidden; }
   [data-webui-pinned-sessions="true"] { margin-bottom: var(--spacing_4); }
   /* The section header is a full-width disclosure row, so its label belongs at
    * the start of the row. The shared button base centres its content, and
@@ -212,9 +189,7 @@
     width: 16px;
     height: 16px;
     flex: 0 0 16px;
-    transition: transform 160ms ease;
   }
-  .webui-project-section-toggle > svg.is-expanded { transform: rotate(90deg); }
   .webui-project-section-toggle[data-webui-rail-section-id="projects"] {
     margin-top: var(--spacing_8);
   }
@@ -233,7 +208,6 @@
     min-height: 30px;
     align-items: center;
     border-radius: var(--radius_8);
-    transition: background-color 120ms ease;
   }
   .webui-project-session-row:hover,
   .webui-project-session-row:has(:focus-visible),
@@ -265,7 +239,6 @@
     transform: translateY(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 120ms ease;
   }
   .webui-project-row:hover .webui-project-row-actions,
   .webui-project-row:has(:focus-visible) .webui-project-row-actions,
@@ -328,10 +301,6 @@
     justify-content: center;
   }
   .webui-session-disclosure svg {
-    transition: transform 160ms ease;
-  }
-  .webui-session-disclosure svg.is-expanded {
-    transform: rotate(90deg);
   }
   .webui-project-session-card,
   .webui-project-child-session-card {
@@ -351,7 +320,6 @@
   }
   .webui-project-session-card > span:first-child {
     clip-path: inset(0 0 0 0);
-    transition: clip-path 160ms cubic-bezier(0.2, 0, 0, 1);
   }
   .webui-project-session-row:hover .webui-project-session-card > span:first-child,
   .webui-project-session-row:focus-within .webui-project-session-card > span:first-child {
@@ -383,11 +351,9 @@
     padding-left: 34px;
     padding-right: var(--spacing_8);
     text-align: left;
-    transition: background-color 120ms ease;
   }
   .webui-project-child-session-card > span:first-of-type {
     clip-path: inset(0 0 0 0);
-    transition: clip-path 160ms cubic-bezier(0.2, 0, 0, 1);
   }
   .webui-project-child-session-row:hover .webui-project-child-session-card > span:first-of-type,
   .webui-project-child-session-row:focus-within .webui-project-child-session-card > span:first-of-type {
@@ -420,7 +386,4 @@
     color: var(--icon_default_tertiary);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .webui-project-section-content { transition: none; }
-  }
 }

@@ -54,6 +54,7 @@ import { createWebuiMiniAppAgentBridge } from "../application/miniapp-agent-brid
 import { sessionHash } from "../../../projection/common/router.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiSkeletonProjection } from "../../../ui/page.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import {
   webuiMiniAppRefusalText,
@@ -100,7 +101,9 @@ export function MiniAppView({
   const composer = useWebuiComposerStore();
   const presentation = state.presentations[pluginId];
   const refusal = state.refusals[pluginId];
-  const row = state.listing.rows.find((candidate) => candidate.pluginId === pluginId);
+  const row = state.listing.rows.find(
+    (candidate) => candidate.pluginId === pluginId,
+  );
   const name = row?.name ?? pluginId;
   const standalone = surface === "standalone";
   /**
@@ -119,7 +122,9 @@ export function MiniAppView({
    * document it was running in. The count is what tells the first load (this
    * view's own document arriving) from a later one (the page replacing itself).
    */
-  const agentHostRef = useRef<ReturnType<typeof createWebuiMiniAppAgentBridge> | null>(null);
+  const agentHostRef = useRef<ReturnType<
+    typeof createWebuiMiniAppAgentBridge
+  > | null>(null);
   const frameLoadsRef = useRef(0);
   /**
    * The revision of the frame this view is showing.
@@ -173,7 +178,9 @@ export function MiniAppView({
     let stopped = false;
     let timer: ReturnType<typeof setInterval> | undefined;
     const ask = async (): Promise<void> => {
-      const outcome = await workflows.presentInline(pluginId).catch(() => "waiting" as const);
+      const outcome = await workflows
+        .presentInline(pluginId)
+        .catch(() => "waiting" as const);
       if (stopped) return;
       if (outcome !== "waiting") {
         if (timer !== undefined) clearInterval(timer);
@@ -191,7 +198,10 @@ export function MiniAppView({
   /** While a view is up, the runtime is asked whether it still is. */
   useEffect(() => {
     if (!workflows || presentation?.kind !== "open") return;
-    const timer = setInterval(() => void workflows.syncPresentations(), PRESENTATION_SYNC_MS);
+    const timer = setInterval(
+      () => void workflows.syncPresentations(),
+      PRESENTATION_SYNC_MS,
+    );
     return () => clearInterval(timer);
   }, [presentation?.kind, workflows]);
 
@@ -201,11 +211,19 @@ export function MiniAppView({
    * before sending any more page bridge calls through the old one.
    */
   useEffect(() => {
-    if (standalone || detached || presentation?.kind !== "open" || !workflows) return;
+    if (standalone || detached || presentation?.kind !== "open" || !workflows)
+      return;
     if (row && row.presentationRevision > presentation.presentationRevision) {
       void workflows.refreshInline(pluginId);
     }
-  }, [detached, pluginId, presentation, row?.presentationRevision, standalone, workflows]);
+  }, [
+    detached,
+    pluginId,
+    presentation,
+    row?.presentationRevision,
+    standalone,
+    workflows,
+  ]);
 
   /**
    * Claim the tab's browsing-context name, so the inline view can focus it.
@@ -234,9 +252,17 @@ export function MiniAppView({
   }, [pluginId, standaloneHref]);
 
   const answer = useCallback(
-    (target: Window, origin: string, reply: { requestId: string; result: WebuiMiniAppComposerResult }) => {
+    (
+      target: Window,
+      origin: string,
+      reply: { requestId: string; result: WebuiMiniAppComposerResult },
+    ) => {
       target.postMessage(
-        { type: WEBUI_MINIAPP_BRIDGE_APPEND_REPLY, requestId: reply.requestId, result: reply.result },
+        {
+          type: WEBUI_MINIAPP_BRIDGE_APPEND_REPLY,
+          requestId: reply.requestId,
+          result: reply.result,
+        },
         origin,
       );
     },
@@ -277,11 +303,20 @@ export function MiniAppView({
         // The person's confirmation, not the page's claim: an untrusted document
         // may ask, and only a person may decide.
         confirm: (question) => window.confirm(question),
-        readDraft: () => composer.readDraft(sessionId ?? WEBUI_COMPOSER_HOME_KEY),
-        writeDraft: (text) => composer.setDraft(sessionId ?? WEBUI_COMPOSER_HOME_KEY, text),
+        readDraft: () =>
+          composer.readDraft(sessionId ?? WEBUI_COMPOSER_HOME_KEY),
+        writeDraft: (text) =>
+          composer.setDraft(sessionId ?? WEBUI_COMPOSER_HOME_KEY, text),
       })
-        .then((result) => answer(frame, origin, { requestId: request.requestId, result }))
-        .catch(() => answer(frame, origin, { requestId: request.requestId, result: { success: false, code: "result_unknown" } }));
+        .then((result) =>
+          answer(frame, origin, { requestId: request.requestId, result }),
+        )
+        .catch(() =>
+          answer(frame, origin, {
+            requestId: request.requestId,
+            result: { success: false, code: "result_unknown" },
+          }),
+        );
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -387,102 +422,150 @@ export function MiniAppView({
   const running = presentation?.kind === "open" && !detached;
 
   return (
-    <div
-      className="webui-miniapp-view"
-      data-testid="miniapp-view"
-      data-plugin-id={pluginId}
-      data-state={presentation?.kind ?? "idle"}
-      data-surface={surface}
-      data-detached={detached ? "true" : "false"}
-    >
-      {presentation?.kind === "opening" && !detached ? (
-        // 启动中是一个要被听到的状态，播报通道交给共享契约。
-        <FeedbackLiveRegion className="webui-miniapp-view-status">正在启动 {name}…</FeedbackLiveRegion>
-      ) : null}
-      {detached ? (
-        <div className="webui-miniapp-view-detached" data-testid="miniapp-view-detached">
-          {/* 切换到独立标签页的事实要被听到，播报通道交给共享契约。 */}
-          <FeedbackLiveRegion>已在独立的浏览器标签页中打开。</FeedbackLiveRegion>
-          <WebuiButton variant="secondary" size="compact" data-testid="miniapp-switch-standalone" onClick={moveToStandalone}>
-            切换到该标签页
-          </WebuiButton>
-        </div>
-      ) : null}
-      {presentation?.kind === "open" && !detached ? (
-        <iframe
-          // Keyed on the presentation revision so a lease that came and went
-          // remounts the frame: the page's in-page state is gone either way
-          // (ADR 0020), and a stale document would otherwise keep rendering from
-          // an origin the service has already re-pointed.
-          key={`${pluginId}:${row?.presentationRevision ?? 0}:${reloadRevision}`}
-          ref={frameRef}
-          className="webui-miniapp-view-frame"
-          data-testid="miniapp-view-frame"
-          title={title ?? name}
-          src={presentation.viewUrl}
-          onLoad={() => {
-            frameLoadsRef.current += 1;
-            // A refresh this view asked for is not a navigation the page made.
-            // The document is replaced either way, but the turn it opened is
-            // still running in the runtime, and the shipped client keeps it
-            // running across a refresh — so nothing is closed here.
-            if (reloadPendingRef.current) {
-              reloadPendingRef.current = false;
-              return;
-            }
-            // The first load is this view's own document. A later one is a
-            // navigation the page made, so the generation that answered it is
-            // closed before the replacement document can call: its live turns are
-            // cancelled and the shown lease is released, because nothing on screen
-            // shows that session any more.
-            if (frameLoadsRef.current > 1) {
-              agentHostRef.current?.handleDocumentReplaced();
-              workflows?.releaseShown(pluginId);
-            }
-          }}
-        />
-      ) : null}
-      {running || canMove ? (
-        <div className="webui-miniapp-view-move" data-testid="miniapp-view-actions">
-          {running ? (
-            <>
-              <span className="webui-miniapp-view-badge" data-testid="miniapp-view-status">
-                {row?.statusLabel ?? "运行中"}
-              </span>
-              <WebuiButton variant="secondary" size="compact" data-testid="miniapp-refresh" onClick={reload}>
-                刷新
-              </WebuiButton>
+    <WebuiSkeletonProjection>
+      <div
+        className="webui-miniapp-view"
+        data-testid="miniapp-view"
+        data-plugin-id={pluginId}
+        data-state={presentation?.kind ?? "idle"}
+        data-surface={surface}
+        data-detached={detached ? "true" : "false"}
+      >
+        {presentation?.kind === "opening" && !detached ? (
+          // 启动中是一个要被听到的状态，播报通道交给共享契约。
+          <FeedbackLiveRegion className="webui-miniapp-view-status">
+            正在启动 {name}…
+          </FeedbackLiveRegion>
+        ) : null}
+        {detached ? (
+          <div
+            className="webui-miniapp-view-detached"
+            data-testid="miniapp-view-detached"
+          >
+            {/* 切换到独立标签页的事实要被听到，播报通道交给共享契约。 */}
+            <FeedbackLiveRegion>
+              已在独立的浏览器标签页中打开。
+            </FeedbackLiveRegion>
+            <WebuiButton
+              variant="secondary"
+              size="compact"
+              data-testid="miniapp-switch-standalone"
+              onClick={moveToStandalone}
+            >
+              切换到该标签页
+            </WebuiButton>
+          </div>
+        ) : null}
+        {presentation?.kind === "open" && !detached ? (
+          <iframe
+            // Keyed on the presentation revision so a lease that came and went
+            // remounts the frame: the page's in-page state is gone either way
+            // (ADR 0020), and a stale document would otherwise keep rendering from
+            // an origin the service has already re-pointed.
+            key={`${pluginId}:${row?.presentationRevision ?? 0}:${reloadRevision}`}
+            ref={frameRef}
+            className="webui-miniapp-view-frame"
+            data-testid="miniapp-view-frame"
+            title={title ?? name}
+            src={presentation.viewUrl}
+            onLoad={() => {
+              frameLoadsRef.current += 1;
+              // A refresh this view asked for is not a navigation the page made.
+              // The document is replaced either way, but the turn it opened is
+              // still running in the runtime, and the shipped client keeps it
+              // running across a refresh — so nothing is closed here.
+              if (reloadPendingRef.current) {
+                reloadPendingRef.current = false;
+                return;
+              }
+              // The first load is this view's own document. A later one is a
+              // navigation the page made, so the generation that answered it is
+              // closed before the replacement document can call: its live turns are
+              // cancelled and the shown lease is released, because nothing on screen
+              // shows that session any more.
+              if (frameLoadsRef.current > 1) {
+                agentHostRef.current?.handleDocumentReplaced();
+                workflows?.releaseShown(pluginId);
+              }
+            }}
+          />
+        ) : null}
+        {running || canMove ? (
+          <div
+            className="webui-miniapp-view-move"
+            data-testid="miniapp-view-actions"
+          >
+            {running ? (
+              <>
+                <span
+                  className="webui-miniapp-view-badge"
+                  data-testid="miniapp-view-status"
+                >
+                  {row?.statusLabel ?? "运行中"}
+                </span>
+                <WebuiButton
+                  variant="secondary"
+                  size="compact"
+                  data-testid="miniapp-refresh"
+                  onClick={reload}
+                >
+                  刷新
+                </WebuiButton>
+                <WebuiButton
+                  variant="secondary"
+                  size="compact"
+                  data-testid="miniapp-stop"
+                  onClick={() => void workflows?.stop(pluginId)}
+                >
+                  停止
+                </WebuiButton>
+              </>
+            ) : null}
+            {canMove ? (
               <WebuiButton
                 variant="secondary"
                 size="compact"
-                data-testid="miniapp-stop"
-                onClick={() => void workflows?.stop(pluginId)}
+                data-testid="miniapp-open-standalone"
+                onClick={moveToStandalone}
               >
-                停止
+                在新标签页中打开
               </WebuiButton>
-            </>
-          ) : null}
-          {canMove ? (
-            <WebuiButton variant="secondary" size="compact" data-testid="miniapp-open-standalone" onClick={moveToStandalone}>
-              在新标签页中打开
+            ) : null}
+          </div>
+        ) : null}
+        {presentation?.kind === "stopped" && !detached ? (
+          <div
+            className="webui-miniapp-view-stopped"
+            data-testid="miniapp-view-stopped"
+          >
+            <FeedbackError message={presentation.reason} />
+            <WebuiButton
+              variant="secondary"
+              size="compact"
+              onClick={() => void workflows?.open(pluginId)}
+            >
+              重新打开
             </WebuiButton>
-          ) : null}
-        </div>
-      ) : null}
-      {presentation?.kind === "stopped" && !detached ? (
-        <div className="webui-miniapp-view-stopped" data-testid="miniapp-view-stopped">
-          <FeedbackError message={presentation.reason} />
-          <WebuiButton variant="secondary" size="compact" onClick={() => void workflows?.open(pluginId)}>
-            重新打开
-          </WebuiButton>
-        </div>
-      ) : null}
-      {presentation === undefined && refusal ? (
-        <FeedbackError message={webuiMiniAppRefusalText({ code: refusal.code, message: refusal.message, rows: state.listing.rows, })} className="webui-plugin-error" testId="miniapp-view-refusal" />
-      ) : null}
-      {presentation === undefined && !refusal && state.unavailable ? (
-        <FeedbackEmpty className="webui-plugin-empty" title={state.unavailable} />
-      ) : null}
-    </div>
+          </div>
+        ) : null}
+        {presentation === undefined && refusal ? (
+          <FeedbackError
+            message={webuiMiniAppRefusalText({
+              code: refusal.code,
+              message: refusal.message,
+              rows: state.listing.rows,
+            })}
+            className="webui-plugin-error"
+            testId="miniapp-view-refusal"
+          />
+        ) : null}
+        {presentation === undefined && !refusal && state.unavailable ? (
+          <FeedbackEmpty
+            className="webui-plugin-empty"
+            title={state.unavailable}
+          />
+        ) : null}
+      </div>
+    </WebuiSkeletonProjection>
   );
 }

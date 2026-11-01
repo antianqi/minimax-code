@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { WebuiButton } from "../ui/button.js";
+import { WebuiPage } from "../ui/page.js";
 
 /**
  * The boot-failure surface for `main.tsx`.
@@ -31,13 +32,25 @@ export function WebuiStartupFallback({
   readonly onReload: () => void;
 }): ReactElement {
   return (
-    <section
+    <WebuiPage
+      as="section"
+      kind="content"
       role="alert"
       data-testid="webui-startup-fallback"
       className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-spacing_8 p-spacing_24 text-center"
     >
-      <h1 data-testid="webui-startup-fallback-title" className="text-2xl font-semibold">页面未能启动</h1>
-      <p data-testid="webui-startup-fallback-detail" className="text-text_default_secondary">{detail}</p>
+      <h1
+        data-testid="webui-startup-fallback-title"
+        className="text-2xl font-semibold"
+      >
+        页面未能启动
+      </h1>
+      <p
+        data-testid="webui-startup-fallback-detail"
+        className="text-text_default_secondary"
+      >
+        {detail}
+      </p>
       {/* Same rule as the boundary's fallback: the message is shown, not just
        * logged, because this surface is the only place the cause survives —
        * there is no console guarantee on a machine where the page never
@@ -48,11 +61,14 @@ export function WebuiStartupFallback({
       >
         {reason}
       </p>
-      <WebuiButton variant="grouped" size="pill" data-testid="webui-startup-fallback-reload"
+      <WebuiButton
+        variant="grouped"
+        size="pill"
+        data-testid="webui-startup-fallback-reload"
         onClick={onReload}
       >
         {reloadLabel}
       </WebuiButton>
-    </section>
+    </WebuiPage>
   );
 }

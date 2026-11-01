@@ -49,7 +49,6 @@
     color: var(--text_default_primary);
     font-size: var(--size_14);
     cursor: pointer;
-    transition: background-color 120ms ease;
   }
 
   .webui-workspace-bar-trigger:hover:not(:disabled) {
@@ -106,7 +105,7 @@
    * that arrives by any route — a drag, a stale value, a restored session —
    * cannot squeeze the conversation to nothing.
    */
-  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: var(--webui-panel-min); min-height: 0; flex: 0 1 50%; max-width: calc(100% - var(--webui-conversation-min)); flex-direction: column; overflow: hidden; scrollbar-gutter: auto; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; container: webui-workspace-panel / inline-size; }
+  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: var(--webui-panel-min); min-height: 0; flex: 0 1 50%; max-width: calc(100% - var(--webui-conversation-min)); flex-direction: column; overflow: hidden; scrollbar-gutter: auto; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); container: webui-workspace-panel / inline-size; }
 
   /* The progress panel's gutter.
    *
@@ -136,10 +135,7 @@
   /* The overlay's width belongs to the stylesheet, so there is nothing to drag. */
   .webui-workspace-panel[data-webui-surface-tier="overlay"] .webui-workspace-panel-resize-handle { display: none; }
   .webui-workspace-panel.is-expanded { position: absolute; inset: 0; z-index: 70; width: auto; max-width: none; flex: none; }
-  .webui-workspace-panel.is-expanded { animation: webui-workspace-panel-expand 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-panel.is-expanding { animation: webui-workspace-panel-expand 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-panel.is-collapsing { animation: webui-workspace-panel-collapse 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-panel.is-closing { pointer-events: none; animation: webui-workspace-panel-exit 180ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-workspace-panel.is-closing { pointer-events: none; }
   .webui-workspace-panel-resize-handle { position: absolute; top: 0; bottom: 0; left: 0; z-index: 5; width: 8px; cursor: col-resize; touch-action: none; }
   .webui-workspace-panel-resize-handle:focus-visible { outline: 2px solid var(--border_accent); outline-offset: -2px; }
   .webui-workspace-panel.is-expanded .webui-workspace-panel-resize-handle { display: none; }
@@ -155,15 +151,12 @@
    * by what the surface can afford, so the gutter and the panel cannot
    * disagree about how much room there is. */
 
-  @keyframes webui-workspace-panel-expand { from { opacity: .88; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-  @keyframes webui-workspace-panel-collapse { from { opacity: .88; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-  @keyframes webui-workspace-panel-exit { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(18px); } }
   .webui-workspace-panel-header, .webui-workspace-panel-actions, .webui-workspace-tabs, .webui-workspace-tab { display: flex; align-items: center; }
   .webui-workspace-panel-header { position: relative; z-index: 2; min-height: 42px; flex: 0 0 42px; justify-content: space-between; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); background: var(--bg_default_secondary); padding: 0 var(--spacing_8); }
   .webui-workspace-tabs { min-width: 0; flex: 1 1 auto; align-self: stretch; gap: var(--spacing_8); overflow: visible; }
   .webui-workspace-tab-list { display: flex; min-width: 0; flex: 1 1 0; align-items: center; gap: var(--spacing_2); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   .webui-workspace-tab-list::-webkit-scrollbar { display: none; }
-  .webui-workspace-tab { position: relative; max-width: 144px; min-width: 88px; height: 32px; flex: 0 1 144px; gap: var(--spacing_4); border: 1px solid transparent; border-bottom: 1px solid transparent; border-radius: 12px 12px 0 0; background: var(--bg_default_secondary); color: var(--text_default_secondary); transition: background-color 100ms ease; }
+  .webui-workspace-tab { position: relative; max-width: 144px; min-width: 88px; height: 32px; flex: 0 1 144px; gap: var(--spacing_4); border: 1px solid transparent; border-bottom: 1px solid transparent; border-radius: 12px 12px 0 0; background: var(--bg_default_secondary); color: var(--text_default_secondary); }
   .webui-workspace-tab.is-active { border-color: var(--border_default); border-bottom-color: var(--bg_default_primary); background: var(--bg_default_primary); color: var(--text_default_primary); }
   .webui-workspace-tab:not(.is-active)::after { position: absolute; top: 50%; right: -2px; width: 1px; height: 20px; transform: translateY(-50%); background: var(--border_default); content: ""; }
   .webui-workspace-tab:not(.is-active):hover { background: var(--bg_interaction_tertiary_hover); color: var(--text_default_primary); }
@@ -214,7 +207,7 @@
   .webui-workspace-file-mode-button { min-height: 28px; border-radius: 6px; padding: 0 10px; font-size: var(--size_12); }
   .webui-workspace-edit-action { width: 34px; height: 34px; flex: 0 0 34px; }
   .webui-workspace-tree-toggle { width: 34px; height: 34px; flex: 0 0 34px; }
-  .webui-workspace-file-tree-panel { display: flex; width: clamp(200px, 38cqi, 288px); flex: 0 0 clamp(200px, 38cqi, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-workspace-file-tree-panel { display: flex; width: clamp(200px, 38cqi, 288px); flex: 0 0 clamp(200px, 38cqi, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); }
   .webui-workspace-file-search { flex: 0 0 40px; margin: var(--spacing_8) var(--spacing_12); }
   .webui-workspace-file-tree-scroll { min-height: 0; flex: 1 1 auto; overflow: auto; padding: 0 var(--spacing_12) var(--spacing_12); }
   .webui-workspace-file-tree-scroll > [role="status"], .webui-workspace-file-tree-scroll > [role="alert"], .webui-workspace-tree-empty { padding: var(--spacing_8); color: var(--text_default_tertiary); font-size: var(--size_12); }
@@ -305,8 +298,7 @@
   .webui-turn-review-files { min-width: 0; flex: 1 1 auto; overflow: auto; }
   .webui-turn-review-file { min-width: 0; border-bottom: 1px solid var(--border_default); }
   .webui-turn-review-file-heading { position: sticky; top: 0; z-index: 1; display: flex; width: 100%; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); padding: 0 var(--spacing_12); text-align: left; }
-  .webui-turn-review-chevron { width: 12px; height: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); transition: transform 120ms ease; }
-  .webui-turn-review-file[data-expanded="true"] > .webui-turn-review-file-heading > .webui-turn-review-chevron { transform: rotate(90deg); }
+  .webui-turn-review-chevron { width: 12px; height: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); }
   .webui-turn-review-file-heading:hover { background: var(--bg_default_secondary); }
   .webui-turn-review-file-heading .webui-diff-file-icon { width: 18px; height: 18px; }
   .webui-turn-review-file-heading .webui-diff-file-icon .webui-workspace-filetype-badge { width: 18px; height: 18px; }
@@ -347,9 +339,7 @@
   .webui-workspace-panel-close { border-radius: var(--radius_8); }
 
   .webui-file-tree-row { display: flex; width: 100%; min-height: 32px; align-items: center; gap: var(--spacing_8); overflow: hidden; padding: 0 var(--spacing_4); text-overflow: ellipsis; white-space: nowrap; font-size: var(--size_14); }
-  .webui-expandable-motion { display: grid; min-height: 0; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 180ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease-out; }
-  .webui-expandable-motion > * { min-height: 0; overflow: hidden; }
-  .webui-expandable-motion.is-open { grid-template-rows: 1fr; opacity: 1; }
+  .webui-file-tree-disclosure, .webui-diff-file-disclosure { min-width: 0; }
   .file-tab { display: flex; align-items: center; gap: var(--spacing_4); overflow: hidden; padding: 0 var(--spacing_8); font-size: var(--size_12); white-space: nowrap; }
 
   .webui-canvas-content { position: relative; display: flex; min-height: 300px; height: calc(100% - 180px); flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); padding: var(--spacing_16); color: var(--text_default_secondary); text-align: center; }

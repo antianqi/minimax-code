@@ -37,6 +37,7 @@ import {
   type WebuiRemoteSnapshot,
 } from "../application/remote-owner.js";
 import { PanelFrame } from "../../../ui/content-page.js";
+import { WebuiMotionSlot } from "../../../ui/page.js";
 
 export interface RemotePageViewProps {
   readonly activeTab: WebuiRemoteTabValue;
@@ -64,7 +65,8 @@ export function RemotePageView({
       className="min-w-0 flex-1"
       scroll={false}
       bodyClassName="min-h-0 flex-1"
-      headerClassName="flex h-[46px] min-w-0 shrink-0 items-center justify-between gap-3 py-2 pr-2 pl-2 transition-[padding] duration-200 ease-in-out"
+      headerMotion="disclosure"
+      headerClassName="flex h-[46px] min-w-0 shrink-0 items-center justify-between gap-3 py-2 pr-2 pl-2"
       header={
         <>
         {/*
@@ -81,11 +83,12 @@ export function RemotePageView({
           {WEBUI_REMOTE_TABS.map((tab) => {
             const selected = tab.value === activeTab;
             return (
+              <WebuiMotionSlot kind="feedback">
               <WebuiInline
                 as="label"
                 justify="center"
                 key={tab.value}
-                className={`h-7 cursor-pointer rounded-[6px] px-3 text-[14px] leading-5 transition-colors ${
+                className={`h-7 cursor-pointer rounded-[6px] px-3 text-[14px] leading-5 ${
                   selected
                     ? "bg-bg_grouped_secondary_elevated font-medium text-text_default_primary"
                     : "font-normal text-text_default_secondary hover:text-text_default_primary"
@@ -101,6 +104,7 @@ export function RemotePageView({
                 />
                 <span title={tab.label}>{tab.label}</span>
               </WebuiInline>
+              </WebuiMotionSlot>
             );
           })}
         </div>

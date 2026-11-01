@@ -12,6 +12,7 @@ import { WebuiField, WebuiTextarea } from "../../../ui/field.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
+import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiPage, WebuiSkeletonProjection } from "../../../ui/page.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -37,16 +38,18 @@ function WorkspaceProgressSection({ kind, className, title, titleMeta, collapsed
   readonly children: ReactElement | null;
   readonly busy?: boolean;
 }): ReactElement {
-  return <section {...{ [`data-webui-${kind}-panel`]: "true" }} className={`webui-progress-section ${className}${collapsed ? " is-collapsed" : ""}`} data-workspace-section="true" aria-busy={busy || undefined}>
+  return <WebuiMotion as="section" kind="disclosure" state={collapsed ? "collapse" : "expand"} {...{ [`data-webui-${kind}-panel`]: "true" }} className={`webui-progress-section ${className}${collapsed ? " is-collapsed" : ""}`} data-workspace-section="true" aria-busy={busy || undefined}>
     <WebuiButton variant="quiet-secondary" size="header" className="webui-workspace-section-title" onClick={onToggle} aria-expanded={!collapsed}>
       <span data-workspace-section-title="true">{title}</span>
       {titleMeta}
-      <WebuiIconChevronDown className={`webui-progress-section-chevron${collapsed ? " is-collapsed" : ""}`} />
+      <WebuiMotionSlot kind="disclosure-transform" rotation={collapsed ? -90 : 0}>
+        <WebuiIconChevronDown className="webui-progress-section-chevron" />
+      </WebuiMotionSlot>
     </WebuiButton>
-    <div className={`webui-expandable-motion${collapsed ? "" : " is-open"}`} aria-hidden={collapsed} ref={(element) => element?.toggleAttribute("inert", collapsed)}>
+    <WebuiDisclosure as="div" open={!collapsed} className="webui-progress-section-body">
       {children}
-    </div>
-  </section>;
+    </WebuiDisclosure>
+  </WebuiMotion>;
 }
 
 export function WebuiProgressPanel({ todos, showProgress = true, showEmptyState = false, collapsed = false, onToggle }: {
@@ -166,23 +169,26 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
   const hasChanges = Boolean(environment && environment.changedFiles > 0);
   const canMutate = Boolean(environment && queries?.canMutateGit && !environment.changesError && !environment.metadataError && (hasChanges || environment.canPush));
   const hasLineChanges = Boolean(environment && environment.lineStatsStatus === "ready" && (environment.insertions > 0 || environment.deletions > 0));
+  const environmentBody = <div className="webui-environment-body">
+    <div className="webui-environment-workspace">{environment?.branch || " "}</div>
+    <div className="webui-environment-actions">
+      <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={onOpenChanges} disabled={!onOpenChanges}>
+        <WebuiIconRunLocation className="size-5" /><span>{PROGRESS_COPY.changes}</span>{hasLineChanges && environment ? <small aria-label={`新增 ${environment.insertions} 行，删除 ${environment.deletions} 行`}><span className="webui-diff-additions">+{environment.insertions}</span><span className="webui-diff-deletions">-{environment.deletions}</span></small> : null}
+      </WebuiButton>
+      <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={() => setCommitOpen(true)} disabled={!canMutate}>
+        <WebuiIconFile className="size-5" /><span>{PROGRESS_COPY.commit}</span>
+      </WebuiButton>
+      <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={onOpenTerminal} disabled={!onOpenTerminal}>
+        <WebuiIconRunLocation className="size-5" /><span>{PROGRESS_COPY.openTerminal}</span>
+      </WebuiButton>
+    </div>
+  </div>;
   return <>
     <WorkspaceProgressSection kind="environment" className={`webui-environment-panel${pending ? " is-loading" : ""}`} title={PROGRESS_COPY.environment} collapsed={collapsed} onToggle={onToggle} busy={pending}>
-        {/* 骨架屏是一个区域状态；播报通道交给共享契约，aria-label 留在承载骨架屏的元素上。 */}
-        {pending ? <FeedbackLiveRegion><div className="webui-environment-loading" aria-label="正在加载环境信息"><span className="webui-environment-skeleton webui-environment-skeleton--branch" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /></div></FeedbackLiveRegion> : environmentError ? <FeedbackError message=<>环境信息加载失败：{environmentError}</> className="webui-environment-loading" /> : environment ? <div className="webui-environment-body">
-          <div className="webui-environment-workspace">{environment.branch || " "}</div>
-          <div className="webui-environment-actions">
-            <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={onOpenChanges} disabled={!onOpenChanges}>
-              <WebuiIconRunLocation className="size-5" /><span>{PROGRESS_COPY.changes}</span>{hasLineChanges ? <small aria-label={`新增 ${environment.insertions} 行，删除 ${environment.deletions} 行`}><span className="webui-diff-additions">+{environment.insertions}</span><span className="webui-diff-deletions">-{environment.deletions}</span></small> : null}
-            </WebuiButton>
-            <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={() => setCommitOpen(true)} disabled={!canMutate}>
-              <WebuiIconFile className="size-5" /><span>{PROGRESS_COPY.commit}</span>
-            </WebuiButton>
-            <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={onOpenTerminal} disabled={!onOpenTerminal}>
-              <WebuiIconRunLocation className="size-5" /><span>{PROGRESS_COPY.openTerminal}</span>
-            </WebuiButton>
-          </div>
-        </div> : null}
+        <>
+          {pending ? <FeedbackLiveRegion className="webui-feedback-sr">正在加载环境信息</FeedbackLiveRegion> : null}
+          {environmentError ? <FeedbackError message=<>环境信息加载失败：{environmentError}</> className="webui-environment-loading" /> : environment || pending ? <WebuiSkeletonProjection loading={pending}>{environmentBody}</WebuiSkeletonProjection> : null}
+        </>
     </WorkspaceProgressSection>
     {commitOpen && environment && workspaceDir && queries?.canMutateGit ? <WorkspaceCommitDialog environment={environment} workspaceDir={workspaceDir} mutateGit={queries.mutateGit} onClose={() => setCommitOpen(false)} /> : null}
   </>;
@@ -225,7 +231,7 @@ export function WebuiProgressOverviewPanel({ open = false, workspaceDir, isDefau
     (!environmentPending && !environmentError && !environment?.isGitRepo)
   );
   const showEmptyProgress = showProgress && todos.length === 0 && subagents.length === 0 && !environmentPanelVisible;
-  return <div className={`webui-progress-panel-motion${open ? " is-open" : ""}`} aria-hidden={!open} ref={(element) => element?.toggleAttribute("inert", !open)}>
+  return <WebuiPage as="div" kind="panel" present={open} motion={{ kind: "panel", state: "enter", direction: "right" }} className="webui-progress-panel-motion">
     <aside className="webui-progress-overview-panel" data-testid="progress-overview-panel" aria-label="环境信息与进度">
       <div className="webui-progress-overview-card" data-testid="progress-overview-card">
         <div className="webui-progress-overview-main">
@@ -235,5 +241,5 @@ export function WebuiProgressOverviewPanel({ open = false, workspaceDir, isDefau
         </div>
       </div>
     </aside>
-  </div>;
+  </WebuiPage>;
 }

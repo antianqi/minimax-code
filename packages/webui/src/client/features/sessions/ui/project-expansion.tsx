@@ -17,6 +17,7 @@ import { sessionLabel } from "../projection/rail-groups.js";
 import { SessionActivityMeta } from "./session-activity-meta.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot } from "../../../ui/page.js";
 
 /**
  * One project's expansion: the sessions under a project's row, each collapsible
@@ -65,11 +66,11 @@ export function ProjectExpansion({
   ) => void;
 }) {
   return (
-                <div
+                <WebuiDisclosure
+                  as="div"
+                  open={expanded}
                   className="webui-project-section-content"
                   data-webui-section-expanded={expanded ? "true" : "false"}
-                  aria-hidden={!expanded}
-                  ref={(element) => element?.toggleAttribute("inert", !expanded)}
                 >
                   <WebuiStack
                     as="ul"
@@ -85,6 +86,7 @@ export function ProjectExpansion({
                       const sessionActive = session.sessionId === selectedSessionId;
                       return (
                         <li key={session.sessionId}>
+                          <WebuiMotionSlot kind="feedback">
                           <div
                             className="webui-project-session-row group/session"
                             data-webui-session-active={sessionActive ? "true" : "false"}
@@ -104,10 +106,13 @@ export function ProjectExpansion({
                                   onToggleChildren(session.sessionId);
                                 }}
                               >
-                                <WebuiIconSessionTreeDisclosure className={childrenExpanded ? "is-expanded" : undefined} />
+                                <WebuiMotionSlot kind="disclosure-transform" rotation={childrenExpanded ? 90 : 0}>
+                                  <WebuiIconSessionTreeDisclosure />
+                                </WebuiMotionSlot>
                               </WebuiIconButton>
                             ) : <span aria-hidden="true" className="webui-session-leading-line" />}
                             </span>
+                            <WebuiMotionSlot kind="feedback">
                             <a
                               href={sessionHash(session.sessionId)}
                               data-webui-session-link={session.sessionId}
@@ -115,15 +120,17 @@ export function ProjectExpansion({
                               onContextMenu={(event) => onSessionContextMenu(event, session)}
                               className="webui-project-session-card text-text_default_primary"
                             >
-                              <span className="min-w-0 flex-1 truncate">
-                                {sessionLabel(session)}
-                              </span>
+                              <WebuiMotionSlot kind="feedback-clip">
+                                <span className="min-w-0 flex-1 truncate">{sessionLabel(session)}</span>
+                              </WebuiMotionSlot>
                               <SessionActivityMeta
                                 session={session}
                                 activity={activity}
                                 now={now}
                               />
                             </a>
+                            </WebuiMotionSlot>
+                            <WebuiMotionSlot kind="feedback-opacity">
                             <div className="webui-session-row-actions">
                               {onToggleSessionPin ? (
                                 <WebuiIconButton
@@ -170,13 +177,15 @@ export function ProjectExpansion({
                                 <WebuiIconMore />
                               </WebuiIconButton>
                             </div>
+                            </WebuiMotionSlot>
                           </div>
+                          </WebuiMotionSlot>
                           {children.length > 0 ? (
-                            <div
+                            <WebuiDisclosure
+                              as="div"
+                              open={childrenExpanded}
                               className="webui-project-section-content"
                               data-webui-section-expanded={childrenExpanded ? "true" : "false"}
-                              aria-hidden={!childrenExpanded}
-                              ref={(element) => element?.toggleAttribute("inert", !childrenExpanded)}
                             >
                               <WebuiStack
                                 as="ul"
@@ -186,7 +195,9 @@ export function ProjectExpansion({
                               >
                                 {children.map((child) => (
                                   <li key={child.sessionId}>
+                                    <WebuiMotionSlot kind="feedback">
                                     <div className="webui-project-child-session-row group/session">
+                                    <WebuiMotionSlot kind="feedback">
                                       <a
                                         href={sessionHash(child.sessionId)}
                                         data-webui-session-link={child.sessionId}
@@ -200,15 +211,17 @@ export function ProjectExpansion({
                                         className="webui-project-child-session-card text-text_default_primary"
                                       >
                                         <WebuiIconAgent className="size-4 shrink-0" />
-                                        <span className="min-w-0 flex-1 truncate">
-                                          {sessionLabel(child)}
-                                        </span>
+                                        <WebuiMotionSlot kind="feedback-clip">
+                                          <span className="min-w-0 flex-1 truncate">{sessionLabel(child)}</span>
+                                        </WebuiMotionSlot>
                                         <SessionActivityMeta
                                           session={child}
                                           activity={activity}
                                           now={now}
                                         />
                                       </a>
+                                    </WebuiMotionSlot>
+                                      <WebuiMotionSlot kind="feedback-opacity">
                                       <div className="webui-session-row-actions">
                                         <WebuiIconButton
                                           tone="bare"
@@ -220,11 +233,13 @@ export function ProjectExpansion({
                                           <WebuiIconMore />
                                         </WebuiIconButton>
                                       </div>
+                                      </WebuiMotionSlot>
                                     </div>
+                                    </WebuiMotionSlot>
                                   </li>
                                 ))}
                               </WebuiStack>
-                            </div>
+                            </WebuiDisclosure>
                           ) : null}
                         </li>
                       );
@@ -244,6 +259,6 @@ export function ProjectExpansion({
                       </li>
                     ) : null}
                   </WebuiStack>
-                </div>
+                </WebuiDisclosure>
   );
 }

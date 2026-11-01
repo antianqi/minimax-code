@@ -9,15 +9,17 @@ import { formatPlanName, formatPlanSourceLabel, hasWebuiPlan } from "../projecti
 import { UsageResetCards } from "./UsageResetCards.js";
 import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
 import { IconChevronDown, IconExternalLink, IconInfoCircle } from "@tabler/icons-react";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { ProviderFormPanel, type WebuiProviderFormCommands } from "../../../features/models/ui/ProviderFormPanel.public.js";
 import { useWebuiProviderEditor } from "../../../features/models/bindings/use-provider-editor.public.js";
 import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
 import { unavailableWebuiProviderOutcome } from "../../../features/models/contracts/provider-outcome.js";
 import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackError, FeedbackLiveRegion, FeedbackProgress } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiMotionSlot, WebuiSkeleton } from "../../../ui/page.js";
 
 type Props = {
   readonly sessionId?: string;
@@ -214,13 +216,57 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
 
   return <SettingsPage testId="settings-usage-model">
     <WebuiInline gap="medium" className="h-8">
-      <div className="relative">
-      <WebuiInline gap="none" className={`h-8 overflow-hidden rounded-[8px] text-[14px] font-medium leading-5 transition-colors ${sourceTab !== "custom" ? "bg-bg_interaction_tertiary_hover text-text_default_primary" : "text-text_default_secondary hover:bg-bg_interaction_tertiary_hover"}`}>
-        <WebuiButton variant="segmented" size="compact" aria-pressed={sourceTab !== "custom"} aria-expanded={sourceMenuOpen} data-testid="settings-usage-source-tab" className="h-full min-w-[140px] pl-3 pr-1 text-left" onClick={() => setSourceMenuOpen((open) => !open)}>{sourceLabel}{sourceBadge ? <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${sourceBadge === "使用中" ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{sourceBadge}</span> : null}</WebuiButton>
-        <WebuiButton variant="quiet-action" size="compact" aria-label="选择模型来源" aria-expanded={sourceMenuOpen} className="h-full w-7 justify-center"><ChevronDownIcon /></WebuiButton>
-      </WebuiInline>
-      {sourceMenuOpen ? <WebuiStack gap="none" className="absolute left-0 top-full z-10 mt-1 min-w-[180px] rounded-[12px] bg-bg_default_primary p-1.5 shadow-lg"><WebuiButton variant="selectable-row" size="compact" className="h-[30px] w-full rounded-[8px] px-3 text-left text-sm" onClick={() => { setSourceMenuOpen(false); void chooseSource("token_plan"); }}>{planSourceLabel}</WebuiButton><WebuiButton variant="selectable-row" size="compact" className="h-[30px] w-full rounded-[8px] px-3 text-left text-sm" onClick={() => { setSourceMenuOpen(false); void chooseSource("minimax_api_key"); }}>MiniMax API</WebuiButton></WebuiStack> : null}
-      </div>
+      <WebuiDropdown
+        open={sourceMenuOpen}
+        onOpen={() => setSourceMenuOpen(true)}
+        onClose={() => setSourceMenuOpen(false)}
+        role="menu"
+        ariaLabel="选择模型来源"
+        width="content"
+        side="bottom"
+        align="start"
+        offset={4}
+        wrapperClassName="webui-usage-source-dropdown inline-flex"
+        className="webui-usage-source-menu min-w-[180px] p-1.5"
+        testId="settings-usage-source-dropdown"
+        trigger={(triggerProps) => {
+          const { ref, ...buttonProps } = triggerProps;
+          return (
+            <WebuiMotionSlot kind="feedback">
+              <WebuiInline gap="none" className={`h-8 overflow-hidden rounded-[8px] text-[14px] font-medium leading-5 ${sourceTab !== "custom" ? "bg-bg_interaction_tertiary_hover text-text_default_primary" : "text-text_default_secondary hover:bg-bg_interaction_tertiary_hover"}`}>
+                <WebuiButton
+                  {...buttonProps}
+                  ref={ref}
+                  variant="segmented"
+                  size="compact"
+                  aria-pressed={sourceTab !== "custom"}
+                  data-testid="settings-usage-source-tab"
+                  className="h-full min-w-[140px] pl-3 pr-1 text-left"
+                >
+                  {sourceLabel}
+                  {sourceBadge ? <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${sourceBadge === "使用中" ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{sourceBadge}</span> : null}
+                </WebuiButton>
+                <WebuiButton
+                  type="button"
+                  variant="quiet-action"
+                  size="compact"
+                  aria-label="选择模型来源"
+                  aria-haspopup={triggerProps["aria-haspopup"]}
+                  aria-expanded={triggerProps["aria-expanded"]}
+                  aria-controls={triggerProps["aria-controls"]}
+                  className="h-full w-7 justify-center"
+                  onClick={triggerProps.onClick}
+                >
+                  <ChevronDownIcon />
+                </WebuiButton>
+              </WebuiInline>
+            </WebuiMotionSlot>
+          );
+        }}
+      >
+        <WebuiButton role="menuitem" variant="selectable-row" size="compact" className="h-[30px] w-full rounded-[8px] px-3 text-left text-sm" onClick={() => { setSourceMenuOpen(false); void chooseSource("token_plan"); }}>{planSourceLabel}</WebuiButton>
+        <WebuiButton role="menuitem" variant="selectable-row" size="compact" className="h-[30px] w-full rounded-[8px] px-3 text-left text-sm" onClick={() => { setSourceMenuOpen(false); void chooseSource("minimax_api_key"); }}>MiniMax API</WebuiButton>
+      </WebuiDropdown>
       <div className="h-3 w-[0.5px] bg-border_default" />
       <WebuiButton variant="segmented" size="compact" aria-pressed={sourceTab === "custom"} className="h-8 rounded-[8px] px-3 text-[14px] font-medium leading-5" onClick={() => setSourceTab("custom")}>自定义模型</WebuiButton>
     </WebuiInline>
@@ -232,8 +278,8 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
             <div className="h-[0.5px] bg-border_default" />
             <WebuiInline gap="large" className="min-h-[64px] w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div><span className="block text-[14px] leading-5">积分</span><span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">剩余 {quotaView.purchasedCredits !== undefined && quotaView.freeCredits !== undefined ? `${formatWebuiCredits(quotaView.purchasedCredits)} + ${formatWebuiCredits(quotaView.freeCredits)}` : formatWebuiCredits(quotaView.creditBalance)}</span></div></WebuiInline>
         </SettingsSection>
-        {quotaData ? <SettingsSection title="用量" testId="settings-usage-limits">{([["5 小时限额", quotaData.fiveHour], ["周限额", quotaData.weekly], ...(quotaData.video ? [["视频限额", quotaData.video] as const] : [])] as const).map(([label, window]) => { const value = recordOf(window); const usedPercent = typeof value.usedPercent === "number" ? value.usedPercent : undefined; const usedCount = typeof value.usedCount === "number" ? value.usedCount : undefined; const totalCount = typeof value.totalCount === "number" ? value.totalCount : undefined; const percent = Math.round(usedPercent ?? (totalCount ? (usedCount ?? 0) / totalCount * 100 : 0)); const resetAtMs = typeof value.resetAtMs === "number" ? value.resetAtMs : undefined; const reset = resetLabel(resetAtMs); return <WebuiStack key={label} gap="small" justify="center" className="min-h-[72px] overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><WebuiInline gap="small" justify="between"><span className="text-[14px] font-normal leading-5 text-text_default_primary">{label}</span><span className="shrink-0 text-[13px] leading-5 text-text_default_secondary">{window.unlimited ? "无限制" : usedCount !== undefined ? `${usedCount}/${totalCount ?? 0}` : `${usedPercent ?? 0}% / 100%`}</span></WebuiInline><div className="h-1 w-full overflow-hidden rounded-full bg-bg_interaction_tertiary_press"><div className="h-full rounded-full bg-text_default_primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>{reset ? <span className="text-[12px] font-normal leading-4 text-text_default_secondary">{reset}</span> : null}</WebuiStack>; })}</SettingsSection> : null}
-        <SettingsSection title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditLoading ? <div data-testid="settings-usage-credit-fallback-loading" className="mx-3 h-[36px] w-full animate-pulse rounded-[12px] bg-bg_interaction_tertiary_press" /> : creditResolved ? <WebuiInline gap="medium" justify="between" className="min-h-[48px] w-full px-3 py-1" data-testid="settings-usage-credit-fallback"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></WebuiInline> : null}</SettingsSection>
+        {quotaData ? <SettingsSection title="用量" testId="settings-usage-limits">{([["5 小时限额", quotaData.fiveHour], ["周限额", quotaData.weekly], ...(quotaData.video ? [["视频限额", quotaData.video] as const] : [])] as const).map(([label, window]) => { const value = recordOf(window); const usedPercent = typeof value.usedPercent === "number" ? value.usedPercent : undefined; const usedCount = typeof value.usedCount === "number" ? value.usedCount : undefined; const totalCount = typeof value.totalCount === "number" ? value.totalCount : undefined; const percent = Math.round(usedPercent ?? (totalCount ? (usedCount ?? 0) / totalCount * 100 : 0)); const resetAtMs = typeof value.resetAtMs === "number" ? value.resetAtMs : undefined; const reset = resetLabel(resetAtMs); return <WebuiStack key={label} gap="small" justify="center" className="min-h-[72px] overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><WebuiInline gap="small" justify="between"><span className="text-[14px] font-normal leading-5 text-text_default_primary">{label}</span><span className="shrink-0 text-[13px] leading-5 text-text_default_secondary">{window.unlimited ? "无限制" : usedCount !== undefined ? `${usedCount}/${totalCount ?? 0}` : `${usedPercent ?? 0}% / 100%`}</span></WebuiInline><FeedbackProgress label={label} value={percent} className="w-full" trackClassName="bg-bg_interaction_tertiary_press" fillClassName="bg-text_default_primary" />{reset ? <span className="text-[12px] font-normal leading-4 text-text_default_secondary">{reset}</span> : null}</WebuiStack>; })}</SettingsSection> : null}
+        <SettingsSection title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditLoading ? <WebuiSkeleton variant="pulse" data-testid="settings-usage-credit-fallback-loading" className="mx-3 h-[36px] w-full rounded-[12px] bg-bg_interaction_tertiary_press" /> : creditResolved ? <WebuiInline gap="medium" justify="between" className="min-h-[48px] w-full px-3 py-1" data-testid="settings-usage-credit-fallback"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></WebuiInline> : null}</SettingsSection>
         <UsageResetCards account={account} state={accountState.resetCards} />
       </>}
     </WebuiStack> : null}

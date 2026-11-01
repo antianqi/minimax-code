@@ -17,6 +17,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import { WebuiInline } from "./layout-primitives.js";
+import { WebuiMotionSlot, WebuiPage, WebuiSkeletonProjection } from "./page.js";
 
 export interface ContentPageProps {
   /** The page's heading. One line: the header truncates rather than wraps. */
@@ -32,6 +33,7 @@ export interface ContentPageProps {
    * region from scrolling the page instead of itself.
    */
   readonly scroll?: boolean;
+  readonly loading?: boolean;
   readonly testId?: string;
   /** Accessibility name for the region. Defaults to the title's text. */
   readonly ariaLabel?: string;
@@ -57,11 +59,13 @@ export function PanelFrame({
   header,
   children,
   scroll = true,
+  loading = false,
   testId,
   ariaLabel,
   dataAttributes,
   className,
   headerClassName,
+  headerMotion,
   bodyClassName,
 }: {
   /** The page's header content. The business writes it; the frame places it. */
@@ -69,6 +73,7 @@ export function PanelFrame({
   readonly children: ReactNode;
   /** Whether the frame's own body scrolls. */
   readonly scroll?: boolean;
+  readonly loading?: boolean;
   readonly testId?: string;
   readonly ariaLabel?: string;
   readonly dataAttributes?: Readonly<Record<string, string>>;
@@ -82,25 +87,33 @@ export function PanelFrame({
    * where the header sits and that the body owns the scroll.
    */
   readonly headerClassName?: string;
+  /** A shared motion family for a header whose layout responds to a state change. */
+  readonly headerMotion?: "disclosure";
   /** The page's own body chrome, when its content brings its own boundary. */
   readonly bodyClassName?: string;
 }): ReactElement {
+  const headerElement = header === undefined ? null : (
+    <header
+      className={
+        headerClassName ??
+        "flex flex-shrink-0 items-center justify-between border-b-[0.5px] border-border_default px-5 py-3"
+      }
+    >
+      <WebuiSkeletonProjection>{header}</WebuiSkeletonProjection>
+    </header>
+  );
   return (
-    <section
+    <WebuiPage
+      as="section"
+      kind="panel"
+      loading={loading}
       {...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel })}
       {...(testId === undefined ? {} : { "data-testid": testId })}
       {...(dataAttributes ?? {})}
       className={`flex h-full min-h-0 flex-col bg-bg_default_primary${className ? ` ${className}` : ""}`}
     >
-      {header === undefined ? null : (
-        <header
-          className={
-            headerClassName ??
-            "flex flex-shrink-0 items-center justify-between border-b-[0.5px] border-border_default px-5 py-3"
-          }
-        >
-          {header}
-        </header>
+      {headerElement === null || headerMotion === undefined ? headerElement : (
+        <WebuiMotionSlot kind={headerMotion}>{headerElement}</WebuiMotionSlot>
       )}
       <div
         className={
@@ -110,9 +123,9 @@ export function PanelFrame({
             : "flex min-h-0 flex-1 flex-col")
         }
       >
-        {children}
+        <WebuiSkeletonProjection>{children}</WebuiSkeletonProjection>
       </div>
-    </section>
+    </WebuiPage>
   );
 }
 
@@ -121,6 +134,7 @@ export function ContentPage({
   title,
   actions,
   scroll = true,
+  loading = false,
   testId,
   ariaLabel,
   dataAttributes,
@@ -131,6 +145,7 @@ export function ContentPage({
   return (
     <PanelFrame
       scroll={scroll}
+      loading={loading}
       testId={testId}
       ariaLabel={ariaLabel}
       dataAttributes={dataAttributes}

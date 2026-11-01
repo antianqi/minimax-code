@@ -20,6 +20,7 @@ import { useState, type ReactElement } from "react";
 import { IconRefresh } from "@tabler/icons-react";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiMotion, WebuiMotionSlot } from "../../../ui/page.js";
 
 import { WebuiIconChevronRight } from "../../../shell/icons.js";
 import type {
@@ -55,6 +56,7 @@ export interface WebuiModelPanelProps {
   readonly onResetEffort: () => void;
   /** Commit a context window. */
   readonly onContextLimitChange: (contextLimit: number) => void;
+  readonly animate?: boolean;
 }
 
 export function WebuiModelPanel({
@@ -64,6 +66,7 @@ export function WebuiModelPanel({
   onEffortChange,
   onResetEffort,
   onContextLimitChange,
+  animate = false,
 }: WebuiModelPanelProps): ReactElement {
   const [previewLevel, setPreviewLevel] = useState<string | undefined>();
   const scale = effortScaleFor(model);
@@ -81,8 +84,9 @@ export function WebuiModelPanel({
   const canReset = !scale.disabled && level !== effortResetOption(model);
 
   return (
-    <WebuiStack gap="small" className="webui-model-panel" data-webui-model-panel="true">
+    <WebuiMotion as="div" kind="surface" state={animate ? "enter" : undefined} direction="right" className="webui-stack webui-stack--gap-small webui-stack--align-stretch webui-stack--justify-start webui-model-panel" data-webui-model-panel="true">
       <div className="webui-model-panel-head">
+        <WebuiMotionSlot kind="feedback">
         <span
           className="webui-model-panel-level"
           data-ultra={level === "max" ? "true" : "false"}
@@ -90,6 +94,7 @@ export function WebuiModelPanel({
         >
           {levelLabel}
         </span>
+        </WebuiMotionSlot>
         <WebuiIconButton
           tone="bare"
           size="compact"
@@ -162,6 +167,6 @@ export function WebuiModelPanel({
         onCommit={onEffortChange}
         onPreviewChange={setPreviewLevel}
       />
-    </WebuiStack>
+    </WebuiMotion>
   );
 }

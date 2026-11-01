@@ -20,6 +20,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { useWebuiPageLoading, WebuiSkeleton, WebuiSkeletonProjection } from "./page.js";
 
 /** The shared single-line text control. Appearance belongs to the field family. */
 export interface WebuiTextInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
@@ -44,6 +45,9 @@ export const WebuiTextInput = forwardRef<HTMLInputElement, WebuiTextInputProps>(
     textTone === "secondary" ? "webui-control--text-secondary" : "",
     className,
   ].filter(Boolean).join(" ");
+  if (useWebuiPageLoading()) {
+    return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape ${classes}`} style={props.style} />;
+  }
   return <input {...props} ref={ref} className={classes} />;
 });
 
@@ -59,6 +63,9 @@ export const WebuiTextarea = forwardRef<
   HTMLTextAreaElement,
   WebuiTextareaProps
 >(function WebuiTextarea({ controlSize = "regular", appearance = "default", className, ...props }, ref): ReactElement {
+  if (useWebuiPageLoading()) {
+    return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-control webui-control--multiline ${controlSize === "compact" ? "webui-control--compact" : ""} ${controlSize === "large" ? "webui-control--large" : ""} ${controlSize === "document" ? "webui-control--document" : ""} ${appearance === "document" ? "webui-control--document-appearance" : ""} ${className ?? ""}`} style={props.style} />;
+  }
   return <textarea {...props} ref={ref} className={["webui-control", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
 });
 
@@ -73,13 +80,16 @@ export const WebuiSelect = forwardRef<HTMLSelectElement, WebuiSelectProps>(funct
   { controlSize = "regular", appearance = "boxed", className, ...props },
   ref,
 ): ReactElement {
-  return <select {...props} ref={ref} className={["webui-control", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "dense" ? "webui-control--dense" : "", appearance === "custom-chevron" ? "webui-control--custom-chevron" : "", className].filter(Boolean).join(" ")} />;
+  const classes = ["webui-control", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "dense" ? "webui-control--dense" : "", appearance === "custom-chevron" ? "webui-control--custom-chevron" : "", className].filter(Boolean).join(" ");
+  if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape ${classes}`} style={props.style} />;
+  return <select {...props} ref={ref} className={classes} />;
 });
 
 export const WebuiCheckbox = forwardRef<
   HTMLInputElement,
   Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & { readonly className?: string }
 >(function WebuiCheckbox({ className, ...props }, ref): ReactElement {
+  if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-checkbox ${className ?? ""}`} style={props.style} />;
   return <input {...props} ref={ref} type="checkbox" className={["webui-checkbox", className].filter(Boolean).join(" ")} />;
 });
 
@@ -87,6 +97,7 @@ export const WebuiRadio = forwardRef<
   HTMLInputElement,
   Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & { readonly className?: string }
 >(function WebuiRadio({ className, ...props }, ref): ReactElement {
+  if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-radio ${className ?? ""}`} style={props.style} />;
   return <input {...props} ref={ref} type="radio" className={["webui-radio", className].filter(Boolean).join(" ")} />;
 });
 
@@ -122,21 +133,23 @@ export function WebuiSearchField({
   testId,
 }: WebuiSearchFieldProps): ReactElement {
   return (
-    <label
-      className={`webui-search-field webui-search-field--${appearance}${className ? ` ${className}` : ""}`}
-      data-testid={testId}
-    >
-      <span className="webui-search-field-icon" aria-hidden="true">{icon}</span>
-      <WebuiTextInput
-        appearance="bare"
-        controlSize="dense"
-        className="webui-search-field-control"
-        aria-label={label}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-      />
-    </label>
+    <WebuiSkeletonProjection>
+      <label
+        className={`webui-search-field webui-search-field--${appearance}${className ? ` ${className}` : ""}`}
+        data-testid={testId}
+      >
+        <span className="webui-search-field-icon" aria-hidden="true">{icon}</span>
+        <WebuiTextInput
+          appearance="bare"
+          controlSize="dense"
+          className="webui-search-field-control"
+          aria-label={label}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+        />
+      </label>
+    </WebuiSkeletonProjection>
   );
 }
 
@@ -243,6 +256,7 @@ export function WebuiField({
 
   if (arrangement === "row") {
     return (
+      <WebuiSkeletonProjection>
       <div className={`webui-field webui-field--gap-${gap} webui-field--row${className ? ` ${className}` : ""}`}>
         <div className="webui-field-text">
           {labelText}
@@ -251,16 +265,19 @@ export function WebuiField({
         </div>
         <div className="webui-field-control">{control(props, field)}</div>
       </div>
+      </WebuiSkeletonProjection>
     );
   }
 
   return (
+    <WebuiSkeletonProjection>
     <div className={`webui-field webui-field--gap-${gap}${className ? ` ${className}` : ""}`}>
       {labelText}
       {descriptionText}
       <div className="webui-field-control">{control(props, field)}</div>
       {errorText}
     </div>
+    </WebuiSkeletonProjection>
   );
 }
 
@@ -272,7 +289,7 @@ export function WebuiFormLayout({
   readonly children: ReactNode;
   readonly className?: string;
 }): ReactElement {
-  return <div className={`webui-form${className ? ` ${className}` : ""}`}>{children}</div>;
+  return <div className={`webui-form${className ? ` ${className}` : ""}`}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>;
 }
 
 /** The actions a form ends with. The commands stay with the caller. */
@@ -283,5 +300,5 @@ export function WebuiFormActions({
   readonly children: ReactNode;
   readonly className?: string;
 }): ReactElement {
-  return <div className={`webui-form-actions${className ? ` ${className}` : ""}`}>{children}</div>;
+  return <div className={`webui-form-actions${className ? ` ${className}` : ""}`}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>;
 }

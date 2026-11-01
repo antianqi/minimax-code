@@ -119,6 +119,9 @@ test("A history is never rendered during B's delayed first page", async ({ page 
 
   await switchSession(page, "B");
   await expect.poll(() => page.evaluate(() => window.__fixture.pending.some((item) => item.operation === "getMessages" && item.body.id === "B"))).toBe(true);
+  const skeleton = page.locator(".webui-skeleton.webui-motion-loading").first();
+  await expect(skeleton).toBeVisible();
+  await expect.poll(() => skeleton.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-skeleton-shimmer");
   await expect(page.getByText("History A synthetic")).toHaveCount(0);
   await expect(page.getByText("History B synthetic")).toHaveCount(0);
 

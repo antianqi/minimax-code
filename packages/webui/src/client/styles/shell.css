@@ -108,8 +108,6 @@
     border-radius: var(--radius_12);
     background: var(--bg_default_primary);
     box-shadow: 0 8px 24px var(--shadow_default);
-    transform-origin: bottom left;
-    animation: webui-menu-enter 150ms cubic-bezier(.2, .7, .2, 1) both;
   }
   .webui-model-menu--two-column {
     display: grid;
@@ -165,10 +163,6 @@
   .webui-workspace-option[aria-selected="true"] {
     background-color: var(--bg_interaction_tertiary_hover);
   }
-  @keyframes message-appear {
-    from { opacity: 0; transform: translateY(2px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
   /* The session title, in the header row.
    *
    * The title used to sit in its own row that carried a left padding chosen
@@ -204,41 +198,6 @@
   .webui-user-menu-quota-row--last,
   .webui-user-menu-quota-row--solo {
     padding-bottom: 8px;
-  }
-  @keyframes webui-user-menu-usage-pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.4;
-    }
-  }
-  .signin-card-collapsing {
-    transform-origin: bottom left;
-    pointer-events: none;
-    animation: signin-card-collapse 0.24s ease-in forwards;
-  }
-  @keyframes signin-day-claimed {
-    0% {
-      transform: scale(0.8);
-    }
-    60% {
-      transform: scale(1.15);
-    }
-    to {
-      transform: scale(1);
-    }
-  }
-  @keyframes signin-card-collapse {
-    0% {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-    to {
-      opacity: 0;
-      transform: translateY(8px) scale(0.96);
-    }
   }
   .webui-signin-credits-tooltip {
     position: absolute;
@@ -276,11 +235,6 @@
     transform: translateX(-50%);
     border: 5px solid transparent;
     border-top-color: rgba(0, 0, 0, 0.85);
-  }
-  @keyframes webui-signin-claim-spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
   .webui-plugin-categories {
     max-width: 960px;
@@ -447,7 +401,7 @@
     line-height: 1;
   }
   .webui-mcp-advanced-fields {
-    padding: 16px 0 0;
+    padding: 0;
   }
   .webui-mcp-advanced-fields textarea {
     min-height: 100px;
@@ -528,16 +482,8 @@
    * to a heading has to do. `pointer-events: none` for the same reason the
    * context-usage label is — otherwise the pointer leaving the glyph toward
    * the bubble drops the hover that is showing it. */
-  .webui-settings-info-hint-bubble { position: absolute; bottom: calc(100% + var(--spacing_8)); left: 50%; z-index: 60; width: max-content; max-width: 250px; padding: var(--spacing_8) var(--spacing_12); border-radius: 6px; transform: translateX(-50%) translateY(3px); transform-origin: bottom center; background: rgb(0 0 0 / 85%); box-shadow: 0 6px 16px rgb(0 0 0 / 18%); color: #fff; font-size: var(--size_12); line-height: var(--line_height_18); white-space: normal; text-align: left; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 120ms ease, transform 120ms ease, visibility 120ms step-end; }
+  .webui-settings-info-hint-bubble { position: absolute; bottom: calc(100% + var(--spacing_8)); left: 50%; z-index: 60; width: max-content; max-width: 250px; padding: var(--spacing_8) var(--spacing_12); border-radius: 6px; transform: translateX(-50%); transform-origin: bottom center; background: rgb(0 0 0 / 85%); box-shadow: 0 6px 16px rgb(0 0 0 / 18%); color: #fff; font-size: var(--size_12); line-height: var(--line_height_18); white-space: normal; text-align: left; pointer-events: none; }
   .webui-settings-info-hint-bubble::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
-  .webui-settings-info-hint-anchor:hover .webui-settings-info-hint-bubble,
-  .webui-settings-info-hint:focus-visible ~ .webui-settings-info-hint-bubble { opacity: 1; transform: translateX(-50%) translateY(0); visibility: visible; transition: opacity 120ms ease, transform 120ms ease, visibility 0s; }
-
-  @keyframes webui-overlay-enter { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes webui-modal-enter { from { opacity: 0; transform: translateY(8px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  @keyframes webui-panel-enter-right { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
-  @keyframes webui-popover-enter { from { opacity: 0; transform: translateY(-6px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  @keyframes webui-menu-enter { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
   /* The Mini App view (ADR 0020).
    *

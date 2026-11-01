@@ -54,15 +54,6 @@
     flex-direction: column;
     gap: 8px;
   }
-  .webui-feedback-skeleton-row {
-    display: block;
-    height: 12px;
-    border-radius: 6px;
-    background: var(--bg_grouped_secondary);
-  }
-  .webui-feedback-skeleton-row:last-child {
-    width: 60%;
-  }
   .webui-feedback--busy {
     flex-direction: row;
     align-items: center;
@@ -102,6 +93,5 @@
     display: block;
     height: 100%;
     background: var(--text_default_primary);
-    transition: width var(--webui-motion-duration-surface) var(--webui-motion-ease-standard);
   }
 }

@@ -183,6 +183,36 @@ test("clicking the account tab shows the account panel", async ({ page }) => {
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
 });
 
+test("the account usage tooltip uses the shared tooltip motion on entry and exit", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("getAccountUsageSummary", { days: [] });
+  });
+  await openApp(page, "#session=A");
+  await openSettings(page);
+  await accountTab(page).click();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  const cell = page.locator('button[data-testid^="usage-cell-"]').first();
+  const tooltip = page.locator(".webui-account-usage-cell-tip");
+  await expect(cell).toBeVisible();
+  await expect(tooltip).toHaveAttribute("data-webui-motion", "tooltip");
+  await expect(tooltip).toHaveAttribute("data-webui-tooltip-visible", "false");
+  expect(
+    await tooltip.evaluate((element) => getComputedStyle(element).transitionDuration.split(", ")),
+  ).toEqual(["0.12s", "0.12s", "0.12s"]);
+
+  await cell.hover();
+  await expect(tooltip).toHaveAttribute("data-webui-tooltip-visible", "true");
+  await expect(tooltip).toHaveAttribute("aria-hidden", "false");
+  await expect(tooltip).toHaveCSS("opacity", "1");
+
+  await page.mouse.move(0, 0);
+  await expect(tooltip).toHaveAttribute("data-webui-tooltip-visible", "false");
+  await expect(tooltip).toHaveAttribute("aria-hidden", "true");
+  await expect(tooltip).toHaveCount(1);
+  await expect(tooltip).toBeHidden();
+});
+
 test("the account panel's 分享 action opens the share preview", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);

@@ -226,7 +226,6 @@
     border-radius: 12px;
     background: transparent;
     padding: 8px 12px;
-    transition: background-color 120ms ease;
   }
   .webui-plugin-management.is-marketplace
     .webui-plugin-grid
@@ -278,6 +277,21 @@
   .webui-plugin-grid .webui-plugin-row {
     min-width: 0;
     border-bottom: 0;
+  }
+  .webui-plugin-expanded-list {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    max-width: 768px;
+  }
+  .webui-plugin-expanded-list > .webui-disclosure-content {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-column: 1 / -1;
+    grid-template-columns: inherit;
+    column-gap: inherit;
+    row-gap: inherit;
   }
   .webui-plugin-icon {
     display: grid;
@@ -485,6 +499,12 @@
   .webui-mcp-advanced-button {
     align-self: flex-start;
     justify-self: flex-start;
+  }
+  .webui-mcp-advanced-fields > .webui-disclosure-content > .webui-mcp-advanced-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 16px;
   }
   .webui-mcp-form {
     display: flex;

@@ -52,6 +52,40 @@ test("the ring appears for a reloaded session whose usage is spelled the runtime
   await expect(ring(page)).toHaveAttribute("aria-label", /上下文窗口使用 6%/u);
 });
 
+test("the context usage tooltip uses the shared tooltip motion and reduced-motion policy", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await configureFixture(page, () => {
+    window.__fixture.setPage("B", {
+      messages: [
+        { msgId: "history-B", role: "assistant", msgContent: "History B synthetic", timestamp: 1_700_000_000_002 },
+      ],
+      hasMore: false,
+      contextSnapshot: { status: "live", usage: { totalTokens: 12000, contextWindow: 200000 } },
+    });
+  });
+  await openApp(page, "#session=A");
+  await switchSession(page, "B");
+
+  const tooltip = page.locator(".webui-context-usage-label");
+  const trigger = ring(page);
+  expect(await tooltip.getAttribute("data-webui-motion")).toBe("tooltip");
+  expect(await tooltip.evaluate((element) => getComputedStyle(element).opacity)).toBe("0");
+  expect(await tooltip.evaluate((element) => getComputedStyle(element).transitionDuration)).toContain("0.12s");
+
+  await trigger.hover();
+  await expect(tooltip).toHaveAttribute("data-webui-tooltip-visible", "true");
+  await expect.poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity)).toBe("1");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await trigger.hover();
+  await page.mouse.move(0, 0);
+  await expect(tooltip).toHaveAttribute("data-webui-tooltip-visible", "false");
+  await expect.poll(() => tooltip.evaluate((element) => {
+    const duration = getComputedStyle(element).transitionDuration;
+    return duration.endsWith("ms") ? Number.parseFloat(duration) / 1000 : Number.parseFloat(duration);
+  })).toBeLessThan(0.0001);
+});
+
 test("the ring appears for the protocol's snake_case spelling too", async ({ page }) => {
   await configureFixture(page, () => {
     window.__fixture.setPage("B", {

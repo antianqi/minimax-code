@@ -19,6 +19,7 @@ import type { WebuiClientMessagePage } from "../contracts/message-view.js";
 import type { WebuiTranscriptItem } from "../contracts/transcript-view.js";
 import type { WebuiTranscriptCommands } from "../contracts/session-read-port.js";
 import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
+import { scrollWebuiTargetIntoView } from "../../../bindings/browser-effects.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
@@ -83,7 +84,7 @@ export function revealTurnNavigatorAnchor(
   target: WebuiTurnRevealTarget,
   flashMs = TURN_NAVIGATOR_FLASH_MS,
 ): void {
-  target.scrollIntoView({ block: "center", behavior: "smooth" });
+  scrollWebuiTargetIntoView(target, { block: "center" });
   target.classList.add(TURN_NAVIGATOR_FLASH_CLASS);
   setTimeout(() => target.classList.remove(TURN_NAVIGATOR_FLASH_CLASS), flashMs);
 }

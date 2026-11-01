@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { useDialogLayer } from "../../../ui/overlay-listeners.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiMotion } from "../../../ui/page.js";
 import type {
   WebuiUsageHeatmapCell,
   WebuiUsageHeatmapModel,
@@ -72,6 +73,7 @@ export function UsageHeatmap({
   const { dom } = useWebuiBrowserCapabilities();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hovered, setHovered] = useState<HoveredCell | null>(null);
+  const [tooltipCell, setTooltipCell] = useState<HoveredCell | null>(null);
   /**
    * The cell tooltip is a floating layer above the page (ADR 0028 § Overlay
    * coordination), so it registers with the coordinator rather than floating
@@ -143,13 +145,17 @@ export function UsageHeatmap({
                   className={levelClassName(cell.level)}
                   aria-label={cellLabel(cell)}
                   data-testid={`usage-cell-${cell.date}`}
-                  onMouseEnter={(event) =>
-                    setHovered(readHoveredCell(cell, event.currentTarget))
-                  }
+                  onMouseEnter={(event) => {
+                    const next = readHoveredCell(cell, event.currentTarget);
+                    setHovered(next);
+                    setTooltipCell(next);
+                  }}
                   onMouseLeave={() => setHovered(null)}
-                  onFocus={(event) =>
-                    setHovered(readHoveredCell(cell, event.currentTarget))
-                  }
+                  onFocus={(event) => {
+                    const next = readHoveredCell(cell, event.currentTarget);
+                    setHovered(next);
+                    setTooltipCell(next);
+                  }}
                   onBlur={() => setHovered(null)}
                 />
               );
@@ -170,23 +176,32 @@ export function UsageHeatmap({
           </div>
         ) : null}
       </div>
-      {portalTarget && hovered
+      {portalTarget
         ? createPortal(
-            <div
+            <WebuiMotion
+              as="div"
+              kind="tooltip"
               className="webui-account-usage-cell-tip"
-              style={{ left: hovered.left, top: hovered.top }}
+              data-webui-tooltip-visible={hovered ? "true" : "false"}
+              aria-hidden={!hovered}
+              style={{
+                left: (hovered ?? tooltipCell)?.left ?? 0,
+                top: (hovered ?? tooltipCell)?.top ?? 0,
+              }}
               data-overlay-layer={tipLayerId}
               role="presentation"
             >
               <div className="webui-account-usage-cell-tip-date">
-                {formatUsageCellDate(hovered.cell.date)}
+                {tooltipCell ? formatUsageCellDate(tooltipCell.cell.date) : null}
               </div>
               <div className="webui-account-usage-cell-tip-value">
-                {hovered.cell.totalToken > 0
-                  ? `${formatCompactToken(hovered.cell.totalToken)} tokens`
-                  : "无用量"}
+                {tooltipCell
+                  ? tooltipCell.cell.totalToken > 0
+                    ? `${formatCompactToken(tooltipCell.cell.totalToken)} tokens`
+                    : "无用量"
+                  : null}
               </div>
-            </div>,
+            </WebuiMotion>,
             portalTarget,
           )
         : null}

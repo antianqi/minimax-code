@@ -9,6 +9,7 @@ import { useDialogLayer } from "./overlay-listeners.js";
 import { ManagedOverlayBoundary } from "./overlay-listeners.js";
 import { useOverlayCoordinator } from "./overlay-coordinator.js";
 import { WebuiIconButton } from "./button.js";
+import { WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
 
 export type WebuiDialogWidth = "compact" | "standard" | "wide";
 
@@ -16,6 +17,7 @@ export interface WebuiDialogProps {
   readonly id?: string;
   readonly parentLayerId?: string | null;
   readonly open?: boolean;
+  readonly loading?: boolean;
   readonly title: ReactNode;
   readonly description?: ReactNode;
   readonly headerActions?: ReactNode;
@@ -52,6 +54,7 @@ export function WebuiDialog({
   id: requestedId,
   parentLayerId,
   open = true,
+  loading = false,
   title,
   description,
   headerActions,
@@ -72,6 +75,8 @@ export function WebuiDialog({
   initialFocusRef,
   dialogRef,
 }: WebuiDialogProps): ReactElement | null {
+  const [present, setPresent] = useState(open);
+  const [motionState, setMotionState] = useState<"enter" | "exit">("enter");
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const generatedId = useId();
   const id = requestedId ?? `webui-dialog-${generatedId}`;
@@ -90,7 +95,20 @@ export function WebuiDialog({
   });
 
   useEffect(() => {
-    if (!open || !surfaceRef.current) return;
+    if (!open) {
+      maskRef.current?.toggleAttribute("inert", true);
+      surfaceRef.current?.toggleAttribute("inert", true);
+      if (present) setMotionState("exit");
+      return;
+    }
+    maskRef.current?.removeAttribute("inert");
+    surfaceRef.current?.removeAttribute("inert");
+    setPresent(true);
+    setMotionState("enter");
+  }, [open, present]);
+
+  useEffect(() => {
+    if (!present || !surfaceRef.current) return;
     const surface = surfaceRef.current;
     const mask = maskRef.current;
     if (!mask) return;
@@ -110,21 +128,39 @@ export function WebuiDialog({
       return descendants;
     };
     const deactivate = dom.activateModalSurface(surface, mask, descendantLayerIds);
-    (initialFocusRef?.current ?? surface).focus();
     return deactivate;
-  }, [coordinator, dom, id, initialFocusRef, open]);
+  }, [coordinator, dom, id, present]);
 
-  if (!open || !portalTarget) return null;
+  useEffect(() => {
+    if (open && surfaceRef.current) (initialFocusRef?.current ?? surfaceRef.current).focus();
+  }, [initialFocusRef, open, present]);
+
+  if (!present || !portalTarget) return null;
+
+  const finishExit = (event: React.AnimationEvent<HTMLDivElement>) => {
+    if (event.currentTarget !== event.target || motionState !== "exit") return;
+    setPresent(false);
+  };
 
   const dialog = (
-    <div
-      ref={maskRef}
+    <WebuiMotion as="div" kind="surface" state={motionState} direction="none"
+      onAnimationEnd={finishExit}
+      ref={(element) => {
+        maskRef.current = element as HTMLDivElement | null;
+        element?.toggleAttribute("inert", !open);
+      }}
       className="webui-dialog-mask"
       data-webui-dialog-scrim="true"
+      aria-hidden={!open || undefined}
     >
-      <section
+      <WebuiPage
+        as="section"
+        kind="dialog"
+        motion={{ kind: "surface", state: motionState, direction: "up" }}
+        loading={loading}
         ref={(element) => {
           surfaceRef.current = element;
+          element?.toggleAttribute("inert", !open);
           dialogRef?.(element);
         }}
         data-webui-dialog-shell="true"
@@ -134,6 +170,7 @@ export function WebuiDialog({
         className={`webui-dialog-surface webui-dialog-surface--${width}`}
         role={role}
         aria-modal="true"
+        aria-hidden={!open || undefined}
         aria-labelledby={titleId}
         {...(descriptionId ? { "aria-describedby": descriptionId } : {})}
         tabIndex={-1}
@@ -141,10 +178,10 @@ export function WebuiDialog({
         <ManagedOverlayBoundary layerId={layerId}>
         <header className="webui-dialog-header">
           <div className="webui-dialog-heading">
-            <h2 id={titleId}>{title}</h2>
-            {descriptionId ? <p id={descriptionId}>{description}</p> : null}
+            <h2 id={titleId}><WebuiSkeletonProjection>{title}</WebuiSkeletonProjection></h2>
+            {descriptionId ? <p id={descriptionId}><WebuiSkeletonProjection>{description}</WebuiSkeletonProjection></p> : null}
           </div>
-          {headerActions}
+          <WebuiSkeletonProjection>{headerActions}</WebuiSkeletonProjection>
           {showClose ? (
             <WebuiIconButton
               label={closeLabel}
@@ -157,17 +194,17 @@ export function WebuiDialog({
           ) : null}
         </header>
         <DialogFooterContext.Provider value={footerTarget}>
-          <div className="webui-dialog-body">{children}</div>
+          <div className="webui-dialog-body"><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
           <footer
             ref={setFooterTarget}
             className={`webui-dialog-footer${footerClassName ? ` ${footerClassName}` : ""}`}
           >
-            {footer}
+            <WebuiSkeletonProjection>{footer}</WebuiSkeletonProjection>
           </footer>
         </DialogFooterContext.Provider>
         </ManagedOverlayBoundary>
-      </section>
-    </div>
+      </WebuiPage>
+    </WebuiMotion>
   );
 
   return createPortal(dialog, portalTarget);

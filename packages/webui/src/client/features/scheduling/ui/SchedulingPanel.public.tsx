@@ -33,6 +33,7 @@ import {
 import { ContentPage } from "../../../ui/content-page.js";
 import { SchedulingEditor } from "./scheduling-editor.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiDisclosure } from "../../../ui/page.js";
 
 export interface SchedulingPanelViewProps {
   readonly snapshot: WebuiSchedulingSnapshot;
@@ -70,6 +71,7 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
   const showEmpty = rows.length === 0 && props.snapshot.status === "ready";
   return (
     <ContentPage
+      loading={props.snapshot.status === "loading" && rows.length === 0}
       ariaLabel="定时任务"
       dataAttributes={{ "data-webui-component": "scheduling-panel" }}
       title="定时任务"
@@ -172,6 +174,8 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
                   立即执行
                 </WebuiButton>
                 <WebuiButton variant="outline-secondary" size="inline-tiny" data-webui-scheduling-history={row.cronId}
+                  aria-expanded={props.expandedRuns === row.cronId}
+                  aria-controls={`webui-scheduling-runs-${encodeURIComponent(row.cronId)}`}
                   onClick={() => {
                     const task = tasksById.get(row.cronId);
                     if (task) props.onToggleRuns(task);
@@ -208,8 +212,13 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
                     删除
                   </WebuiButton>}
               </WebuiInline>
-              {props.expandedRuns === row.cronId
-                ? <WebuiStack as="ul" gap="tight" data-webui-scheduling-runs={row.cronId} className="mt-2 border-t-[0.5px] border-border_default pt-1">
+              <WebuiDisclosure
+                id={`webui-scheduling-runs-${encodeURIComponent(row.cronId)}`}
+                open={props.expandedRuns === row.cronId}
+                className="webui-scheduling-runs-disclosure"
+                data-webui-scheduling-runs={row.cronId}
+              >
+                <WebuiStack as="ul" gap="tight" className="mt-2 border-t-[0.5px] border-border_default pt-1">
                   {(props.runs?.get(row.cronId) ?? []).length === 0
                     ? <li className="text-xs text-text_default_tertiary">还没有运行记录。</li>
                     : webuiCronRunRows(props.runs?.get(row.cronId) ?? []).map((run) => (
@@ -233,7 +242,7 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
                       </li>
                     ))}
                 </WebuiStack>
-                : null}
+              </WebuiDisclosure>
             </li>
           ))}
         </WebuiStack>

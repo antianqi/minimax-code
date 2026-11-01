@@ -121,6 +121,7 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
 
   const cards = page.locator(".webui-plugin-grid .webui-plugin-row");
   await expect(cards).toHaveCount(10);
+  await expect(cards.nth(9)).toBeVisible();
   await expect(page.getByRole("heading", { name: "插件" }).last()).toBeVisible();
 
   const captureDir = process.env.WEBUI_DECOMPOSITION_SCREENSHOT_DIR;
@@ -133,7 +134,9 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   }
 
   await page.getByRole("button", { name: "收起插件" }).click();
-  await expect(cards).toHaveCount(8);
+  const expandedList = page.getByTestId("webui-plugin-expanded-list");
+  await expect(expandedList).toHaveAttribute("aria-hidden", "true");
+  await expect.poll(() => expandedList.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
   await expect(page.getByRole("button", { name: "查看全部 10 个" })).toBeVisible();
   if (captureDir) {
     await page.screenshot({
@@ -143,7 +146,22 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   }
 
   await page.getByRole("button", { name: "查看全部 10 个" }).click();
-  await expect(cards).toHaveCount(10);
+  await expect(expandedList).toHaveAttribute("data-webui-motion-state", "expand");
+  await expect(cards.nth(9)).toBeVisible();
+  const columns = await Promise.all([0, 1].map(async (column) => Promise.all([
+    cards.nth(column).evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, width: rect.width };
+    }),
+    cards.nth(column + 8).evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, width: rect.width };
+    }),
+  ])));
+  for (const [preview, expanded] of columns) {
+    expect(Math.abs(preview.left - expanded.left), "expanded cards keep the preview column alignment").toBeLessThan(8);
+    expect(Math.abs(preview.width - expanded.width), "expanded cards keep the preview column width").toBeLessThan(8);
+  }
 });
 
 test("Skill add form is centered, usable and submits through plugin management", async ({ page }) => {
@@ -269,7 +287,14 @@ test("MCP add form validates inputs, switches transport and sends advanced HTTP 
   await expect(dialog.getByLabel("地址")).toBeVisible();
   await expect(dialog.getByLabel("命令")).toHaveCount(0);
   await dialog.getByLabel("地址").fill("http://127.0.0.1:43121/mcp");
-  await dialog.getByRole("button", { name: "高级" }).click();
+  const advancedToggle = dialog.getByRole("button", { name: "高级" });
+  const advancedFields = dialog.locator("#webui-mcp-advanced-fields");
+  await expect(advancedToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(advancedFields).toHaveAttribute("aria-hidden", "true");
+  await advancedToggle.click();
+  await expect(advancedFields).toHaveAttribute("data-webui-motion-state", "expand");
+  await expect(advancedFields).not.toHaveAttribute("aria-hidden", "true");
+  await expect.poll(() => advancedFields.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
   await dialog.getByLabel("请求头").fill('{"x-test":"synthetic"}');
   await dialog.getByLabel("超时（毫秒）").fill("0");
   // The Desktop dialog disables its primary action while the form is invalid,
@@ -282,6 +307,13 @@ test("MCP add form validates inputs, switches transport and sends advanced HTTP 
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) =>
     request.operation === "pluginManagement" && request.body.action === "createMcpServer",
   ))).toBe(false);
+
+  await advancedToggle.click();
+  await expect(advancedFields).toHaveAttribute("data-webui-motion-state", "collapse");
+  await expect(advancedFields).toHaveAttribute("aria-hidden", "true");
+  await expect(advancedFields).toHaveAttribute("inert", "");
+  await expect.poll(() => advancedFields.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
+  await advancedToggle.click();
 
   await dialog.getByLabel("超时（毫秒）").fill("1500");
   await expect(dialog.getByRole("button", { name: "添加服务器" })).toBeEnabled();
@@ -303,6 +335,34 @@ test("MCP add form validates inputs, switches transport and sends advanced HTTP 
     },
   });
   await expect(dialog).toHaveCount(0);
+});
+
+test("MCP advanced fields use the shared disclosure for open and close", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listMcpServers", { servers: [] });
+    });
+  });
+  await openManagement(page);
+  await page.getByRole("menuitem", { name: "添加 MCP server" }).click();
+  const dialog = page.getByRole("dialog", { name: "MCP Server" });
+  await dialog.getByLabel("传输方式").selectOption("http");
+  const toggle = dialog.getByRole("button", { name: "高级" });
+  const disclosure = dialog.locator("#webui-mcp-advanced-fields");
+
+  await expect(disclosure).toHaveAttribute("data-webui-motion", "disclosure");
+  await expect(disclosure).toHaveAttribute("aria-hidden", "true");
+  await toggle.click();
+  await expect(disclosure).toHaveAttribute("data-webui-motion-state", "expand");
+  await expect(disclosure).not.toHaveAttribute("aria-hidden", "true");
+  await expect(dialog.getByLabel("请求头")).toBeVisible();
+
+  await toggle.click();
+  await expect(disclosure).toHaveAttribute("data-webui-motion-state", "collapse");
+  await expect(disclosure).toHaveAttribute("aria-hidden", "true");
+  await expect(disclosure).toHaveAttribute("inert", "");
+  await expect.poll(() => disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });
 
 test("Git plugin import form is an accessible viewport overlay and previews local fixture data", async ({ page }) => {

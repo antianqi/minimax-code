@@ -5,6 +5,7 @@
 // content that makes that layout unique rather than re-declaring the layout.
 
 import { createElement, type HTMLAttributes, type ReactElement, type ReactNode } from "react";
+import { WebuiSkeletonProjection } from "./page.js";
 
 export type WebuiLayoutGap = "none" | "hairline" | "micro" | "tight" | "compact" | "small" | "medium" | "roomy" | "large";
 export type WebuiLayoutAlignment = "start" | "center" | "end" | "stretch" | "baseline";
@@ -58,7 +59,7 @@ export function WebuiInline({
       ].filter(Boolean).join(" "),
       ...rest,
     },
-    children,
+    <WebuiSkeletonProjection>{children}</WebuiSkeletonProjection>,
   );
 }
 
@@ -84,6 +85,6 @@ export function WebuiStack({
       ].filter(Boolean).join(" "),
       ...rest,
     },
-    children,
+    <WebuiSkeletonProjection>{children}</WebuiSkeletonProjection>,
   );
 }

@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { compareMotion, scanStylesheet } from "../../../../scripts/check-webui-motion.mjs";
+import { compareMotion, featureInteractionTransformOwnershipProblems, featureRotationOwnershipProblems, featureSmoothScrollOwnershipProblems, scanStylesheet, sourceMotionOwnershipProblems } from "../../../../scripts/check-webui-motion.mjs";
 
 const clientRoot = new URL("../../src/client/", import.meta.url);
 const motionCss = readFileSync(new URL("styles/motion.css", clientRoot), "utf8");
@@ -66,6 +66,40 @@ describe("the motion inventory", () => {
     expect(problems).toContain("a.css: 400ms is recorded as distinct with no reason");
     expect(problems).toContain("a.css: recorded 120ms no longer appears");
     expect(problems).toContain("a.css: recorded @keyframes fade-in no longer appears");
+  });
+
+  it("keeps animation engines, Web Animations API and SVG animation behind shared motion components", () => {
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `import lottie from "lottie-web";`))
+      .toContain("features/example/ui/Widget.tsx: lottie-web playback belongs in the shared ui/feedback.tsx component");
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `node.animate([{ opacity: 0 }, { opacity: 1 }]);`))
+      .toContain("features/example/ui/Widget.tsx: Web Animations API call bypasses the shared motion component");
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `target.scrollIntoView({ block: "center", behavior: "smooth" });`))
+      .toContain("features/example/ui/Widget.tsx: smooth scrolling belongs in the shared browser-effects helper");
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<svg><animate attributeName="opacity" /></svg>`))
+      .toContain("features/example/ui/Widget.tsx: inline SVG animation bypasses the shared motion component");
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<Chevron className="webui-motion-disclosure-transform rotate-90" />`))
+      .toContain('features/example/ui/Widget.tsx: source uses raw motion utility "rotate-90"; use a shared motion component or an approved exception');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<Chevron className="webui-motion-disclosure-transform" />`))
+      .toContain('features/example/ui/Widget.tsx: source names "webui-motion-disclosure-transform" directly; use WebuiMotionSlot or WebuiDisclosure');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="webui-motion-feedback" />`))
+      .toContain('features/example/ui/Widget.tsx: source names "webui-motion-feedback" directly; use WebuiMotionSlot or WebuiDisclosure');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="hover:scale-105" />`))
+      .toContain('features/example/ui/Widget.tsx: source uses raw motion utility "hover:scale-105"; use a shared motion component or an approved exception');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="hover:-translate-x-1" />`))
+      .toContain('features/example/ui/Widget.tsx: source uses raw motion utility "hover:-translate-x-1"; use a shared motion component or an approved exception');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="hover:[transform:scale(1.05)]" />`))
+      .toContain('features/example/ui/Widget.tsx: source uses raw motion utility "hover:[transform:scale(1.05)]"; use a shared motion component or an approved exception');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="-translate-x-1/2 scale-y-50" />`))
+      .toEqual([]);
+    expect(featureRotationOwnershipProblems("features/example/ui/widget.css", `.widget-chevron.is-open { transform: rotate(90deg); }`))
+      .toContain("features/example/ui/widget.css: business-owned rotation belongs in shared motion styles");
+    expect(featureRotationOwnershipProblems("features/example/ui/widget.css", `.widget[data-expanded="true"] svg { transform: rotate(90deg); }`))
+      .toContain("features/example/ui/widget.css: business-owned rotation belongs in shared motion styles");
+    expect(featureSmoothScrollOwnershipProblems("features/example/ui/widget.css", `.widget { scroll-behavior: smooth; }`))
+      .toContain("features/example/ui/widget.css: smooth scrolling belongs in the shared browser-effects helper");
+    expect(featureInteractionTransformOwnershipProblems("features/example/ui/widget.css", `.widget:hover .thumb { scale: 1.08; }`))
+      .toContain("features/example/ui/widget.css: interaction transforms belong to a shared motion family");
+    expect(sourceMotionOwnershipProblems("ui/feedback.tsx", `import lottie from "lottie-web";`)).toEqual([]);
   });
 });
 

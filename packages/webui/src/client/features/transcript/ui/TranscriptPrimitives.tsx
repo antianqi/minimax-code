@@ -7,7 +7,7 @@
 // `WebuiToolRow` stays private — it is a non-exported helper used only by
 // `WebuiToolResults`.
 
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { IconBrowser, IconBrain, IconCode, IconFile, IconHammer, IconHexagon, IconListCheck, IconMusic, IconPhoto, IconRobot, IconSearch, IconSparkles, IconSquares, IconTarget, IconTerminal2, IconVideo, IconWorld } from "@tabler/icons-react";
 import { ActivityIndicator } from "./ActivityIndicator.js";
 import {
@@ -18,6 +18,7 @@ import {
 import { WebuiMarkdown } from "./markdown.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
 import {
   isWebuiEditTool,
   toolCallInputText,
@@ -46,16 +47,25 @@ function WebuiToolRow({
   const status = toolCallStatus(tool);
   const statusLabel = status === "completed" ? undefined : toolCallStatusLabel(status);
   const resourcePath = toolCallResourcePath(tool);
+  const disclosureId = useId();
+  const [expanded, setExpanded] = useState(false);
   const pathSegments = resourcePath?.replaceAll("\\", "/").split("/").filter(Boolean) ?? [];
   const resourceLabel = pathSegments[pathSegments.length - 1] ?? resourcePath;
   return (
-    <details
+    <div
       key={`tool-call-${toolCallName(tool)}-${index}`}
       className="webui-tool-row"
       data-webui-tool-call={toolCallName(tool)}
       data-webui-tool-status={status}
     >
-      <summary className="webui-tool-row-summary">
+      <WebuiButton
+        variant="plain"
+        size="regular"
+        className="webui-tool-row-summary"
+        aria-expanded={expanded}
+        aria-controls={disclosureId}
+        onClick={() => setExpanded((value) => !value)}
+      >
         <span className={`webui-tool-icon webui-tool-icon--${toolCallIconCategory(tool)}`} aria-hidden="true">
           <WebuiToolIcon category={toolCallIconCategory(tool)} />
         </span>
@@ -64,20 +74,26 @@ function WebuiToolRow({
           {statusLabel ? ` · ${statusLabel}` : ""}
         </span>
         {resourcePath ? <span className="webui-tool-resource-path" title={resourcePath}>{resourceLabel}</span> : null}
-        {!resourcePath ? <WebuiIconChevronDown className="webui-tool-chevron" /> : null}
-      </summary>
-      {status === "running" && !input && !result && !error ? (
-        <WebuiToolDetailShell title={toolCallLabel(tool)}>
-          <div className="webui-tool-detail-running">运行中…</div>
-        </WebuiToolDetailShell>
-      ) : input || result || error ? (
-        <WebuiToolDetailShell title={toolCallLabel(tool)}>
-          {input !== undefined ? <WebuiToolDetailSection label="输入" value={formatToolInputForDisplay(input)} /> : null}
-          {result !== undefined ? <WebuiToolDetailSection label="结果" value={result} /> : null}
-          {error !== undefined ? <WebuiToolDetailSection label="错误" value={error} error /> : status === "error" ? <WebuiToolDetailSection label="错误" value="执行失败" error /> : null}
-        </WebuiToolDetailShell>
-      ) : null}
-    </details>
+        {!resourcePath ? (
+          <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 180 : 0}>
+            <WebuiIconChevronDown className="webui-tool-chevron" />
+          </WebuiMotionSlot>
+        ) : null}
+      </WebuiButton>
+      <WebuiDisclosure id={disclosureId} open={expanded} className="webui-tool-row-disclosure">
+        {status === "running" && !input && !result && !error ? (
+          <WebuiToolDetailShell title={toolCallLabel(tool)}>
+            <div className="webui-tool-detail-running">运行中…</div>
+          </WebuiToolDetailShell>
+        ) : input || result || error ? (
+          <WebuiToolDetailShell title={toolCallLabel(tool)}>
+            {input !== undefined ? <WebuiToolDetailSection label="输入" value={formatToolInputForDisplay(input)} /> : null}
+            {result !== undefined ? <WebuiToolDetailSection label="结果" value={result} /> : null}
+            {error !== undefined ? <WebuiToolDetailSection label="错误" value={error} error /> : status === "error" ? <WebuiToolDetailSection label="错误" value="执行失败" error /> : null}
+          </WebuiToolDetailShell>
+        ) : null}
+      </WebuiDisclosure>
+    </div>
   );
 }
 
@@ -154,6 +170,7 @@ export function WebuiToolResults({
   readonly showEditToolRows?: boolean;
 }): ReactElement | null {
   const [expanded, setExpanded] = useState(false);
+  const statsDisclosureId = useId();
   const edits = tools.filter(isWebuiEditTool);
   const others = tools.filter((tool) => !isWebuiEditTool(tool));
   const renderRows = (rows: readonly Record<string, unknown>[]) =>
@@ -181,9 +198,23 @@ export function WebuiToolResults({
   const stats = edits.map(webuiEditFileStat);
   const totalAdded = stats.reduce((sum, stat) => sum + stat.added, 0);
   const totalDeleted = stats.reduce((sum, stat) => sum + stat.deleted, 0);
-  const shown = expanded ? stats : stats.slice(0, 3);
+  const shown = stats.slice(0, 3);
+  const remaining = stats.slice(3);
+  const renderStat = (stat: (typeof stats)[number], index: number): ReactElement => (
+    <li className="webui-diff-file" key={`${stat.name ?? "file"}-${index}`}>
+      <span className="webui-diff-file-icon" data-testid="turn-diff-file-icon"><WebuiIconDiffFile fileName={stat.name ?? undefined} /></span>
+      <span className="webui-diff-file-name">{stat.name ?? "文件"}</span>
+      {stat.added > 0 || stat.deleted > 0 ? (
+        <span className="webui-diff-file-stats">
+          {stat.added > 0 ? <span className="webui-diff-add">{`+${stat.added}`}</span> : null}
+          {stat.deleted > 0 ? <span className="webui-diff-del">{`-${stat.deleted}`}</span> : null}
+        </span>
+      ) : null}
+    </li>
+  );
   return (
     <div className="webui-diff-card" data-webui-diff-card="true">
+      <WebuiMotionSlot kind="feedback">
       <div className="webui-diff-header">
         <div className="webui-diff-summary">
           <span className="webui-diff-icon" aria-hidden="true"><WebuiIconDiffSummary /></span>
@@ -204,33 +235,19 @@ export function WebuiToolResults({
           </span>
         </div>
       </div>
-      <ul className="webui-diff-files">
-        {shown.map((stat, index) => (
-          <li
-            className="webui-diff-file"
-            key={`${stat.name ?? "file"}-${index}`}
-          >
-            <span className="webui-diff-file-icon" data-testid="turn-diff-file-icon"><WebuiIconDiffFile fileName={stat.name ?? undefined} /></span>
-            <span className="webui-diff-file-name">{stat.name ?? "文件"}</span>
-            {stat.added > 0 || stat.deleted > 0 ? (
-              <span className="webui-diff-file-stats">
-                {stat.added > 0 ? (
-                  <span className="webui-diff-add">{`+${stat.added}`}</span>
-                ) : null}
-                {stat.deleted > 0 ? (
-                  <span className="webui-diff-del">{`-${stat.deleted}`}</span>
-                ) : null}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      </WebuiMotionSlot>
+      <ul className="webui-diff-files">{shown.map(renderStat)}</ul>
+      <WebuiDisclosure id={statsDisclosureId} open={expanded} className="webui-diff-expanded-files">
+        <ul className="webui-diff-files webui-diff-files-expanded">{remaining.map(renderStat)}</ul>
+      </WebuiDisclosure>
       {stats.length > 3 ? (
         <WebuiButton
           variant="plain"
           size="regular"
           className="webui-diff-expand"
           data-webui-diff-expand="true"
+          aria-expanded={expanded}
+          aria-controls={statsDisclosureId}
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "收起" : `展开其余 ${stats.length - 3} 个`}
@@ -264,6 +281,7 @@ export function WebuiActivityGroup({
     return status === "pending" || status === "running";
   });
   const [expanded, setExpanded] = useState(initiallyExpanded);
+  const disclosureId = useId();
   if (tools.length === 0) return null;
   const thinkingCount = activityItems?.filter((item) => item.type === "thinking").length ?? 0;
   const summary = [
@@ -291,25 +309,34 @@ export function WebuiActivityGroup({
     }
   }
   return (
-    <details
+    <section
       className="activity-group"
       data-testid="activity-group"
       data-active={active ? "true" : undefined}
-      open={active || expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <summary className="activity-group-header">
+      <WebuiButton
+        variant="plain"
+        size="regular"
+        className={`activity-group-header${active || expanded ? " is-open" : ""}`}
+        aria-expanded={active || expanded}
+        aria-controls={disclosureId}
+        onClick={() => { if (!active) setExpanded((value) => !value); }}
+      >
         <span className="activity-group-icon" data-webui-activity-icon-category={iconCategory} aria-hidden="true"><WebuiToolIcon category={iconCategory} /></span>
         <span className="activity-group-summary">{summary}</span>
-        <WebuiIconChevronDown className="activity-group-chevron" />
-      </summary>
-      <div className="activity-group-body">
-        <span className="timeline-spine" aria-hidden="true" />
-        <div className="activity-group-items">
-          {activityItems ? detailItems : <WebuiToolResults tools={tools} authoritativeDiffAvailable={authoritativeDiffAvailable} showEditToolRows />}
+        <WebuiMotionSlot kind="disclosure-transform" rotation={active || expanded ? 90 : 0}>
+          <WebuiIconChevronDown className="activity-group-chevron" />
+        </WebuiMotionSlot>
+      </WebuiButton>
+      <WebuiDisclosure id={disclosureId} open={active || expanded} className="activity-group-disclosure">
+        <div className="activity-group-body">
+          <span className="timeline-spine" aria-hidden="true" />
+          <div className="activity-group-items">
+            {activityItems ? detailItems : <WebuiToolResults tools={tools} authoritativeDiffAvailable={authoritativeDiffAvailable} showEditToolRows />}
+          </div>
         </div>
-      </div>
-    </details>
+      </WebuiDisclosure>
+    </section>
   );
 }
 
@@ -366,6 +393,7 @@ export function WebuiTurnProcess({
   readonly showLiveActivity?: boolean;
 }): ReactElement {
   const [expanded, setExpanded] = useState(initiallyExpanded);
+  const disclosureId = useId();
   const wasActive = useRef(active);
   useEffect(() => {
     if (wasActive.current && !active) setExpanded(false);
@@ -435,17 +463,20 @@ export function WebuiTurnProcess({
             size="inline"
             className="group/turn-process flex items-center gap-1 py-1 text-center text-sm font-normal leading-5 tracking-normal"
             aria-expanded={contentExpanded}
+            aria-controls={disclosureId}
             data-testid="turn-process-trigger"
             data-summary-text={summary}
             onClick={() => setExpanded((value) => !value)}
           >
             <span data-testid="turn-process-summary-text">{summary}</span>
-            <span
-              data-testid="turn-process-chevron"
-              className={`-ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center text-icon_interaction_tertiary_default transition-transform duration-200 ease-out motion-reduce:transition-none group-hover/turn-process:text-icon_interaction_tertiary_hover ${contentExpanded ? "rotate-90" : ""}`}
-            >
-              <WebuiIconChevronDown className="size-4" />
-            </span>
+            <WebuiMotionSlot kind="disclosure-transform" rotation={contentExpanded ? 90 : 0}>
+              <span
+                data-testid="turn-process-chevron"
+                className="-ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center text-icon_interaction_tertiary_default group-hover/turn-process:text-icon_interaction_tertiary_hover"
+              >
+                <WebuiIconChevronDown className="size-4" />
+              </span>
+            </WebuiMotionSlot>
           </WebuiButton>
         ) : (
           <span
@@ -468,9 +499,11 @@ export function WebuiTurnProcess({
       </div>
       <div className="mt-2 border-b-[0.5px] border-border_default" data-testid="turn-process-separator" aria-hidden="true" />
       {hasExpandableContent ? (
-        <WebuiStack gap="roomy" className="mt-2" data-testid="turn-process-detail" hidden={!contentExpanded}>
-          {typeof children === "function" ? children(contentExpanded) : contentExpanded ? children : null}
-        </WebuiStack>
+        <WebuiDisclosure id={disclosureId} open={contentExpanded} className="mt-2" data-testid="turn-process-detail">
+          <WebuiStack gap="roomy">
+            {typeof children === "function" ? children(true) : children}
+          </WebuiStack>
+        </WebuiDisclosure>
       ) : null}
       {collapsedContent?.(contentExpanded)}
       {active && showLiveActivity ? (
@@ -507,8 +540,10 @@ export function WebuiThinkingBlock({
 }): ReactElement | null {
   const [, forceTick] = useState(0);
   const [detailOpen, setDetailOpen] = useState(initiallyExpanded);
+  const disclosureId = useId();
   const [contentExpanded, setContentExpanded] = useState(false);
   const [contentOverflows, setContentOverflows] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!streaming || !showStreamingStatus) return undefined;
@@ -518,7 +553,10 @@ export function WebuiThinkingBlock({
   useEffect(() => {
     const content = contentRef.current;
     if (!detailOpen || !content) return undefined;
-    const measure = () => setContentOverflows(content.scrollHeight > 224);
+    const measure = () => {
+      setContentHeight(content.scrollHeight);
+      setContentOverflows(content.scrollHeight > 224);
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(measure);
@@ -536,8 +574,16 @@ export function WebuiThinkingBlock({
       ? Math.max(1, Math.floor(durationMs / 1000))
       : undefined;
   return (
-    <details className="webui-thinking-block" data-webui-thinking-block="true" open={streaming || detailOpen} onToggle={(event) => setDetailOpen(event.currentTarget.open)}>
-      <summary className="webui-thinking-summary" data-webui-thinking="true">
+    <section className="webui-thinking-block" data-webui-thinking-block="true">
+      <WebuiButton
+        variant="plain"
+        size="regular"
+        className={`webui-thinking-summary${streaming || detailOpen ? " is-open" : ""}`}
+        data-webui-thinking="true"
+        aria-expanded={streaming || detailOpen}
+        aria-controls={disclosureId}
+        onClick={() => { if (!streaming) setDetailOpen((value) => !value); }}
+      >
         {summaryLabel === "思考过程" ? (
           <span className="webui-tool-icon webui-tool-icon--thinking" aria-hidden="true"><WebuiToolIcon category="thinking" /></span>
         ) : null}
@@ -545,24 +591,32 @@ export function WebuiThinkingBlock({
         {!streaming && typeof elapsed === "number" && elapsed >= 1 ? (
           <span className="webui-thinking-elapsed">{elapsed}s</span>
         ) : null}
-        <WebuiIconChevronDown className="webui-thinking-chevron" />
-      </summary>
-      <div className="webui-thinking-detail">
-        {showDetailHeading ? (
-          <div className="webui-thinking-detail-heading">
-            <span className="webui-tool-icon webui-tool-icon--thinking" aria-hidden="true"><WebuiToolIcon category="thinking" /></span>
-            <span>思考过程</span>
+        <WebuiMotionSlot kind="disclosure-transform" rotation={streaming || detailOpen ? 180 : 0}>
+          <WebuiIconChevronDown className="webui-thinking-chevron" />
+        </WebuiMotionSlot>
+      </WebuiButton>
+      <WebuiDisclosure id={disclosureId} open={streaming || detailOpen} className="webui-thinking-disclosure">
+        <div className="webui-thinking-detail">
+          {showDetailHeading ? (
+            <div className="webui-thinking-detail-heading">
+              <span className="webui-tool-icon webui-tool-icon--thinking" aria-hidden="true"><WebuiToolIcon category="thinking" /></span>
+              <span>思考过程</span>
+            </div>
+          ) : null}
+          <div
+            className={`webui-thinking-detail-content${contentOverflows && !contentExpanded ? " is-clamped" : ""}`}
+            ref={contentRef}
+            style={contentOverflows ? { maxHeight: `${contentExpanded ? contentHeight : 224}px`, overflow: "hidden" } : undefined}
+          >
+            <WebuiMarkdown source={text} />
           </div>
-        ) : null}
-        <div className={`webui-thinking-detail-content${contentOverflows && !contentExpanded ? " is-clamped" : ""}`} ref={contentRef}>
-          <WebuiMarkdown source={text} />
+          {contentOverflows ? (
+            <WebuiButton variant="quiet-subtle" size="inline" className="webui-thinking-expand" onClick={() => setContentExpanded((expanded) => !expanded)}>
+              {contentExpanded ? "收起" : "展开"}
+            </WebuiButton>
+          ) : null}
         </div>
-        {contentOverflows ? (
-          <WebuiButton variant="quiet-subtle" size="inline" className="webui-thinking-expand" onClick={() => setContentExpanded((expanded) => !expanded)}>
-            {contentExpanded ? "收起" : "展开"}
-          </WebuiButton>
-        ) : null}
-      </div>
+      </WebuiDisclosure>
       {streaming && showStreamingStatus ? (
         <div className="webui-thinking-live-status" data-webui-thinking-live-status="true">
           <ActivityIndicator aria-hidden="true" />
@@ -572,7 +626,7 @@ export function WebuiThinkingBlock({
           ) : null}
         </div>
       ) : null}
-    </details>
+    </section>
   );
 }
 

@@ -66,6 +66,7 @@ import { WebuiDropdown, type WebuiDropdownTriggerProps } from "../../../ui/Dropd
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiMotionSlot } from "../../../ui/page.js";
 
 const STRIP_COPY = {
   addTab: "新建标签页",
@@ -324,8 +325,8 @@ export function WebuiWorkspaceTabStrip({
   return (
     <div className="webui-workspace-tab-list" data-testid="workspace-tab-strip" ref={tabListRef}>
       {state.tabs.map((item) => (
+        <WebuiMotionSlot key={item.id} kind="feedback">
         <div
-          key={item.id}
           className={`webui-workspace-tab ${state.activeTabId === item.id ? "is-active" : ""}`}
           role="presentation"
           data-testid={`workspace-tab-strip-item-${item.id}`}
@@ -354,6 +355,7 @@ export function WebuiWorkspaceTabStrip({
             <WebuiIconClose className="size-3" />
           </WebuiButton>
         </div>
+        </WebuiMotionSlot>
       ))}
       <WebuiButton
         variant="quiet-action"

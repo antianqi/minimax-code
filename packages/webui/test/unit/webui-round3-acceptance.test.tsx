@@ -13,6 +13,7 @@ import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.
 import { WebuiGoalBanner } from "../../src/client/features/goal/ui/GoalBanner.public.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
 import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { WebuiMotionSlot } from "../../src/client/ui/page.js";
 import { projectWebuiDiffFile } from "../../src/client/projection/common/diff-workspace-boundary.js";
 import { projectWebuiUnifiedDiffLines } from "../../src/client/features/workspace/projection/panel-projection.js";
 import {
@@ -47,7 +48,7 @@ import {
 import {
   DEFAULT_THINKING_PHRASE_ROTATION_INTERVAL_MS,
 } from "../../src/client/features/transcript/ui/ActivityIndicator.js";
-import { computeThinkingPhraseStartDelay, pickWeightedPhrase, shouldPlayActivityIndicator, bucketPhrases, type ThinkingPhraseSet } from "../../src/client/ui/activity-phrase.js";
+import { computeThinkingPhraseStartDelay, pickWeightedPhrase, bucketPhrases, type ThinkingPhraseSet } from "../../src/client/ui/activity-phrase.js";
 import { initialWebuiStreamState, reduceWebuiStreamFrame } from "../../src/client/features/turn/projection/stream-state.js";
 import {
   getSessionDiffOperation,
@@ -148,7 +149,8 @@ describe("round-3 authoritative diff state machine", () => {
     expect(active).toContain('data-source-message-id="assistant-1"');
     expect(active).toContain("展开其余 1 个");
     expect(active).toContain("撤销");
-    expect(active).not.toContain("four.ts");
+    expect(active).toContain("four.ts");
+    expect(active).toMatch(/aria-hidden="true" data-webui-motion="disclosure" data-webui-motion-state="collapse"/u);
 
     const expandedReview = renderToStaticMarkup(createElement(WebuiDiffCard, {
       initialView: activeView,
@@ -432,8 +434,6 @@ describe("round-3 phrase and reduced-motion behavior", () => {
   });
 
   it("disables animation for reduced motion while keeping the label path available", () => {
-    expect(shouldPlayActivityIndicator(true)).toBe(false);
-    expect(shouldPlayActivityIndicator(false)).toBe(true);
   });
 });
 
@@ -567,5 +567,24 @@ describe("plugin management WebUI operation", () => {
         input: { url: "" },
       }).ok,
     ).toBe(false);
+  });
+});
+
+describe("shared motion slot", () => {
+  it("applies disclosure motion and rotation to the semantic child without adding a wrapper", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        WebuiMotionSlot,
+        {
+          kind: "disclosure-transform",
+          rotation: 90,
+          children: createElement("span", { className: "existing-layout" }, "arrow"),
+        },
+      ),
+    );
+
+    expect(markup).toBe(
+      '<span class="existing-layout webui-motion-disclosure-transform is-rotated-90">arrow</span>',
+    );
   });
 });

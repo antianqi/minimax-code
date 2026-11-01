@@ -111,10 +111,14 @@ describe("a review line is a real jump target, and only where one exists", () =>
   it("renders the diff only for an expanded file", () => {
     const collapsed = panel();
     expect(collapsed).not.toContain('data-testid="review-lines"');
+    expect(collapsed).toContain('data-webui-motion="disclosure"');
+    expect(collapsed).toContain('id="webui-review-file-diff-f1"');
+    expect(collapsed).toContain('aria-hidden="true"');
 
     const opened = panel(expanded);
     expect(opened).toContain('data-testid="review-lines"');
     expect(opened).toContain("const here = 3;");
+    expect(opened).toContain('data-webui-motion-state="expand"');
   });
 
   it("gives the surviving line a jump control carrying its new-side number", () => {

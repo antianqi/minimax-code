@@ -20,7 +20,91 @@
 // What belongs here: the contract — the role, the ARIA, the announcement policy.
 // What belongs to the business: the words, the retry command, the amount.
 
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import lottie from "lottie-web";
+import { useWebuiPageLoading, WebuiSkeleton, WebuiSkeletonProjection } from "./page.js";
+
+export interface WebuiLottieProps {
+  readonly play?: boolean;
+  readonly loop?: boolean;
+  readonly speed?: number;
+  readonly name: string;
+  readonly data: unknown;
+  readonly className?: string;
+  readonly style?: CSSProperties;
+  readonly respectReducedMotion?: boolean;
+}
+
+export function shouldPlayWebuiAnimation(play: boolean, prefersReducedMotion: boolean): boolean {
+  return play && !prefersReducedMotion;
+}
+
+function readReducedMotionPreference(respectReducedMotion: boolean): boolean {
+  return respectReducedMotion &&
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Shared owner for Lottie playback, lifecycle and the package reduced-motion policy. */
+export function WebuiLottie({
+  play = true,
+  loop = false,
+  speed = 1,
+  name,
+  data,
+  className,
+  style,
+  respectReducedMotion = true,
+}: WebuiLottieProps): ReactElement {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const animationRef = useRef<ReturnType<typeof lottie.loadAnimation> | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => readReducedMotionPreference(respectReducedMotion));
+
+  useEffect(() => {
+    if (!respectReducedMotion || typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      setPrefersReducedMotion(false);
+      return undefined;
+    }
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setPrefersReducedMotion(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, [respectReducedMotion]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    const animation = lottie.loadAnimation({
+      container,
+      renderer: "svg",
+      loop,
+      autoplay: false,
+      animationData: data as object,
+      name,
+    });
+    animation.setSpeed(speed);
+    animationRef.current = animation;
+    return () => {
+      animation.destroy();
+      animationRef.current = null;
+    };
+  }, [data, loop, name]);
+
+  useEffect(() => {
+    const animation = animationRef.current;
+    if (!animation) return;
+    if (shouldPlayWebuiAnimation(play, respectReducedMotion && prefersReducedMotion)) animation.play();
+    else animation.pause();
+  }, [play, prefersReducedMotion, respectReducedMotion]);
+
+  useEffect(() => {
+    animationRef.current?.setSpeed(speed);
+  }, [speed]);
+
+  return <div ref={containerRef} className={className} style={style} data-lottie-name={name} />;
+}
 
 /** Nothing here yet, and what a user can do about it. Not announced: it is a state. */
 export function FeedbackEmpty({
@@ -39,9 +123,9 @@ export function FeedbackEmpty({
 }): ReactElement {
   return (
     <div className={`webui-feedback webui-feedback--empty${className ? ` ${className}` : ""}`} data-testid={testId}>
-      <p className="webui-feedback-title">{title}</p>
-      {description === undefined ? null : <p className="webui-feedback-description">{description}</p>}
-      {action === undefined ? null : <div className="webui-feedback-action">{action}</div>}
+      <p className="webui-feedback-title"><WebuiSkeletonProjection>{title}</WebuiSkeletonProjection></p>
+      {description === undefined ? null : <p className="webui-feedback-description"><WebuiSkeletonProjection>{description}</WebuiSkeletonProjection></p>}
+      {action === undefined ? null : <div className="webui-feedback-action"><WebuiSkeletonProjection>{action}</WebuiSkeletonProjection></div>}
     </div>
   );
 }
@@ -112,7 +196,7 @@ export function FeedbackSkeleton({
       </p>
       <div aria-hidden="true" className="webui-feedback-skeleton-body">
         {Array.from({ length: rows }, (_, index) => (
-          <span key={index} className="webui-feedback-skeleton-row" />
+          <WebuiSkeleton key={index} variant="text" className={index === rows - 1 ? "webui-skeleton--short" : undefined} />
         ))}
       </div>
     </div>
@@ -137,6 +221,8 @@ export function FeedbackProgress({
   max = 100,
   testId,
   className,
+  trackClassName,
+  fillClassName,
   children,
   indeterminate = false,
 }: {
@@ -146,6 +232,10 @@ export function FeedbackProgress({
   readonly testId?: string;
   /** The surface's own classes. */
   readonly className?: string;
+  /** A surface's track appearance; geometry and motion remain shared. */
+  readonly trackClassName?: string;
+  /** A surface's fill appearance; geometry and motion remain shared. */
+  readonly fillClassName?: string;
   /** The caller's own segments, in place of the single default fill. */
   readonly children?: ReactNode;
   /**
@@ -170,8 +260,8 @@ export function FeedbackProgress({
       {...(indeterminate ? {} : { "aria-valuenow": clamped, "aria-valuetext": `${percent}%` })}
       data-testid={testId}
     >
-      <span aria-hidden="true" className="webui-feedback-progress-track">
-        {children ?? <span className="webui-feedback-progress-fill" style={{ width: `${percent}%` }} />}
+      <span aria-hidden="true" className={`webui-feedback-progress-track${trackClassName ? ` ${trackClassName}` : ""}`}>
+        {children ?? <span className={`webui-feedback-progress-fill webui-motion-progress${fillClassName ? ` ${fillClassName}` : ""}`} style={{ width: `${percent}%` }} />}
       </span>
     </div>
   );
@@ -194,10 +284,13 @@ export function FeedbackBusy({
   /** The surface's own classes, for a place whose busy state has its own chrome. */
   readonly className?: string;
 }): ReactElement {
+  const pageLoading = useWebuiPageLoading();
   return (
-    <div className={`webui-feedback webui-feedback--busy${className ? ` ${className}` : ""}`} role="status" data-testid={testId}>
-      <span aria-hidden="true" className="webui-feedback-spinner" />
-      <span className="webui-feedback-busy-label">{label}</span>
+    <div className={`webui-feedback webui-feedback--busy${className ? ` ${className}` : ""}`} role={pageLoading ? undefined : "status"} data-testid={testId}>
+      <WebuiSkeletonProjection>
+        <span aria-hidden="true" className="webui-feedback-spinner" />
+      </WebuiSkeletonProjection>
+      <WebuiSkeletonProjection><span className="webui-feedback-busy-label">{label}</span></WebuiSkeletonProjection>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { WebuiWorkspacePanel } from "../features/workspace/ui/WorkspacePanels.js
 import { webuiRailIsDrawer, WEBUI_PROGRESS_PANEL_NARROW_QUERY } from "../ui/layout-thresholds.js";
 import { useOverlayLayer } from "../ui/overlay-coordinator.js";
 import { WebuiIconButton } from "../ui/button.js";
+import { WebuiPage } from "../ui/page.js";
 import { WebuiProgressOverviewPanel } from "../features/workspace/ui/WorkspaceProgressPanel.js";
 import {
   getWorkspacePanelSessionState,
@@ -1035,6 +1036,8 @@ export function WebuiClientFoundationApp(
             <LeftRail>
             <SessionRailRegion
               collapsed={railCollapsed}
+              drawer={railIsDrawer}
+              drawerOpen={railDrawerOpen}
               homeMode={homeMode}
               pluginManagementOpen={pluginManagementOpen}
               startNewTask={startNewTask}
@@ -1088,7 +1091,7 @@ export function WebuiClientFoundationApp(
             aria-orientation="vertical"
             aria-label="Resize navigation"
           >
-            <div className="webui-rail-grip absolute left-1/2 top-1/2 h-12 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-text_default_tertiary opacity-0 transition-opacity duration-150 group-hover:opacity-50" />
+            <div className="webui-rail-grip webui-motion-feedback-opacity absolute left-1/2 top-1/2 h-12 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-text_default_tertiary opacity-0 group-hover:opacity-50" />
           </div>
 
           {/* -------------------------------------------------------------- main */}
@@ -1137,11 +1140,10 @@ export function WebuiClientFoundationApp(
               // that started the creation is still current.
               if (outcome.selected) application.select(outcome.sessionId);
               handleSessionCreatedViewEffect(outcome.sessionId, outcome.selected, teamModeOff);
-            }} /></WebuiZoneBoundary> : <>
+            }} /></WebuiZoneBoundary> : <WebuiPage as="div" kind="content" loading={homeGreetingPending} className="contents">
             <ConversationSurface
               home={homeMode}
               title={selectedSession?.title}
-              greetingPending={homeGreetingPending}
               progressOpen={progressPanelVisible}
               progressPanelAvailable={progressPanelFits}
               workspacePanelOpen={workspacePanel.open}
@@ -1251,7 +1253,7 @@ export function WebuiClientFoundationApp(
                 onManageMiniApps={() => openPluginManagement("plugins")}
               /></WebuiZoneBoundary> : undefined}
             />
-            </>}
+            </WebuiPage>}
           </main>
         </div>
       </div>

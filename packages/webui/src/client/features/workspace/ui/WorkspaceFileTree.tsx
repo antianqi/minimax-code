@@ -4,8 +4,9 @@
 
 import type { ReactElement } from "react";
 import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.js";
-import { WebuiIconChevronLeft, WebuiIconFile } from "../../../shell/icons.js";
+import { WebuiIconChevronRight, WebuiIconFile } from "../../../shell/icons.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
 import { formatWorkspaceFileSize, formatWorkspaceFileModifiedAt } from "../projection/workspace-file-tree.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 
@@ -45,10 +46,14 @@ export function FileTree({ files, onOpen, expandedPaths, loadingPaths, directory
     const expanded = expandedPaths.has(file.path);
     return <div key={file.path}>
       <WebuiButton variant="selectable-row" size="regular" className="webui-file-tree-row" aria-current={file.path === selectedPath ? "true" : undefined} aria-expanded={file.type === "directory" ? expanded : undefined} aria-busy={file.type === "directory" && loadingPaths.has(file.path) ? "true" : undefined} onClick={() => file.type === "directory" ? onToggle(file) : onOpen(file)}>
-        {file.type === "directory" ? <WebuiIconChevronLeft className={`inline size-3 transition-transform duration-[180ms] ease-out ${expanded ? "rotate-90" : ""}`} /> : <WebuiIconFile className="inline size-3" />} <span className="min-w-0 flex-1 truncate">{file.name}</span>
+        {file.type === "directory" ? (
+          <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
+            <WebuiIconChevronRight className="inline size-3" />
+          </WebuiMotionSlot>
+        ) : <WebuiIconFile className="inline size-3" />} <span className="min-w-0 flex-1 truncate">{file.name}</span>
         <FileTreeRowMeta file={file} />
       </WebuiButton>
-      {file.type === "directory" ? <div className={`webui-expandable-motion${expanded ? " is-open" : ""}`} aria-hidden={!expanded} ref={(element) => element?.toggleAttribute("inert", !expanded)}>
+      {file.type === "directory" ? <WebuiDisclosure as="div" open={expanded} className="webui-file-tree-disclosure">
         <div className="webui-file-tree-children">
           {/* 目录在读取中是一条播报；契约的 div 仍带 role="status"，
               `.webui-file-tree-children > [role="status"]` 继续命中。 */}
@@ -57,7 +62,7 @@ export function FileTree({ files, onOpen, expandedPaths, loadingPaths, directory
               : file.children?.length ? <FileTree files={file.children} onOpen={onOpen} expandedPaths={expandedPaths} loadingPaths={loadingPaths} directoryErrors={directoryErrors} onToggle={onToggle} selectedPath={selectedPath} />
                 : <p>此文件夹为空。</p>}
         </div>
-      </div> : null}
+      </WebuiDisclosure> : null}
     </div>;
   })}</div>;
 }

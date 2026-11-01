@@ -20,6 +20,7 @@ import { useState } from "react";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { useDialogLayer } from "../../../ui/overlay-listeners.js";
+import { WebuiPage } from "../../../ui/page.js";
 import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.public.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.js";
 import { WebuiIconCheck, WebuiIconFolder } from "../../../shell/icons.js";
@@ -157,7 +158,10 @@ export function WebuiComposerProjectRow({
           </WebuiButton>
         </WebuiDropdown>
         {browserOpen ? (
-          <div
+          <WebuiPage
+            as="div"
+            kind="dialog"
+            motion={{ kind: "surface", state: "enter", direction: "down" }}
             role="dialog"
             aria-label="选择项目目录"
             data-overlay-layer={browserLayerId}
@@ -172,7 +176,7 @@ export function WebuiComposerProjectRow({
               }}
               onCancel={() => setBrowserOpen(false)}
             />
-          </div>
+          </WebuiPage>
         ) : null}
       </div>
     </div>

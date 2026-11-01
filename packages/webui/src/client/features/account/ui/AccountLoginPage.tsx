@@ -24,6 +24,7 @@
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
+import { WebuiPage } from "../../../ui/page.js";
 import { IconCopy } from "@tabler/icons-react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -351,7 +352,10 @@ export function AccountLoginPage({
   );
 
   return createPortal(
-    <div
+    <WebuiPage
+      as="div"
+      kind="dialog"
+      motion={{ kind: "surface", state: "enter", direction: "none" }}
       className="webui-account-login-page-overlay"
       role="dialog"
       aria-modal="true"
@@ -360,7 +364,7 @@ export function AccountLoginPage({
       data-testid="account-login-page-overlay"
     >
       {page}
-    </div>,
+    </WebuiPage>,
     portalTarget,
   );
 }

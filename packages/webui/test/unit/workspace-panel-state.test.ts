@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createWebuiWorkspacePanelOwner,
 } from "../../src/client/features/workspace/application/workspace-panel-owner.js";
@@ -20,7 +20,7 @@ import {
   webuiWorkspaceTabLabel,
   type WorkspacePanelSessionStates,
 } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
-import { focusWebuiFileLine, webuiFileLineTargetId } from "../../src/client/bindings/browser-effects.js";
+import { focusWebuiFileLine, scrollWebuiTargetIntoView, webuiFileLineTargetId, webuiScrollBehavior } from "../../src/client/bindings/browser-effects.js";
 
 describe("right workspace panel navigation", () => {
   it("keeps workspace and progress visibility isolated per session", () => {
@@ -366,6 +366,22 @@ describe("right workspace panel navigation", () => {
       ["focus", { preventScroll: true }],
     ]);
     expect(webuiFileLineTargetId("preview-tab", 42)).toBe("webui-file-line-preview-tab-42");
+  });
+
+  it("uses instant scrolling when reduced motion is requested", () => {
+    expect(webuiScrollBehavior(false)).toBe("smooth");
+    expect(webuiScrollBehavior(true)).toBe("instant");
+  });
+
+  it("applies the reduced-motion preference to programmatic scrolling", () => {
+    vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
+    try {
+      const calls: unknown[] = [];
+      scrollWebuiTargetIntoView({ scrollIntoView: (options) => calls.push(options) }, { block: "center" });
+      expect(calls).toEqual([{ block: "center", behavior: "instant" }]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

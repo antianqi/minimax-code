@@ -80,7 +80,7 @@ const tickHitTargetBase =
   "flex h-3 w-full items-center justify-center";
 
 const tickBase =
-  "block size-2 rounded-full transition-colors";
+  "block size-2 rounded-full";
 
 const STATE_CLASS: Record<TurnState, string> = {
   default: "bg-bg_default_tertiary",

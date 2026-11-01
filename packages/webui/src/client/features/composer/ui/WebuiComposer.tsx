@@ -33,6 +33,7 @@ import { WebuiComposerPermissionControl } from "./ComposerPermissionControl.js";
 import { WebuiComposerProjectRow } from "./ComposerProjectRow.js";
 import { WebuiFileInput, WebuiTextarea } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiMotionSlot } from "../../../ui/page.js";
 import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
@@ -1096,7 +1097,7 @@ export function WebuiComposer({
 
       <div
         ref={composerRegionRef}
-        className={`relative ${sessionLayout ? "mt-0 webui-session-composer-overlay" : "mt-8"} w-full`}
+        className={`${sessionLayout ? "mt-0 webui-session-composer-overlay" : "relative mt-8"} w-full`}
         data-webui-composer-region="true"
         // The mention and command menus are managed layers whose region is this
         // element: a press anywhere in the composer is inside them, so typing does
@@ -1129,7 +1130,8 @@ export function WebuiComposer({
         >
           <WebuiStack gap="compact" align="center" className="message-input-home-container rounded-[20px] bg-bg_default_scrim pb-2">
             <div className="w-full rounded-[20px] border border-border_default bg-bg_grouped_secondary_elevated p-3 webui-composer-card">
-              <div ref={composerInputContainerRef} className="message-input-container relative transition-colors">
+              <WebuiMotionSlot kind="feedback">
+              <div ref={composerInputContainerRef} className="message-input-container relative">
                 <WebuiTextarea
                   ref={textareaRef}
                   id={`${fieldId}-content`}
@@ -1240,6 +1242,7 @@ export function WebuiComposer({
                   }}
                 />
               </div>
+              </WebuiMotionSlot>
               <WebuiInline
                 gap="medium"
                 className="w-full px-3 pt-1"

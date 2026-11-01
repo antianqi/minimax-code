@@ -53,7 +53,7 @@ describe("workspace file tree metadata column", () => {
     expect(markup).not.toContain("Invalid Date");
   });
 
-  it("keeps the existing row contract: class, button type, selection and expansion", () => {
+  it("keeps the row contract and renders expanded directories through the shared disclosure", () => {
     const markup = renderTree(
       [
         {
@@ -69,10 +69,33 @@ describe("workspace file tree metadata column", () => {
     expect(markup).toMatch(/<button[^>]*class="[^"]*webui-file-tree-row[^"]*"[^>]*aria-current="true"/u);
     expect(markup).toContain('aria-current="true"');
     expect(markup).toContain('aria-expanded="true"');
-    expect(markup).toContain("webui-expandable-motion is-open");
-    expect(markup).toContain('aria-hidden="false"');
+    expect(markup).toContain('data-webui-motion="disclosure"');
+    expect(markup).toContain('data-webui-motion-state="expand"');
+    expect(markup).toContain('data-webui-disclosure-axis="vertical"');
+    expect(markup).toContain('class="webui-motion webui-file-tree-disclosure"');
+    expect(markup).toContain('class="webui-disclosure-content"');
+    expect(markup).toMatch(/class="webui-motion webui-file-tree-disclosure">/u);
     // The child file still carries its own metadata inside the expanded tree.
     expect(markup).toContain("10 B");
+  });
+
+  it("keeps collapsed directory content mounted but hidden through the shared disclosure", () => {
+    const markup = renderTree([
+      {
+        path: "src",
+        name: "src",
+        type: "directory",
+        children: [{ path: "src/a.ts", name: "a.ts", type: "file" }],
+      },
+    ]);
+
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).toContain('data-webui-motion="disclosure"');
+    expect(markup).toContain('data-webui-motion-state="collapse"');
+    expect(markup).toMatch(/aria-hidden="true"[^>]*class="webui-motion webui-file-tree-disclosure"/u);
+    expect(markup).toContain('class="webui-disclosure-content"');
+    // Retaining children lets the shared collapse transition finish.
+    expect(markup).toContain("a.ts");
   });
 
   it("renders the metadata without a container element when both fields are missing", () => {

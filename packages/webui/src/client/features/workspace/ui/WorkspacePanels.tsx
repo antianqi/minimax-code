@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Animati
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import { WebuiSearchField, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
 import { Terminal } from "@xterm/xterm";
 import { IconEdit } from "@tabler/icons-react";
 import { FitAddon } from "@xterm/addon-fit";
@@ -153,13 +154,15 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
   const language = webuiFileLanguage(file.file);
   return <section className="webui-turn-review-file" data-expanded={expanded} data-testid="turn-review-diff-file">
     <WebuiButton variant="plain" size="regular" type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(); setExpanded((value) => !value); }}>
-      <WebuiIconChevronRight className="webui-turn-review-chevron" />
+      <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
+        <WebuiIconChevronRight className="webui-turn-review-chevron" />
+      </WebuiMotionSlot>
       <span className="webui-diff-file-icon"><WebuiIconDiffFile fileName={file.file} /></span>
       <span className="webui-turn-review-file-path">{file.file}</span>
       <span className="webui-diff-add">+{file.additions}</span>
       {file.deletions > 0 ? <span className="webui-diff-del">-{file.deletions}</span> : null}
     </WebuiButton>
-    <div className={`webui-expandable-motion${expanded ? " is-open" : ""}`} aria-hidden={!expanded}>
+    <WebuiDisclosure as="div" open={expanded} className="webui-diff-file-disclosure">
       <div>
         {!file.withinWorkspace
           /* The file is outside the workspace, so its content is not shown. The
@@ -179,7 +182,7 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
         </span>;
       })}</code></pre> : <p className="webui-turn-review-unavailable">当前运行时没有提供该文件的文本 patch。</p>}
       </div>
-    </div>
+    </WebuiDisclosure>
   </section>;
 }
 
@@ -239,7 +242,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const browserPort = useWebuiPortSlice("browser");
   const [panelWidth, setPanelWidth] = useState<number>();
   const [panelClosing, setPanelClosing] = useState(false);
-  const [expansionMotion, setExpansionMotion] = useState<"expanding" | "collapsing">();
+  const [expansionMotion, setExpansionMotion] = useState<"expand" | "collapse">();
   /**
    * The tier this panel takes on the surface it shares with the conversation
    * column (ADR 0025).
@@ -306,7 +309,9 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
    * moved left the panel holding a width the conversation could not afford.
    */
   useLayoutEffect(() => {
-    const surface = panelRef.current?.parentElement;
+    const surface = panelRef.current?.closest<HTMLElement>(
+      '[data-webui-shell-region="surface"]',
+    );
     if (!surface) return;
     const measure = (width: number): void => {
       surfaceWidthRef.current = width;
@@ -724,7 +729,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   };
   const handlePanelAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget) return;
-    if (event.animationName === "webui-workspace-panel-exit") {
+    if (event.animationName === "webui-motion-panel-exit") {
       const pendingClose = pendingPanelClose.current;
       pendingPanelClose.current = undefined;
       if (pendingClose) dispatch(pendingClose);
@@ -746,10 +751,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     dispatch(command);
   }, [dispatch]);
   const toggleExpanded = () => {
-    setExpansionMotion(state.expanded ? "collapsing" : "expanding");
+    setExpansionMotion(state.expanded ? "collapse" : "expand");
     dispatch({ type: "toggle-expanded" });
   };
-  return <aside ref={panelRef} className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelClosing ? "is-closing" : ""} ${expansionMotion ? `is-${expansionMotion}` : ""}`} onAnimationEnd={handlePanelAnimationEnd} style={panelWidth !== undefined && !state.expanded && surfaceTier === "split" ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab} data-webui-surface-tier={surfaceTier}>
+  return <WebuiPage as="aside" kind="panel" motion={{ kind: "panel", state: panelClosing ? "exit" : expansionMotion ?? "enter", direction: "right" }} ref={panelRef} className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelClosing ? "is-closing" : ""}`} onAnimationEnd={handlePanelAnimationEnd} style={panelWidth !== undefined && !state.expanded && surfaceTier === "split" ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab} data-webui-surface-tier={surfaceTier}>
     <div className="webui-workspace-panel-resize-handle" role="separator" aria-label="调整工作区面板宽度" aria-orientation="vertical" aria-valuenow={Math.round(panelWidth ?? 50)} tabIndex={state.expanded ? -1 : 0} onPointerDown={startPanelResize} onPointerMove={movePanelResize} onPointerUp={stopPanelResize} onPointerCancel={stopPanelResize} onKeyDown={nudgePanelResize} />
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">
@@ -899,14 +904,14 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         {terminalError && terminalTargetId ? <FeedbackError message={terminalError} /> : null}
     </div> : null}
       </div>
-      {hasFileWorkspace && fileTreeOpen ? <aside className="webui-workspace-file-tree-panel" aria-label="工作区文件树">
+      {hasFileWorkspace ? <WebuiPage as="aside" kind="panel" present={fileTreeOpen} motion={{ kind: "panel", state: "enter", direction: "right" }} className="webui-workspace-file-tree-panel" aria-label="工作区文件树">
         <WebuiSearchField className="webui-workspace-file-search" icon={<WebuiIconSearch className="size-4" />} label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} />
         <div className="webui-workspace-file-tree-scroll" ref={fileTreeScrollRef}>
           {/* 加载中是一条播报；播报通道交给共享契约。契约本身带 role="status"，
               仍是这个滚动容器的直接子元素，`.webui-workspace-file-tree-scroll > [role="status"]` 继续命中。 */}
           {fileTree.workspaceDir !== activeWorkspace || fileTree.loading ? <FeedbackLiveRegion>正在加载文件…</FeedbackLiveRegion> : fileTree.error ? <FeedbackError message={fileTree.error} /> : fileTree.files.length ? visibleFiles.length ? <FileTree files={visibleFiles} expandedPaths={expandedDirectories} loadingPaths={fileTree.loadingDirectories} directoryErrors={fileTree.directoryErrors} onToggle={toggleWorkspaceDirectory} selectedPath={activeTab?.content.kind === "file-preview" ? selectedFilePath : activeTab?.content.kind === "review" ? selectedReviewPath : undefined} onOpen={(entry) => { const context = activeTab && "sessionId" in activeTab.content ? activeTab.content.sessionId : sessionId; if (!activeWorkspace || !context || entry.type === "directory") return; if (activeTab?.content.kind === "review" && activeTab.content.source === "turn" && turnReviewFiles.some((file) => file.file === entry.path) || activeTab?.content.kind === "review" && activeTab.content.source === "workspace" && workspaceReviewFiles.some((file) => file.path === entry.path)) dispatch({ type: "select-review-file", tabId: activeTab.id, path: entry.path }); else dispatch({ type: "open-file", sessionId: context, workspaceDir: activeWorkspace, path: entry.path }); }} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"没有匹配的文件。"} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"此工作区没有可显示的文件。"} />}
         </div>
-      </aside> : null}
+      </WebuiPage> : null}
     </div>
-  </aside>;
+  </WebuiPage>;
 }

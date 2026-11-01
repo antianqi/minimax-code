@@ -1,11 +1,11 @@
 // WebuiAssistantBody — the assistant message body. It renders <WebuiDiffCard>
 // at its end.
 
-import { useState, type ReactElement } from "react";
+import { useId, useState, type ReactElement } from "react";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiIconAlertTriangle } from "../../../shell/icons.js";
+import { WebuiIconAlertTriangle, WebuiIconChevronDown } from "../../../shell/icons.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
-import { IconChevronDown } from "@tabler/icons-react";
+import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
 import { WebuiMarkdown } from "./markdown.public.js";
 import { basenamePath } from "../../../projection/common/paths.js";
 import { parseWebuiMessageFileReference, type WebuiMessageFileReference } from "../projection/message-file-reference.js";
@@ -135,6 +135,7 @@ function WebuiAgentJoinedGroup({
   readonly agents: readonly Record<string, unknown>[];
 }): ReactElement | null {
   const [expanded, setExpanded] = useState(false);
+  const disclosureId = useId();
   if (agents.length === 0) return null;
   return (
     <section className="webui-agent-joined-group" data-webui-agent-activity="agent-joined-group">
@@ -143,30 +144,35 @@ function WebuiAgentJoinedGroup({
         size="regular"
         className="webui-agent-joined-toggle"
         aria-expanded={expanded}
+        aria-controls={disclosureId}
         aria-label="分配任务"
         onClick={() => setExpanded((value) => !value)}
       >
         <span>分配任务</span>
-        <IconChevronDown className={`webui-agent-joined-chevron${expanded ? "" : " is-collapsed"}`} aria-hidden="true" size={16} stroke={1.7} />
+        <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 0 : -90}>
+          <WebuiIconChevronDown className="webui-agent-joined-chevron" aria-hidden="true" />
+        </WebuiMotionSlot>
       </WebuiButton>
-      <div className="webui-agent-joined-list" data-testid="agent-task-list" hidden={!expanded}>
-        {agents.map((agent, index) => {
-          const name = String(agent.agentName ?? agent.name ?? "Agent");
-          const title = String(agent.title ?? name);
-          return (
-            <div
-              className="webui-agent-joined-row"
-              key={String(agent.sessionId ?? `${name}-${index}`)}
-              data-testid="agent-task-row"
-              data-webui-agent-task-session={typeof agent.sessionId === "string" ? agent.sessionId : undefined}
-            >
-              <span className="webui-agent-joined-avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
-              <span className="webui-agent-joined-name">@{name}</span>
-              <span className="webui-agent-joined-title">{title}</span>
-            </div>
-          );
-        })}
-      </div>
+      <WebuiDisclosure id={disclosureId} open={expanded} className="webui-agent-joined-disclosure">
+        <div className="webui-agent-joined-list" data-testid="agent-task-list">
+          {agents.map((agent, index) => {
+            const name = String(agent.agentName ?? agent.name ?? "Agent");
+            const title = String(agent.title ?? name);
+            return (
+              <div
+                className="webui-agent-joined-row"
+                key={String(agent.sessionId ?? `${name}-${index}`)}
+                data-testid="agent-task-row"
+                data-webui-agent-task-session={typeof agent.sessionId === "string" ? agent.sessionId : undefined}
+              >
+                <span className="webui-agent-joined-avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+                <span className="webui-agent-joined-name">@{name}</span>
+                <span className="webui-agent-joined-title">{title}</span>
+              </div>
+            );
+          })}
+        </div>
+      </WebuiDisclosure>
     </section>
   );
 }

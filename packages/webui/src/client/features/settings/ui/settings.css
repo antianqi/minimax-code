@@ -4,7 +4,7 @@
   /* One scrim for every role="dialog" surface: this host is page-like in its
    * geometry, but it sits over the live shell like the shared dialog shell, so
    * it dims the app with the same token rather than the lighter utility wash. */
-  .webui-settings-mask { position: fixed; inset: 0; z-index: 100; display: flex; background: var(--webui-modal-scrim); animation: webui-overlay-enter 160ms ease-out both; }
+  .webui-settings-mask { position: fixed; inset: 0; z-index: 100; display: flex; background: var(--webui-modal-scrim); }
   /* The account login dialog: the settings mask's overlay treatment around a
    * small centered card — a dialog, not a full page, because the entry points
    * (user menu, usage panel) are popovers over the live shell. */
@@ -15,7 +15,7 @@
   .webui-account-login-uri { color: var(--text_default_primary); }
   .webui-account-login-status { margin: 0; color: var(--text_default_tertiary); }
   .webui-account-login-actions { display: flex; gap: var(--spacing_8); justify-content: center; }
-  .webui-settings-modal { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-modal-enter 200ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-settings-modal { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg_default_primary); color: var(--text_default_primary); }
   .webui-settings-sidebar { width: 260px; flex: 0 0 260px; overflow-y: hidden; }
   .webui-settings-back { display: flex; width: 100%; align-items: center; gap: var(--spacing_8); text-align: left; }
   .webui-settings-nav-item { display: flex; width: 100%; align-items: center; gap: var(--spacing_8); text-align: left; }
@@ -26,7 +26,7 @@
   .webui-settings-nav > .webui-settings-group:first-child { margin-top: var(--spacing_24); }
   .webui-settings-group h3 { margin: 0 0 var(--spacing_6); color: var(--text_default_tertiary); font-weight: var(--weight_medium); }
   .webui-settings-icon { width: 18px; height: 18px; flex: 0 0 18px; }
-  .webui-settings-content { min-width: 0; flex: 1; overflow: auto; animation: webui-settings-content-in 180ms ease both; }
+  .webui-settings-content { min-width: 0; flex: 1; overflow: auto; }
   .webui-settings-content-header { display: flex; align-items: flex-start; justify-content: space-between; }
 
   .webui-settings-content h2 { margin: 0; font-size: var(--size_16); font-weight: var(--weight_medium); line-height: 26px; }
@@ -366,7 +366,6 @@
   .webui-settings-content-header { position: sticky; top: 0; z-index: 2; margin: 0 0 var(--spacing_48); padding: var(--spacing_8) var(--spacing_20); background: var(--bg_grouped_secondary); }
   .webui-settings-sidebar, .webui-settings-content { scrollbar-width: none; }
   .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar { display: none; }
-  @keyframes webui-settings-content-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
   @media (max-height: 680px) {
     .webui-settings-sidebar { padding-top: 16px; padding-bottom: var(--spacing_12); }
     .webui-settings-back { margin-bottom: var(--spacing_16); }
@@ -407,5 +406,4 @@
     background-color: var(--bg_grouped_tertiary);
   }
 
-  @media (prefers-reduced-motion: reduce) { .webui-settings-content { animation: none; } .webui-toggle-switch, .webui-toggle-switch > span { transition: none; } }
 }

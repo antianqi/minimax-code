@@ -27,6 +27,7 @@ import type { ReactElement } from "react";
 import { WebuiIconCheck } from "../../../shell/icons.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiMotion } from "../../../ui/page.js";
 import type {
   WebuiModelPickerEntry,
   WebuiModelProviderGroup,
@@ -42,16 +43,18 @@ export interface WebuiModelListPanelProps {
   readonly onSelect: (model: WebuiModelPickerEntry) => void;
   /** Retained for callers that provide the legacy secondary-panel action. */
   readonly onBack?: () => void;
+  readonly animate?: boolean;
 }
 
 export function WebuiModelListPanel({
   groups,
   selected,
   onSelect,
+  animate = false,
 }: WebuiModelListPanelProps): ReactElement {
   const selectedKey = selected ? modelKey(selected) : undefined;
   return (
-    <WebuiStack gap="medium" className="webui-model-list" data-webui-model-list="true">
+    <WebuiMotion as="div" kind="surface" state={animate ? "enter" : undefined} direction="left" className="webui-stack webui-stack--gap-medium webui-stack--align-stretch webui-stack--justify-start webui-model-list" data-webui-model-list="true">
       <div className="webui-model-list-head">
         <span className="webui-model-list-title">选择模型</span>
       </div>
@@ -96,6 +99,6 @@ export function WebuiModelListPanel({
           </WebuiStack>
         ))}
       </WebuiStack>
-    </WebuiStack>
+    </WebuiMotion>
   );
 }

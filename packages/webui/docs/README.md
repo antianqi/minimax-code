@@ -101,8 +101,10 @@ the actions that already have keyboard meaning are bindable. ADR 0027 records th
 scheduled-task surface: the WebUI is a scheduler host. It reaches the v2 runtime's Cron
 service, arms the persisted scheduled tasks and fires them, and when the Desktop runs at the
 same time the shared database decides which host acts on a given slot — the Desktop needs no
-change. A new decision takes the next free
-number.
+change. [ADR 0028](adr/0028-the-webui-has-one-shared-presentation-layer.md) establishes the
+shared presentation layer and its motion foundations; [ADR 0029](adr/0029-page-surfaces-share-layout-skeleton-and-motion-contracts.md)
+defines the page, skeleton and shared motion contracts for route pages, dialogs, drawers and
+repeated semantic elements. A new decision takes the next free number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |

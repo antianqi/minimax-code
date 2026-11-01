@@ -26,6 +26,7 @@ import { SessionActivityMeta } from "./session-activity-meta.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiSkeletonProjection } from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 /** Project rows consume rail-owned display state and return named view actions. */
@@ -83,7 +84,10 @@ export function ProjectList({
   readonly onShowMoreProjects: () => void;
   readonly page: WebuiClientSessionPage;
   readonly sessionsById: ReadonlyMap<string, WebuiClientSession>;
-  readonly childrenByParentId: ReadonlyMap<string, readonly WebuiClientSession[]>;
+  readonly childrenByParentId: ReadonlyMap<
+    string,
+    readonly WebuiClientSession[]
+  >;
   readonly selectedSessionId?: string;
   readonly projectNames?: Readonly<Record<string, string>>;
   readonly activity?: WebuiSessionActivityMap;
@@ -121,11 +125,17 @@ export function ProjectList({
         const orderedSessionIds = sortWebuiProjectSessionIds(
           page.sessions,
           pinnedSessionState ?? {},
-          project.sessionIds.filter((sessionId) => !pinnedSessionState?.[sessionId]),
+          project.sessionIds.filter(
+            (sessionId) => !pinnedSessionState?.[sessionId],
+          ),
         );
         const visibleSessionCount =
-          visibleProjectSessionCounts[project.key] ?? PROJECT_SESSION_BATCH_SIZE;
-        const visibleSessionIds = orderedSessionIds.slice(0, visibleSessionCount);
+          visibleProjectSessionCounts[project.key] ??
+          PROJECT_SESSION_BATCH_SIZE;
+        const visibleSessionIds = orderedSessionIds.slice(
+          0,
+          visibleSessionCount,
+        );
         return (
           <li key={project.key}>
             <div className="webui-project-row group/project">
@@ -147,7 +157,8 @@ export function ProjectList({
                   {projectName}
                 </span>
               </WebuiButton>
-              <div className="webui-project-row-actions" aria-hidden="false">
+              <WebuiMotionSlot kind="feedback-opacity">
+                <div className="webui-project-row-actions" aria-hidden="false">
                 {project.workspaceDir &&
                 (onRenameProject || onToggleProjectPin || onArchiveProject) ? (
                   <WebuiIconButton
@@ -175,7 +186,8 @@ export function ProjectList({
                     <WebuiIconProjectAdd />
                   </WebuiIconButton>
                 ) : null}
-              </div>
+                </div>
+              </WebuiMotionSlot>
             </div>
             <ProjectExpansion
               projectKey={project.key}
@@ -202,145 +214,183 @@ export function ProjectList({
   );
 
   return (
-    <div className="webui-project-sections">
-      <RailSectionHeader
-        label="置顶"
-        expanded={pinnedSectionExpanded}
-        onToggle={onTogglePinnedSection}
-        testId="pinned"
-      />
-      <div
-        className="webui-project-section-content"
-        data-webui-section-expanded={pinnedSectionExpanded ? "true" : "false"}
-        aria-hidden={!pinnedSectionExpanded}
-      >
-        <div className="webui-project-section-content-inner" data-webui-pinned-section="true">
-          {pinnedSessions.length > 0 ? (
-            <WebuiStack as="ul" gap="hairline" data-webui-pinned-sessions="true">
-              {pinnedSessions.map((session) => (
-                <li key={session.sessionId}>
-                  <div
-                    className="webui-pinned-session-row group/session"
-                    data-webui-session-active={
-                      selectedSessionId === session.sessionId ? "true" : "false"
-                    }
-                  >
-                    <a
-                      href={sessionHash(session.sessionId)}
-                      data-webui-session-link={session.sessionId}
+    <WebuiSkeletonProjection>
+      <div className="webui-project-sections">
+        <RailSectionHeader
+          label="置顶"
+          expanded={pinnedSectionExpanded}
+          onToggle={onTogglePinnedSection}
+          testId="pinned"
+        />
+        <WebuiDisclosure
+          as="div"
+          open={pinnedSectionExpanded}
+          className="webui-project-section-content"
+          data-webui-section-expanded={pinnedSectionExpanded ? "true" : "false"}
+        >
+          <div
+            className="webui-project-section-content-inner"
+            data-webui-pinned-section="true"
+          >
+            {pinnedSessions.length > 0 ? (
+              <WebuiStack
+                as="ul"
+                gap="hairline"
+                data-webui-pinned-sessions="true"
+              >
+                {pinnedSessions.map((session) => (
+                  <li key={session.sessionId}>
+                    <WebuiMotionSlot kind="feedback">
+                      <div
+                      className="webui-pinned-session-row group/session"
                       data-webui-session-active={
-                        selectedSessionId === session.sessionId ? "true" : "false"
+                        selectedSessionId === session.sessionId
+                          ? "true"
+                          : "false"
                       }
-                      title={session.workspaceDir ?? undefined}
-                      onContextMenu={(event) => onSessionContextMenu(event, session)}
-                      className="webui-pinned-session-card text-text_default_primary"
                     >
-                      <WebuiIconSession className="flex-shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">
-                        {sessionLabel(session)}
-                      </span>
-                      <SessionActivityMeta
-                        session={session}
-                        activity={activity}
-                        now={now}
-                      />
-                    </a>
-                    <div className="webui-session-row-actions">
-                      {onToggleSessionPin ? (
-                        <WebuiIconButton
-                          tone="bare"
-                          size="rail"
-                          label={`取消置顶：${sessionLabel(session)}`}
-                          title="取消置顶"
-                          data-webui-rail-action="pin"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onToggleSessionPin(session);
-                          }}
-                        >
-                          <WebuiIconContextPin pinned />
-                        </WebuiIconButton>
-                      ) : null}
-                      {onArchiveSession ? (
-                        <WebuiIconButton
-                          tone="bare"
-                          size="rail"
-                          label={`归档：${sessionLabel(session)}`}
-                          title="归档"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onArchiveSession(session);
-                          }}
-                        >
-                          <WebuiIconContextArchive />
-                        </WebuiIconButton>
-                      ) : null}
-                      <WebuiIconButton
-                        tone="bare"
-                        size="rail"
-                        label={`${sessionLabel(session)} 更多操作`}
-                        title="更多操作"
-                        onClick={(event) => onSessionContextMenu(event, session)}
+                      <a
+                        href={sessionHash(session.sessionId)}
+                        data-webui-session-link={session.sessionId}
+                        data-webui-session-active={
+                          selectedSessionId === session.sessionId
+                            ? "true"
+                            : "false"
+                        }
+                        title={session.workspaceDir ?? undefined}
+                        onContextMenu={(event) =>
+                          onSessionContextMenu(event, session)
+                        }
+                        className="webui-pinned-session-card text-text_default_primary"
                       >
-                        <WebuiIconMore />
-                      </WebuiIconButton>
+                        <WebuiIconSession className="flex-shrink-0" />
+                        <WebuiMotionSlot kind="feedback-clip">
+                          <span className="min-w-0 flex-1 truncate">{sessionLabel(session)}</span>
+                        </WebuiMotionSlot>
+                        <SessionActivityMeta
+                          session={session}
+                          activity={activity}
+                          now={now}
+                        />
+                      </a>
+                      <WebuiMotionSlot kind="feedback-opacity">
+                        <div className="webui-session-row-actions">
+                        {onToggleSessionPin ? (
+                          <WebuiIconButton
+                            tone="bare"
+                            size="rail"
+                            label={`取消置顶：${sessionLabel(session)}`}
+                            title="取消置顶"
+                            data-webui-rail-action="pin"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onToggleSessionPin(session);
+                            }}
+                          >
+                            <WebuiIconContextPin pinned />
+                          </WebuiIconButton>
+                        ) : null}
+                        {onArchiveSession ? (
+                          <WebuiIconButton
+                            tone="bare"
+                            size="rail"
+                            label={`归档：${sessionLabel(session)}`}
+                            title="归档"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onArchiveSession(session);
+                            }}
+                          >
+                            <WebuiIconContextArchive />
+                          </WebuiIconButton>
+                        ) : null}
+                        <WebuiIconButton
+                          tone="bare"
+                          size="rail"
+                          label={`${sessionLabel(session)} 更多操作`}
+                          title="更多操作"
+                          onClick={(event) =>
+                            onSessionContextMenu(event, session)
+                          }
+                        >
+                          <WebuiIconMore />
+                        </WebuiIconButton>
+                        </div>
+                      </WebuiMotionSlot>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </WebuiStack>
-          ) : null}
-          {renderProjects(pinnedProjectGroups)}
-        </div>
-      </div>
+                    </WebuiMotionSlot>
+                  </li>
+                ))}
+              </WebuiStack>
+            ) : null}
+            {renderProjects(pinnedProjectGroups)}
+          </div>
+        </WebuiDisclosure>
 
-      <RailSectionHeader
-        label="项目"
-        expanded={projectSectionExpanded}
-        onToggle={onToggleProjectSection}
-        testId="projects"
-      />
-      <div
-        className="webui-project-section-content"
-        data-webui-section-expanded={projectSectionExpanded ? "true" : "false"}
-        aria-hidden={!projectSectionExpanded}
-      >
-        <div className="webui-project-section-content-inner" data-webui-projects-section="true">
-          {error ? (
-            <FeedbackError message="Unable to load projects: {error}" className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16" />
-          ) : null}
-          {projectLoadError ? (
-            <FeedbackError message="Unable to load project list: {projectLoadError}" className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16" />
-          ) : null}
-          {!error && projects.length === 0 ? (
-            <p className="webui-project-empty">
-              <WebuiIconFolder aria-hidden="true" />
-              <span>{pinnedProjectGroups.length > 0 ? "项目已全部置顶" : "暂无项目"}</span>
-            </p>
-          ) : (
-            <>
-              {renderProjects(projects.slice(0, visibleProjectCount))}
-              {hasMoreProjects ? (
-                <div className="px-1 pt-px">
-                  <WebuiButton
-                    variant="selectable-row"
-                    size="compact"
-                    className="webui-project-session-more text-text_default_secondary"
-                    onClick={onShowMoreProjects}
-                    disabled={projectLoading}
-                    aria-label="显示更多项目"
-                  >
-                    {projectLoading ? "加载中…" : "更多"}
-                  </WebuiButton>
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+        <RailSectionHeader
+          label="项目"
+          expanded={projectSectionExpanded}
+          onToggle={onToggleProjectSection}
+          testId="projects"
+        />
+        <WebuiDisclosure
+          as="div"
+          open={projectSectionExpanded}
+          className="webui-project-section-content"
+          data-webui-section-expanded={
+            projectSectionExpanded ? "true" : "false"
+          }
+        >
+          <div
+            className="webui-project-section-content-inner"
+            data-webui-projects-section="true"
+          >
+            {error ? (
+              <FeedbackError
+                message="Unable to load projects: {error}"
+                className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16"
+              />
+            ) : null}
+            {projectLoadError ? (
+              <FeedbackError
+                message="Unable to load project list: {projectLoadError}"
+                className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16"
+              />
+            ) : null}
+            {!error && projects.length === 0 ? (
+              <p className="webui-project-empty">
+                <WebuiIconFolder aria-hidden="true" />
+                <span>
+                  {pinnedProjectGroups.length > 0
+                    ? "项目已全部置顶"
+                    : "暂无项目"}
+                </span>
+              </p>
+            ) : (
+              <>
+                {renderProjects(projects.slice(0, visibleProjectCount))}
+                {hasMoreProjects ? (
+                  <div className="px-1 pt-px">
+                    <WebuiButton
+                      variant="selectable-row"
+                      size="compact"
+                      className="webui-project-session-more text-text_default_secondary"
+                      onClick={onShowMoreProjects}
+                      disabled={projectLoading}
+                      aria-label="显示更多项目"
+                    >
+                      {projectLoading ? "加载中…" : "更多"}
+                    </WebuiButton>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+        </WebuiDisclosure>
       </div>
-    </div>
+    </WebuiSkeletonProjection>
   );
 }
 
@@ -366,7 +416,9 @@ function RailSectionHeader({
       onClick={onToggle}
     >
       <span>{label}</span>
-      <WebuiIconSessionDisclosure className={expanded ? "is-expanded" : undefined} />
+      <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
+        <WebuiIconSessionDisclosure />
+      </WebuiMotionSlot>
     </WebuiButton>
   );
 }

@@ -160,11 +160,25 @@ test("the slider sets the level, and the chip names it", async ({ page }) => {
   const thumbStyle = await slider.locator(".webui-model-effort-thumb").evaluate((thumb) => {
     const style = getComputedStyle(thumb);
     return {
-      scale: new DOMMatrix(style.transform).a,
+      scale: style.scale === "none" ? 1 : Number(style.scale),
+      transitionProperty: style.transitionProperty,
       transitionDuration: style.transitionDuration,
     };
   });
   const thumbScale = thumbStyle.scale;
   expect(thumbScale).toBeGreaterThan(1);
-  expect(thumbStyle.transitionDuration).toContain("0.14s");
+  expect(thumbStyle.transitionProperty).toContain("scale");
+  expect(thumbStyle.transitionDuration).toContain("0.12s");
+
+  const ultraFillStyle = await slider.locator(".webui-model-effort-ultra-fill").evaluate((fill) => {
+    const style = getComputedStyle(fill);
+    return {
+      opacity: style.opacity,
+      transitionProperty: style.transitionProperty,
+      transitionDuration: style.transitionDuration,
+    };
+  });
+  expect(ultraFillStyle.opacity).toBe("0");
+  expect(ultraFillStyle.transitionProperty).toContain("opacity");
+  expect(ultraFillStyle.transitionDuration).toContain("0.12s");
 });

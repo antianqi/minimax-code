@@ -26,6 +26,7 @@ import {
 } from "../bindings/use-miniapp-workflows.js";
 import { MiniAppView } from "./MiniAppView.public.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { WebuiPage } from "../../../ui/page.js";
 
 export interface MiniAppStandaloneProps {
   readonly pluginId: string;
@@ -59,9 +60,16 @@ export function MiniAppStandalone({
     standalone !== undefined &&
     standalone.pluginId === pluginId &&
     standalone.session === "unresolved";
+  const loading =
+    standalone === undefined &&
+    state.standaloneFailure === undefined &&
+    state.unavailable === undefined;
 
   return (
-    <div
+    <WebuiPage
+      as="main"
+      kind="content"
+      loading={loading}
       className="webui-miniapp-standalone"
       data-testid="miniapp-standalone"
       data-plugin-id={pluginId}
@@ -85,9 +93,17 @@ export function MiniAppStandalone({
         </FeedbackLiveRegion>
       ) : null}
       {state.standaloneFailure !== undefined ? (
-        <FeedbackError message=<>无法确认会话状态：{state.standaloneFailure}</> className="webui-miniapp-standalone-notice" testId="miniapp-standalone-session-unresolved" />
+        <FeedbackError
+          message=<>无法确认会话状态：{state.standaloneFailure}</>
+          className="webui-miniapp-standalone-notice"
+          testId="miniapp-standalone-session-unresolved"
+        />
       ) : null}
-      <MiniAppView pluginId={pluginId} sessionId={sessionId} surface="standalone" />
-    </div>
+      <MiniAppView
+        pluginId={pluginId}
+        sessionId={sessionId}
+        surface="standalone"
+      />
+    </WebuiPage>
   );
 }

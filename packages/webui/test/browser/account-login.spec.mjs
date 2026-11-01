@@ -26,7 +26,7 @@
 
 import { expect } from "@playwright/test";
 
-import { openApp, test } from "./harness.mjs";
+import { configureFixture, openApp, test } from "./harness.mjs";
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => console.error("BROWSER_PAGE_ERROR", error.stack ?? error.message));
@@ -100,6 +100,24 @@ test("the signed-out usage block carries a 登录 button into the same page", as
   await signIn.click();
   await expect(loginPage(page)).toBeVisible();
   await expect(loginPage(page)).toHaveAttribute("data-webui-account-login-phase", "signed-out");
+});
+
+test("usage loading applies the shared pulse animation to each skeleton shape", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.delayEvery("getUsageQuota", {}));
+  await openApp(page, "#session=A");
+  await expect.poll(() =>
+    page.evaluate(() => window.__fixture.pending.some((item) => item.operation === "getUsageQuota")),
+  ).toBe(true);
+  await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
+  await page.locator('[data-testid="user-menu-usage"]').click();
+
+  const skeletons = page.locator('[data-testid="usage-popover-loading"] .webui-skeleton--pulse.webui-motion-loading');
+  await expect(skeletons).toHaveCount(8);
+  await expect.poll(() => skeletons.first().evaluate((element) => getComputedStyle(element).animationName))
+    .toBe("webui-skeleton-pulse");
+
+  await page.evaluate(() => window.__fixture.resolveAllPending("getUsageQuota", {}, { signedIn: false }));
+  await expect(page.locator('[data-testid="usage-sign-in-button"]')).toBeVisible();
 });
 
 test("the legal notice names the account's own documents", async ({ page }) => {

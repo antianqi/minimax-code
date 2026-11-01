@@ -20,6 +20,7 @@ import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react"
 import { IconEye, IconFileText, IconPhoto } from "@tabler/icons-react";
 import { WebuiIconButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiMotionSlot } from "../../../ui/page.js";
 
 // The attachment shape lives in contracts.ts (so projection/message-projection.ts
 // can return it without importing the React component). Re-export it under the
@@ -120,8 +121,9 @@ function AttachmentFile(props: {
   const { attachment, onPreview } = props;
   const href = attachment.preview_url || attachment.file_path;
   return (
+    <WebuiMotionSlot kind="feedback">
     <div
-      className="w-60 rounded-xl border-[0.5px] border-border_default bg-bg_default_secondary p-2 transition-colors hover:bg-bg_interaction_tertiary_hover"
+      className="w-60 rounded-xl border-[0.5px] border-border_default bg-bg_default_secondary p-2 hover:bg-bg_interaction_tertiary_hover"
       data-testid="message-attachment-file"
     >
       <WebuiInline align="start" gap="small">
@@ -155,6 +157,7 @@ function AttachmentFile(props: {
         ) : null}
       </WebuiInline>
     </div>
+    </WebuiMotionSlot>
   );
 }
 

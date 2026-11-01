@@ -130,9 +130,10 @@ describe("marketplace page layout parity", () => {
 
   it("previews the same number of cards on both pages", () => {
     expect(marketplaceSource).toContain("const MARKET_PREVIEW_COUNT = 8;");
-    expect(marketplaceSource).toMatch(
-      /showAll \? rows : rows\.slice\(0, MARKET_PREVIEW_COUNT\)/,
-    );
+    expect(marketplaceSource).toContain("rows.slice(0, MARKET_PREVIEW_COUNT)");
+    expect(marketplaceSource).toContain("rows.slice(MARKET_PREVIEW_COUNT)");
+    expect(marketplaceSource).toContain("<WebuiDisclosure");
+    expect(marketplaceSource).toContain("open={showAll}");
   });
 
   it("offers the same expand affordance on both pages", () => {

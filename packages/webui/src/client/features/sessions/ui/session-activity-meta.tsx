@@ -41,7 +41,7 @@ export function SessionActivityMeta({
               and the family brings a visible label the rail row has no room
               for. What the rail owes the reader is the announcement, and that
               is the shared contract's. */}
-          <span className="webui-rail-spinner" aria-hidden="true" />
+          <span className="webui-feedback-spinner webui-rail-spinner" aria-hidden="true" />
           <FeedbackAnnouncement
             message={busy.busyReason === "compaction" ? "正在压缩上下文" : "正在运行"}
           />

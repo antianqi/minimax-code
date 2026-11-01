@@ -314,10 +314,15 @@ describe("UsagePanel states", () => {
     const html = render({ status: "loading" });
     expect(html).toContain('data-testid="usage-popover-loading"');
     expect(html).toContain("webui-user-menu-usage-skeleton-bar--a");
+    expect(html).toContain("webui-skeleton--pulse");
+    expect(html).toContain("webui-motion-loading");
   });
 
   it("shows the pending skeleton before the first load", () => {
-    expect(render({ status: "idle" })).toContain('data-testid="usage-popover-pending"');
+    const html = render({ status: "idle" });
+    expect(html).toContain('data-testid="usage-popover-pending"');
+    expect(html).toContain("webui-skeleton--shape");
+    expect(html).not.toContain("webui-motion-loading");
   });
 
   it("distinguishes auth errors from generic failures and offers retry", () => {

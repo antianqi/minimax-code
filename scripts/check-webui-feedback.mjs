@@ -30,7 +30,7 @@ const clientRoot = path.join(repoRoot, "packages/webui/src/client");
 const budgetPath = path.join(repoRoot, "scripts/lib/webui-feedback-budget.json");
 
 /** The shared layer itself is where these are allowed, and where nothing else is. */
-const ALLOWED = new Set(["ui/feedback.tsx", "ui/field.tsx", "ui/content-page.tsx"]);
+const ALLOWED = new Set(["ui/feedback.tsx", "ui/field.tsx", "ui/content-page.tsx", "ui/page.tsx"]);
 
 /**
  * The announcement channels a caller may not author for itself.

@@ -7,35 +7,12 @@
  * them. Declaring them locally means the WebUI's `pnpm build:webui` stylesheet
  * still emits the same computed values.
  *
- *   .animate-shimmer   — skeleton loader; --shimmer-duration drives the
- *                        keyframe interval, default 1.6s.
  *   .scrollbar-hide    — hides horizontal/vertical scrollbars on the
  *                        navigator artifacts strip and elsewhere.
  *   .shadow-s1         — card shadow (a literal `0 4px 16px #0000000f` when
  *                        `var(--shadow-s1-…)` is not present).
  *
- * The keyframes are defined here too — `shimmer` is a translateX mask sweep.
  */
-
-@keyframes transcript-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--bg_default_tertiary) 0%,
-    var(--bg_default_secondary) 50%,
-    var(--bg_default_tertiary) 100%
-  );
-  background-size: 200% 100%;
-  animation: transcript-shimmer var(--shimmer-duration, 1.6s) linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-shimmer { animation: none; }
-}
 
 .scrollbar-hide {
   -ms-overflow-style: none;

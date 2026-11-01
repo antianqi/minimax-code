@@ -72,7 +72,3 @@ export function computeThinkingPhraseStartDelay(
 ): number {
   return startMinMs + random() * Math.max(0, startMaxMs - startMinMs);
 }
-
-export function shouldPlayActivityIndicator(prefersReducedMotion: boolean): boolean {
-  return !prefersReducedMotion;
-}

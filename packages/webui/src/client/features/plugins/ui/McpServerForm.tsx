@@ -26,6 +26,7 @@ import { WebuiField, WebuiSelect, WebuiTextarea, WebuiTextInput } from "../../..
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiDisclosure } from "../../../ui/page.js";
 
 export interface McpServerFormProps {
   /** The server being edited, or `undefined` for a new one. */
@@ -389,11 +390,16 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
             </WebuiStack>
             <ToggleSwitch label="启用 MCP server" checked={enabled} onChange={setEnabled} />
           </WebuiInline>
-          <WebuiButton variant="outline-secondary" size="compact" className="webui-mcp-advanced-button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((open) => !open)}>
+          <WebuiButton variant="outline-secondary" size="compact" className="webui-mcp-advanced-button" aria-expanded={advancedOpen} aria-controls="webui-mcp-advanced-fields" onClick={() => setAdvancedOpen((open) => !open)}>
             高级
           </WebuiButton>
-          {advancedOpen ? (
-            <>
+          <WebuiDisclosure
+            id="webui-mcp-advanced-fields"
+            open={advancedOpen}
+            mountOnOpen
+            className="webui-mcp-advanced-fields"
+          >
+            <div className="webui-mcp-advanced-content">
               {isStdio ? (
                 <WebuiField
                   label="环境变量"
@@ -419,8 +425,8 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
                   />
                 )}
               />
-            </>
-          ) : null}
+            </div>
+          </WebuiDisclosure>
         </div>
       )}
       {localError ? <FeedbackError message={localError} /> : null}

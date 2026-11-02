@@ -550,15 +550,8 @@
     color: var(--text_default_tertiary);
     opacity: 0.55;
   }
-  /* The directory browser keeps the shared `.webui-workspace-menu` panel, which
-   * is still anchored to this row. The recent list is a dropdown now: the
-   * shared layer gives it the surface and the placement, and this says only
-   * what the list itself needs. */
-  .webui-workspace-menu {
-    right: auto;
-    left: 0;
-    min-width: 220px;
-  }
+  /* The recent list is a shared dropdown surface; this says only what its
+   * workspace rows need. The directory browser uses the shared dialog shell. */
   .webui-workspace-picker-menu {
     display: flex;
     min-width: 220px;

@@ -126,7 +126,7 @@ export function WebuiWorkspaceDirectoryBrowser({
             variant="plain"
             size="compact"
             type="button"
-            className="webui-workspace-option webui-workspace-option--desktop"
+            className="webui-workspace-option"
             data-webui-workspace-action="up"
             onClick={() => browse(listing.parent)}
           >
@@ -151,7 +151,7 @@ export function WebuiWorkspaceDirectoryBrowser({
             size="regular"
             key={entry.path}
             type="button"
-            className="webui-workspace-option webui-workspace-option--desktop"
+            className="webui-workspace-option"
             data-webui-workspace-action="enter"
             onClick={() => browse(entry.path)}
           >

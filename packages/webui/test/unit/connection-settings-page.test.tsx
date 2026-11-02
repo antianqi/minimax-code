@@ -3,9 +3,8 @@
  *
  * The claims are about the page's shape:
  *
- *   * the page carries the Desktop's three tabs, and the first one is the one that opens;
- *   * the controlled-devices half keeps the Desktop's card and leaves its command disabled,
- *     because this runtime cannot drive another machine;
+ *   * the page carries the two supported tabs, and the first one is the one that opens;
+ *   * the removed controlled-devices tab and card are absent;
  *   * the SSH half mounts the SSH panel, so the hosts live where the Desktop keeps them.
  */
 import { renderToStaticMarkup } from "react-dom/server";
@@ -52,7 +51,7 @@ function remoteControlOwner(): WebuiRemoteControlOwner {
 }
 
 describe("the connection settings page", () => {
-  it("carries the Desktop's three tabs", () => {
+  it("carries the supported tabs", () => {
     const markup = renderToStaticMarkup(
       <WebuiRemoteControlOwnerProvider owner={remoteControlOwner()}>
         <ConnectionSettingsPage />
@@ -60,23 +59,19 @@ describe("the connection settings page", () => {
     );
     expect(markup).toContain('role="tablist"');
     expect(markup).toContain("控制这台电脑");
-    expect(markup).toContain("控制其他设备");
+    expect(markup).not.toContain("控制其他设备");
     expect(markup).toContain("SSH");
     // The first tab is the one that opens.
     expect(markup).toContain('aria-selected="true"');
   });
 
-  it("keeps the controlled-devices card and leaves its command disabled", () => {
+  it("does not render the removed controlled-devices panel", () => {
     const markup = renderToStaticMarkup(
       <WebuiRemoteControlOwnerProvider owner={remoteControlOwner()}>
-        <ConnectionSettingsPage initialSection="other-devices" />
+        <ConnectionSettingsPage />
       </WebuiRemoteControlOwnerProvider>,
     );
-    expect(markup).toContain("通过这台电脑控制的设备");
-    expect(markup).toContain("尚未添加设备");
-    expect(markup).toContain('data-testid="connection-controlled-devices"');
-    expect(markup).toContain('aria-disabled="true"');
-    expect(markup).toContain('disabled=""');
+    expect(markup).not.toContain("connection-controlled-devices");
   });
 
   it("mounts the SSH panel in the SSH half", () => {

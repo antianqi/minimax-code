@@ -182,6 +182,7 @@ describe("the SSH panel", () => {
         onOpenTerminal: () => undefined,
         onCloseTerminal: () => undefined,
         onTerminalInput: () => undefined,
+        onTerminalResize: () => undefined,
         onRemoveProject: () => undefined,
         onRequestRemove: () => undefined,
         ...overrides,

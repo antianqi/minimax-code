@@ -19,8 +19,8 @@ import { useState } from "react";
 
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { useDialogLayer } from "../../../ui/overlay-listeners.js";
-import { WebuiPage } from "../../../ui/page.js";
+import { WebuiDialog } from "../../../ui/dialog.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { workspaceProjectName } from "../../../features/workspace/projection/workspace-name.public.js";
 import { WebuiWorkspaceDirectoryBrowser } from "../../../features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.js";
 import { WebuiIconCheck, WebuiIconFolder } from "../../../shell/icons.js";
@@ -45,17 +45,7 @@ export function WebuiComposerProjectRow({
   onSelectProject,
 }: WebuiComposerProjectRowProps) {
   const [browserOpen, setBrowserOpen] = useState(false);
-
-  // The directory browser is a dialog, and a dialog that floats above the
-  // composer is a layer (ADR 0028 § Overlay coordination): the coordinator
-  // answers the Escape and the press outside it, so the browser holds no
-  // listener of its own. It is active only while it is on screen.
-  const browserLayerId = useDialogLayer({
-    id: "composer-directory-browser",
-    dismissible: true,
-    onClose: () => setBrowserOpen(false),
-    active: browserOpen,
-  });
+  const { dom } = useWebuiBrowserCapabilities();
 
   return (
     <div className="webui-workspace-bar" data-webui-workspace-toolbar="true">
@@ -112,7 +102,7 @@ export function WebuiComposerProjectRow({
                     role="option"
                     aria-selected={active}
                     data-webui-workspace-recent={dir}
-                    className="webui-workspace-option webui-workspace-option--desktop"
+                    className="webui-workspace-option"
                     title={dir}
                     onClick={() => onSelectProject(dir)}
                   >
@@ -132,7 +122,7 @@ export function WebuiComposerProjectRow({
             role="option"
             aria-selected={false}
             data-webui-workspace-action="add-new"
-            className="webui-workspace-option webui-workspace-option--desktop"
+            className="webui-workspace-option"
             onClick={() => {
               onMenuOpenChange(false);
               setBrowserOpen(true);
@@ -148,7 +138,7 @@ export function WebuiComposerProjectRow({
             role="option"
             aria-selected={projectDir === undefined}
             data-webui-workspace-action="no-project"
-            className="webui-workspace-option webui-workspace-option--desktop"
+            className="webui-workspace-option"
             onClick={() => onSelectProject(undefined)}
           >
             <WebuiIconFolder className="flex-shrink-0" />
@@ -157,26 +147,29 @@ export function WebuiComposerProjectRow({
             </span>
           </WebuiButton>
         </WebuiDropdown>
-        <WebuiPage
-          as="div"
-          kind="dialog"
-          present={browserOpen}
-          motion={{ kind: "surface", state: "enter", direction: "down" }}
-          role="dialog"
-          aria-label="选择项目目录"
-          data-overlay-layer={browserLayerId}
-          data-webui-workspace-browser-dialog="true"
-          className="webui-workspace-menu webui-workspace-menu--desktop"
+        <WebuiDialog
+          id="composer-directory-browser"
+          open={browserOpen}
+          title="选择项目目录"
+          description="选择要用于新会话的工作目录"
+          width="standard"
+          portalTarget={dom.portalTarget()}
+          onClose={() => setBrowserOpen(false)}
+          dismissOnEscape
+          dismissOnBackdrop
+          testId="webui-workspace-browser-dialog"
+          dataAttributes={{ "data-webui-workspace-browser-dialog": "true" }}
+          bodyClassName="webui-workspace-browser-dialog-body"
         >
-            <WebuiWorkspaceDirectoryBrowser
-              initialDir={projectDir}
-              onSelect={(dir) => {
-                setBrowserOpen(false);
-                onSelectProject(dir);
-              }}
-              onCancel={() => setBrowserOpen(false)}
-            />
-        </WebuiPage>
+          <WebuiWorkspaceDirectoryBrowser
+            initialDir={projectDir}
+            onSelect={(dir) => {
+              setBrowserOpen(false);
+              onSelectProject(dir);
+            }}
+            onCancel={() => setBrowserOpen(false)}
+          />
+        </WebuiDialog>
       </div>
     </div>
   );

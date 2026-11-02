@@ -30,14 +30,17 @@ test.describe("the scheduled-task panel", () => {
     const held = panel.locator('[data-webui-scheduling-task="cron-fixture-held"]');
     await expect(held).toContainText("队列摘要");
     await expect(held).toContainText("每天 09:00");
-    await expect(held.locator('[data-webui-scheduling-hold="held"]')).toContainText("本客户端已接管");
+    await panel.locator('[data-webui-scheduling-select="cron-fixture-held"]').click();
+    await expect(panel.locator('[data-webui-scheduling-hold="held"]')).toContainText("本客户端已接管");
 
     const unheld = panel.locator('[data-webui-scheduling-task="cron-fixture-unheld"]');
     await expect(unheld).toContainText("每 30 分钟");
-    await expect(unheld.locator('[data-webui-scheduling-hold="unheld"]')).toContainText("本客户端未接管");
+    await panel.locator('[data-webui-scheduling-select="cron-fixture-unheld"]').click();
+    await expect(panel.locator('[data-webui-scheduling-hold="unheld"]')).toContainText("本客户端未接管");
 
     const paused = panel.locator('[data-webui-scheduling-task="cron-fixture-paused"]');
-    await expect(paused.locator('[data-webui-scheduling-enabled="false"]')).toContainText("已停用");
+    await panel.locator('[data-webui-scheduling-select="cron-fixture-paused"]').click();
+    await expect(panel.locator('[data-webui-scheduling-enabled="false"]')).toContainText("已停用");
 
     // The panel is a surface, not an overlay: the transcript is gone while it is open.
     await expect(page.locator('[data-webui-component="composer"]')).toHaveCount(0);
@@ -59,7 +62,7 @@ test.describe("the scheduled-task panel", () => {
 
     // Create, from the daily preset the form opens on.
     await panel.locator('[data-webui-scheduling-new="true"]').click();
-    const editor = panel.locator('[data-webui-component="scheduling-editor"]');
+    const editor = page.locator('[data-webui-component="scheduling-editor"]');
     await expect(editor).toBeVisible();
     await editor.locator('[data-webui-scheduling-field="name"]').fill("每日摘要");
     // The panel is opened from the rail, so no session is selected and this client has no agent to
@@ -75,18 +78,19 @@ test.describe("the scheduled-task panel", () => {
     // What the preset means reached the runtime: daily at 09:00 is `0 9 * * *`.
     await expect(created).toContainText("每天 09:00");
 
-    // Turn one off: the row's own switch, and the label follows the runtime's answer.
+    // Turn one off: the selected task's action, and the label follows the runtime's answer.
     const heldRow = panel.locator('[data-webui-scheduling-task="cron-fixture-held"]');
-    await heldRow.locator('[data-webui-scheduling-toggle="cron-fixture-held"]').click();
-    await expect(heldRow.locator('[data-webui-scheduling-enabled="false"]')).toContainText("已停用");
+    await panel.locator('[data-webui-scheduling-toggle="cron-fixture-held"]').click();
+    await expect(panel.locator('[data-webui-scheduling-enabled="false"]')).toContainText("已停用");
     // And back on again.
-    await heldRow.locator('[data-webui-scheduling-toggle="cron-fixture-held"]').click();
-    await expect(heldRow.locator('[data-webui-scheduling-enabled="true"]')).toContainText("已启用");
+    await panel.locator('[data-webui-scheduling-toggle="cron-fixture-held"]').click();
+    await expect(panel.locator('[data-webui-scheduling-enabled="true"]')).toContainText("已启用");
 
     // Delete takes two clicks, and the row goes.
     const doomed = panel.locator('[data-webui-scheduling-task="cron-fixture-paused"]');
-    await doomed.locator('[data-webui-scheduling-delete="cron-fixture-paused"]').click();
-    await doomed.locator('[data-webui-scheduling-delete-confirm="cron-fixture-paused"]').click();
+    await panel.locator('[data-webui-scheduling-select="cron-fixture-paused"]').click();
+    await panel.locator('[data-webui-scheduling-delete="cron-fixture-paused"]').click();
+    await panel.locator('[data-webui-scheduling-delete-confirm="cron-fixture-paused"]').click();
     await expect(doomed).toHaveCount(0);
   });
 
@@ -99,15 +103,15 @@ test.describe("the scheduled-task panel", () => {
 
     // The history holds the run the schedule produced, labelled as such.
     const heldRow = panel.locator('[data-webui-scheduling-task="cron-fixture-held"]');
-    const historyToggle = heldRow.locator('[data-webui-scheduling-history="cron-fixture-held"]');
+    const historyToggle = panel.locator('[data-webui-scheduling-history="cron-fixture-held"]');
     await expect(historyToggle).toHaveAttribute("aria-expanded", "false");
     await historyToggle.click();
     await expect(historyToggle).toHaveAttribute("aria-expanded", "true");
-    const disclosure = heldRow.locator('[data-webui-scheduling-runs="cron-fixture-held"]');
+    const disclosure = panel.locator('[data-webui-scheduling-runs="cron-fixture-held"]');
     await expect(disclosure).toHaveAttribute("data-webui-motion-state", "expand");
     await expect.poll(() => disclosure.evaluate((element) => getComputedStyle(element).transitionDuration))
       .toBe("0.16s");
-    const seeded = heldRow.locator('[data-webui-scheduling-run-row="run-fixture-scheduled"]');
+    const seeded = panel.locator('[data-webui-scheduling-run-row="run-fixture-scheduled"]');
     await expect(seeded).toContainText("定时");
     await expect(seeded).toContainText("已完成");
 
@@ -119,8 +123,8 @@ test.describe("the scheduled-task panel", () => {
     await historyToggle.click();
 
     // Run now: the run appears in the history with its source, its outcome and its session.
-    await heldRow.locator('[data-webui-scheduling-run="cron-fixture-held"]').click();
-    const runs = heldRow.locator('[data-webui-scheduling-runs="cron-fixture-held"]');
+    await panel.locator('[data-webui-scheduling-run="cron-fixture-held"]').click();
+    const runs = panel.locator('[data-webui-scheduling-runs="cron-fixture-held"]');
     await expect(runs).toContainText("手动");
     // Two runs now: the scheduled one and the manual one.
     await expect(runs.locator("[data-webui-scheduling-run-row]")).toHaveCount(2);

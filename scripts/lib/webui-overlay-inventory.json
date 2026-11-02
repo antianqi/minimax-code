@@ -139,6 +139,18 @@
       "disposition": "managed",
       "note": "the connection-details dialog registers with the coordinator as a managed layer and attaches no listener of its own"
     },
+    "features/ssh/ui/ssh-project-form.tsx": {
+      "disposition": "managed",
+      "note": "the project form renders through the shared dialog, which registers with the coordinator and owns dismissal"
+    },
+    "features/ssh/ui/ssh-terminal-view.tsx": {
+      "disposition": "managed",
+      "note": "the remote terminal window renders through the shared dialog, which registers with the coordinator and owns dismissal"
+    },
+    "features/scheduling/ui/scheduling-editor.tsx": {
+      "disposition": "managed",
+      "note": "the scheduled-task form renders through the shared dialog, which registers with the coordinator and owns dismissal"
+    },
     "features/ssh/ui/ssh-connection-row.tsx": {
       "disposition": "managed",
       "note": "the row's menu is the shared dropdown, which registers with the coordinator and owns its own dismissal"

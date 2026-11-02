@@ -4089,6 +4089,7 @@
     "packages/webui/src/client/features/scheduling/projection/scheduling-panel.ts",
     "packages/webui/src/client/features/scheduling/ui/SchedulingPanel.public.tsx",
     "packages/webui/src/client/features/scheduling/ui/scheduling-editor.tsx",
+    "packages/webui/src/client/features/scheduling/ui/scheduling.css",
     "packages/webui/src/client/features/sessions/application/session-activity-controller.ts",
     "packages/webui/src/client/features/sessions/application/session-catalog.public.ts",
     "packages/webui/src/client/features/sessions/application/session-catalog.ts",

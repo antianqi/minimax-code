@@ -93,22 +93,6 @@
     min-width: 220px;
     flex-direction: column;
   }
-  .webui-workspace-menu {
-    position: absolute;
-    right: 0;
-    bottom: calc(100% + var(--spacing_8));
-    z-index: 70;
-    display: flex;
-    min-width: 220px;
-    max-height: 320px;
-    flex-direction: column;
-    overflow-y: auto;
-    padding: var(--spacing_4);
-    border: 1px solid var(--border_default);
-    border-radius: var(--radius_12);
-    background: var(--bg_default_primary);
-    box-shadow: 0 8px 24px var(--shadow_default);
-  }
   .webui-model-menu--two-column {
     display: grid;
     grid-template-columns: minmax(220px, 1fr) minmax(220px, 1.4fr);
@@ -145,12 +129,6 @@
     color: var(--text_default_primary);
     text-align: left;
     font-size: var(--size_14);
-    line-height: var(--line_height_20);
-  }
-  .webui-workspace-menu--desktop .webui-workspace-option--desktop {
-    border-radius: var(--radius_8);
-    background: transparent;
-    padding: 8px 10px;
     line-height: var(--line_height_20);
   }
   .webui-model-option:hover,

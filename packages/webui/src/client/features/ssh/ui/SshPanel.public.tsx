@@ -15,7 +15,7 @@
 //
 // The shape is the Desktop's `设置 > 连接 > SSH` half: the hosts in one grouped card, a switch
 // and the host's own menu on each row, and one 「添加」 button that opens the host picker.
-import { useEffect, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { IconLoader2, IconTerminal2 } from "@tabler/icons-react";
 
 import type {
@@ -54,8 +54,8 @@ import { WebuiStack } from "../../../ui/layout-primitives.js";
 export interface SshPanelViewProps {
   readonly snapshot: WebuiSshSnapshot;
   readonly terminal: WebuiSshTerminalSnapshot;
-  /** The project form, shown under the host list. */
-  readonly projectForm?: ReactNode;
+  /** The project form, rendered as a managed dialog by the panel. */
+  readonly projectDialog?: ReactNode;
   /** The add dialog, rendered by the panel because it needs the overlay layer. */
   readonly addDialog?: ReactNode;
   /** The details dialog. */
@@ -74,6 +74,7 @@ export interface SshPanelViewProps {
   readonly onOpenTerminal: (connection: WebuiSshConnection) => void;
   readonly onCloseTerminal: () => void;
   readonly onTerminalInput: (data: string) => void;
+  readonly onTerminalResize: (cols: number, rows: number) => void;
   readonly onRemoveProject: (project: WebuiSshProject) => void;
   readonly onRequestRemove: (connection: WebuiSshConnection) => void;
 }
@@ -179,7 +180,6 @@ export function SshPanelView(props: SshPanelViewProps): ReactElement {
         : <p data-webui-ssh-notice="true" className="px-4 text-xs text-text_default_secondary">
           {props.notice}
         </p>}
-      {props.projectForm}
       {projectRows.length === 0
         ? null
         : <WebuiStack as="ul" gap="small" data-webui-ssh-projects="true">
@@ -211,12 +211,16 @@ export function SshPanelView(props: SshPanelViewProps): ReactElement {
             </li>
           ))}
         </WebuiStack>}
-      <SshTerminalView
-        terminal={props.terminal}
-        onInput={props.onTerminalInput}
-        onClose={props.onCloseTerminal}
-      />
+      {props.terminal.status === "closed"
+        ? null
+        : <SshTerminalView
+          terminal={props.terminal}
+          onInput={props.onTerminalInput}
+          onResize={props.onTerminalResize}
+          onClose={props.onCloseTerminal}
+        />}
       {props.addDialog}
+      {props.projectDialog}
       {props.detailsDialog}
       {props.removeDialog}
     </div>
@@ -235,6 +239,10 @@ export interface SshPanelProps {
 }
 
 export function SshPanel(props: SshPanelProps): ReactElement {
+  const browseDirectories = useCallback(
+    (alias: string, path?: string) => props.owner.listDirectories(alias, path),
+    [props.owner],
+  );
   const snapshot = useSyncExternalStore(
     props.owner.subscribe,
     props.owner.getSnapshot,
@@ -374,13 +382,13 @@ export function SshPanel(props: SshPanelProps): ReactElement {
     />
   );
 
-  const projectForm = projectFor === undefined
+  const projectDialog = projectFor === undefined
     ? undefined
     : <SshProjectForm
       hosts={snapshot.connections}
       alias={projectFor}
       error={error}
-      onBrowse={(alias, path) => props.owner.listDirectories(alias, path)}
+      onBrowse={browseDirectories}
       onCancel={() => setProjectFor(undefined)}
       onSubmit={(request) => {
         void props.owner.saveProject(request).then((answer) => {
@@ -398,7 +406,7 @@ export function SshPanel(props: SshPanelProps): ReactElement {
     <SshPanelView
       snapshot={snapshot}
       terminal={terminal}
-      {...(projectForm ? { projectForm } : {})}
+      {...(projectDialog ? { projectDialog } : {})}
       {...(notice === undefined ? {} : { notice })}
       {...(error === undefined ? {} : { error })}
       onOpenAdd={openAdd}
@@ -428,6 +436,9 @@ export function SshPanel(props: SshPanelProps): ReactElement {
       }}
       onTerminalInput={(data) => {
         void props.owner.writeTerminal(data);
+      }}
+      onTerminalResize={(cols, rows) => {
+        void props.owner.resizeTerminal(cols, rows);
       }}
       onRemoveProject={(project) => {
         void props.owner.removeProject(project.id).then((answer) => {

@@ -11,9 +11,9 @@
 // suffix is a publication marker; the dialog and the pages it mounts are
 // unchanged, and every other settings surface stays in the private sibling.
 
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
-import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconChevronDown, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconMicrophone, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
-import { WebuiSearchField, WebuiSelect, WebuiTextInput } from "../../../ui/field.js";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconMicrophone, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
+import { WebuiSearchField, WebuiSelectMenu, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
@@ -76,12 +76,20 @@ function stored(key: string, fallback: string, storage: ReturnType<typeof useWeb
   return storage.getItem(key) ?? fallback;
 }
 function Select({ value, onChange, disabled = false, wide = false, testId }: { readonly value: string; readonly onChange?: (value: string) => void; readonly disabled?: boolean; readonly wide?: boolean; readonly testId?: string }): ReactElement {
+  const labelId = useId();
   return (
-    <WebuiInline as="label" inline className={`webui-ant-select${wide ? " is-wide" : ""}`} data-testid={testId}>
-      <WebuiSelect appearance="custom-chevron" value={value} disabled={disabled} onChange={(event) => onChange?.(event.target.value)}>
-        <option>{value}</option>
-      </WebuiSelect>
-      <IconChevronDown aria-hidden="true" size={16} stroke={1.5} />
+    <WebuiInline inline className={`webui-ant-select${wide ? " is-wide" : ""}`} data-testid={testId}>
+      <span id={labelId} className="sr-only">{value}</span>
+      <WebuiSelectMenu
+        id={`${labelId}-control`}
+        labelId={labelId}
+        aria-label={value}
+        className="webui-control--dense h-full"
+        options={[{ value, label: value }]}
+        value={value}
+        disabled={disabled}
+        onChange={(nextValue) => onChange?.(nextValue)}
+      />
     </WebuiInline>
   );
 }

@@ -23,6 +23,7 @@ export interface WebuiDialogProps {
   readonly headerActions?: ReactNode;
   readonly children: ReactNode;
   readonly footer?: ReactNode;
+  readonly bodyClassName?: string;
   readonly footerClassName?: string;
   readonly onClose: () => void;
   readonly onExitComplete?: () => void;
@@ -61,6 +62,7 @@ export function WebuiDialog({
   headerActions,
   children,
   footer,
+  bodyClassName,
   footerClassName,
   onClose,
   onExitComplete,
@@ -197,7 +199,7 @@ export function WebuiDialog({
           ) : null}
         </header>
         <DialogFooterContext.Provider value={footerTarget}>
-          <div className="webui-dialog-body"><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
+          <div className={`webui-dialog-body${bodyClassName ? ` ${bodyClassName}` : ""}`}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
           <footer
             ref={setFooterTarget}
             className={`webui-dialog-footer${footerClassName ? ` ${footerClassName}` : ""}`}

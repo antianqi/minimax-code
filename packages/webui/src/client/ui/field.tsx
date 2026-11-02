@@ -21,7 +21,6 @@ import {
   type Ref,
   type ReactElement,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
 import { WebuiDropdown } from "./Dropdown.js";
@@ -73,22 +72,6 @@ export const WebuiTextarea = forwardRef<
     return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-control webui-control--multiline ${controlSize === "compact" ? "webui-control--compact" : ""} ${controlSize === "large" ? "webui-control--large" : ""} ${controlSize === "document" ? "webui-control--document" : ""} ${appearance === "document" ? "webui-control--document-appearance" : ""} ${className ?? ""}`} style={props.style} />;
   }
   return <textarea {...props} rows={rows} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
-});
-
-/** The shared native select control, including its focus and disabled states. */
-export interface WebuiSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "className"> {
-  readonly controlSize?: "regular" | "compact" | "dense";
-  readonly appearance?: "boxed" | "custom-chevron";
-  readonly className?: string;
-}
-
-export const WebuiSelect = forwardRef<HTMLSelectElement, WebuiSelectProps>(function WebuiSelect(
-  { controlSize = "regular", appearance = "boxed", className, ...props },
-  ref,
-): ReactElement {
-  const classes = ["webui-control", "webui-motion-feedback", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "dense" ? "webui-control--dense" : "", appearance === "custom-chevron" ? "webui-control--custom-chevron" : "", className].filter(Boolean).join(" ");
-  if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape ${classes}`} style={props.style} />;
-  return <select {...props} ref={ref} className={classes} />;
 });
 
 export interface WebuiSelectOption {

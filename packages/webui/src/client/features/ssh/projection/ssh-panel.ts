@@ -32,7 +32,6 @@ export const WEBUI_SSH_CONFIG_UNREADABLE_TEXT = "无法读取 ~/.ssh/config 文�
 /** No project is rooted on a host yet. */
 export const WEBUI_SSH_NO_PROJECTS_TEXT = "还没有 SSH 项目。";
 /** The terminal is not open. */
-export const WEBUI_SSH_NO_TERMINAL_TEXT = "还没有打开远程终端。";
 /** The host list is being read. */
 export const WEBUI_SSH_LOADING_TEXT = "正在读取 SSH 主机…";
 

@@ -1,26 +1,6 @@
 /* workspace — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
-  /* No `min-width` here: the shared `.webui-workspace-menu` rule already sets
-   * 220px, and that is the width the panel actually rendered before the
-   * split. This rule's 240px never won the cascade in the pre-split sheet — the
-   * engine reports the pre-split panel at min-width: 220px and width: 220px —
-   * but after the split it started winning, which widened the panel by
-   * 20px. The dead declaration is removed rather than left to change
-   * behaviour. */
-  .webui-workspace-menu--desktop {
-    display: flex;
-    max-width: 320px;
-    padding: var(--spacing_4);
-    border-radius: var(--radius_12);
-  }
-  .webui-workspace-menu--desktop
-    [data-webui-workspace-action="add-new"]
-    + [data-webui-workspace-action="no-project"] {
-    margin-top: var(--spacing_2);
-  }
-
-
   /* The project row under the composer. It is a LAYOUT element only — the
    * light surface comes from `.message-input-home-container`, the scrim box
    * that already wraps the card, so the card and this row read as one

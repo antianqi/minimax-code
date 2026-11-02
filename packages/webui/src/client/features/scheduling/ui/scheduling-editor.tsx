@@ -10,6 +10,8 @@
 // shared row cannot disagree about what the preset means.
 import { useState, type ReactElement } from "react";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { WebuiDialog } from "../../../ui/dialog.js";
 
 import type {
   WebuiCronSchedule,
@@ -28,7 +30,7 @@ import {
   type WebuiCronSchedulePreset,
 } from "../projection/scheduling-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiField, WebuiFormLayout, WebuiSelect, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiFormLayout, WebuiSelectMenu, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
 
 export interface SchedulingEditorViewProps {
   readonly mode: "create" | "edit";
@@ -51,7 +53,8 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
         event.preventDefault();
         props.onSubmit();
       }}
-      className="mb-4 rounded-[8px] border border-border_default p-3"
+      id="webui-scheduling-editor-form"
+      className="flex flex-col gap-4"
     >
       <WebuiFormLayout>
         <WebuiField
@@ -100,20 +103,19 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
         />
         <WebuiField
           label="周期"
-          control={(props) => (
-            <WebuiSelect
-              {...props}
-              controlSize="dense"
+          control={(controlProps, field) => (
+            <WebuiSelectMenu
+              {...controlProps}
+              labelId={field.labelId}
+              className="webui-control--dense"
               data-webui-scheduling-field="preset"
+              options={(Object.keys(WEBUI_CRON_PRESET_LABELS) as WebuiCronSchedulePreset[]).map((preset) => ({
+                value: preset,
+                label: WEBUI_CRON_PRESET_LABELS[preset],
+              }))}
               value={draft.preset}
-              onChange={(event) => onChange({ preset: event.target.value as WebuiCronSchedulePreset })}
-            >
-              {(Object.keys(WEBUI_CRON_PRESET_LABELS) as WebuiCronSchedulePreset[]).map((preset) => (
-                <option key={preset} value={preset}>
-                  {WEBUI_CRON_PRESET_LABELS[preset]}
-                </option>
-              ))}
-            </WebuiSelect>
+              onChange={(value) => onChange({ preset: value as WebuiCronSchedulePreset })}
+            />
           )}
         />
         {draft.preset === "daily" || draft.preset === "weekly"
@@ -242,21 +244,6 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
             {props.error}
           </p>
           : null}
-        <WebuiInline gap="small" className="pt-1">
-          <WebuiButton variant="outline" size="inline" type="submit"
-            data-webui-scheduling-submit="true"
-            disabled={props.busy}
-
-          >
-            {props.mode === "create" ? "创建" : "保存"}
-          </WebuiButton>
-          <WebuiButton variant="quiet-secondary" size="inline" data-webui-scheduling-cancel="true"
-            onClick={props.onCancel}
-
-          >
-            取消
-          </WebuiButton>
-        </WebuiInline>
       </WebuiFormLayout>
     </form>
   );
@@ -265,18 +252,22 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
 export function SchedulingEditor(props: {
   readonly owner: WebuiSchedulingOwner;
   readonly task?: WebuiCronTask;
+  readonly open: boolean;
+  readonly seed?: Partial<WebuiCronDraft>;
   /** The agent a new task belongs to; the panel passes the client's own. */
   readonly agentName?: string;
   readonly nowMs: () => number;
   readonly onDone: () => void;
+  readonly onExitComplete: () => void;
 }): ReactElement {
+  const { dom } = useWebuiBrowserCapabilities();
   // Read once: a narrowed `props.task` inside the submit closure loses the narrowing.
   const editingTask = props.task;
   const mode = editingTask ? "edit" : "create";
   const [initialDraft] = useState<WebuiCronDraft>(() =>
     editingTask
       ? webuiCronDraftFromTask(editingTask)
-      : { ...WEBUI_CRON_EMPTY_DRAFT, agentName: props.agentName ?? "" },
+      : { ...WEBUI_CRON_EMPTY_DRAFT, agentName: props.agentName ?? "", ...(props.seed ?? {}) },
   );
   const [draft, setDraft] = useState<WebuiCronDraft>(initialDraft);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -324,14 +315,41 @@ export function SchedulingEditor(props: {
   };
 
   return (
-    <SchedulingEditorView
-      mode={mode}
-      draft={draft}
-      busy={busy}
-      {...(error === undefined ? {} : { error })}
-      onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-      onCancel={props.onDone}
-      onSubmit={() => void submit()}
-    />
+    <WebuiDialog
+      id="webui-scheduling-editor-dialog"
+      open={props.open}
+      title={editingTask ? "编辑定时任务" : "新建定时任务"}
+      description={editingTask ? "调整任务内容和执行计划" : "设置任务指令与自动执行计划"}
+      width="wide"
+      portalTarget={dom.portalTarget()}
+      onClose={props.onDone}
+      onExitComplete={props.onExitComplete}
+      dismissOnEscape
+      dismissOnBackdrop
+      testId="webui-scheduling-editor-dialog"
+      footer={(
+        <WebuiInline gap="small">
+          <WebuiButton variant="secondary" size="dialog" type="button" data-webui-scheduling-cancel="true" onClick={props.onDone}>
+            取消
+          </WebuiButton>
+          <WebuiButton variant="primary" size="dialog" type="submit" form="webui-scheduling-editor-form"
+            data-webui-scheduling-submit="true" loading={busy}
+            loadingLabel={editingTask ? "保存中…" : "创建中…"}
+          >
+            {editingTask ? "保存" : "创建任务"}
+          </WebuiButton>
+        </WebuiInline>
+      )}
+    >
+      <SchedulingEditorView
+        mode={mode}
+        draft={draft}
+        busy={busy}
+        {...(error === undefined ? {} : { error })}
+        onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+        onCancel={props.onDone}
+        onSubmit={() => void submit()}
+      />
+    </WebuiDialog>
   );
 }

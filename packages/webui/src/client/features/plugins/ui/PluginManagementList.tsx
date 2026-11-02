@@ -4,9 +4,9 @@ import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
-import { FeedbackEmpty } from "../../../ui/feedback.js";
+import { FeedbackEmpty, FeedbackSkeleton } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiMotion, WebuiSkeleton, WebuiSkeletonProjection } from "../../../ui/page.js";
+import { WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
 import {
   PluginRow,
   PluginRowActions,
@@ -74,18 +74,7 @@ export function PluginManagementList({
   readonly onPrepareMcp: (row: WebuiPluginCatalogueRow["source"]) => void;
 }): ReactElement {
   return loading ? (
-    <div className="webui-plugin-management-skeleton" aria-hidden="true" data-testid="plugin-management-skeleton">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div className="webui-plugin-management-skeleton-row" key={index}>
-          <WebuiSkeleton variant="shape" width={40} height={40} />
-          <div className="webui-plugin-management-skeleton-copy">
-          <WebuiSkeleton variant="text" width="42%" height={12} />
-          <WebuiSkeleton variant="text" width="65%" height={12} />
-          </div>
-          <WebuiSkeleton variant="control" width={64} height={36} />
-        </div>
-      ))}
-    </div>
+    <FeedbackSkeleton rows={6} testId="plugin-management-skeleton" />
   ) : rows.length === 0 ? (
     <FeedbackEmpty title="暂无内容" />
   ) : (

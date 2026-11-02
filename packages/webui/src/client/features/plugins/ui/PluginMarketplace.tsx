@@ -4,9 +4,9 @@ import { MarketplaceCategory } from "@mavis/protocol/local";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
-import { FeedbackEmpty } from "../../../ui/feedback.js";
+import { FeedbackEmpty, FeedbackSkeleton } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiDisclosure, WebuiMotion, WebuiSkeleton, WebuiSkeletonProjection } from "../../../ui/page.js";
+import { WebuiDisclosure, WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
 import {
   PluginRow,
   PluginRowActions,
@@ -208,7 +208,7 @@ export function PluginMarketplace({
   const noun = area === "skills" ? "技能" : "插件";
   const expandedListId = useId();
   if (sections) {
-    return loading ? <PluginMarketSkeleton /> : sections.length === 0 ? <FeedbackEmpty title="暂无内容" /> : (
+    return loading ? <FeedbackSkeleton rows={6} testId="plugin-market-skeleton" /> : sections.length === 0 ? <FeedbackEmpty title="暂无内容" /> : (
       <>
         {sections.map((section) => (
           <section
@@ -257,7 +257,7 @@ export function PluginMarketplace({
     <WebuiSkeletonProjection loading={false}>
       <>
         {loading ? (
-          <PluginMarketSkeleton />
+          <FeedbackSkeleton rows={6} testId="plugin-market-skeleton" />
         ) : rows.length === 0 ? (
           <FeedbackEmpty title="暂无内容" />
         ) : (
@@ -298,22 +298,5 @@ export function PluginMarketplace({
         ) : null}
       </>
     </WebuiSkeletonProjection>
-  );
-}
-
-function PluginMarketSkeleton(): ReactElement {
-  return (
-    <div className="webui-plugin-grid" aria-hidden="true" data-testid="plugin-market-skeleton">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div className="webui-plugin-market-skeleton-row" key={index}>
-          <WebuiSkeleton variant="shape" width={40} height={40} />
-          <span className="webui-plugin-market-skeleton-copy">
-            <WebuiSkeleton variant="text" width="72%" height={12} />
-            <WebuiSkeleton variant="text" width="88%" height={12} />
-          </span>
-          <WebuiSkeleton variant="control" width={56} height={36} />
-        </div>
-      ))}
-    </div>
   );
 }

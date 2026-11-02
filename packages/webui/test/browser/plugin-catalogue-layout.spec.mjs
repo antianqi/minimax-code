@@ -4,7 +4,20 @@ import { expect } from "@playwright/test";
 
 import { openApp, screenshotOptions, test } from "./harness.mjs";
 
-test("marketplace and management share horizontal categories beneath search", async ({ page }) => {
+test("marketplace and management keep vertical categories pinned on the left", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listInstalledPlugins", {
+        plugins: Array.from({ length: 30 }, (_, index) => ({
+          name: `scroll-fixture-${index}`,
+          displayName: `Scroll fixture ${index}`,
+          description: "Synthetic row for plugin page scroll coverage",
+          enabled: true,
+        })),
+      });
+    });
+  });
   await openApp(page, "#session=A");
   await page.getByRole("button", { name: "插件" }).first().click();
 
@@ -20,22 +33,29 @@ test("marketplace and management share horizontal categories beneath search", as
     const content = element.querySelector(".webui-plugin-page-content").getBoundingClientRect();
     return {
       rowDirection: getComputedStyle(element.querySelector(".webui-plugin-category-filter")).flexDirection,
-      searchBeforeCategories: search.bottom <= categories.top,
-      contentAfterSearch: content.top >= search.bottom,
-      contentCentered: Math.abs(content.left + content.width / 2 - (element.getBoundingClientRect().left + element.getBoundingClientRect().width / 2)) < 2,
+      categoryHasNoScroll: element.querySelector(".webui-plugin-page-categories").scrollHeight <= element.querySelector(".webui-plugin-page-categories").clientHeight,
+      searchOutsideScroll: !element.querySelector(".webui-plugin-page-scroll").contains(search.parentElement),
+      categoriesLeftOfContent: categories.right < content.left,
+      searchAlignedWithContent: Math.abs(search.left - content.left) < 2,
+      searchWidth: search.width,
+      searchAboveContent: search.bottom <= content.top,
       categoryTextSize: Number.parseFloat(getComputedStyle(element.querySelector(".webui-plugin-category-filter .webui-mavis-button")).fontSize),
       selectedCategoryWidth: element.querySelector(".webui-plugin-category-filter .webui-mavis-button[aria-pressed=true]").getBoundingClientRect().width,
     };
   });
   expect(marketGeometry).toEqual({
-    rowDirection: "row",
-    searchBeforeCategories: true,
-    contentAfterSearch: true,
-    contentCentered: true,
+    rowDirection: "column",
+    categoryHasNoScroll: true,
+    searchOutsideScroll: true,
+    categoriesLeftOfContent: true,
+    searchAlignedWithContent: true,
+    searchWidth: expect.any(Number),
+    searchAboveContent: true,
     categoryTextSize: 14,
     selectedCategoryWidth: expect.any(Number),
   });
-  expect(marketGeometry.selectedCategoryWidth).toBeLessThan(120);
+  expect(marketGeometry.selectedCategoryWidth).toBeGreaterThan(100);
+  expect(marketGeometry.searchWidth).toBeLessThanOrEqual(768);
   const captureDir = process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR;
   if (captureDir) {
     mkdirSync(captureDir, { recursive: true });
@@ -51,17 +71,45 @@ test("marketplace and management share horizontal categories beneath search", as
     const content = element.querySelector(".webui-plugin-page-content").getBoundingClientRect();
     return {
       rowDirection: getComputedStyle(element.querySelector(".webui-plugin-category-filter")).flexDirection,
-      searchBeforeCategories: search.bottom <= categories.top,
-      contentAfterSearch: content.top >= search.bottom,
-      contentCentered: Math.abs(content.left + content.width / 2 - (element.getBoundingClientRect().left + element.getBoundingClientRect().width / 2)) < 2,
+      categoryHasNoScroll: element.querySelector(".webui-plugin-page-categories").scrollHeight <= element.querySelector(".webui-plugin-page-categories").clientHeight,
+      searchOutsideScroll: !element.querySelector(".webui-plugin-page-scroll").contains(search.parentElement),
+      categoriesLeftOfContent: categories.right < content.left,
+      searchAlignedWithContent: Math.abs(search.left - content.left) < 2,
+      searchWidth: search.width,
+      searchAboveContent: search.bottom <= content.top,
     };
   });
   expect(managementGeometry).toEqual({
-    rowDirection: "row",
-    searchBeforeCategories: true,
-    contentAfterSearch: true,
-    contentCentered: true,
+    rowDirection: "column",
+    categoryHasNoScroll: true,
+    searchOutsideScroll: true,
+    categoriesLeftOfContent: true,
+    searchAlignedWithContent: true,
+    searchWidth: expect.any(Number),
+    searchAboveContent: true,
   });
+  expect(managementGeometry.searchWidth).toBeLessThanOrEqual(768);
+  const scrollRegion = layout.locator(".webui-plugin-page-scroll");
+  const pinnedGeometry = await layout.evaluate((element) => ({
+    categoriesTop: element.querySelector(".webui-plugin-page-categories").getBoundingClientRect().top,
+    searchTop: element.querySelector(".webui-plugin-page-controls").getBoundingClientRect().top,
+    scrollHeight: element.querySelector(".webui-plugin-page-scroll").scrollHeight,
+    clientHeight: element.querySelector(".webui-plugin-page-scroll").clientHeight,
+    layoutHeight: element.getBoundingClientRect().height,
+    mainHeight: element.querySelector(".webui-plugin-page-main").getBoundingClientRect().height,
+  }));
+  expect(pinnedGeometry.mainHeight).toBe(pinnedGeometry.layoutHeight);
+  expect(pinnedGeometry.scrollHeight).toBeGreaterThan(pinnedGeometry.clientHeight);
+  await scrollRegion.hover();
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => layout.evaluate((element) => ({
+    categoriesTop: element.querySelector(".webui-plugin-page-categories").getBoundingClientRect().top,
+    searchTop: element.querySelector(".webui-plugin-page-controls").getBoundingClientRect().top,
+  }))).toEqual({ categoriesTop: pinnedGeometry.categoriesTop, searchTop: pinnedGeometry.searchTop });
+  const managementRows = await layout.locator(".webui-plugin-list").first().boundingBox();
+  const managementSearch = await layout.locator(".webui-plugin-page-search").boundingBox();
+  expect(Math.abs(managementRows.x - managementSearch.x)).toBeLessThan(2);
   if (captureDir) {
     await page.screenshot({ path: join(captureDir, "plugin-management.png"), fullPage: true });
   }
@@ -74,13 +122,41 @@ test("marketplace and management share horizontal categories beneath search", as
       noHorizontalOverflow: element.scrollWidth <= element.clientWidth,
     };
   });
-  expect(narrowGeometry).toEqual({ direction: "row", noHorizontalOverflow: true });
+  expect(narrowGeometry).toEqual({ direction: "column", noHorizontalOverflow: true });
   if (captureDir) {
     await page.screenshot({ path: join(captureDir, "plugin-management-narrow.png"), fullPage: true });
   }
 });
 
-test("plugin loading skeleton follows the card and action geometry", async ({ page }) => {
+test("the skills marketplace renders rows from the skill hub listing", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listMarketplacePlugins", { plugins: [], pluginTotal: 0 });
+      window.__fixture.setPluginManagementResult("listInstalledPlugins", { plugins: [] });
+      window.__fixture.setPluginManagementResult("listSkillHub", {
+        skills: [{ name: "release-notes", displayName: "Release notes", description: "Prepare a release summary", url: "https://example.invalid/release-notes" }],
+      });
+    });
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "插件" }).first().click();
+  const surface = page.getByTestId("plugin-management");
+  await surface.getByRole("button", { name: "技能", exact: true }).click();
+  await expect(surface.locator(".webui-plugin-grid .webui-plugin-row")).toHaveCount(1);
+  await expect(surface.getByText("Release notes")).toBeVisible();
+  const skillSearch = await surface.locator(".webui-plugin-page-search").boundingBox();
+  const skillRow = await surface.locator(".webui-plugin-grid .webui-plugin-row").first().boundingBox();
+  expect(skillSearch.width).toBeLessThanOrEqual(768);
+  expect(Math.abs(skillRow.x - skillSearch.x)).toBeLessThanOrEqual(16);
+  const captureDir = process.env.WEBUI_SKILL_CATALOGUE_SCREENSHOT_DIR;
+  if (captureDir) {
+    mkdirSync(captureDir, { recursive: true });
+    await page.screenshot({ path: join(captureDir, "skill-marketplace.png"), fullPage: true });
+  }
+});
+
+test("plugin loading uses the shared single-layer skeleton", async ({ page }) => {
   await page.addInitScript(() => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
     window.__WEBUI_FIXTURE_SETUP__.push(() => {
@@ -90,24 +166,45 @@ test("plugin loading skeleton follows the card and action geometry", async ({ pa
   });
   await openApp(page, "#session=A");
   await page.getByRole("button", { name: "插件" }).first().click();
+  await page.setViewportSize({ width: 315, height: 470 });
   const skeleton = page.getByTestId("plugin-market-skeleton");
   await expect(skeleton).toBeVisible();
-  const geometry = await skeleton.locator(".webui-plugin-market-skeleton-row").first().evaluate((row) => {
-    const icon = row.querySelector(":scope > .webui-skeleton").getBoundingClientRect();
-    const lines = [...row.querySelectorAll(".webui-plugin-market-skeleton-copy > .webui-skeleton")]
-      .map((line) => line.getBoundingClientRect());
-    const action = row.querySelector(":scope > .webui-skeleton:last-child").getBoundingClientRect();
+  const searchSkeletons = page.locator(".webui-plugin-page-search .webui-skeleton");
+  await expect(searchSkeletons).toHaveCount(1);
+  await expect(searchSkeletons.locator(".webui-skeleton")).toHaveCount(0);
+  const searchBox = await page.locator(".webui-plugin-page-search .webui-search-field").boundingBox();
+  const searchShape = await searchSkeletons.boundingBox();
+  expect(Math.abs(searchShape.width - searchBox.width)).toBeLessThan(1);
+  expect(Math.abs(searchShape.height - searchBox.height)).toBeLessThan(1);
+  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(6);
+  await expect(skeleton.locator(".webui-plugin-market-skeleton-row")).toHaveCount(0);
+  const shapes = await skeleton.locator(".webui-skeleton").evaluateAll((elements) => elements.map((element) => {
+    const style = getComputedStyle(element);
     return {
-      icon: { width: icon.width, height: icon.height },
-      lines: lines.map(({ width, height }) => ({ width, height })),
-      action: { width: action.width, height: action.height },
-      actionInset: row.getBoundingClientRect().right - action.right,
+      boxShadow: style.boxShadow,
+      backgroundImage: style.backgroundImage,
+      animationName: style.animationName,
+      nestedSkeletons: element.querySelectorAll(".webui-skeleton").length,
     };
-  });
-  expect(geometry.icon).toEqual({ width: 40, height: 40 });
-  expect(geometry.lines.every((line) => line.height === 12 && line.width < 240), JSON.stringify(geometry)).toBe(true);
-  expect(geometry.action.height).toBe(36);
-  expect(Math.abs(geometry.actionInset - 12)).toBeLessThan(2);
+  }));
+  expect(shapes).toHaveLength(6);
+  expect(shapes.every((shape) => shape.boxShadow === "none" && shape.backgroundImage === "none" && shape.nestedSkeletons === 0), JSON.stringify(shapes)).toBe(true);
+  expect(shapes.every((shape) => shape.animationName === "webui-skeleton-pulse")).toBe(true);
+  const projectedControls = await page.locator(".webui-plugin-management .webui-page-skeleton-node[data-webui-page-skeleton-control='true']")
+    .evaluateAll((elements) => elements.map((element) => {
+      const style = getComputedStyle(element);
+      return { backgroundColor: style.backgroundColor, boxShadow: style.boxShadow, animationName: style.animationName };
+    }));
+  expect(projectedControls.length).toBeGreaterThan(0);
+  expect(projectedControls.every((control) => control.backgroundColor === "rgba(0, 0, 0, 0)" && control.boxShadow === "none" && control.animationName === "none"), JSON.stringify(projectedControls)).toBe(true);
+  const rows = await skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton").evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { top: rect.top, left: rect.left, width: rect.width, height: rect.height, background: style.backgroundColor, opacity: style.opacity };
+    }),
+  );
+  expect(rows.every((row, index) => row.width > 0 && row.height === 12 && row.background !== "rgba(0, 0, 0, 0)" && (index === 0 || row.top > rows[index - 1].top)), JSON.stringify(rows)).toBe(true);
   if (process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR) {
     mkdirSync(process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({
@@ -119,6 +216,32 @@ test("plugin loading skeleton follows the card and action geometry", async ({ pa
     "pluginManagement",
     { action: "listMarketplacePlugins" },
     { plugins: [], pluginTotal: 0 },
+  ));
+  expect(released).toBe(1);
+  await expect(skeleton).toHaveCount(0);
+});
+
+test("plugin management loading uses the shared skeleton group", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listMarketplacePlugins", { plugins: [], pluginTotal: 0 });
+      window.__fixture.setPluginManagementResult("listInstalledPlugins", { plugins: [] });
+    });
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "插件" }).first().click();
+  await page.evaluate(() => window.__fixture.delayNext("pluginManagement", { action: "listInstalledPlugins" }));
+  await page.getByTestId("plugin-manage-trigger").click();
+
+  const skeleton = page.getByTestId("plugin-management-skeleton");
+  await expect(skeleton).toBeVisible();
+  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(6);
+  await expect(skeleton.locator(".webui-plugin-management-skeleton-row")).toHaveCount(0);
+  const released = await page.evaluate(() => window.__fixture.resolveAllPending(
+    "pluginManagement",
+    { action: "listInstalledPlugins" },
+    { plugins: [] },
   ));
   expect(released).toBe(1);
   await expect(skeleton).toHaveCount(0);

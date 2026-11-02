@@ -3,16 +3,11 @@
 
   /* --------------------------------------------------------------- rail rows */
 
-  /* Navigation rows. The row's geometry is a utility
-   * composition (`h-8`, `rounded-lg`, `gap-2`, `pl-2 pr-2.5`); this rule carries
-   * the selected state, which those utilities cannot express. */
-  .webui-nav-item {
-    border-radius: var(--radius_8);
-  }
-  .webui-nav-item[data-webui-nav-active="true"] {
-    background-color: var(--bg_interaction_tertiary_hover);
-    color: var(--text_default_primary);
-  }
+  /* Navigation rows. The row's geometry, its hover fill, the fill of the
+   * row the reader is at and the gap that keeps a filled row from touching the
+   * row beside it are the shared button contract's `selectable-row`
+   * appearance (`styles/button.css`); what is left here is the rail's own
+   * brand button, which is not a navigation row. */
   .webui-brand-create-button {
     box-sizing: border-box;
     display: flex;

@@ -144,30 +144,37 @@ export function WebuiSearchField({
   onKeyDown,
   ...dataAttributes
 }: WebuiSearchFieldProps): ReactElement {
+  if (useWebuiPageLoading()) {
+    return (
+      <WebuiSkeleton
+        variant="shape"
+        className={`webui-page-skeleton-shape webui-search-field${className ? ` ${className}` : ""}`}
+        testId={testId}
+      />
+    );
+  }
   return (
-    <WebuiSkeletonProjection>
-      <div
-        className={`webui-search-field${className ? ` ${className}` : ""}`}
-      >
-        {icon ? <span className="webui-search-field-icon" aria-hidden="true">{icon}</span> : null}
-        <WebuiTextInput
-          appearance="bare"
-          controlSize="dense"
-          className={`webui-search-field-control${inputClassName ? ` ${inputClassName}` : ""}`}
-          id={id}
-          ref={inputRef}
-          role="searchbox"
-          aria-label={label}
-          data-testid={testId}
-          placeholder={placeholder}
-          value={value}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-          {...dataAttributes}
-        />
-        {trailing ? <span className="webui-search-field-trailing">{trailing}</span> : null}
-      </div>
-    </WebuiSkeletonProjection>
+    <div
+      className={`webui-search-field${className ? ` ${className}` : ""}`}
+    >
+      {icon ? <span className="webui-search-field-icon" aria-hidden="true">{icon}</span> : null}
+      <WebuiTextInput
+        appearance="bare"
+        controlSize="dense"
+        className={`webui-search-field-control${inputClassName ? ` ${inputClassName}` : ""}`}
+        id={id}
+        ref={inputRef}
+        role="searchbox"
+        aria-label={label}
+        data-testid={testId}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        {...dataAttributes}
+      />
+      {trailing ? <span className="webui-search-field-trailing">{trailing}</span> : null}
+    </div>
   );
 }
 

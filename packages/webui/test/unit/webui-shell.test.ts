@@ -1182,9 +1182,12 @@ describe("WebUI shell — desktop anatomy", () => {
     for (const label of INERT_NAV_LABELS) {
       const at = html.indexOf(`data-webui-nav-item="${label}"`);
       expect(at, `nav row ${label} missing`).toBeGreaterThan(-1);
-      expect(html.slice(at, at + 500), `nav row ${label} is not inert`).toMatch(
-        /disabled/u,
-      );
+      // The row is one element now — the shared row is the button — so the
+      // marker and the disabled state live on the same tag. The attribute
+      // order is the component's, so the assertion reads the tag rather than
+      // a window of markup after the marker.
+      const tag = html.slice(html.lastIndexOf("<", at), html.indexOf(">", at) + 1);
+      expect(tag, `nav row ${label} is not inert`).toMatch(/disabled/u);
     }
     expect(html).toMatch(/data-webui-nav-item="插件"/u);
 

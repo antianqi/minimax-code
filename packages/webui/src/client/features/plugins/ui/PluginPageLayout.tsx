@@ -10,7 +10,7 @@ export interface PluginPageLayoutProps {
   readonly children: ReactNode;
 }
 
-/** Shared top search, horizontal category navigation and centered plugin content frame. */
+/** Shared fixed category and search controls beside a scrollable content frame. */
 export function PluginPageLayout({
   categories,
   searchLabel,
@@ -19,24 +19,26 @@ export function PluginPageLayout({
   children,
 }: PluginPageLayoutProps): ReactElement {
   return (
-    <div className="webui-plugin-page-layout">
-      <div className="webui-plugin-page-controls">
-        {searchLabel && onQueryChange ? (
-          <div className="webui-plugin-page-search">
-            <WebuiSearchField
-              icon={<IconSearch size={18} stroke={1.5} />}
-              label={searchLabel}
-              placeholder={`${searchLabel}...`}
-              value={query}
-              onChange={(event) => onQueryChange(event.currentTarget.value)}
-            />
-          </div>
-        ) : null}
-        {categories ? <div className="webui-plugin-page-categories">{categories}</div> : null}
+    <div className={`webui-plugin-page-layout${categories ? " has-categories" : ""}`}>
+      {categories ? <aside className="webui-plugin-page-categories">{categories}</aside> : null}
+      <div className="webui-plugin-page-main">
+        <div className="webui-plugin-page-controls">
+          {searchLabel && onQueryChange ? (
+            <div className="webui-plugin-page-search">
+              <WebuiSearchField
+                icon={<IconSearch size={18} stroke={1.5} />}
+                label={searchLabel}
+                placeholder={`${searchLabel}...`}
+                value={query}
+                onChange={(event) => onQueryChange(event.currentTarget.value)}
+              />
+            </div>
+          ) : null}
+        </div>
+        <main className="webui-plugin-page-scroll">
+          <div className="webui-plugin-page-content">{children}</div>
+        </main>
       </div>
-      <main className="webui-plugin-page-main">
-        <div className="webui-plugin-page-content">{children}</div>
-      </main>
     </div>
   );
 }

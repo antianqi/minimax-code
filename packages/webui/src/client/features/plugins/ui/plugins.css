@@ -17,13 +17,15 @@
    * `left: 50% / translateX(-50%)`). Search narrows the result list past the
    * overflow threshold and everything used to twitch by 3px. */
   .webui-plugin-management {
+    display: flex;
     width: 100%;
     height: 100%;
-    overflow: auto;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    /* The top padding moved onto the sticky header below. Left here it would
-     * open an unpainted band above the pinned bar for rows to scroll through. */
+  /* The header and left rail stay outside the content scroll viewport below. */
     padding: 0 24px 48px;
     color: var(--text_default_primary);
     /* The page is inside the surface, not beside it, so the width it has is
@@ -66,14 +68,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Pinned full-bleed bar. A sticky element has to carry its own opaque
-   * background and span the scroll container, so the constrained row lives on
-   * `webui-plugin-header-inner` instead of on the header itself. The vertical
-   * rhythm is unchanged — the space below the row just belongs to the bar now,
-   * which is what keeps it opaque while rows scroll up behind it. */
+  /* The header stays fixed in the page column; only the content pane below it
+   * scrolls. Keep the inner row constrained independently of the full-bleed bar. */
   .webui-plugin-header {
-    position: sticky;
-    top: 0;
+    position: relative;
+    flex: 0 0 auto;
     /* The declared "pinned header above its own panel's content" rung — the
      * same one `.webui-workspace-panel-header` uses. Dropdowns inside the bar
      * sit on 20, so they still clear it. */
@@ -172,37 +171,60 @@
   }
   .webui-plugin-category-filter {
     display: flex;
-    width: max-content;
-    min-width: 100%;
-    flex-direction: row;
-    align-items: center;
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--spacing_4);
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
+    overflow: visible;
     scrollbar-width: none;
   }
   .webui-plugin-category-filter::-webkit-scrollbar { display: none; }
   .webui-plugin-page-layout {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    flex: 1 1 auto;
     width: min(1200px, 100%);
-    margin: 16px auto 0;
+    margin: 0 auto;
+  }
+  .webui-plugin-page-layout.has-categories {
+    grid-template-columns: 160px minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--spacing_16);
   }
   .webui-plugin-management.is-marketplace .webui-plugin-page-layout {
     box-sizing: border-box;
     padding: 0 var(--spacing_16);
   }
   .webui-plugin-page-main {
+    display: flex;
     min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .webui-plugin-page-layout.has-categories > .webui-plugin-page-categories {
+    align-self: start;
+    min-width: 0;
+    overflow: visible;
+    padding-top: var(--spacing_32);
   }
   .webui-plugin-page-controls {
-    position: sticky;
-    top: 0;
-    z-index: 4;
+    flex: 0 0 auto;
     background: var(--bg_default_primary);
-    padding: 0 var(--spacing_16) var(--spacing_8);
+    padding: 0 0 var(--spacing_16);
   }
+  .webui-plugin-page-scroll {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .webui-plugin-page-scroll::-webkit-scrollbar { display: none; }
   .webui-plugin-category-filter > .webui-mavis-button {
-    width: max-content;
+    width: 100%;
     max-width: none;
     flex: 0 0 auto;
     justify-content: space-between;
@@ -213,18 +235,17 @@
     padding-left: var(--spacing_12);
   }
   .webui-plugin-page-search {
-    max-width: 832px;
-    margin: 0 auto var(--spacing_12);
+    width: 100%;
+    max-width: 768px;
+    margin: 0 0 var(--spacing_12);
   }
   .webui-plugin-page-categories {
-    max-width: 832px;
-    margin: 0 auto;
-    overflow: hidden;
+    min-width: 0;
   }
   .webui-plugin-page-content {
     width: 100%;
     max-width: 960px;
-    margin: 0 auto;
+    margin: 0;
   }
   .webui-plugin-page-content > .webui-feedback--empty {
     align-items: center;
@@ -232,11 +253,12 @@
   }
   .webui-plugin-management.is-marketplace .webui-plugin-grid {
     max-width: 768px;
+    margin-left: 0;
     row-gap: var(--spacing_12);
   }
   .webui-plugin-market-heading {
     max-width: 768px;
-    margin: 40px auto 12px;
+    margin: 32px 0 12px;
     font-size: var(--size_16);
     font-weight: 600;
     line-height: var(--line_height_26);
@@ -250,35 +272,8 @@
   .webui-mavis-button.webui-plugin-show-all {
     display: flex;
     width: fit-content;
-    margin: 8px auto 34px;
+    margin: 8px 0 34px;
   }
-  .webui-plugin-market-skeleton-row {
-    display: flex;
-    min-width: 0;
-    min-height: 60px;
-    align-items: center;
-    gap: var(--spacing_12);
-    border-radius: var(--radius_12);
-    padding: var(--spacing_8) var(--spacing_12);
-  }
-  .webui-plugin-market-skeleton-copy {
-    display: flex;
-    min-width: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: var(--spacing_8);
-  }
-  .webui-plugin-market-skeleton-copy > .webui-skeleton:first-child {
-    max-width: 160px;
-  }
-  .webui-plugin-market-skeleton-copy > .webui-skeleton:last-child {
-    max-width: 220px;
-  }
-  .webui-plugin-market-skeleton-row > .webui-skeleton:last-child {
-    flex: 0 0 auto;
-    margin-left: auto;
-  }
-
   /* Marketplace rows stay open at rest and reveal a rounded surface only
    * while hovered or keyboard-focused. */
   .webui-plugin-management.is-marketplace .webui-plugin-grid .webui-plugin-row {
@@ -322,29 +317,7 @@
   .webui-plugin-management.is-managing .webui-plugin-error {
     width: min(768px, calc(100% - 64px));
     max-width: 768px;
-  }
-  .webui-plugin-management-skeleton {
-    width: min(768px, calc(100% - 64px));
-    margin: 0 auto;
-  }
-  .webui-plugin-management-skeleton-row {
-    display: flex;
-    min-height: 64px;
-    align-items: center;
-    gap: var(--spacing_12);
-    border-bottom: 1px solid var(--border_default);
-    padding: var(--spacing_8) 0;
-  }
-  .webui-plugin-management-skeleton-copy {
-    display: flex;
-    min-width: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: var(--spacing_8);
-  }
-  .webui-plugin-management-skeleton-row > .webui-skeleton:last-child {
-    flex: 0 0 auto;
-    margin-left: auto;
+    margin-left: 0;
   }
   .webui-plugin-row {
     min-height: 84px;
@@ -616,8 +589,8 @@
    * that number whether it arrived by a narrow window or a collapsed rail. */
   @container webui-plugin-management (max-width: 520px) {
     .webui-plugin-management {
-      /* No top padding here either: the sticky header owns it, and a
-       * padding-top would show rows through the gap above the pinned bar. */
+      min-height: 0;
+      /* Keep the content pane aligned with the narrower mobile surface. */
       padding: 0 14px 18px;
     }
     .webui-plugin-header {
@@ -627,11 +600,30 @@
       overflow-x: auto;
     }
     .webui-plugin-category-filter > .webui-mavis-button {
+      width: 100%;
       min-width: 0;
-      padding-right: var(--spacing_10);
-      padding-left: var(--spacing_10);
+      /* The spacing scale has no 10px step, so this padding was being dropped
+       * by the browser and the buttons kept their default padding. */
+      padding-right: var(--spacing_8);
+      padding-left: var(--spacing_8);
+    }
+    .webui-plugin-page-layout.has-categories {
+      grid-template-columns: minmax(112px, 32%) minmax(0, 1fr);
+      gap: var(--spacing_8);
+      padding: 0 var(--spacing_8);
+    }
+    .webui-plugin-management.is-marketplace .webui-plugin-page-layout {
+      padding: 0 var(--spacing_8);
+    }
+    .webui-plugin-page-layout.has-categories > .webui-plugin-page-categories {
+      padding-top: var(--spacing_8);
     }
     .webui-plugin-page-controls { padding-right: 0; padding-left: 0; }
+    .webui-plugin-page-search { max-width: 100%; }
+    .webui-plugin-page-content { max-width: 100%; }
+    .webui-plugin-management.is-managing .webui-plugin-list,
+    .webui-plugin-management.is-managing .webui-plugin-toolbar,
+    .webui-plugin-management.is-managing .webui-plugin-error,
     .webui-plugin-grid {
       grid-template-columns: 1fr;
     }

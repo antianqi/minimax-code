@@ -360,8 +360,21 @@ describe("WebUI compiled stylesheet", () => {
       // `.webui-textarea` names, which no element carried.
       /\.webui-control\s*\{/u,
       /\.webui-composer-input\s*\{/u,
-      /\.webui-nav-item\s*\{/u,
-      /\.webui-nav-item\[data-webui-nav-active="true"\]\s*\{/u,
+      // The navigation row's appearance is the shared button contract's:
+      // the fill it takes under the pointer, the fill of the destination the
+      // reader is at, and the gap that keeps a filled row from touching the
+      // row beside it. A rail row that painted its own fill sat directly
+      // against its neighbour, so two filled rows read as one block.
+      /\.webui-mavis-button-selectable-row\s*\{/u,
+      /\.webui-mavis-button-selectable-row:hover:not\(:disabled\)\s*\{/u,
+      /\.webui-mavis-button-selectable-row\[aria-current="page"\]/u,
+      // The separation the fill needs: two rows that carry a fill and touch
+      // paint one block, so the row owns the gap under itself.
+      /\.webui-mavis-button-selectable-row\s*\{[^}]*margin-block-end:\s*var\(--spacing_2\)/su,
+      // An expanded row is not a chosen row. A folder that is open says so
+      // with its disclosure; painting every expanded level of a tree made a
+      // stack of grey blocks and hid which row the reader had chosen.
+      // A pointer over the row still takes the hover fill.
       // The rail's empty state, renamed from `.webui-empty-state` when the
       // rail became project-first: the box it draws now carries the folder
       // glyph, and the old class went with it.
@@ -393,5 +406,14 @@ describe("WebUI compiled stylesheet", () => {
     for (const re of required) {
       expect(re.test(compiled), `compiled CSS missing ${re}`).toBe(true);
     }
+    // The chosen fill belongs to the chosen row, not to the expanded one. A
+    // folder that is open says so with its disclosure; painting every
+    // expanded level of a tree made a stack of grey blocks and hid which row
+    // the reader had actually chosen. A pointer over the row still takes the
+    // hover fill.
+    expect(
+      compiled,
+      "the shared selectable row still paints an expanded row as chosen",
+    ).not.toMatch(/\.webui-mavis-button-selectable-row\[aria-expanded="true"\]/u);
   });
 });

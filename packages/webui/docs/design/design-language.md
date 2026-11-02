@@ -305,6 +305,18 @@ content at the leading edge; a control with a different internal arrangement mus
 documented variant rule. Callers may still set the button's outer width, margin and placement, but do
 not repeat the shared content-row declarations in feature CSS.
 
+`selectable-row` is the row a list of destinations or of choices is made of, and it carries two rules
+of its own. **It is separated from the row below it by 2px.** A row that takes a fill sits directly
+against its neighbour otherwise, so a hovered row and the row the reader is at paint one continuous
+block: the reader cannot tell two rows from one, and the hover reads as stuck to the row beside it.
+The gap belongs to the row, so every list separates the same way. **Only a chosen row takes the
+chosen fill.** `aria-current`, `aria-selected` and `aria-pressed` say that a row is the
+destination the reader is at, a selected option or a pressed toggle. An expanded row is not one of
+them: a folder that is open says so with its own disclosure, and painting it as if it were chosen
+made every level of an expanded tree carry a fill — a stack of grey blocks that read as one shape and
+that left the reader unable to tell which row they had actually chosen. A pointer over a row still
+takes the hover fill; that is a transient answer, not a state.
+
 Inside a `WebuiDialog` footer, the shared dialog action slot owns action geometry, measured on the
 running Desktop 3.1.3 app: 37px height, a 14px label on a 21px line at weight 500, an 8px radius,
 24px horizontal padding and 8px spacing, with no minimum width — the width follows the label, which

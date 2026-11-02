@@ -386,11 +386,25 @@
     background: transparent;
     color: var(--text_default_primary);
     text-align: left;
+    /* The separation from the row below. A row that carries a fill sat
+     * directly against its neighbour, so a hovered row and the row beside it
+     * painted one continuous block: the reader could not tell two rows from
+     * one, and the hover read as stuck to the row it sat against. The gap
+     * belongs to the row, so a list separates the same way wherever it is
+     * drawn — a rail, a settings list, a file tree. */
+    margin-block-end: var(--spacing_2);
   }
   .webui-mavis-button-selectable-row:hover:not(:disabled) {
     background: var(--bg_interaction_tertiary_hover);
   }
-  .webui-mavis-button-selectable-row[aria-expanded="true"],
+  /* The fill of the row that is in a chosen state: the destination the
+   * reader is at, a pressed toggle, a selected option.
+   *
+   * An expanded row is not one of them. A folder that is open says so with
+   * its own disclosure, and painting it as if it were the chosen destination
+   * made every level of an expanded tree carry a fill — a stack of grey
+   * blocks that read as one shape, and that left the reader unable to tell
+   * which row was actually the one they had chosen. */
   .webui-mavis-button-selectable-row[aria-pressed="true"],
   .webui-mavis-button-selectable-row[aria-current="page"],
   .webui-mavis-button-selectable-row[aria-current="true"],

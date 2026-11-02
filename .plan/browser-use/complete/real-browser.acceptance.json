@@ -18,7 +18,7 @@
     },
     "observed": "the handshake completed and the host reported the surface connected",
     "result": "pass",
-    "at": "2026-10-31T04:22:09.255Z",
+    "at": "2026-11-02T04:05:41.437Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -41,7 +41,7 @@
     },
     "observed": "the host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-10-31T04:22:09.558Z",
+    "at": "2026-11-02T04:05:41.804Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -64,7 +64,7 @@
     },
     "observed": "the handshake completed and the host reported the surface connected",
     "result": "pass",
-    "at": "2026-10-31T04:22:09.909Z",
+    "at": "2026-11-02T04:05:42.234Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -87,7 +87,7 @@
     },
     "observed": "the host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-10-31T04:22:10.321Z",
+    "at": "2026-11-02T04:05:42.650Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -110,7 +110,7 @@
     },
     "observed": "both browsers were connected, each on its own surface, and each surface's provider belonged to that surface",
     "result": "pass",
-    "at": "2026-10-31T04:22:11.242Z",
+    "at": "2026-11-02T04:05:43.299Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   }

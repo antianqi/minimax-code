@@ -184,7 +184,8 @@ export function PluginCatalogue({
   );
   useEffect(() => {
     if (!isMarketCatalogue || area !== "plugins" || marketplaceSections.length === 0) return;
-    const container = pluginPageRef.current;
+    const page = pluginPageRef.current;
+    const container = page?.querySelector<HTMLElement>(".webui-plugin-page-scroll");
     if (!container) return;
     const sections = marketplaceSections.flatMap((section) => {
       const element = [...container.querySelectorAll<HTMLElement>("[data-plugin-category-section]")]
@@ -197,9 +198,7 @@ export function PluginCatalogue({
     const update = (): void => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const containerTop = container.getBoundingClientRect().top;
-        const toolbar = container.querySelector<HTMLElement>(".webui-plugin-page-controls");
-        const threshold = containerTop + (toolbar?.getBoundingClientRect().height ?? 0) + 8;
+        const threshold = container.getBoundingClientRect().top + 8;
         let active = sections[0]!.value;
         for (const section of sections) {
           if (section.element.getBoundingClientRect().top > threshold) break;
@@ -219,14 +218,14 @@ export function PluginCatalogue({
     };
   }, [area, isMarketCatalogue, marketplaceSections]);
   const scrollToMarketplaceCategory = (value: string): void => {
-    const container = pluginPageRef.current;
-    const element = [...(container?.querySelectorAll<HTMLElement>("[data-plugin-category-section]") ?? [])]
+    const page = pluginPageRef.current;
+    const container = page?.querySelector<HTMLElement>(".webui-plugin-page-scroll");
+    const element = [...(page?.querySelectorAll<HTMLElement>("[data-plugin-category-section]") ?? [])]
       .find((candidate) => candidate.dataset.pluginCategorySection === value);
     if (!container || !element) return;
     setCategory(value);
-    const controlsHeight = container.querySelector<HTMLElement>(".webui-plugin-page-controls")?.offsetHeight ?? 0;
     container.scrollTo({
-      top: container.scrollTop + element.getBoundingClientRect().top - container.getBoundingClientRect().top - controlsHeight - 8,
+      top: container.scrollTop + element.getBoundingClientRect().top - container.getBoundingClientRect().top - 8,
       behavior: "smooth",
     });
   };
@@ -692,7 +691,7 @@ export function PluginCatalogue({
             marketTotal={marketTotal}
             visibleMarketTotal={visibleMarketTotal}
             loading={listing.loading}
-            sections={marketplaceSections}
+            sections={area === "plugins" ? marketplaceSections : undefined}
             showAll={showAllCatalogue}
             onToggleAll={() => setShowAllCatalogue((value) => !value)}
             onIntent={(intent) => void mutate(intent)}

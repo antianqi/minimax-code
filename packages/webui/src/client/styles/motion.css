@@ -155,6 +155,18 @@
     flex-shrink: 0;
     overflow: hidden;
   }
+  /* A horizontal disclosure opens sideways: it is a panel. Its content fills
+   * the panel and lays out as a column, so a panel whose body scrolls — the
+   * workspace's file tree — scrolls inside the panel. Without this the content
+   * layer is a plain block: the panel's own column layout never reaches the
+   * body, the body takes its content's height, and the disclosure's overflow
+   * clips the rest of it away with nothing left to scroll. */
+  .webui-motion[data-webui-motion="disclosure"][data-webui-disclosure-axis="horizontal"] > .webui-disclosure-content {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
   .webui-disclosure-content { min-width: 0; min-height: 0; overflow: hidden; }
   .webui-motion-disclosure-transform {
     transition: transform var(--webui-motion-duration-disclosure) var(--webui-motion-ease-standard);
@@ -225,6 +237,7 @@
     overflow: hidden;
     background-color: var(--border_default);
     background-image: none;
+    box-shadow: none;
   }
   .webui-skeleton--text { height: 12px; border-radius: var(--radius_4); }
   .webui-skeleton--control { height: 36px; border-radius: var(--radius_8); }
@@ -245,7 +258,7 @@
   .webui-page { min-width: 0; min-height: 0; color: var(--text_default_primary); }
   .webui-page-skeleton-node { pointer-events: none !important; color: transparent !important; }
   .webui-page-skeleton-node:not([data-webui-page-skeleton-surface="true"]) { background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
-  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: var(--border_default) !important; background-image: none !important; animation-name: webui-skeleton-pulse; animation-timing-function: ease-in-out; }
+  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: transparent !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; animation: none !important; }
   .webui-page-skeleton-shape { display: block !important; pointer-events: none !important; color: transparent !important; background-color: var(--border_default) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; }
   .webui-page-loading-status {
     position: absolute;

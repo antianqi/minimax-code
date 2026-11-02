@@ -559,7 +559,6 @@
     align-items: start;
     gap: var(--spacing_16) var(--spacing_20);
   }
-  .webui-mcp-form-full-row { grid-column: 1 / -1; }
   .webui-mcp-enabled {
     grid-column: 1 / -1;
     min-height: 40px;

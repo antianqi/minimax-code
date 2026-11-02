@@ -22,7 +22,7 @@ import {
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiField, WebuiSelect, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiSelectMenu, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
 import { FeedbackError } from "../../../ui/feedback.js";
@@ -345,13 +345,19 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
           />
           <WebuiField
             label="传输方式"
-            control={(props) => (
-              <WebuiSelect {...props} value={transport} onChange={(event) => setTransport(event.currentTarget.value)}>
-                <option value="stdio">stdio</option>
-                <option value="http">http</option>
-                <option value="streamable-http">streamable-http</option>
-                <option value="sse">sse</option>
-              </WebuiSelect>
+            control={(props, field) => (
+              <WebuiSelectMenu
+                {...props}
+                labelId={field.labelId}
+                options={[
+                  { value: "stdio", label: "stdio" },
+                  { value: "http", label: "http" },
+                  { value: "streamable-http", label: "streamable-http" },
+                  { value: "sse", label: "sse" },
+                ]}
+                value={transport}
+                onChange={setTransport}
+              />
             )}
           />
           {isStdio ? (
@@ -381,7 +387,6 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
           )}
           <WebuiField
             label="描述"
-            className="webui-mcp-form-full-row"
             control={(props) => (
               <WebuiTextInput {...props} value={description} placeholder="简要说明此服务的用途" onChange={(event) => setDescription(event.currentTarget.value)} />
             )}

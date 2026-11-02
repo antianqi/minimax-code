@@ -388,7 +388,8 @@ export function MemoryManagerDialog({
                 <WebuiTextarea
                   {...props}
                   data-testid="agent-memory-textarea"
-                  className="webui-personalization-textarea"
+                  controlSize="large"
+                  className="webui-memory-manager-textarea"
                   value={draft}
                   placeholder="编辑 Agent 的工作记忆摘要"
                   spellCheck={false}

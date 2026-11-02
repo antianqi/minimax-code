@@ -390,7 +390,8 @@ contract owns; if no published size fits, the size is the contract's to add.
   `aria-invalid`. `WebuiTextInput`, `WebuiTextarea`, `WebuiSelect`, `WebuiCheckbox`, `WebuiRadio` and
   `WebuiFileInput` own the common native control markup, appearance, focus, hidden-picker geometry
   and disabled states. `WebuiSearchField` owns the labelled icon/input composition and focus-within
-  treatment shared by search surfaces. `WebuiFormLayout` and `WebuiFormActions` own the arrangement of a form.
+  treatment shared by search surfaces. Form controls use the same blue border on focus, without an
+  outer ring. `WebuiFormLayout` and `WebuiFormActions` own the arrangement of a form.
   Feature code keeps submission, validation rules and business state.
 - **Multi-line text sizes** — `WebuiTextarea` defaults to a 280px minimum height; `compact` is 120px,
   `large` is 360px, and `document` grows with its content between 220px and 360px. Use these shared

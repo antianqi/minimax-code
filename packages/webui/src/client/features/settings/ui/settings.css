@@ -132,47 +132,7 @@
      settings pages themselves render the shared section header instead. */
   .webui-personalization-header { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--spacing_12); padding: 0 var(--spacing_16); }
   .webui-memory-manager-editor { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; gap: var(--spacing_4); }
-  /* The dialog's own editor is the *base* `.mavis-textarea`, not the
-     `mavis-personalization-editor` the two settings-page editors carry, so it
-     keeps a border where those two have none. `!rounded-xl` on the call site is
-     what sets the 12px radius, and `box-shadow` is cleared at every state so the
-     focus reads as a recoloured edge rather than a glow.
-   *
-     The focus ring is an `outline` outside the box, not a recoloured border.
-     The blue itself is `--blue_500` -- the 1px `#0077d9`,
-     which is this app's blue and antd's themed `colorPrimary`, not the
-     `--border_heavy` that a `.mavis-textarea:focus` rule names. But
-     drawing it *as* the border costs the content 1px and leaves the text
-     sitting right against the ring. `outline` paints on the border edge
-     without taking layout, so the content box is identical focused and
-     unfocused and the blue ring sits outside it; `border-color` returns to its
-     resting value for the same reason. Hover still deepens the border itself
-     to `--border_heavy`. */
-  /* Height follows `autoSize: {minRows: 13, maxRows: 24}` at
-     `!leading-6`. Measured: 24px between baselines, and
-     a 593px box for content long enough to cap out — which is 24 rows. So
-     13 rows + 8px top padding + the 28px the count needs is the floor, and 24
-     rows is the ceiling.
-   *
-     `field-sizing: content` is the native equivalent of antd's autoSize: the
-     browser measures the content and drives `height`, no script involved. Where
-     it is unsupported the editor simply keeps `min-height` and the dialog stays
-     usable, so the fallback is the old behaviour rather than a broken one.
-   *
-     `height: auto` is load-bearing, not tidying. `field-sizing` only has an
-     effect when height is `auto`; the shared rule still sets `height: 300px`,
-     so without this the property was silently inert, the box sat on its
-     `min-height` at 348px, and the text scrolled underneath the count. Nothing
-     errors and nothing is visible in devtools — the declaration is simply
-     ignored.
-     `flex: none` because the field is marked `shrink-0`: its height is
-     its content's, not the leftover space in the dialog.
-   *
-     The face changes too. This is prose, not an editor of code: it
-     runs at `!text-sm !leading-6` in the UI face, and we were running 12px
-     monospace, which is also why a "13 row" floor was not 312px here. */
-  .webui-memory-manager-editor .webui-personalization-textarea { flex: none; height: auto; field-sizing: content; min-height: 348px; max-height: 612px; border: 1px solid var(--border_default); border-radius: var(--radius_12); background: transparent; padding: var(--spacing_8) 0 28px; font-family: inherit; font-size: var(--size_14); line-height: 24px; }
-  .webui-memory-manager-editor .webui-personalization-textarea:hover { border-color: var(--border_heavy); outline: none; box-shadow: none; }
+  .webui-memory-manager-textarea { padding-bottom: 28px; }
   /* The character count sits INSIDE the editor, bottom-right, 14px from each
      edge. Measured at 1:1: the digits land 14px left of
      the border and 14px above it, and the focus ring around the field reads as

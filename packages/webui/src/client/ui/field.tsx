@@ -13,14 +13,18 @@
 
 import {
   forwardRef,
+  useCallback,
+  useState,
   useId,
   type InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
   type Ref,
   type ReactElement,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { WebuiDropdown } from "./Dropdown.js";
 import { useWebuiPageLoading, WebuiSkeleton, WebuiSkeletonProjection } from "./page.js";
 
 /** The shared single-line text control. Appearance belongs to the field family. */
@@ -86,6 +90,127 @@ export const WebuiSelect = forwardRef<HTMLSelectElement, WebuiSelectProps>(funct
   if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape ${classes}`} style={props.style} />;
   return <select {...props} ref={ref} className={classes} />;
 });
+
+export interface WebuiSelectOption {
+  readonly value: string;
+  readonly label: string;
+}
+
+/** A shared select whose option surface is rendered by the WebUI. */
+export interface WebuiSelectMenuProps extends FieldControlProps {
+  readonly options: readonly WebuiSelectOption[];
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly labelId: string;
+  readonly disabled?: boolean;
+  readonly className?: string;
+  readonly "aria-label"?: string;
+}
+
+export function WebuiSelectMenu({
+  options,
+  value,
+  onChange,
+  labelId,
+  disabled = false,
+  className,
+  ...attributes
+}: WebuiSelectMenuProps): ReactElement {
+  const [open, setOpen] = useState(false);
+  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+  const optionIdPrefix = useId();
+  const optionIds = options.map((_, index) => `${optionIdPrefix}-option-${index}`);
+  const close = useCallback(() => setOpen(false), []);
+  const selectIndex = useCallback((index: number) => {
+    const option = options[index];
+    if (!option) return;
+    onChange(option.value);
+    setActiveIndex(index);
+    close();
+  }, [close, onChange, options]);
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (disabled || options.length === 0) return;
+    let nextIndex: number | undefined;
+    if (event.key === "ArrowDown") nextIndex = (activeIndex + 1) % options.length;
+    else if (event.key === "ArrowUp") nextIndex = (activeIndex - 1 + options.length) % options.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = options.length - 1;
+    else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (open) selectIndex(activeIndex);
+      else {
+        setActiveIndex(selectedIndex);
+        setOpen(true);
+      }
+      return;
+    } else return;
+    event.preventDefault();
+    setActiveIndex(nextIndex);
+    if (!open) setOpen(true);
+  };
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <WebuiDropdown
+      open={open}
+      onOpen={() => { setActiveIndex(selectedIndex); setOpen(true); }}
+      onClose={close}
+      role="listbox"
+      managed
+      triggerHasPopup="listbox"
+      labelledBy={labelId}
+      width="match"
+      className="webui-select-menu-options"
+      wrapperClassName="webui-select-menu"
+      trigger={(triggerProps) => (
+        <button
+          {...attributes}
+          type="button"
+          id={attributes.id}
+          ref={triggerProps.ref}
+          role="combobox"
+          aria-labelledby={attributes["aria-label"] ? undefined : labelId}
+          aria-label={attributes["aria-label"]}
+          aria-describedby={attributes["aria-describedby"]}
+          aria-invalid={attributes["aria-invalid"]}
+          aria-activedescendant={open ? optionIds[activeIndex] : undefined}
+          aria-expanded={triggerProps["aria-expanded"]}
+          aria-controls={triggerProps["aria-controls"]}
+          aria-haspopup="listbox"
+          disabled={disabled}
+          className={["webui-control", "webui-motion-feedback", "webui-select-menu-trigger", className].filter(Boolean).join(" ")}
+          onClick={() => {
+            triggerProps.onClick();
+            if (!open) setActiveIndex(selectedIndex);
+          }}
+          onKeyDown={(event) => {
+            triggerProps.onKeyDown(event);
+            handleKeyDown(event);
+          }}
+        >
+          <span>{selected?.label ?? ""}</span>
+          <span className="webui-select-menu-chevron" aria-hidden="true" />
+        </button>
+      )}
+    >
+      {options.map((option, index) => (
+          <button
+            key={option.value}
+            id={optionIds[index]}
+            type="button"
+            role="option"
+            aria-selected={option.value === value}
+            className={`webui-select-menu-option${index === activeIndex ? " is-active" : ""}`}
+            onPointerMove={() => setActiveIndex(index)}
+            onClick={() => selectIndex(index)}
+          >
+            {option.label}
+          </button>
+        ))}
+    </WebuiDropdown>
+  );
+}
 
 export const WebuiCheckbox = forwardRef<
   HTMLInputElement,

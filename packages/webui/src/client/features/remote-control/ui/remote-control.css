@@ -1,0 +1,50 @@
+/*
+ * The 远程控制 tab's own layout.
+ *
+ * The Desktop draws this page inside an application window of a fixed height, so
+ * its vertical rhythm is a fixed set of steps: 32px around the column, 12px
+ * under the title, 40px before the card and 40px between the card's parts, 32px
+ * before the app-store marks. A browser window has no such height, and those
+ * fixed steps stop fitting once the window is short: the column scrolls, and the
+ * phone mockup beside it is cut through at both ends.
+ *
+ * So the rhythm is one step — `--webui-remote-control-space` — that every gap
+ * on the page is a multiple of. At the Desktop's own height the step is its
+ * measured 16px, so every gap is exactly the Desktop's value; below it the step
+ * closes in, and the page keeps its shape and its content on one screen instead
+ * of scrolling.
+ *
+ * The step reaches its 8px floor where the page still fits. Below that the
+ * column's own scroll boundary takes over, because a page that hides its
+ * content is worse than one that scrolls.
+ */
+@layer components {
+  .webui-remote-control {
+    --webui-remote-control-space: clamp(8px, 1.78vh, 16px);
+  }
+
+  /* The column's own breathing room. */
+  .webui-remote-control-column {
+    padding-block: calc(var(--webui-remote-control-space) * 2);
+  }
+
+  /* The line under the title. */
+  .webui-remote-control-subtitle {
+    margin-top: calc(var(--webui-remote-control-space) * 0.75);
+  }
+
+  /* The card: the space before it, the space inside it, and the gap between
+     the parts it stacks. */
+  .webui-remote-control-card {
+    margin-top: calc(var(--webui-remote-control-space) * 2.5);
+    padding-top: calc(var(--webui-remote-control-space) * 1.5);
+    padding-bottom: calc(var(--webui-remote-control-space) * 1.25);
+    gap: calc(var(--webui-remote-control-space) * 2.5);
+  }
+
+  /* The app-store marks and the minimum-version line under the card. */
+  .webui-remote-control-marks {
+    margin-top: calc(var(--webui-remote-control-space) * 2);
+    padding-bottom: calc(var(--webui-remote-control-space) * 1);
+  }
+}

@@ -611,15 +611,6 @@ export function WebuiClientFoundationApp(
     },
     [selectSession],
   );
-  const handleSelectComposerSession = useCallback((sessionId: string) => {
-    selectSession(sessionId);
-    if (typeof window !== "undefined")
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}${sessionHash(sessionId)}`,
-      );
-  }, [selectSession]);
   const childSessions = selectedSessionId
     ? page.sessions.filter(
         (session) => session.parentSessionId === selectedSessionId,
@@ -1234,7 +1225,6 @@ export function WebuiClientFoundationApp(
                   onInputSubmitted={recordComposerInput}
                   teamModeOff={composerTeamModeOff}
                   workspaceDir={selectedSession?.workspaceDir ?? newTaskWorkspaceDir}
-                  onSelectSession={handleSelectComposerSession}
                   onOpenPluginManagement={openPluginManagement}
                   onSessionCreated={handleSessionCreatedViewEffect}
                 /></WebuiZoneBoundary></Composer>

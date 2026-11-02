@@ -177,15 +177,21 @@ class ScriptedHarnessPort implements WebuiHarnessPort {
     return { items: [], hasMore: false };
   }
 
-  // The 接入 IM surface. The port requires the six members, so a fake that claims the whole
+  // The 接入 IM surface. The port requires these members, so a fake that claims the whole
   // port has to answer them; none of these suites registers an IM channel operation.
-  async listChannelStatus() {
-    return { clients: [] };
+  async listChannelConnections() {
+    return { connections: [] };
+  }
+  async prepareChannelConnection(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
   }
   async connectChannel(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   }
-  async disconnectChannel(): Promise<never> {
+  async disconnectChannelConnection(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  }
+  async deleteChannelConnection(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   }
   async checkChannelConfig(): Promise<never> {
@@ -195,6 +201,12 @@ class ScriptedHarnessPort implements WebuiHarnessPort {
     throw new Error("this port has no IM channel bridge");
   }
   async updateChannelMessageFilter(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  }
+  async startChannelWechatBind(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  }
+  async getChannelWechatBindStatus(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   }
 
@@ -911,12 +923,16 @@ function awaitFinalised(
  */
 const NO_REMOTE_SURFACES: Pick<
   WebuiHarnessPort,
-  | "listChannelStatus"
+  | "listChannelConnections"
+  | "prepareChannelConnection"
   | "connectChannel"
-  | "disconnectChannel"
+  | "disconnectChannelConnection"
+  | "deleteChannelConnection"
   | "checkChannelConfig"
   | "getChannelMessageFilter"
   | "updateChannelMessageFilter"
+  | "startChannelWechatBind"
+  | "getChannelWechatBindStatus"
   | "getRemoteControlStatus"
   | "watchRemoteControlStatus"
   | "connectRemoteControl"
@@ -942,13 +958,19 @@ const NO_REMOTE_SURFACES: Pick<
   | "closeSshTerminal"
   | "watchSshTerminal"
 > = {
-  async listChannelStatus() {
-    return { clients: [] };
+  async listChannelConnections() {
+    return { connections: [] };
+  },
+  async prepareChannelConnection(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
   },
   async connectChannel(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   },
-  async disconnectChannel(): Promise<never> {
+  async disconnectChannelConnection(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  },
+  async deleteChannelConnection(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   },
   async checkChannelConfig(): Promise<never> {
@@ -958,6 +980,12 @@ const NO_REMOTE_SURFACES: Pick<
     throw new Error("this port has no IM channel bridge");
   },
   async updateChannelMessageFilter(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  },
+  async startChannelWechatBind(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  },
+  async getChannelWechatBindStatus(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   },
   async getRemoteControlStatus() {

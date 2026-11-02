@@ -20,21 +20,42 @@ import type { WebuiRuntimeHostHandle } from "./host-contract.js";
 import { requireHostSlot } from "./requirements.js";
 import { WebuiResultShapeError } from "./result-conversion.js";
 import type {
-  WebuiChannelClient,
   WebuiChannelConfigCheckRequest,
   WebuiChannelConfigCheckResult,
   WebuiChannelConnectRequest,
-  WebuiChannelDisconnectRequest,
+  WebuiChannelConnection,
+  WebuiChannelConnectionList,
+  WebuiChannelConnectionRequest,
   WebuiChannelMessageFilter,
   WebuiChannelMessageFilterMode,
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
-  WebuiChannelStatus,
+  WebuiChannelPrepareRequest,
   WebuiChannelWechatBindStartRequest,
   WebuiChannelWechatBindStartResult,
   WebuiChannelWechatBindStatusRequest,
   WebuiChannelWechatBindStatusResult,
 } from "../../shared/contracts/channel.js";
+
+/** One bot, as the runtime's surface answers it. */
+export interface WebuiRuntimeConnection {
+  readonly connectionId: string;
+  readonly channel: string;
+  readonly agentName: string;
+  readonly projectKey: string | null;
+  readonly state: "configured" | "authorizing" | "bound" | "error";
+  readonly binding?: {
+    readonly bindingId: string;
+    readonly externalId: string;
+    readonly label?: string;
+    readonly currentSessionId?: string;
+    readonly createdAt: number;
+    readonly updatedAt: number;
+  };
+  readonly errorCode?: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
 
 /**
  * The runtime's channel-bridge surface, as this adapter reads it.
@@ -44,22 +65,33 @@ import type {
  * same fields, which is what keeps the two in step without a package dependency.
  */
 export interface WebuiRuntimeChannelBridge {
-  readonly listStatus: () => Promise<{
-    readonly clients: readonly {
-      readonly name: string;
-      readonly platform: string;
-      readonly agentName?: string;
-    }[];
+  /** The bots this runtime knows, bound or waiting for their authorization. */
+  readonly listConnections: () => Promise<{
+    readonly connections: readonly WebuiRuntimeConnection[];
+  }>;
+  /** Creates the bot a create flow is adding, before its platform authorization. */
+  readonly prepareConnection?: (request: {
+    readonly platform: string;
+    readonly agent?: string;
+  }) => Promise<{
+    readonly ok: boolean;
+    readonly connection?: WebuiRuntimeConnection;
+    readonly error?: string;
+    readonly code?: string;
   }>;
   readonly connect: (request: {
     readonly name: string;
     readonly appId?: string;
     readonly appSecret?: string;
+    readonly connectionId?: string;
   }) => Promise<{ readonly ok: boolean; readonly error?: string; readonly code?: string }>;
-  readonly disconnect: (request: {
-    readonly name: string;
-    readonly clearCredentials?: boolean;
-    readonly platform?: string;
+  /** 解除连接: unbinds one bot, keeping it in the list. */
+  readonly disconnectConnection?: (request: {
+    readonly connectionId: string;
+  }) => Promise<{ readonly ok: boolean; readonly error?: string; readonly code?: string }>;
+  /** 删除Bot: removes one bot. */
+  readonly deleteConnection?: (request: {
+    readonly connectionId: string;
   }) => Promise<{ readonly ok: boolean; readonly error?: string; readonly code?: string }>;
   readonly checkConfig: (request: { readonly agent: string }) => Promise<{
     readonly configured: boolean;
@@ -82,6 +114,7 @@ export interface WebuiRuntimeChannelBridge {
   readonly startWechatBind?: (request: {
     readonly name: string;
     readonly agent?: string;
+    readonly connectionId?: string;
   }) => Promise<{
     readonly ok: boolean;
     readonly sessionId?: string;
@@ -120,12 +153,18 @@ interface WebuiChannelBridgeSlot {
  * the conversion lives in one place either way.
  */
 interface WebuiChannelMembers {
-  readonly listChannelStatus: () => Promise<WebuiChannelStatus>;
+  readonly listChannelConnections: () => Promise<WebuiChannelConnectionList>;
+  readonly prepareChannelConnection: (
+    request: WebuiChannelPrepareRequest,
+  ) => Promise<WebuiChannelOperationResult>;
   readonly connectChannel: (
     request: WebuiChannelConnectRequest,
   ) => Promise<WebuiChannelOperationResult>;
-  readonly disconnectChannel: (
-    request: WebuiChannelDisconnectRequest,
+  readonly disconnectChannelConnection: (
+    request: WebuiChannelConnectionRequest,
+  ) => Promise<WebuiChannelOperationResult>;
+  readonly deleteChannelConnection: (
+    request: WebuiChannelConnectionRequest,
   ) => Promise<WebuiChannelOperationResult>;
   readonly checkChannelConfig: (
     request: WebuiChannelConfigCheckRequest,
@@ -145,9 +184,11 @@ interface WebuiChannelMembers {
 }
 
 const CHANNEL_MEMBER_NAMES = [
-  "listChannelStatus",
+  "listChannelConnections",
+  "prepareChannelConnection",
   "connectChannel",
-  "disconnectChannel",
+  "disconnectChannelConnection",
+  "deleteChannelConnection",
   "checkChannelConfig",
   "getChannelMessageFilter",
   "updateChannelMessageFilter",
@@ -167,25 +208,35 @@ function hasAllChannelMembers(candidate: Partial<WebuiChannelMembers>): boolean 
 /** The members the runtime's raw bridge answers, converted to the wire. */
 function membersFromRuntimeBridge(bridge: WebuiRuntimeChannelBridge): WebuiChannelMembers {
   return {
-    listChannelStatus: async () => ({ clients: toClients(await bridge.listStatus()) }),
+    listChannelConnections: async () => toConnections(await bridge.listConnections()),
+    prepareChannelConnection: async (request) => {
+      const prepare = bridge.prepareConnection;
+      if (!prepare) throw new WebuiResultShapeError("the host carries no IM bot route");
+      const outcome = await prepare({
+        platform: request.platform,
+        ...(request.agent === undefined ? {} : { agent: request.agent }),
+      });
+      return toOperationResult(outcome);
+    },
     connectChannel: async (request) =>
       toOperationResult(
         await bridge.connect({
           name: request.name,
           ...(request.appId === undefined ? {} : { appId: request.appId }),
           ...(request.appSecret === undefined ? {} : { appSecret: request.appSecret }),
+          ...(request.connectionId === undefined ? {} : { connectionId: request.connectionId }),
         }),
       ),
-    disconnectChannel: async (request) =>
-      toOperationResult(
-        await bridge.disconnect({
-          name: request.name,
-          ...(request.clearCredentials === undefined
-            ? {}
-            : { clearCredentials: request.clearCredentials }),
-          ...(request.platform === undefined ? {} : { platform: request.platform }),
-        }),
-      ),
+    disconnectChannelConnection: async (request) => {
+      const disconnect = bridge.disconnectConnection;
+      if (!disconnect) throw new WebuiResultShapeError("the host carries no IM bot route");
+      return toOperationResult(await disconnect({ connectionId: request.connectionId }));
+    },
+    deleteChannelConnection: async (request) => {
+      const remove = bridge.deleteConnection;
+      if (!remove) throw new WebuiResultShapeError("the host carries no IM bot route");
+      return toOperationResult(await remove({ connectionId: request.connectionId }));
+    },
     checkChannelConfig: async (request) => {
       const result = await bridge.checkConfig({ agent: request.agent });
       const detail = optionalText(result.detail);
@@ -212,6 +263,7 @@ function membersFromRuntimeBridge(bridge: WebuiRuntimeChannelBridge): WebuiChann
       const outcome = await start({
         name: request.name,
         ...(request.agent === undefined ? {} : { agent: request.agent }),
+        ...(request.connectionId === undefined ? {} : { connectionId: request.connectionId }),
       });
       return {
         ok: outcome.ok === true,
@@ -311,24 +363,52 @@ function toMessageFilter(
   };
 }
 
-function toClients(status: {
-  readonly clients: readonly {
-    readonly name: string;
-    readonly platform: string;
-    readonly agentName?: string;
-  }[];
-}): WebuiChannelClient[] {
-  if (!Array.isArray(status.clients)) {
-    throw new WebuiResultShapeError("an IM channel status carried no clients list");
+const CONNECTION_STATES: readonly WebuiRuntimeConnection["state"][] = [
+  "configured",
+  "authorizing",
+  "bound",
+  "error",
+];
+
+/** The runtime's bot list, converted field by field. */
+function toConnections(list: {
+  readonly connections: readonly WebuiRuntimeConnection[];
+}): WebuiChannelConnectionList {
+  if (!Array.isArray(list.connections)) {
+    throw new WebuiResultShapeError("an IM bot list was not readable");
   }
-  return status.clients.map((client) => {
-    const agentName = optionalText(client.agentName);
-    return {
-      name: requiredText(client.name, "client.name"),
-      platform: requiredText(client.platform, "client.platform"),
-      ...(agentName === undefined ? {} : { agentName }),
-    };
-  });
+  return {
+    connections: list.connections.map((connection) => toConnection(connection)),
+  };
+}
+
+function toConnection(connection: WebuiRuntimeConnection): WebuiChannelConnection {
+  const state = connection.state;
+  if (!CONNECTION_STATES.includes(state)) {
+    throw new WebuiResultShapeError("an IM bot field was not readable: state");
+  }
+  const binding = connection.binding;
+  const label = binding ? optionalText(binding.label) : undefined;
+  const currentSessionId = binding ? optionalText(binding.currentSessionId) : undefined;
+  const errorCode = optionalText(connection.errorCode);
+  return {
+    connectionId: requiredText(connection.connectionId, "connectionId"),
+    channel: requiredText(connection.channel, "channel"),
+    agentName: requiredText(connection.agentName, "agentName"),
+    projectKey: typeof connection.projectKey === "string" ? connection.projectKey : null,
+    state,
+    ...(binding
+      ? {
+          binding: {
+            bindingId: requiredText(binding.bindingId, "binding.bindingId"),
+            externalId: requiredText(binding.externalId, "binding.externalId"),
+            ...(label === undefined ? {} : { label }),
+            ...(currentSessionId === undefined ? {} : { currentSessionId }),
+          },
+        }
+      : {}),
+    ...(errorCode === undefined ? {} : { errorCode }),
+  };
 }
 
 /**
@@ -353,9 +433,11 @@ function toOperationResult(outcome: {
 
 export function createChannelAdapter(host: WebuiRuntimeHostHandle): Pick<
   WebuiHarnessPort,
-  | "listChannelStatus"
+  | "listChannelConnections"
+  | "prepareChannelConnection"
   | "connectChannel"
-  | "disconnectChannel"
+  | "disconnectChannelConnection"
+  | "deleteChannelConnection"
   | "checkChannelConfig"
   | "getChannelMessageFilter"
   | "updateChannelMessageFilter"
@@ -363,16 +445,30 @@ export function createChannelAdapter(host: WebuiRuntimeHostHandle): Pick<
   | "getChannelWechatBindStatus"
 > {
   return {
-    async listChannelStatus(): Promise<WebuiChannelStatus> {
-      return requireChannelMembers(host).listChannelStatus();
+    async listChannelConnections(): Promise<WebuiChannelConnectionList> {
+      return requireChannelMembers(host).listChannelConnections();
+    },
+
+    async prepareChannelConnection(
+      request: WebuiChannelPrepareRequest,
+    ): Promise<WebuiChannelOperationResult> {
+      return requireChannelMembers(host).prepareChannelConnection(request);
     },
 
     async connectChannel(request): Promise<WebuiChannelOperationResult> {
       return requireChannelMembers(host).connectChannel(request);
     },
 
-    async disconnectChannel(request): Promise<WebuiChannelOperationResult> {
-      return requireChannelMembers(host).disconnectChannel(request);
+    async disconnectChannelConnection(
+      request: WebuiChannelConnectionRequest,
+    ): Promise<WebuiChannelOperationResult> {
+      return requireChannelMembers(host).disconnectChannelConnection(request);
+    },
+
+    async deleteChannelConnection(
+      request: WebuiChannelConnectionRequest,
+    ): Promise<WebuiChannelOperationResult> {
+      return requireChannelMembers(host).deleteChannelConnection(request);
     },
 
     async checkChannelConfig(request): Promise<WebuiChannelConfigCheckResult> {

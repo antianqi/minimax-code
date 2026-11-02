@@ -18,11 +18,16 @@ import {
   webuiSshDiscoveryEmptyText,
   webuiSshErrorMessage,
   webuiSshHostRows,
+  webuiSshOverridePort,
+  webuiSshOverrideValue,
+  webuiSshPortInputError,
   webuiSshProjectRows,
+  webuiSshStatusDotClass,
   webuiSshStatusLabel,
   WEBUI_SSH_CONFIG_UNREADABLE_TEXT,
   WEBUI_SSH_NO_CONFIG_TEXT,
-  WEBUI_SSH_NO_CONNECTIONS_TEXT,
+  WEBUI_SSH_EMPTY_DESCRIPTION,
+  WEBUI_SSH_EMPTY_TITLE,
   WEBUI_SSH_NO_HOSTS_TEXT,
 } from "../../src/client/features/ssh/projection/ssh-panel.js";
 import { SshPanelView } from "../../src/client/features/ssh/ui/SshPanel.public.js";
@@ -45,9 +50,10 @@ function connection(overrides: Partial<WebuiSshConnection> = {}): WebuiSshConnec
 
 describe("the SSH projection", () => {
   it("keeps the two empty states apart", () => {
-    expect(WEBUI_SSH_NO_HOSTS_TEXT).not.toBe(WEBUI_SSH_NO_CONNECTIONS_TEXT);
+    expect(WEBUI_SSH_NO_HOSTS_TEXT).not.toBe(WEBUI_SSH_EMPTY_DESCRIPTION);
     expect(WEBUI_SSH_NO_HOSTS_TEXT).toContain("~/.ssh/config");
-    expect(WEBUI_SSH_NO_CONNECTIONS_TEXT).toContain("设置");
+    expect(WEBUI_SSH_EMPTY_TITLE).toContain("SSH");
+    expect(WEBUI_SSH_EMPTY_DESCRIPTION).toContain("远程服务器");
   });
 
   it("tells the three discovery outcomes apart", () => {
@@ -63,6 +69,57 @@ describe("the SSH projection", () => {
     expect(webuiSshDiscoveryEmptyText(noHosts)).toBe(WEBUI_SSH_NO_HOSTS_TEXT);
     expect(webuiSshDiscoveryEmptyText(unreadable)).toBe(WEBUI_SSH_CONFIG_UNREADABLE_TEXT);
     expect(webuiSshDiscoveryEmptyText(withHosts)).toBeUndefined();
+  });
+
+  it("colours the status dot by what the host answered", () => {
+    // A host that is up wears the success glyph; a host that did not answer wears the error one;
+    // a host that is off or still connecting stays neutral.
+    expect(webuiSshStatusDotClass("connected", true)).toBe("bg-text_status_success");
+    expect(webuiSshStatusDotClass("ready", true)).toBe("bg-text_status_success");
+    expect(webuiSshStatusDotClass("probe_failed", true)).toBe("bg-text_status_error");
+    expect(webuiSshStatusDotClass("connecting", true)).toBe("bg-icon_default_tertiary");
+    expect(webuiSshStatusDotClass("disabled", false)).toBe("bg-icon_default_tertiary");
+    expect(webuiSshStatusDotClass("connected", false)).toBe("bg-icon_default_tertiary");
+  });
+
+  it("keeps an override, drops it when the config value comes back, and asks for a new one", () => {
+    // A host named in `~/.ssh/config` follows the config file unless a value is overridden on
+    // purpose. This is Desktop's own rule for such a host.
+    // Untouched, and the host follows the config: no override at all.
+    expect(webuiSshOverrideValue("build.example.com", undefined, "build.example.com")).toBeUndefined();
+    // Untouched, and the host carries an override: the override stays.
+    expect(webuiSshOverrideValue("other.example.com", "other.example.com", "build.example.com")).toBe(
+      "other.example.com",
+    );
+    // Set back to the config's own value: the override is dropped.
+    expect(webuiSshOverrideValue("build.example.com", "other.example.com", "build.example.com")).toBe(
+      undefined,
+    );
+    // A value the person chose: an override of their own.
+    expect(webuiSshOverrideValue("third.example.com", "other.example.com", "build.example.com")).toBe(
+      "third.example.com",
+    );
+    // Cleared: the host follows the config again.
+    expect(webuiSshOverrideValue("", "other.example.com", "build.example.com")).toBeUndefined();
+  });
+
+  it("resolves a port the same way", () => {
+    expect(webuiSshOverridePort("54751", undefined, 54751)).toBeUndefined();
+    expect(webuiSshOverridePort("2222", 2222, 54751)).toBe(2222);
+    expect(webuiSshOverridePort("54751", 2222, 54751)).toBeUndefined();
+    expect(webuiSshOverridePort("22", 2222, 54751)).toBe(22);
+    expect(webuiSshOverridePort("", 2222, 54751)).toBeUndefined();
+  });
+
+  it("refuses a port that cannot be read instead of dropping it", () => {
+    // A port that is silently ignored is a connection that lands on a different port than
+    // the one the person named.
+    expect(webuiSshPortInputError("")).toBeUndefined();
+    expect(webuiSshPortInputError("22")).toBeUndefined();
+    expect(webuiSshPortInputError(" 54751 ")).toBeUndefined();
+    expect(webuiSshPortInputError("not-a-port")).toContain("端口");
+    expect(webuiSshPortInputError("0")).toContain("端口");
+    expect(webuiSshPortInputError("70000")).toContain("端口");
   });
 
   it("prints the status word as it is", () => {
@@ -117,28 +174,28 @@ describe("the SSH panel", () => {
       SshPanelView({
         snapshot: { status: "ready", connections: [], projects: [] },
         terminal: { status: "closed", output: "" },
-        onRefresh: () => undefined,
-        onAddHost: () => undefined,
+        onOpenAdd: () => undefined,
         onToggleHost: () => undefined,
-        onProbeHost: () => undefined,
-        onRemoveHost: () => undefined,
-        onDiscoverHosts: () => undefined,
-        onAddProject: () => undefined,
-        onRemoveProject: () => undefined,
+        onOpenDetails: () => undefined,
+        onCreateProject: () => undefined,
+        onEditHost: () => undefined,
         onOpenTerminal: () => undefined,
         onCloseTerminal: () => undefined,
         onTerminalInput: () => undefined,
+        onRemoveProject: () => undefined,
         onRequestRemove: () => undefined,
-        onCancelRemove: () => undefined,
         ...overrides,
       }),
     );
 
-  it("shows the empty state when there is no host at all", () => {
+  it("shows the Desktop's empty card when there is no host at all", () => {
     const markup = view();
-    // The rendered markup escapes the angle brackets of "设置 > 连接 > SSH".
-    expect(markup).toContain(WEBUI_SSH_NO_CONNECTIONS_TEXT.replaceAll(">", "&gt;"));
+    expect(markup).toContain(WEBUI_SSH_EMPTY_TITLE);
+    expect(markup).toContain(WEBUI_SSH_EMPTY_DESCRIPTION);
     expect(markup).toContain("data-webui-ssh-empty");
+    // The empty state offers the picker, and the list is not drawn.
+    expect(markup).toContain("data-webui-ssh-add");
+    expect(markup).not.toContain("data-webui-ssh-list");
   });
 
   it("does not show the empty state when the read failed", () => {
@@ -149,7 +206,7 @@ describe("the SSH panel", () => {
     expect(markup).toContain("读取 SSH 主机失败。");
   });
 
-  it("shows a host with its status and its actions", () => {
+  it("shows a host with its status, its switch and its actions", () => {
     const markup = view({
       snapshot: {
         status: "ready",
@@ -161,7 +218,26 @@ describe("the SSH panel", () => {
     expect(markup).toContain("探测失败");
     expect(markup).toContain("连接被拒绝。");
     expect(markup).toContain("data-webui-ssh-toggle=\"build\"");
-    expect(markup).toContain("data-webui-ssh-terminal=\"build\"");
+    // The Desktop's row carries a remote-project action and the row's own menu.
+    expect(markup).toContain("data-webui-ssh-new-project=\"build\"");
+    expect(markup).toContain("data-webui-ssh-more=\"build\"");
+    expect(markup).toContain("查看 Build machine 的连接详情");
+    expect(markup).toContain("启用或停用 build");
+  });
+
+  it("puts the hosts in one grouped card and offers the picker", () => {
+    const markup = view({
+      snapshot: {
+        status: "ready",
+        connections: [connection(), connection({ alias: "second", displayName: "Second" })],
+        projects: [],
+      },
+    });
+    expect(markup).toContain("data-webui-ssh-list");
+    expect(markup).toContain("data-testid=\"ssh-connection-build\"");
+    expect(markup).toContain("data-testid=\"ssh-connection-second\"");
+    // The second row draws the separator the first one does not.
+    expect(markup).toContain("border-t border-border_light");
   });
 
   it("shows the terminal's output", () => {

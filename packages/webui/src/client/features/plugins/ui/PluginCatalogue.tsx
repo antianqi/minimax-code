@@ -551,7 +551,7 @@ export function PluginCatalogue({
               <WebuiButton
                 variant="selectable-row"
                 size="row"
-                className="w-full gap-2.5 overflow-hidden"
+                className="webui-agent-list-item w-full gap-2.5 overflow-hidden"
                 key={nameOf(item)}
                 aria-pressed={selectedAgent === item}
                 onClick={() => {

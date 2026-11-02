@@ -26,7 +26,7 @@
 // | `account` | `WebuiAccountSlice` | `AccountPort` | the eight login, signin and quota members |
 // | `shell` | `WebuiShellSlice` | `ShellEventPort` | `watchEvents` |
 // | `scheduling` | `WebuiSchedulingSlice` | `SchedulingPort` | `listCronTasks` |
-// | `channel` | `WebuiChannelSlice` | `ChannelPort` | the six 接入 IM members |
+// | `channel` | `WebuiChannelSlice` | `ChannelPort` | the 接入 IM bot list and its commands |
 // | `remoteControl` | `WebuiRemoteControlSlice` | `RemoteControlPort` | the nine 远程控制 members |
 // | `ssh` | `WebuiSshSlice` | `SshPort` | the fifteen SSH members |
 // | `turn` | `WebuiTurnCapabilitySlice` | `TurnExecutionPort` (+ the queue write, the message loader and the session creator its send path needs) | the published capability slice |
@@ -263,9 +263,11 @@ const SCHEDULING_KEYS = [
  * them.
  */
 const CHANNEL_KEYS = [
-  "listChannelStatus",
+  "listChannelConnections",
+  "prepareChannelConnection",
   "connectChannel",
-  "disconnectChannel",
+  "disconnectChannelConnection",
+  "deleteChannelConnection",
   "checkChannelConfig",
   "getChannelMessageFilter",
   "updateChannelMessageFilter",

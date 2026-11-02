@@ -87,7 +87,7 @@ export function RemoteControlDevices(): ReactElement | null {
               >
                 <WebuiInline gap="small" className="min-w-0 flex-1 items-center">
                   <WebuiIconRemote className="h-5 w-5 shrink-0 text-icon_default_primary" />
-                  <WebuiStack gap="micro" className="min-w-0">
+                  <WebuiStack gap="tight" className="min-w-0">
                     <span className="truncate text-sm text-text_default_primary">{deviceName}</span>
                     <span className="text-xs text-text_default_secondary">{stateLabel}</span>
                   </WebuiStack>
@@ -112,24 +112,24 @@ export function RemoteControlDevices(): ReactElement | null {
               >
                 <WebuiInline gap="small" className="min-w-0 flex-1 items-center">
                   <WebuiIconRemote className="h-5 w-5 shrink-0 text-icon_default_primary" />
-                  <WebuiStack gap="micro" className="min-w-0 flex-1">
-                    <span className="text-sm font-medium leading-5 text-text_default_primary">
+                  <WebuiStack gap="tight" className="min-w-0 flex-1">
+                    <span className="text-[14px] font-[430] leading-[21px] text-text_default_primary">
                       {WEBUI_REMOTE_CONTROL_DEVICES_ADD_TITLE}
                     </span>
-                    <span className="text-sm leading-5 text-text_default_secondary">
+                    <span className="text-[14px] font-[430] leading-[21px] text-text_default_secondary">
                       {WEBUI_REMOTE_CONTROL_DEVICES_ADD_DESCRIPTION}
                     </span>
                   </WebuiStack>
                 </WebuiInline>
                 <WebuiButton
                   variant="secondary"
-                  size="regular"
+                  size="header"
                   data-testid="rc-device-add-action"
                   disabled={busy}
                   onClick={() => {
                     run(() => owner.connect());
                   }}
-                  className="h-9 min-w-20 shrink-0 px-3 py-0 font-medium"
+                  className="min-w-20 shrink-0"
                 >
                   {WEBUI_REMOTE_CONTROL_DEVICES_ADD_ACTION}
                 </WebuiButton>

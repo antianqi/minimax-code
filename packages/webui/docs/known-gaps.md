@@ -119,32 +119,78 @@ the selected bot's card. The runtime's channel bridge serves more of it than thi
 claim, because the bridge routes are the same ones Desktop 3.1.6 calls — under the
 `/channel-bridge/*` prefix instead of Desktop's `/minimax-desktop/api/v1/*`.
 
+The list is the runtime's **Channel Connections**, not its bound-client map. That distinction is the
+whole feature: Desktop's bot list carries every bot with the state that decides which card shape it
+draws, and a bot whose QR scan has not finished is listed as 未绑定 rather than reported as bound.
+Reading the per-platform status routes instead answers a different question — which transport clients
+are bound — and a pending scan then read as 已绑定.
+
 | Desktop action | The route this runtime serves | Where the WebUI reaches it |
 | --- | --- | --- |
-| list bots | `GET /channel-bridge/status` (the bound clients) | `listChannelStatus` |
-| bind a Feishu bot | `POST /channel-bridge/connect` (name + app id + secret) | `connectChannel` |
-| 解除连接 | `POST /channel-bridge/disconnect` | `disconnectChannel` |
-| the WeChat QR authorization | `POST /channel-bridge/wechat/bind/start`, `GET /channel-bridge/wechat/bind/status` | `startChannelWechatBind`, `getChannelWechatBindStatus` |
+| list the bots, bound or not | `GET /channel-bridge/connections` | `listChannelConnections` |
+| create a bot (before its authorization) | `POST /channel-bridge/connections/prepare` | `prepareChannelConnection` |
+| bind a Feishu bot | `POST /channel-bridge/connect` (name + app id + secret + `connectionId`) | `connectChannel` |
+| 解除连接 | `DELETE /channel-bridge/connections/<id>/binding` | `disconnectChannelConnection` |
+| 删除Bot | `DELETE /channel-bridge/connections/<id>` | `deleteChannelConnection` |
+| the WeChat QR authorization | `POST /channel-bridge/wechat/bind/start` (with `connectionId`), `GET /channel-bridge/wechat/bind/status` | `startChannelWechatBind`, `getChannelWechatBindStatus` |
 | the per-agent configuration | `GET /channel-bridge/config-check` | `checkChannelConfig` |
 | the message filter | `GET`/`PUT /channel-bridge/message-filter/<agent>` | `getChannelMessageFilter`, `updateChannelMessageFilter` |
 
-Three things are still missing, and each renders as Desktop's own copy with an
-`aria-disabled` state and no handler, never as a faked success:
+The connections route family is this repository's port of the runtime's own v2 dispatcher
+(`channel-system/delivery/legacy-http/dispatch/connections-routes`), re-stated against the v1 store
+and adapters this package owns. Two Desktop behaviours it does not carry, both because the v1
+adapters have no equivalent read: the live transport overlay on a bound binding (`transportClients`,
+so `connected`/`reconnecting` are not reported per row) and the connection's `project` reference
+beyond its stored key.
+
+One thing is still missing, and it renders as Desktop's own copy with an `aria-disabled` state and no
+handler, never as a faked success:
 
 | Desktop action | What is missing here |
 | --- | --- |
-| list the bots that are still waiting for their authorization | the connection list route — the store exists (`LocalImConnectionStore.listViews`), the route does not. The list therefore shows the bound clients only, and a bot that is being added appears in the detail column instead of in the list. |
 | the Agent and working-directory choice | the binding write (`LocalChannelBindingWrite`: agentName, sessionId, strategy, pinned, routeRuleId, exactOwnerName, ownerInstanceId, projectKey, routingMode) |
-| 删除Bot | `store.deleteConnection` — the runtime has the store method but no route, so the WebUI's 删除 button unbinds the client instead of removing the bot |
 
-One substitution: Desktop binds Feishu by a QR code and a link (`lark/onboard/start`), and this
-runtime has no onboarding route for it. The WebUI's Feishu add surface therefore asks for the app
-id and the secret — the path the runtime does serve (`connect`) — where Desktop shows a QR.
+Two substitutions:
+
+* Desktop binds Feishu by a QR code and a link (`lark/onboard/start`), and this runtime has no
+  onboarding route for it. The WebUI's Feishu bot therefore asks for the app id and the secret — the
+  path the runtime does serve (`connect`) — where Desktop shows a QR.
+* Desktop asks for a Telegram token inline on the bot's card. This runtime serves `telegram/bind`,
+  but the pane does not offer a Telegram bot in its create menu, so an unbound Telegram bot's card
+  marks the authorization as not wired instead of rendering Desktop's token field.
 
 The WeChat authorization's QR is drawn in the client, the way Desktop draws it: the bind route
 answers with the link the phone opens rather than with a picture, and the pane encodes that text
 as a QR with the same library Desktop bundles (`qrcode.react`). A runtime that answers with an
 image instead is drawn as that image.
+
+## 4b. The 连接 page: the SSH half carries the hosts, and three commands stay put
+
+The 连接 tab is Desktop's `设置 > 连接`, transcribed into three segments: 控制这台电脑 (this
+computer), 控制其他设备 (other devices) and SSH. The SSH half is the whole host management: the
+hosts in `~/.ssh/config`, a host saved by hand, the switch, the host's own menu, the projects
+rooted on a host and the remote terminal.
+
+A host picked from `~/.ssh/config` is stored as its alias alone. OpenSSH resolves the host, the
+user, the port and the key when it is asked for that alias, and Desktop stores nothing else for
+such a host (`ssh-runtime/connection-service.js`, `createPendingConnection`). The values
+`ssh -G` reports are what the editor shows, and a value the person changes on purpose is stored
+as an override — Desktop's own rule (`updatedEndpoint`). A key path may be written the way
+OpenSSH writes it (`~/.ssh/id_ed25519`); the runtime expands it and stores the absolute path
+(`parseIdentityFile`).
+
+Three commands in this surface have no counterpart in this runtime, and each renders as Desktop's
+own copy with an `aria-disabled` state and no handler, never as a faked success:
+
+| Desktop command | Why it cannot run here |
+| --- | --- |
+| 控制其他设备 — reach another computer | the runtime serves the host it runs on; there is no second host to reach |
+| 登录 — log in as a remote account | the runtime carries no remote-account authorization |
+| 安装 / 更新 MCode, and the install progress | the runtime has no installer on this machine |
+
+The host row's 打开终端 is this client's own addition: Desktop opens a remote terminal from the
+remote project's workspace, and this client keeps the terminal inside the connection settings, so
+the command lives on the host's row.
 
 ## 5. Upstream open results need runtime conversion
 

@@ -4,37 +4,36 @@
 // published module may not re-export another module's symbol — so the pane lives here and is
 // published as itself rather than through a forwarding file.
 //
-// Split in two on purpose. `ChannelConnectPanelView` is a pure render of a snapshot, so a test
-// can pin every branch — the rows, the empty state, the load failure, the create menu, the
-// authorization, the sections the runtime has no route behind — through `renderToStaticMarkup`
-// without a DOM (there is no jsdom in this package). `ChannelConnectPanel` is the thin part that
-// subscribes to the owner and reads once when it opens.
+// Split in two on purpose. `ChannelConnectPanelView` is a pure render of a snapshot, so a test can
+// pin every branch — the rows, the empty state, the load failure, the create menu, the two card
+// shapes, the sections the runtime has no route behind — through `renderToStaticMarkup` without a
+// DOM (there is no jsdom in this package). `ChannelConnectPanel` is the thin part that subscribes to
+// the owner and reads once when it opens.
 //
-// The pane is Desktop 3.1.6's 接入 IM tab, transcribed: a 220px list column with one row per IM
-// client (a status dot, the platform's icon, the bot's name and the platform's label), the
-// create action under the rows, and, beside it, the selected bot's card.
+// The pane is Desktop 3.1.6's 接入 IM tab, transcribed: a 220px list column with one row per bot (a
+// status dot, the platform's icon, the bot's name and the platform's label), the create action under
+// the rows, and, beside it, the selected bot's card.
 //
 // ## The two card shapes
 //
-// Desktop draws the card from one flag: a bot that is already bound carries the association's
-// bound copy, the 解除连接 action and no QR; a bot that is still waiting for its authorization
-// carries the unbound copy, the 刷新二维码 action and the QR itself. The runtime's list reports
-// bound bots only, so the list's rows are always the first shape and the create flow is the
-// second.
+// Desktop draws the card from one fact: the bot's state. A bound bot carries the association's bound
+// copy, 解除连接 and no QR. A bot that has not finished its authorization carries the unbound copy,
+// 刷新二维码 and the QR itself — including while it is authorizing, which is why a pending scan is
+// listed as 未绑定 rather than as a bound bot.
 //
 // ## The create flow
 //
-// The create action opens Desktop's platform menu — one entry per platform, each with the
-// platform's own icon. Choosing one opens that platform's add surface:
+// The create action opens Desktop's platform menu. Choosing one creates the bot first (the runtime's
+// own prepare route) and authorizes it second:
 //
 //   * 微信 — the QR authorization. The runtime owns that route; the pane shows the QR it produced
 //     and reads the authorization until it is confirmed.
 //   * 飞书 — the credential form. This runtime has no onboarding route for Feishu, and the
-//     credential path is the one it does serve, so the form asks for the app id and secret
-//     instead of showing a QR.
+//     credential path is the one it does serve, so the form asks for the app id and secret instead
+//     of showing a QR.
 //
-// A section the runtime has no route behind is rendered with Desktop's own copy and marked as
-// not wired, never as if it worked.
+// A section the runtime has no route behind is rendered with Desktop's own copy and marked as not
+// wired, never as if it worked.
 import {
   IconBrandTelegram,
   IconBrandWechat,
@@ -83,11 +82,11 @@ import {
   WEBUI_CHANNEL_SECTION_UNBIND,
   WEBUI_CHANNEL_SECTION_WORKSPACE,
   WEBUI_CHANNEL_SECTION_WORKSPACE_DESCRIPTION,
-  WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY,
   webuiChannelAssociationLabel,
   webuiChannelFilterModeLabel,
-  webuiChannelPendingRow,
+  webuiChannelProjectLabel,
   webuiChannelRows,
+  webuiChannelStateLabel,
   type WebuiChannelRow,
 } from "../projection/channel-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
@@ -104,27 +103,22 @@ export interface ChannelConnectPanelProps {
 
 export interface ChannelConnectPanelViewProps {
   readonly snapshot: WebuiChannelSnapshot;
-  readonly onSelect: (name: string) => void;
+  readonly onSelect: (connectionId: string) => void;
+  /** Creates the bot for one platform — Desktop's create menu. */
+  readonly onAdd: (platform: "wechat" | "feishu") => void;
+  /** Starts the bot's authorization over — Desktop's 刷新二维码. */
+  readonly onRefreshAuthorization: (connectionId: string) => void;
+  readonly onUnbind: (connectionId: string) => void;
+  readonly onDelete: (connectionId: string) => void;
   readonly onBind: (request: WebuiChannelConnectRequest) => void;
-  readonly onUnbind: (name: string) => void;
   readonly onUpdateFilter: (request: WebuiChannelMessageFilterRequest) => void;
   /** Whether the platform menu is open. */
   readonly menuOpen: boolean;
   readonly onMenuOpenChange: (open: boolean) => void;
-  /** Whether the Feishu credential form is open. */
-  readonly binding: boolean;
-  readonly onOpenBinding: () => void;
-  readonly onCloseBinding: () => void;
   /** Whether the delete confirmation is open. */
   readonly deleting: boolean;
   readonly onOpenDelete: () => void;
   readonly onCloseDelete: () => void;
-  /** Starts the create flow for one platform. */
-  readonly onStartAdding: (platform: "wechat" | "feishu") => void;
-  /** Leaves the create flow. */
-  readonly onCancelAdding: () => void;
-  /** Starts the authorization over — the Desktop's 刷新二维码. */
-  readonly onRenewAuthorization: () => void;
 }
 
 /** The platform's icon. Feishu has no brand glyph in the icon set, so it gets a neutral one. */
@@ -174,9 +168,9 @@ function NotWired(): ReactElement {
 /**
  * A selector the Desktop draws as a dropdown trigger.
  *
- * The value it shows is real — the Agent the client is bound to, the working directory it keeps
- * its conversations in — but choosing another one has no route behind it here, so the control
- * carries the Desktop's shape, the `aria-disabled` state and no handler.
+ * The value it shows is real — the Agent the bot talks to, the working directory it keeps its
+ * conversations in — but choosing another one has no route behind it here, so the control carries
+ * the Desktop's shape, the `aria-disabled` state and no handler.
  */
 function UnwiredSelect(props: {
   readonly icon: ReactNode;
@@ -201,12 +195,12 @@ function UnwiredSelect(props: {
  * The Feishu credential form.
  *
  * Desktop binds Feishu by a QR code and a link; this runtime has no onboarding route for it, and
- * the credential path is the one it does serve, so the form asks for the app id and the secret
- * and binds through the runtime's connect route.
+ * the credential path is the one it does serve, so the form asks for the app id and the secret and
+ * binds through the runtime's connect route — onto the bot the create flow already prepared.
  */
 function ChannelBindForm(props: {
+  readonly connectionId: string;
   readonly onSubmit: (request: WebuiChannelConnectRequest) => void;
-  readonly onCancel: () => void;
 }): ReactElement {
   const [name, setName] = useState("");
   const [appId, setAppId] = useState("");
@@ -220,6 +214,7 @@ function ChannelBindForm(props: {
         if (name.trim() === "") return;
         props.onSubmit({
           name: name.trim(),
+          connectionId: props.connectionId,
           ...(appId.trim() === "" ? {} : { appId: appId.trim() }),
           ...(appSecret === "" ? {} : { appSecret }),
         });
@@ -229,9 +224,9 @@ function ChannelBindForm(props: {
         <p className="text-sm leading-5 text-text_default_primary">{WEBUI_CHANNEL_SECTION_BIND}</p>
         <WebuiField
           label="客户端名称"
-          control={(props) => (
+          control={(fieldProps) => (
             <WebuiTextInput
-              {...props}
+              {...fieldProps}
               data-webui-channel-bind-name="true"
               controlSize="compact"
               placeholder="例如：团队飞书机器人"
@@ -242,9 +237,9 @@ function ChannelBindForm(props: {
         />
         <WebuiField
           label="飞书 App ID"
-          control={(props) => (
+          control={(fieldProps) => (
             <WebuiTextInput
-              {...props}
+              {...fieldProps}
               data-webui-channel-bind-app-id="true"
               controlSize="compact"
               placeholder="输入飞书 App ID"
@@ -255,9 +250,9 @@ function ChannelBindForm(props: {
         />
         <WebuiField
           label="飞书 App Secret"
-          control={(props) => (
+          control={(fieldProps) => (
             <WebuiTextInput
-              {...props}
+              {...fieldProps}
               data-webui-channel-bind-app-secret="true"
               controlSize="compact"
               placeholder="输入飞书 App Secret"
@@ -274,7 +269,12 @@ function ChannelBindForm(props: {
             绑定
           </WebuiButton>
           <WebuiButton variant="quiet-highlight" size="inline" data-webui-channel-bind-cancel="true"
-            onClick={props.onCancel}
+            onClick={() => {
+              // The form is local until it is submitted, so cancelling clears it.
+              setName("");
+              setAppId("");
+              setAppSecret("");
+            }}
 
           >
             取消
@@ -286,11 +286,11 @@ function ChannelBindForm(props: {
 }
 
 /**
- * The QR the WeChat authorization shows.
+ * The QR the bot's authorization shows.
  *
- * Desktop draws the picture the runtime produced; when the runtime answers with text instead of
- * an image, Desktop encodes that text as a QR and draws it inline. The WeChat bind route answers
- * with the liteapp link the phone opens, so the text path is the one this authorization takes —
+ * Desktop draws the picture the runtime produced; when the runtime answers with text instead of an
+ * image, Desktop encodes that text as a QR and draws it inline. The WeChat bind route answers with
+ * the liteapp link the phone opens, so the text path is the one this authorization usually takes —
  * encoded by the same library Desktop uses, at the same size.
  */
 function AuthorizationQr(props: {
@@ -327,100 +327,65 @@ function AuthorizationQr(props: {
   );
 }
 
-/**
- * The bot the create flow is adding, as Desktop's card.
- *
- * It is the unbound shape: the header names the bot and its state, the association carries the
- * unbound copy and the 刷新二维码 action, and the QR sits under it.
- */
-function ChannelPendingCard(props: {
+/** The QR block under an unbound bot's association: the code, then what it is for. */
+function AuthorizationBlock(props: {
   readonly row: WebuiChannelRow;
   readonly authorization: WebuiChannelAuthorization | undefined;
-  readonly onRenew: () => void;
-  readonly onCancel: () => void;
-  readonly children?: ReactNode;
 }): ReactElement {
   return (
-    <div className="rounded-2xl bg-bg_grouped_tertiary p-4" data-webui-component="channel-detail-card">
-      <header className="flex min-h-14 items-center justify-between gap-4">
+    <section
+      className="flex h-[176px] w-full items-center gap-4 py-2"
+      data-webui-channel-section="authorization"
+    >
+      <AuthorizationQr authorization={props.authorization} />
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5" data-testid="authorization-copy">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center text-icon_default_primary">
+          {platformIcon(props.row.platform)}
+        </span>
         <div className="min-w-0">
-          <h1 className="truncate text-sm leading-5 text-text_default_primary">{props.row.botName}</h1>
-          <div className="mt-1 flex items-center gap-1.5 text-xs leading-4 text-text_default_secondary">
-            <span className="h-1.5 w-1.5 rounded-full bg-text_default_tertiary" aria-hidden="true" />
-            <span>{props.row.platformLabel}</span>
-            <span className="text-text_default_secondary" data-testid="connection-state">
-              {props.row.stateLabel}
-            </span>
-          </div>
+          <p className="text-sm leading-5 text-text_default_secondary">
+            {WEBUI_CHANNEL_SECTION_BIND_QR_DESCRIPTION}
+          </p>
+          <p className="text-sm leading-5 text-text_default_secondary">
+            {WEBUI_CHANNEL_SECTION_BIND_QR_HINT}
+          </p>
         </div>
-        <WebuiButton
-          variant="quiet-secondary"
-          size="inline"
-          data-webui-channel-cancel-adding="true"
-          onClick={props.onCancel}
-        >
-          取消
-        </WebuiButton>
-      </header>
-
-      <section
-        className="border-t-[0.5px] border-border_default"
-        data-webui-channel-section="association"
-      >
-        <div className="flex min-h-14 items-center justify-between gap-6 py-2">
-          <div className="min-w-0">
-            <p className="text-sm leading-5 text-text_default_primary">{WEBUI_CHANNEL_SECTION_BIND}</p>
-            <p className="mt-1 text-xs leading-4 text-text_default_secondary">
-              {WEBUI_CHANNEL_SECTION_BIND_QR}
-            </p>
-          </div>
-          <WebuiInline gap="small" className="shrink-0">
-            <WebuiButton
-              variant="quiet-secondary"
-              size="inline"
-              data-webui-channel-refresh-authorization="true"
-              onClick={props.onRenew}
-            >
-              {WEBUI_CHANNEL_SECTION_BIND_QR_REFRESH}
-            </WebuiButton>
-          </WebuiInline>
-        </div>
-        {props.children ?? (
-          <section
-            className="flex h-[176px] w-full items-center gap-4 py-2"
-            data-webui-channel-section="authorization"
-          >
-            <AuthorizationQr authorization={props.authorization} />
-            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5" data-testid="authorization-copy">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center text-icon_default_primary">
-                {platformIcon(props.row.platform)}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm leading-5 text-text_default_secondary">
-                  {WEBUI_CHANNEL_SECTION_BIND_QR_DESCRIPTION}
-                </p>
-                <p className="text-sm leading-5 text-text_default_secondary">
-                  {WEBUI_CHANNEL_SECTION_BIND_QR_HINT}
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }
 
-/** The selected bot's card: its header, the association, the Agent, the workspace and the deletion. */
-function ChannelDetail(props: {
+/**
+ * The selected bot's card.
+ *
+ * One component, two shapes, decided by the bot's state exactly as Desktop decides it: bound means
+ * the association's bound copy and 解除连接; anything else means the unbound copy and the surface
+ * that finishes the authorization — a QR for WeChat, the credential form for Feishu.
+ */
+function ChannelCard(props: {
   readonly row: WebuiChannelRow;
+  readonly projectLabel: string;
   readonly snapshot: WebuiChannelSnapshot;
-  readonly onUnbind: (name: string) => void;
+  readonly onRefreshAuthorization: (connectionId: string) => void;
+  readonly onUnbind: (connectionId: string) => void;
+  readonly onBind: (request: WebuiChannelConnectRequest) => void;
   readonly onUpdateFilter: (request: WebuiChannelMessageFilterRequest) => void;
   readonly onOpenDelete: () => void;
 }): ReactElement {
   const filter = props.snapshot.filter;
-  const filterKey = props.row.name;
+  const filterKey = props.snapshot.connections.find(
+    (entry) => entry.connectionId === props.row.connectionId,
+  )?.binding?.externalId;
+  const unboundSurface =
+    props.row.platform === "feishu" ? (
+      <ChannelBindForm connectionId={props.row.connectionId} onSubmit={props.onBind} />
+    ) : props.row.platform === "wechat" ? (
+      <AuthorizationBlock row={props.row} authorization={props.snapshot.authorization} />
+    ) : (
+      <div className="flex min-h-14 items-center py-2">
+        <NotWired />
+      </div>
+    );
   return (
     <div className="rounded-2xl bg-bg_grouped_tertiary p-4" data-webui-component="channel-detail-card">
       <header className="flex min-h-14 items-center justify-between gap-4">
@@ -431,6 +396,7 @@ function ChannelDetail(props: {
               className="h-1.5 w-1.5 shrink-0 rounded-full bg-text_default_tertiary"
               aria-hidden="true"
             />
+            {props.row.bound ? null : <span>{props.row.platformLabel}</span>}
             <span className="text-text_default_secondary" data-testid="connection-state">
               {props.row.stateLabel}
             </span>
@@ -446,20 +412,36 @@ function ChannelDetail(props: {
           <div className="min-w-0">
             <p className="text-sm leading-5 text-text_default_primary">{WEBUI_CHANNEL_SECTION_BIND}</p>
             <p className="mt-1 text-xs leading-4 text-text_default_secondary">
-              {webuiChannelAssociationLabel(props.row.platform)}
+              {props.row.bound
+                ? webuiChannelAssociationLabel(props.row.platform)
+                : WEBUI_CHANNEL_SECTION_BIND_QR}
             </p>
           </div>
           <WebuiInline gap="small" className="shrink-0">
-            <WebuiButton
-              variant="quiet-secondary"
-              size="inline"
-              data-webui-channel-unbind="true"
-              onClick={() => props.onUnbind(props.row.name)}
-            >
-              {WEBUI_CHANNEL_SECTION_UNBIND}
-            </WebuiButton>
+            {props.row.bound ? (
+              <WebuiButton
+                variant="quiet-secondary"
+                size="inline"
+                data-webui-channel-unbind="true"
+                onClick={() => props.onUnbind(props.row.connectionId)}
+              >
+                {WEBUI_CHANNEL_SECTION_UNBIND}
+              </WebuiButton>
+            ) : props.row.platform === "wechat" ? (
+              // A QR is the one authorization this pane drives itself, so it is the one shape that
+              // carries Desktop's 刷新二维码.
+              <WebuiButton
+                variant="quiet-secondary"
+                size="inline"
+                data-webui-channel-refresh-authorization="true"
+                onClick={() => props.onRefreshAuthorization(props.row.connectionId)}
+              >
+                {WEBUI_CHANNEL_SECTION_BIND_QR_REFRESH}
+              </WebuiButton>
+            ) : null}
           </WebuiInline>
         </div>
+        {props.row.bound ? null : unboundSurface}
       </section>
 
       <DetailSection
@@ -482,47 +464,49 @@ function ChannelDetail(props: {
       >
         <UnwiredSelect
           icon={<IconFolder aria-hidden="true" size={16} stroke={1.5} />}
-          label={WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY}
+          label={props.projectLabel}
           testId="web-project-setting-value"
         />
         <NotWired />
       </DetailSection>
 
-      <DetailSection
-        testId="filter"
-        title={WEBUI_CHANNEL_SECTION_FILTER}
-        description={WEBUI_CHANNEL_SECTION_FILTER_DESCRIPTION}
-      >
-        <WebuiInline gap="small">
-          <WebuiButton variant="outline" size="inline-dense" data-webui-channel-filter-mode="result"
-            aria-pressed={filter?.mode !== "full"}
-            onClick={() =>
-              props.onUpdateFilter({
-                agent: filterKey,
-                filter: { mode: "result", includeToolSummary: filter?.includeToolSummary === true },
-              })
-            }
+      {props.row.bound && filterKey !== undefined ? (
+        <DetailSection
+          testId="filter"
+          title={WEBUI_CHANNEL_SECTION_FILTER}
+          description={WEBUI_CHANNEL_SECTION_FILTER_DESCRIPTION}
+        >
+          <WebuiInline gap="small">
+            <WebuiButton variant="outline" size="inline-dense" data-webui-channel-filter-mode="result"
+              aria-pressed={filter?.mode !== "full"}
+              onClick={() =>
+                props.onUpdateFilter({
+                  agent: filterKey,
+                  filter: { mode: "result", includeToolSummary: filter?.includeToolSummary === true },
+                })
+              }
 
-          >
-            {WEBUI_CHANNEL_FILTER_MODE_RESULT}
-          </WebuiButton>
-          <WebuiButton variant="outline" size="inline-dense" data-webui-channel-filter-mode="full"
-            aria-pressed={filter?.mode === "full"}
-            onClick={() =>
-              props.onUpdateFilter({
-                agent: filterKey,
-                filter: { mode: "full", includeToolSummary: filter?.includeToolSummary === true },
-              })
-            }
+            >
+              {WEBUI_CHANNEL_FILTER_MODE_RESULT}
+            </WebuiButton>
+            <WebuiButton variant="outline" size="inline-dense" data-webui-channel-filter-mode="full"
+              aria-pressed={filter?.mode === "full"}
+              onClick={() =>
+                props.onUpdateFilter({
+                  agent: filterKey,
+                  filter: { mode: "full", includeToolSummary: filter?.includeToolSummary === true },
+                })
+              }
 
-          >
-            {WEBUI_CHANNEL_FILTER_MODE_FULL}
-          </WebuiButton>
-        </WebuiInline>
-        <span className="text-xs text-text_default_secondary">
-          {filter === undefined ? "" : webuiChannelFilterModeLabel(filter.mode)}
-        </span>
-      </DetailSection>
+            >
+              {WEBUI_CHANNEL_FILTER_MODE_FULL}
+            </WebuiButton>
+          </WebuiInline>
+          <span className="text-xs text-text_default_secondary">
+            {filter === undefined ? "" : webuiChannelFilterModeLabel(filter.mode)}
+          </span>
+        </DetailSection>
+      ) : null}
 
       <DetailSection
         testId="delete"
@@ -543,15 +527,14 @@ function ChannelDetail(props: {
 }
 
 export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): ReactElement {
-  const rows = webuiChannelRows(props.snapshot.clients, props.snapshot.selectedName);
+  const rows = webuiChannelRows(props.snapshot.connections, props.snapshot.selectedId);
   const selected = rows.find((row) => row.selected);
-  // "No IM client is bound" is only true of a *successful* empty read: a failed one is not empty,
-  // and saying so would invite the reader to bind a client they may already have.
-  const showEmpty =
-    rows.length === 0 && props.snapshot.status === "ready" && props.snapshot.addPlatform === undefined;
-  const addPlatform = props.snapshot.addPlatform;
-  const pendingRow =
-    addPlatform === undefined ? undefined : webuiChannelPendingRow(addPlatform, addPlatform === "wechat" ? "ClawBot" : "新 Bot");
+  const selectedConnection = props.snapshot.connections.find(
+    (entry) => entry.connectionId === props.snapshot.selectedId,
+  );
+  // "No IM bot exists" is only true of a *successful* empty read: a failed one is not empty, and
+  // saying so would invite the reader to create a bot they may already have.
+  const showEmpty = rows.length === 0 && props.snapshot.status === "ready";
   return (
     <WebuiInline
       align="stretch"
@@ -569,10 +552,10 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
               <WebuiButton
                 variant="selectable-row"
                 size="regular"
-                key={row.name}
+                key={row.connectionId}
                 aria-pressed={row.selected}
-                data-webui-channel-row={row.name}
-                onClick={() => props.onSelect(row.name)}
+                data-webui-channel-row={row.connectionId}
+                onClick={() => props.onSelect(row.connectionId)}
                 className="flex h-[62px] w-full items-center gap-2 rounded-lg py-2.5 pl-2 pr-3 text-left"
               >
                 <span
@@ -627,7 +610,7 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
                 data-webui-channel-add={option.key}
                 onClick={() => {
                   props.onMenuOpenChange(false);
-                  props.onStartAdding(option.key);
+                  props.onAdd(option.key);
                 }}
               >
                 {option.label}
@@ -659,56 +642,20 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
           className="h-full min-h-0 w-[680px] min-w-0 overflow-y-auto overscroll-contain"
           data-webui-component="channel-connection-detail"
         >
-          {pendingRow === undefined ? (
-            selected === undefined ? (
-              showEmpty ? (
-                <p className="py-3 text-sm text-text_default_secondary">{WEBUI_CHANNEL_EMPTY_TEXT}</p>
-              ) : null
-            ) : (
-              <ChannelDetail
-                row={selected}
-                snapshot={props.snapshot}
-                onUnbind={props.onUnbind}
-                onUpdateFilter={props.onUpdateFilter}
-                onOpenDelete={props.onOpenDelete}
-              />
-            )
-          ) : addPlatform === "feishu" ? (
-            <ChannelPendingCard
-              row={pendingRow}
-              authorization={props.snapshot.authorization}
-              onRenew={props.onRenewAuthorization}
-              onCancel={props.onCancelAdding}
-            >
-              {props.binding ? (
-                <ChannelBindForm onSubmit={props.onBind} onCancel={props.onCloseBinding} />
-              ) : (
-                <section
-                  className="flex h-[176px] w-full items-center gap-4 py-2"
-                  data-webui-channel-section="authorization"
-                >
-                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5" data-testid="authorization-copy">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center text-icon_default_primary">
-                      {platformIcon(pendingRow.platform)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm leading-5 text-text_default_secondary">
-                        输入飞书 App ID 与 App Secret 以完成绑定
-                      </p>
-                      <p className="text-sm leading-5 text-text_default_secondary">
-                        {WEBUI_CHANNEL_SECTION_BIND_QR_HINT}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              )}
-            </ChannelPendingCard>
+          {selected === undefined ? (
+            showEmpty ? (
+              <p className="py-3 text-sm text-text_default_secondary">{WEBUI_CHANNEL_EMPTY_TEXT}</p>
+            ) : null
           ) : (
-            <ChannelPendingCard
-              row={pendingRow}
-              authorization={props.snapshot.authorization}
-              onRenew={props.onRenewAuthorization}
-              onCancel={props.onCancelAdding}
+            <ChannelCard
+              row={selected}
+              projectLabel={webuiChannelProjectLabel(selectedConnection?.projectKey ?? null)}
+              snapshot={props.snapshot}
+              onRefreshAuthorization={props.onRefreshAuthorization}
+              onUnbind={props.onUnbind}
+              onBind={props.onBind}
+              onUpdateFilter={props.onUpdateFilter}
+              onOpenDelete={props.onOpenDelete}
             />
           )}
         </section>
@@ -717,7 +664,7 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
   );
 }
 
-/** How often the create flow reads the authorization it started. */
+/** How often the pane reads the authorization one bot's card is showing. */
 const AUTHORIZATION_POLL_MS = 2_000;
 
 export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactElement {
@@ -727,7 +674,6 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
     props.owner.getSnapshot,
   );
   const [menuOpen, setMenuOpen] = useState(false);
-  const [binding, setBinding] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { dom } = useWebuiBrowserCapabilities();
   const portalTarget = dom.portalTarget();
@@ -737,14 +683,15 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
     return props.owner.startRefreshing();
   }, [props.owner]);
 
-  // The Desktop shows the first bot's detail as soon as the list has one, so the card is never
-  // an empty column beside a populated list.
+  // Desktop shows the first bot's card as soon as the list has one, so the detail column is never
+  // empty beside a populated list. "First" is the first *row*: the list is grouped by platform, and
+  // the row at the top is the one Desktop opens on.
   useEffect(() => {
-    if (snapshot.selectedName !== undefined) return;
-    const first = snapshot.clients[0];
+    if (snapshot.selectedId !== undefined) return;
+    const first = webuiChannelRows(snapshot.connections)[0];
     if (!first) return;
-    void props.owner.select(first.name);
-  }, [props.owner, snapshot.clients, snapshot.selectedName]);
+    void props.owner.select(first.connectionId);
+  }, [props.owner, snapshot.connections, snapshot.selectedId]);
 
   // The authorization is the one thing on this page that moves without the host saying anything,
   // so the clock ticks only while one is on screen.
@@ -759,45 +706,26 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
     };
   }, [props.owner, authorizationPending]);
 
-  const selected = snapshot.clients.find((client) => client.name === snapshot.selectedName);
+  const selected = snapshot.connections.find(
+    (entry) => entry.connectionId === snapshot.selectedId,
+  );
 
   return (
     <>
       <ChannelConnectPanelView
         snapshot={snapshot}
-        onSelect={(name) => void props.owner.select(name)}
-        onBind={(request) => {
-          void props.owner.connect(request).then((result) => {
-            if (result.ok) {
-              setBinding(false);
-              props.owner.cancelAdding();
-            }
-          });
-        }}
-        onUnbind={(name) => {
-          void props.owner.disconnect({ name, clearCredentials: true });
-        }}
+        onSelect={(connectionId) => void props.owner.select(connectionId)}
+        onAdd={(platform) => void props.owner.addBot(platform)}
+        onRefreshAuthorization={(connectionId) => void props.owner.refreshAuthorization(connectionId)}
+        onUnbind={(connectionId) => void props.owner.disconnect(connectionId)}
+        onDelete={(connectionId) => void props.owner.deleteBot(connectionId)}
+        onBind={(request) => void props.owner.connect(request)}
         onUpdateFilter={(request) => void props.owner.updateMessageFilter(request)}
         menuOpen={menuOpen}
         onMenuOpenChange={setMenuOpen}
-        binding={binding}
-        onOpenBinding={() => setBinding(true)}
-        onCloseBinding={() => setBinding(false)}
         deleting={deleting}
         onOpenDelete={() => setDeleting(true)}
         onCloseDelete={() => setDeleting(false)}
-        onStartAdding={(platform) => {
-          void props.owner.startAdding(platform).then((result) => {
-            if (result.ok && platform === "feishu") setBinding(true);
-          });
-        }}
-        onCancelAdding={() => {
-          setBinding(false);
-          props.owner.cancelAdding();
-        }}
-        onRenewAuthorization={() => {
-          void props.owner.renewAuthorization();
-        }}
       />
       {deleting && selected && portalTarget ? (
         <WebuiDialog
@@ -826,7 +754,7 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
                 data-webui-channel-delete-confirm="true"
                 onClick={() => {
                   setDeleting(false);
-                  void props.owner.disconnect({ name: selected.name, clearCredentials: true });
+                  void props.owner.deleteBot(selected.connectionId);
                 }}
               >
                 {WEBUI_CHANNEL_SECTION_DELETE_ACTION}

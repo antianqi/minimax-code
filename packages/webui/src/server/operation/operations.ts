@@ -21,10 +21,12 @@ export { pluginManagementOperation } from "./plugin-management.js";
 export {
   checkChannelConfigOperation,
   connectChannelOperation,
-  disconnectChannelOperation,
+  deleteChannelConnectionOperation,
+  disconnectChannelConnectionOperation,
   getChannelMessageFilterOperation,
   getChannelWechatBindStatusOperation,
-  listChannelStatusOperation,
+  listChannelConnectionsOperation,
+  prepareChannelConnectionOperation,
   startChannelWechatBindOperation,
   updateChannelMessageFilterOperation,
 } from "./channel.js";
@@ -387,9 +389,11 @@ export function createOperationRegistry(
   registerOperation(registry, entry("resizeSshTerminal"));
   registerOperation(registry, entry("closeSshTerminal"));
   registerOperation(registry, entry("watchSshTerminal"));
-  registerOperation(registry, entry("listChannelStatus"));
+  registerOperation(registry, entry("listChannelConnections"));
+  registerOperation(registry, entry("prepareChannelConnection"));
   registerOperation(registry, entry("connectChannel"));
-  registerOperation(registry, entry("disconnectChannel"));
+  registerOperation(registry, entry("disconnectChannelConnection"));
+  registerOperation(registry, entry("deleteChannelConnection"));
   registerOperation(registry, entry("checkChannelConfig"));
   registerOperation(registry, entry("getChannelMessageFilter"));
   registerOperation(registry, entry("updateChannelMessageFilter"));

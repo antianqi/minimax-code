@@ -126,6 +126,22 @@
     "ui/feedback.tsx": {
       "disposition": "exception",
       "boundary": "the pending-action overlay is feedback about one command, not a surface the reader opened: it has no dismissal of its own, so it does not register with the coordinator. It portals into the platform's portal target, covers the viewport while the action settles, and leaves with the action's result. It is inert to Escape and outside presses by construction, and a second action cannot start because the control that started it is disabled while it shows."
+    },
+    "features/ssh/ui/SshPanel.public.tsx": {
+      "disposition": "managed",
+      "note": "the SSH panel hosts the add, details and removal dialogs; each registers with the coordinator through the shared dialog and attaches no listener of its own"
+    },
+    "features/ssh/ui/ssh-add-connection-dialog.tsx": {
+      "disposition": "managed",
+      "note": "the add-connection dialog registers with the coordinator as a managed layer and attaches no listener of its own"
+    },
+    "features/ssh/ui/ssh-connection-details-dialog.tsx": {
+      "disposition": "managed",
+      "note": "the connection-details dialog registers with the coordinator as a managed layer and attaches no listener of its own"
+    },
+    "features/ssh/ui/ssh-connection-row.tsx": {
+      "disposition": "managed",
+      "note": "the row's menu is the shared dropdown, which registers with the coordinator and owns its own dismissal"
     }
   }
 }

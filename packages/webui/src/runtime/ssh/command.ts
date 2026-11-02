@@ -10,7 +10,14 @@
 //     remote shell through `quoteRemoteShellArg`, which is the POSIX single-quote rule.
 //   * **No user-owned option reaches OpenSSH.** Every `-o` below is fixed here; the person's
 //     hostname, port, user and identity file are arguments OpenSSH understands, never options.
-import { isSafeSshHostname, isSafeSshPort, isSafeSshUser, isSafeAbsoluteLocalPath } from "./validators.js";
+import os from "node:os";
+
+import {
+  isSafeSshHostname,
+  isSafeSshPort,
+  isSafeSshUser,
+  normalizeSshIdentityFile,
+} from "./validators.js";
 import type { SshEndpointRecord } from "./types.js";
 
 /** Quote one argument for the remote POSIX shell used by OpenSSH. */
@@ -86,10 +93,28 @@ export function buildSshArgs(
   if (endpoint.kind === "ssh_config") {
     const alias = endpoint.alias;
     if (!alias) throw new Error("invalid_ssh_endpoint");
-    if (endpoint.host) args.push("-o", `HostName=${endpoint.host}`);
-    if (endpoint.port !== undefined) args.push("-p", String(endpoint.port));
-    if (endpoint.identityFile) {
-      args.push("-i", endpoint.identityFile, "-o", "IdentitiesOnly=yes");
+    if (endpoint.host !== undefined) {
+      if (!isSafeSshHostname(endpoint.host)) throw new Error("invalid_ssh_endpoint");
+      args.push("-o", `HostName=${endpoint.host}`);
+    }
+    if (endpoint.port !== undefined) {
+      if (!isSafeSshPort(endpoint.port)) throw new Error("invalid_ssh_endpoint");
+      args.push("-p", String(endpoint.port));
+    }
+    // A user the config file does not name is an override, the same way a host or a port is.
+    if (endpoint.username !== undefined) {
+      if (!isSafeSshUser(endpoint.username)) throw new Error("invalid_ssh_endpoint");
+      args.push("-l", endpoint.username);
+    }
+    const identityFile =
+      endpoint.identityFile === undefined
+        ? undefined
+        : normalizeSshIdentityFile(endpoint.identityFile, os.homedir());
+    if (endpoint.identityFile !== undefined && identityFile === undefined) {
+      throw new Error("invalid_ssh_endpoint");
+    }
+    if (identityFile) {
+      args.push("-i", identityFile, "-o", "IdentitiesOnly=yes");
     }
     args.push(alias);
     return args;
@@ -103,12 +128,16 @@ export function buildSshArgs(
   if (endpoint.port !== undefined && !isSafeSshPort(endpoint.port)) {
     throw new Error("invalid_ssh_endpoint");
   }
-  if (endpoint.identityFile !== undefined && !isSafeAbsoluteLocalPath(endpoint.identityFile)) {
+  const identityFile =
+    endpoint.identityFile === undefined
+      ? undefined
+      : normalizeSshIdentityFile(endpoint.identityFile, os.homedir());
+  if (endpoint.identityFile !== undefined && identityFile === undefined) {
     throw new Error("invalid_ssh_endpoint");
   }
   if (endpoint.port !== undefined) args.push("-p", String(endpoint.port));
-  if (endpoint.identityFile) {
-    args.push("-i", endpoint.identityFile, "-o", "IdentitiesOnly=yes");
+  if (identityFile) {
+    args.push("-i", identityFile, "-o", "IdentitiesOnly=yes");
   }
   args.push(endpoint.username ? `${endpoint.username}@${host}` : host);
   return args;
@@ -143,11 +172,16 @@ export const SSH_DIRECTORY_MARKER = "__WEBUI_SSH_DIRECTORY_V1__";
  */
 export function buildRemoteDirectoryListCommand(path: string): string {
   const quotedPath = quoteRemoteShellArg(path);
+  // The lines are joined with a newline, not with a semicolon: a shell block needs its own
+  // line (`do`, `then`, `fi`), and `do;` is a syntax error the remote side refuses to run.
   return [
     `printf '${SSH_DIRECTORY_MARKER}\\0'`,
     `if canonical="$(CDPATH= cd ${quotedPath} 2>/dev/null && pwd -P)"`,
     `then printf 'status=ready\\0path=%s\\0' "$canonical"`,
-    `for entry in "$canonical"/* "$canonical"/.[!.]* "$canonical"/..?*`,
+    // The glob is built from the path without its trailing slash: the root is "/", and
+    // "/*" would list the entries as "//name" — a path that is not the one it names.
+    `root="\${canonical%/}"`,
+    `for entry in "$root"/* "$root"/.[!.]* "$root"/..?*`,
     `do`,
     `[ -e "$entry" ] || [ -L "$entry" ] || continue`,
     `if [ -L "$entry" ]; then kind=symlink`,
@@ -159,7 +193,7 @@ export function buildRemoteDirectoryListCommand(path: string): string {
     `done`,
     `else printf 'status=not_found\\0'`,
     `fi`,
-  ].join("; ");
+  ].join("\n");
 }
 
 /**

@@ -29,6 +29,7 @@ import {
   buildAgentChannelConfigForAgents,
 } from './agent-channel-config.js';
 import { routeLocalChannelBindApi } from './channel-bind-routes.js';
+import { routeLocalChannelConnectionsApi } from './channel-connections-routes.js';
 import { routeChannelBindingTarget } from './channel-binding-target-route.js';
 import { LocalChannelLaneQueue } from './channel-lane-queue.js';
 import {
@@ -1987,6 +1988,20 @@ export async function routeLocalChannelBridgeInfraApi(input: {
       })),
     });
   }
+  // Channel Connections: the bot list the 接入 IM pane draws, and the three mutations the pane's
+  // card performs on one bot. Desktop's own pane is driven by these routes rather than by the
+  // per-platform status routes, which report a bot that is still waiting for its QR scan as bound.
+  const connectionsResponse = await routeLocalChannelConnectionsApi({
+    request: input.request,
+    method: input.method,
+    parts: input.parts,
+    url: input.url,
+    infra: input.infra,
+    ...(input.feishu ? { feishu: input.feishu } : {}),
+    ...(input.telegram ? { telegram: input.telegram } : {}),
+    ...(input.wechat ? { wechat: input.wechat } : {}),
+  });
+  if (connectionsResponse) return connectionsResponse;
   // Access Control CRUD lives under /channel-bridge/access-control.
   // Delegate to the dedicated routes module so the channel subsystem
   // does not bloat this 1k+ line dispatcher.

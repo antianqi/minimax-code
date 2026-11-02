@@ -219,7 +219,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
 
 
   return <SettingsPage testId="settings-usage-model">
-    <WebuiInline gap="medium" justify="between" className="min-h-8 flex-wrap">
+    <WebuiInline gap="medium" justify="between" className="webui-usage-model-toolbar min-h-8 flex-wrap">
       <WebuiInline gap="medium" className="h-8">
       <WebuiDropdown
         open={sourceMenuOpen}
@@ -278,13 +278,13 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
       <WebuiButton variant="segmented" size="compact" aria-pressed={sourceTab === "custom"} className="h-8 rounded-[8px] px-3 text-[14px] font-medium leading-5" onClick={() => setSourceTab("custom")}>自定义模型</WebuiButton>
       </WebuiInline>
       {sourceTab === "custom" ? <WebuiInline gap="small" className="ml-auto">
-        <WebuiButton variant="outline-highlight" size="compact" disabled={!models?.canManageProviders || !addProviderAction} onClick={() => addProviderAction?.()}>添加模型</WebuiButton>
+        <WebuiButton variant="secondary" size="compact" disabled={!models?.canManageProviders || !addProviderAction} onClick={() => addProviderAction?.()}>添加模型</WebuiButton>
         {oauth?.state === "connected" ? <>
           <span className="self-center text-[13px] text-text_default_secondary">Codex OAuth 已连接</span>
-          <WebuiButton variant="outline-highlight" size="compact" disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</WebuiButton>
+          <WebuiButton variant="secondary" size="compact" disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</WebuiButton>
         </> : <>
-          <WebuiButton variant="outline-highlight" size="compact" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</WebuiButton>
-          {oauthLoginId ? <WebuiButton variant="outline-highlight" size="compact" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</WebuiButton> : null}
+          <WebuiButton variant="secondary" size="compact" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</WebuiButton>
+          {oauthLoginId ? <WebuiButton variant="secondary" size="compact" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</WebuiButton> : null}
         </>}
       </WebuiInline> : null}
     </WebuiInline>

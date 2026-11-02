@@ -3,7 +3,7 @@
 // The folder is picked on the remote machine, one directory at a time: the runtime lists one
 // remote directory and the browser walks up and down through them. Nothing is mounted and nothing
 // is copied — the project is a path on the far side.
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 
 import type { WebuiSshConnection, WebuiSshProjectRequest } from "../../../../shared/contracts/ssh.js";
 import type { WebuiSshDirectoryListing } from "../application/ssh-owner.js";
@@ -13,6 +13,8 @@ import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 
 export interface SshProjectFormProps {
   readonly hosts: readonly WebuiSshConnection[];
+  /** The host the person asked a project for. */
+  readonly alias?: string;
   readonly onSubmit: (request: WebuiSshProjectRequest) => void;
   readonly onCancel: () => void;
   /** Lists one remote directory. */
@@ -29,11 +31,19 @@ function parentPath(path: string): string {
 }
 
 export function SshProjectForm(props: SshProjectFormProps): ReactElement {
-  const [alias, setAlias] = useState(props.hosts[0]?.alias ?? "");
+  // The host the person asked for comes first: the form opens on the row they pressed, and a
+  // project that lands on another host is a project on the wrong machine.
+  const [alias, setAlias] = useState(props.alias ?? props.hosts[0]?.alias ?? "");
   const [path, setPath] = useState("/");
   const [displayName, setDisplayName] = useState("");
   const [listing, setListing] = useState<WebuiSshDirectoryListing | undefined>(undefined);
   const [browsing, setBrowsing] = useState(false);
+  const requestedAlias = props.alias;
+
+  // The host can change while the form is open — another row's 新建远程项目 was pressed.
+  useEffect(() => {
+    if (requestedAlias) setAlias(requestedAlias);
+  }, [requestedAlias]);
 
   const browse = async (target: string): Promise<void> => {
     if (!alias) return;

@@ -80,8 +80,9 @@ export function effortLabel(value: string): string {
  * this is empty for a binary model — there the level is a switch, and it is
  * named by the panel that owns the switch.
  *
- * Empty for an absent record and for a record the model does not offer: a level
- * the target cannot honour is not a level to print.
+ * A depth scale with no valid recorded level names its engine-controlled
+ * position as "default", matching the model panel. Binary controls have no
+ * level word to carry, and models without a depth scale have nothing to name.
  */
 export function chipLevelLabel(
   options: readonly string[],
@@ -89,7 +90,7 @@ export function chipLevelLabel(
 ): string {
   if (thinkingControlShape(options) !== "radiogroup") return "";
   const value = (recorded ?? "").trim();
-  if (value === "" || !options.includes(value)) return "";
+  if (value === "" || !options.includes(value)) return effortLabel("default");
   return effortLabel(value);
 }
 

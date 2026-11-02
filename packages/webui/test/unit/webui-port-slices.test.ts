@@ -105,8 +105,10 @@ const EXPECTED: Record<
   ],
   shell: ["watchEvents"],
   channel: [
-    "listChannelStatus", "connectChannel", "disconnectChannel",
+    "listChannelConnections", "prepareChannelConnection", "connectChannel",
+    "disconnectChannelConnection", "deleteChannelConnection",
     "checkChannelConfig", "getChannelMessageFilter", "updateChannelMessageFilter",
+    "startChannelWechatBind", "getChannelWechatBindStatus",
   ],
   remoteControl: [
     "getRemoteControlStatus", "watchRemoteControlStatus", "connectRemoteControl",

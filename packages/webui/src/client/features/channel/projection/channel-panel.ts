@@ -3,17 +3,23 @@
 // Pure functions, so the wording of every row is testable without a DOM. The panel renders what
 // this module returns and decides nothing itself.
 //
-// Two honesty rules live here:
+// Three honesty rules live here:
 //
-//   * **A platform is named, never guessed.** The runtime reports the platform of every client it
+//   * **A platform is named, never guessed.** The runtime reports the platform of every bot it
 //     knows; a platform this module does not know is printed as it came, because a wrong "微信"
 //     would send the reader to the wrong app.
-//   * **A section with no route behind it says so.** The Desktop's 接入 IM pane has four sections
-//     and the runtime's routes cover two of them. The other two carry the Desktop's own copy and
-//     are marked as not wired, rather than shown as if they worked.
+//   * **Bound is a state, not an assumption.** Desktop draws two card shapes from the bot's own
+//     state: a bound bot carries the association's bound copy and 解除连接, and a bot whose
+//     authorization has not finished carries the unbound copy and the QR. A row is `bound` only
+//     when the runtime says so, because a bot that is waiting for its QR scan is not bound.
+//   * **A section with no route behind it says so.** The Desktop's 接入 IM pane has sections the
+//     runtime's routes do not cover — the Agent and working-directory binding writes — and they
+//     carry the Desktop's own copy and are marked as not wired, rather than shown as if they
+//     worked.
 import type {
-  WebuiChannelClient,
   WebuiChannelConfigCheckResult,
+  WebuiChannelConnection,
+  WebuiChannelConnectionState,
   WebuiChannelMessageFilterMode,
 } from "../../../../shared/contracts/channel.js";
 
@@ -116,8 +122,8 @@ export const WEBUI_CHANNEL_NOT_CONFIGURED_LABEL = "未配置";
 export const WEBUI_CHANNEL_CONFIG_UNKNOWN_LABEL = "未读取";
 
 export interface WebuiChannelRow {
-  /** The IM client's own name — the identity the runtime stores the binding under. */
-  readonly name: string;
+  /** The bot's durable identity. */
+  readonly connectionId: string;
   readonly platform: string;
   readonly platformLabel: string;
   readonly agentLabel: string;
@@ -135,10 +141,12 @@ export interface WebuiChannelRow {
   /**
    * The name the list and the detail header show.
    *
-   * The Desktop names a WeChat bot `ClawBot` and falls back to the binding's own label, and
-   * to `新 Bot` when it has none. The runtime's client name is this client's binding label.
+   * Desktop names a WeChat bot `ClawBot`, a bound bot by its binding's label (then its transport
+   * identity), and a bot with neither `新 Bot`.
    */
   readonly botName: string;
+  /** The runtime's own failure code for the bot's last authorization, when it has one. */
+  readonly errorCode?: string;
 }
 
 /** The platform's label, or the platform as it came when this module does not know it. */
@@ -146,57 +154,81 @@ export function webuiChannelPlatformLabel(platform: string): string {
   return WEBUI_CHANNEL_PLATFORM_LABELS[platform] ?? platform;
 }
 
-/** One row per bound IM client, in the runtime's own order. */
+/**
+ * The order Desktop's platform catalogue lists bots in.
+ *
+ * Desktop groups the list by platform rather than by creation time, so the first row — the one the
+ * card opens on — is the most familiar platform. The runtime's own order stays inside a platform.
+ */
+export const WEBUI_CHANNEL_PLATFORM_ORDER: readonly string[] = ["wechat", "feishu", "telegram"];
+
+function platformRank(platform: string): number {
+  const index = WEBUI_CHANNEL_PLATFORM_ORDER.indexOf(platform);
+  return index === -1 ? WEBUI_CHANNEL_PLATFORM_ORDER.length : index;
+}
+
+/** One row per bot, grouped by platform in Desktop's catalogue order. */
 export function webuiChannelRows(
-  clients: readonly WebuiChannelClient[],
-  selectedName?: string,
+  connections: readonly WebuiChannelConnection[],
+  selectedId?: string,
 ): WebuiChannelRow[] {
-  return clients.map((client) => ({
-    name: client.name,
-    platform: client.platform,
-    platformLabel: webuiChannelPlatformLabel(client.platform),
-    agentLabel: client.agentName ?? WEBUI_CHANNEL_DEFAULT_AGENT_LABEL,
-    selected: client.name === selectedName,
-    botName: webuiChannelBotName(client.platform, client.name),
-    bound: true,
-    stateLabel: WEBUI_CHANNEL_STATE_BOUND,
+  const ordered = connections
+    .map((connection, index) => ({ connection, index }))
+    .sort(
+      (left, right) =>
+        platformRank(left.connection.channel) - platformRank(right.connection.channel) ||
+        left.index - right.index,
+    )
+    .map((entry) => entry.connection);
+  return ordered.map((connection) => ({
+    connectionId: connection.connectionId,
+    platform: connection.channel,
+    platformLabel: webuiChannelPlatformLabel(connection.channel),
+    agentLabel: connection.agentName || WEBUI_CHANNEL_DEFAULT_AGENT_LABEL,
+    selected: connection.connectionId === selectedId,
+    botName: webuiChannelBotName(connection),
+    bound: connection.state === "bound",
+    stateLabel: webuiChannelStateLabel(connection.state),
+    ...(connection.errorCode === undefined ? {} : { errorCode: connection.errorCode }),
   }));
 }
 
-/**
- * The bot the create flow is adding, as a row.
- *
- * Desktop adds a bot by preparing it: the new bot is not bound yet, so its card carries the
- * unbound copy, the QR and the 未绑定 state. The row is built here so the card has one shape for
- * both cases.
- */
-export function webuiChannelPendingRow(
-  platform: "wechat" | "feishu",
-  name: string,
-): WebuiChannelRow {
-  const option = WEBUI_CHANNEL_ADD_OPTIONS.find((entry) => entry.key === platform);
-  return {
-    name,
-    platform,
-    platformLabel: option?.label ?? platform,
-    agentLabel: WEBUI_CHANNEL_DEFAULT_AGENT_LABEL,
-    selected: true,
-    botName: webuiChannelBotName(platform, name),
-    bound: false,
-    stateLabel: WEBUI_CHANNEL_STATE_UNBOUND,
-  };
+/** The state the card's header shows. Desktop has one word for every unbound shape. */
+export function webuiChannelStateLabel(state: WebuiChannelConnectionState): string {
+  return state === "bound" ? WEBUI_CHANNEL_STATE_BOUND : WEBUI_CHANNEL_STATE_UNBOUND;
 }
 
 /**
  * The bot's name, as the Desktop names it.
  *
- * A WeChat bot is always `ClawBot` on the Desktop; every other bot carries its binding's
- * label, and a bot with no label at all is `新 Bot`.
+ * A WeChat bot is always `ClawBot`; every other bot carries its binding's label, then the
+ * transport identity the platform knows it by, and a bot with neither is `新 Bot`.
  */
-export function webuiChannelBotName(platform: string, name: string): string {
-  if (platform === "wechat") return WEBUI_CHANNEL_WECHAT_BOT_NAME;
-  const trimmed = name.trim();
-  return trimmed === "" ? WEBUI_CHANNEL_NEW_BOT_NAME : trimmed;
+export function webuiChannelBotName(connection: WebuiChannelConnection): string {
+  if (connection.channel === "wechat") return WEBUI_CHANNEL_WECHAT_BOT_NAME;
+  const label = connection.binding?.label?.trim();
+  if (label) return label;
+  const externalId = connection.binding?.externalId.trim();
+  if (externalId) return externalId;
+  return WEBUI_CHANNEL_NEW_BOT_NAME;
+}
+
+/**
+ * The working-directory slot's value.
+ *
+ * The runtime stores the project a bot's conversations belong to, or null for "the user chose no
+ * project". Only the key travels over the wire, so that is what is shown — a display name would
+ * have to be invented here.
+ */
+export function webuiChannelProjectLabel(projectKey: string | null): string {
+  return projectKey === null || projectKey.trim() === ""
+    ? WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY
+    : projectKey;
+}
+
+/** The key the message filter is stored under: the bot's transport identity, once it is bound. */
+export function webuiChannelFilterKey(connection: WebuiChannelConnection): string | undefined {
+  return connection.binding?.externalId;
 }
 
 /**

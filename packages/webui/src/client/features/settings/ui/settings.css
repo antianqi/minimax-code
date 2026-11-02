@@ -28,6 +28,7 @@
   .webui-settings-icon { width: 18px; height: 18px; flex: 0 0 18px; }
   .webui-settings-content { min-width: 0; flex: 1; overflow: auto; }
   .webui-settings-content-header { display: flex; align-items: flex-start; justify-content: space-between; }
+  .webui-usage-model-toolbar { position: sticky; top: 0; z-index: 2; background: var(--bg_grouped_secondary); padding-block: 4px; margin-block: -4px; }
 
   .webui-settings-content h2 { margin: 0; font-size: var(--size_16); font-weight: var(--weight_medium); line-height: 26px; }
 
@@ -323,6 +324,7 @@
    * through above the title. */
   .webui-settings-content { padding: 0; background: var(--bg_grouped_secondary); }
   .webui-settings-content-header { position: sticky; top: 0; z-index: 2; margin: 0 0 var(--spacing_48); padding: var(--spacing_8) var(--spacing_20); background: var(--bg_grouped_secondary); }
+  .webui-settings-content:has(.webui-usage-model-toolbar) > .webui-settings-content-header { position: static; }
   .webui-settings-sidebar, .webui-settings-content { scrollbar-width: none; }
   .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar { display: none; }
   @media (max-height: 680px) {

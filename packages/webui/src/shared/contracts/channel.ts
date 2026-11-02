@@ -4,39 +4,56 @@
 //
 // | Declaration | Wire purpose | Producer | Consumers |
 // | --- | --- | --- | --- |
-// | `WebuiChannelClient` | One IM client the runtime has bound, as the 接入 IM tab lists it. | Runtime channel-bridge `GET /channel-bridge/status` (via `runtime/harness/channel.ts`). | `runtime/harness/channel.ts`; the 接入 IM tab. |
-// | `WebuiChannelStatus` | The whole channel-bridge status snapshot. | Runtime channel-bridge `GET /channel-bridge/status`. | `runtime/harness/channel.ts`; the 接入 IM tab. |
-// | `WebuiChannelConnectRequest` | Body for binding one IM client. | The 接入 IM tab's connect form. | `runtime/harness/channel.ts`. |
-// | `WebuiChannelDisconnectRequest` | Body for unbinding one IM client. | The 接入 IM tab's disconnect action. | `runtime/harness/channel.ts`. |
+// | `WebuiChannelConnection` | One IM bot the runtime knows, bound or waiting for its authorization, as the 接入 IM tab lists it. | Runtime channel-bridge `GET /channel-bridge/connections` (via `runtime/harness/channel.ts`). | `runtime/harness/channel.ts`; the 接入 IM tab. |
+// | `WebuiChannelConnectionList` | The whole bot list. | Runtime channel-bridge `GET /channel-bridge/connections`. | `runtime/harness/channel.ts`; the 接入 IM tab. |
+// | `WebuiChannelPrepareRequest` | The platform a create flow is adding a bot for. | The 接入 IM tab's create menu. | `runtime/harness/channel.ts`. |
+// | `WebuiChannelConnectRequest` | Body for binding one IM client. | The 接入 IM tab's Feishu credential form. | `runtime/harness/channel.ts`. |
+// | `WebuiChannelConnectionRequest` | Which bot a mutation acts on. | The 接入 IM tab's 解除连接 and 删除Bot actions. | `runtime/harness/channel.ts`. |
 // | `WebuiChannelConfigCheckRequest` | Which agent's channel configuration to check. | The 接入 IM tab's per-agent check. | `runtime/harness/channel.ts`. |
 // | `WebuiChannelConfigCheckResult` | Whether the agent's IM channel is configured. | Runtime channel-bridge `GET /channel-bridge/config-check?agent=`. | `runtime/harness/channel.ts`; the 接入 IM tab. |
 // | `WebuiChannelMessageFilter` | How much of a turn an IM client receives. | Runtime channel-bridge `GET`/`PUT /channel-bridge/message-filter/<agent>`. | `runtime/harness/channel.ts`; the 接入 IM tab. |
 // | `WebuiChannelMessageFilterRequest` | Which agent's filter to read or write. | The 接入 IM tab's filter editor. | `runtime/harness/channel.ts`. |
 //
-// The runtime's own channel types (`LocalChannelClient`, `LocalChannelMessageFilter`, …) are
+// The runtime's own channel types (`LocalImConnectionView`, `LocalChannelMessageFilter`, …) are
 // deliberately absent: `src/shared` may not import them, so the harness adapter converts. The
 // shape that survives the conversion is the one Desktop's own IM client already speaks
-// (`channels/infra.ts` → `routeLocalChannelBridgeInfraApi`).
+// (`channel-bridge-surface.ts` → `GET /channel-bridge/connections`).
 
 /** The IM platforms Desktop's channel bridge ships an adapter for. */
 export type WebuiChannelPlatform = "feishu" | "wechat" | "telegram";
 
 /**
- * One IM client known to the runtime.
+ * Where one bot stands.
  *
- * The runtime keys clients by **name**, not by (platform, name): Desktop's IM client sends
- * `{name, appId?, appSecret?}` to connect and `{name, clearCredentials, platform?}` to
- * disconnect, so the name is the identity a user types.
+ * `bound` is the only state in which the bot is bound to its platform. `configured` is a bot that
+ * exists and has not been authorized yet, `authorizing` one whose QR is on screen, and `error` one
+ * whose last authorization failed. Desktop draws the same two card shapes from this: bound, and
+ * not-yet-bound.
  */
-export interface WebuiChannelClient {
-  readonly name: string;
-  readonly platform: WebuiChannelPlatform | (string & {});
-  /** The agent this client is bound to, when the runtime reports one. */
-  readonly agentName?: string;
+export type WebuiChannelConnectionState = "configured" | "authorizing" | "bound" | "error";
+
+/** One IM bot the runtime knows — bound, or waiting for its authorization. */
+export interface WebuiChannelConnection {
+  readonly connectionId: string;
+  readonly channel: WebuiChannelPlatform | (string & {});
+  readonly agentName: string;
+  /** Null means the user explicitly chose no project. */
+  readonly projectKey: string | null;
+  readonly state: WebuiChannelConnectionState;
+  /** The platform binding, once the bot is bound. */
+  readonly binding?: {
+    readonly bindingId: string;
+    /** The transport client the platform knows this bot by; the message filter is keyed by it. */
+    readonly externalId: string;
+    /** The platform's own display name for the bot, when the adapter knows one. */
+    readonly label?: string;
+    readonly currentSessionId?: string;
+  };
+  readonly errorCode?: string;
 }
 
-export interface WebuiChannelStatus {
-  readonly clients: readonly WebuiChannelClient[];
+export interface WebuiChannelConnectionList {
+  readonly connections: readonly WebuiChannelConnection[];
 }
 
 /**
@@ -57,12 +74,20 @@ export interface WebuiChannelConnectRequest {
   readonly appId?: string;
   /** Feishu app secret; never echoed back to the browser. */
   readonly appSecret?: string;
+  /** The prepared bot this bind belongs to. */
+  readonly connectionId?: string;
 }
 
-export interface WebuiChannelDisconnectRequest {
-  readonly name: string;
-  readonly clearCredentials?: boolean;
-  readonly platform?: string;
+/** The bot a create flow is adding, and the platform it is adding it for. */
+export interface WebuiChannelPrepareRequest {
+  readonly platform: WebuiChannelPlatform | (string & {});
+  /** The agent the bot talks to, when the caller names one. */
+  readonly agent?: string;
+}
+
+/** Which bot a mutation acts on. */
+export interface WebuiChannelConnectionRequest {
+  readonly connectionId: string;
 }
 
 export interface WebuiChannelConfigCheckRequest {
@@ -98,6 +123,8 @@ export interface WebuiChannelWechatBindStartRequest {
   readonly name: string;
   /** The agent the bot is bound to, when the caller names one. */
   readonly agent?: string;
+  /** The bot this authorization belongs to, when the bot already exists. */
+  readonly connectionId?: string;
 }
 
 export interface WebuiChannelWechatBindStartResult {

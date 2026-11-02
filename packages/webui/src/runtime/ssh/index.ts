@@ -49,6 +49,8 @@ export interface CreateSshRuntimeOptions {
   readonly transport?: SshTransport;
   /** The dependencies the discovery reads `~/.ssh/config` with. */
   readonly discovery?: SshDiscoveryDependencies;
+  /** The home directory a `~` in a key path is expanded against. */
+  readonly homeDirectory?: () => string;
 }
 
 export async function createSshRuntime(options: CreateSshRuntimeOptions): Promise<SshRuntime> {
@@ -74,12 +76,19 @@ export async function createSshRuntime(options: CreateSshRuntimeOptions): Promis
     sshProjectStorePath(options.dataDir),
   );
 
+  // The hosts the config file declares. The connection service asks it whether an alias is
+  // still there, and the runtime answers the same discovery.
+  const discovery = (): Promise<SshDiscoveryRecord> =>
+    discoverSshHosts(options.discovery ?? DEFAULT_SSH_DISCOVERY_DEPENDENCIES);
+
   const connections = createSshConnectionService({
     repository: connectionRepository,
     projects: projectRepository,
     transport,
     credentials,
     ...(askpass ? { askpass } : {}),
+    ...(options.homeDirectory ? { homeDirectory: options.homeDirectory } : {}),
+    discoverHosts: discovery,
   });
   const projects = createSshProjectService({
     repository: projectRepository,
@@ -100,7 +109,7 @@ export async function createSshRuntime(options: CreateSshRuntimeOptions): Promis
     connections,
     projects,
     terminals,
-    discovery: () => discoverSshHosts(options.discovery ?? DEFAULT_SSH_DISCOVERY_DEPENDENCIES),
+    discovery,
     dispose: async () => {
       terminals.dispose();
       credentials.clear();

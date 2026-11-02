@@ -18,11 +18,10 @@
 // button — so they are the skeleton in its triggerless shape, and they name the
 // region they belong to instead.
 
-import { Fragment, type RefObject } from "react";
+import { Fragment, type ReactElement, type RefObject } from "react";
 import { IconX } from "@tabler/icons-react";
 
 import { WebuiDropdown, type WebuiDropdownPlacementArgs } from "../../../ui/Dropdown.js";
-import type { WebuiClientSession } from "../../sessions/contracts/session-view.js";
 import {
   type WebuiComposerAttachment,
   type WebuiComposerUrlReference,
@@ -31,17 +30,24 @@ import type { SlashCommandEntry } from "./slash-palette.js";
 import { FeedbackBusy } from "../../../ui/feedback.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiIconAttach, WebuiIconPlugins, WebuiIconProjectAdd } from "../../../shell/icons.js";
 
 /** One row the `@` list can offer. */
 export type WebuiComposerMentionChoice =
   | { readonly kind: "plugin"; readonly name: string; readonly label: string; readonly detail?: string; readonly section: string }
-  | { readonly kind: "file"; readonly path: string; readonly label: string; readonly section: string }
   | { readonly kind: "local-file"; readonly label: string; readonly section: string }
-  | { readonly kind: "local-folder"; readonly label: string; readonly section: string }
-  | { readonly kind: "agent"; readonly session: WebuiClientSession; readonly label: string; readonly section: string };
+  | { readonly kind: "local-folder"; readonly label: string; readonly section: string };
 
 /** One row the `/` palette can offer. */
 export type WebuiComposerCommandSuggestion = SlashCommandEntry;
+
+function MentionChoiceIcon({ choice }: { readonly choice: WebuiComposerMentionChoice }): ReactElement {
+  switch (choice.kind) {
+    case "plugin": return <WebuiIconPlugins className="webui-composer-mention-icon" />;
+    case "local-file": return <WebuiIconAttach className="webui-composer-mention-icon" />;
+    case "local-folder": return <WebuiIconProjectAdd className="webui-composer-mention-icon" />;
+  }
+}
 
 export interface WebuiComposerEditorStagingProps {
   readonly attachments: readonly WebuiComposerAttachment[];
@@ -206,11 +212,14 @@ export function WebuiComposerEditorStaging({
           dismissRegionRef={dismissRegionRef}
         >
           {mention.choices.map((choice, index) => (
-            <Fragment key={`${choice.section}:${choice.kind}:${choice.kind === "agent" ? choice.session.sessionId : choice.label}`}>
+            <Fragment key={`${choice.section}:${choice.kind}:${choice.label}`}>
               {index === 0 || mention.choices[index - 1]?.section !== choice.section ? <div className="webui-composer-mention-section">{choice.section}</div> : null}
               <WebuiButton variant="selectable-row" size="option" type="button" role="option" aria-selected={index === mention.index} className="webui-composer-mention-option" onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => mention.onIndexChange(index)} onClick={() => mention.onChoose(choice)}>
-                <span>{choice.label}</span>
-                {choice.kind === "plugin" && choice.detail ? <small>{choice.detail}</small> : null}
+                <MentionChoiceIcon choice={choice} />
+                <span className="webui-composer-mention-copy">
+                  <span>{choice.label}</span>
+                  {choice.kind === "plugin" && choice.detail ? <small>{choice.detail}</small> : null}
+                </span>
               </WebuiButton>
             </Fragment>
           ))}

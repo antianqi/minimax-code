@@ -1,12 +1,13 @@
 // The 接入 IM wire operations.
 //
-// Six operations: the bound-client list, the bind and unbind of one IM client, the per-agent
-// configuration check, and the read and write of one agent's message filter.
+// The bot list, the create and bind of one bot, the two mutations Desktop's card performs on it
+// (解除连接 / 删除Bot), the per-agent configuration check, and the read and write of one agent's
+// message filter.
 //
 // They live in one file because they are one domain and one client business.
 //
-// Each validator checks the shape a browser may send — the name a client is keyed by, the
-// credentials a bind carries, the two fields a filter carries — and never learns the runtime's
+// Each validator checks the shape a browser may send — the platform a create flow adds, the
+// credentials a bind carries, the connection a mutation acts on — and never learns the runtime's
 // model: the runtime's channel-bridge routes answer behind the harness adapter, and the wire
 // contract (`shared/contracts/channel.ts`) is what the browser is given.
 //
@@ -17,10 +18,12 @@ import { WebuiErrorCode } from "../../shared/envelope.js";
 import {
   CHECK_CHANNEL_CONFIG_OPERATION_NAME,
   CONNECT_CHANNEL_OPERATION_NAME,
-  DISCONNECT_CHANNEL_OPERATION_NAME,
+  DELETE_CHANNEL_CONNECTION_OPERATION_NAME,
+  DISCONNECT_CHANNEL_CONNECTION_OPERATION_NAME,
   GET_CHANNEL_MESSAGE_FILTER_OPERATION_NAME,
   GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME,
-  LIST_CHANNEL_STATUS_OPERATION_NAME,
+  LIST_CHANNEL_CONNECTIONS_OPERATION_NAME,
+  PREPARE_CHANNEL_CONNECTION_OPERATION_NAME,
   START_CHANNEL_WECHAT_BIND_OPERATION_NAME,
   UPDATE_CHANNEL_MESSAGE_FILTER_OPERATION_NAME,
 } from "../../shared/operation-names.js";
@@ -28,12 +31,13 @@ import type {
   WebuiChannelConfigCheckRequest,
   WebuiChannelConfigCheckResult,
   WebuiChannelConnectRequest,
-  WebuiChannelDisconnectRequest,
+  WebuiChannelConnectionList,
+  WebuiChannelConnectionRequest,
   WebuiChannelMessageFilter,
   WebuiChannelMessageFilterMode,
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
-  WebuiChannelStatus,
+  WebuiChannelPrepareRequest,
   WebuiChannelWechatBindStartRequest,
   WebuiChannelWechatBindStartResult,
   WebuiChannelWechatBindStatusRequest,
@@ -88,9 +92,70 @@ function readOptionalText(
 
 const MESSAGE_FILTER_MODES: readonly WebuiChannelMessageFilterMode[] = ["result", "full"];
 
-export const listChannelStatusOperation: WebuiOperation<undefined, WebuiChannelStatus> = {
-  name: LIST_CHANNEL_STATUS_OPERATION_NAME,
-  validate: (body) => validateNoBody(LIST_CHANNEL_STATUS_OPERATION_NAME, body),
+export const listChannelConnectionsOperation: WebuiOperation<
+  undefined,
+  WebuiChannelConnectionList
+> = {
+  name: LIST_CHANNEL_CONNECTIONS_OPERATION_NAME,
+  validate: (body) => validateNoBody(LIST_CHANNEL_CONNECTIONS_OPERATION_NAME, body),
+};
+
+/** The platform a create flow adds a bot for. */
+export const prepareChannelConnectionOperation: WebuiOperation<
+  WebuiChannelPrepareRequest,
+  WebuiChannelOperationResult
+> = {
+  name: PREPARE_CHANNEL_CONNECTION_OPERATION_NAME,
+  validate: (body) => {
+    if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) {
+      return invalid(`${PREPARE_CHANNEL_CONNECTION_OPERATION_NAME} body must be an object`);
+    }
+    const value = body as Record<string, unknown>;
+    const platform = readName(value.platform);
+    if (typeof platform !== "string") return invalid("platform must be a non-empty string");
+    const agent = readOptionalText(value.agent, "agent");
+    if (agent !== undefined && typeof agent !== "string") return invalid(agent.error);
+    return {
+      ok: true,
+      body: {
+        platform,
+        ...(agent === undefined ? {} : { agent }),
+      },
+    };
+  },
+};
+
+/** Which bot a Connection mutation acts on. */
+function readConnectionRequest(
+  operation: string,
+  body: unknown,
+): WebuiOperationValidation<WebuiChannelConnectionRequest> {
+  if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) {
+    return invalid(`${operation} body must be an object`);
+  }
+  const connectionId = readName((body as Record<string, unknown>).connectionId);
+  if (typeof connectionId !== "string") {
+    return invalid("connectionId must be a non-empty string");
+  }
+  return { ok: true, body: { connectionId } };
+}
+
+/** 解除连接: unbinds one bot's platform binding. */
+export const disconnectChannelConnectionOperation: WebuiOperation<
+  WebuiChannelConnectionRequest,
+  WebuiChannelOperationResult
+> = {
+  name: DISCONNECT_CHANNEL_CONNECTION_OPERATION_NAME,
+  validate: (body) => readConnectionRequest(DISCONNECT_CHANNEL_CONNECTION_OPERATION_NAME, body),
+};
+
+/** 删除Bot: removes one bot. */
+export const deleteChannelConnectionOperation: WebuiOperation<
+  WebuiChannelConnectionRequest,
+  WebuiChannelOperationResult
+> = {
+  name: DELETE_CHANNEL_CONNECTION_OPERATION_NAME,
+  validate: (body) => readConnectionRequest(DELETE_CHANNEL_CONNECTION_OPERATION_NAME, body),
 };
 
 export const connectChannelOperation: WebuiOperation<
@@ -112,41 +177,17 @@ export const connectChannelOperation: WebuiOperation<
     if (appId !== undefined && typeof appId !== "string") return invalid(appId.error);
     const appSecret = readOptionalText(value.appSecret, "appSecret");
     if (appSecret !== undefined && typeof appSecret !== "string") return invalid(appSecret.error);
+    const connectionId = readOptionalText(value.connectionId, "connectionId");
+    if (connectionId !== undefined && typeof connectionId !== "string") {
+      return invalid(connectionId.error);
+    }
     return {
       ok: true,
       body: {
         name,
         ...(appId === undefined ? {} : { appId }),
         ...(appSecret === undefined ? {} : { appSecret }),
-      },
-    };
-  },
-};
-
-export const disconnectChannelOperation: WebuiOperation<
-  WebuiChannelDisconnectRequest,
-  WebuiChannelOperationResult
-> = {
-  name: DISCONNECT_CHANNEL_OPERATION_NAME,
-  validate: (body) => {
-    if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) {
-      return invalid(`${DISCONNECT_CHANNEL_OPERATION_NAME} body must be an object`);
-    }
-    const value = body as Record<string, unknown>;
-    const name = readName(value.name);
-    if (typeof name !== "string") return invalid(name.error);
-    const clearCredentials = value.clearCredentials;
-    if (clearCredentials !== undefined && typeof clearCredentials !== "boolean") {
-      return invalid("clearCredentials must be a boolean");
-    }
-    const platform = readOptionalText(value.platform, "platform");
-    if (platform !== undefined && typeof platform !== "string") return invalid(platform.error);
-    return {
-      ok: true,
-      body: {
-        name,
-        ...(clearCredentials === undefined ? {} : { clearCredentials }),
-        ...(platform === undefined ? {} : { platform }),
+        ...(connectionId === undefined ? {} : { connectionId }),
       },
     };
   },
@@ -202,11 +243,16 @@ export const startChannelWechatBindOperation: WebuiOperation<
     if (typeof name !== "string") return invalid(name.error);
     const agent = readOptionalText(value.agent, "agent");
     if (agent !== undefined && typeof agent !== "string") return invalid(agent.error);
+    const connectionId = readOptionalText(value.connectionId, "connectionId");
+    if (connectionId !== undefined && typeof connectionId !== "string") {
+      return invalid(connectionId.error);
+    }
     return {
       ok: true,
       body: {
         name,
         ...(agent === undefined ? {} : { agent }),
+        ...(connectionId === undefined ? {} : { connectionId }),
       },
     };
   },

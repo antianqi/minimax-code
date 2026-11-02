@@ -135,10 +135,12 @@ function providerModels(provider?: WebuiModelProviderView): readonly WebuiModelP
  */
 function ProviderPresetPicker({ controlId, presets, selected, selectedName, onSelect }: { readonly controlId?: string; readonly presets: readonly Record<string, unknown>[]; readonly selected: string; readonly selectedName: string; readonly onSelect: (preset?: Record<string, unknown>) => void }): ReactElement {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  // `undefined` means the field is showing its selected label; an empty string
+  // is an intentional cleared search and must stay empty while the popup is open.
+  const [query, setQuery] = useState<string>();
   /** The field's visible frame — the anchor the popup hangs off. */
   const frameRef = useRef<HTMLDivElement | null>(null);
-  const visible = presets.filter((preset) => `${textOf(preset.name)} ${textOf(preset.providerId)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const visible = presets.filter((preset) => `${textOf(preset.name)} ${textOf(preset.providerId)}`.toLocaleLowerCase().includes((query ?? "").trim().toLocaleLowerCase()));
   // `其他` is the value the field carries once it is chosen, so the field has to
   // show the word and not the marker.
   const label = selected === "__other__" ? "其他" : selectedName;
@@ -146,8 +148,8 @@ function ProviderPresetPicker({ controlId, presets, selected, selectedName, onSe
           managed
           managedLayerId="provider-form-preset"
     open={open}
-    onOpen={() => { setOpen(true); setQuery(""); }}
-    onClose={() => { setOpen(false); setQuery(""); }}
+    onOpen={() => { setOpen(true); setQuery(undefined); }}
+    onClose={() => { setOpen(false); setQuery(undefined); }}
     role="listbox"
     ariaLabel="提供商列表"
     width="content"
@@ -173,7 +175,7 @@ function ProviderPresetPicker({ controlId, presets, selected, selectedName, onSe
         aria-autocomplete="list"
         autoComplete="off"
         placeholder="请选择提供商"
-        value={open ? query || label : label}
+        value={open ? query ?? label : label}
         onFocus={(event) => {
           // The field shows the selection until it is typed into, so the first
           // keystroke replaces it rather than appending to it. Opening is the
@@ -187,7 +189,7 @@ function ProviderPresetPicker({ controlId, presets, selected, selectedName, onSe
             event.preventDefault();
             if (!open) {
               setOpen(true);
-              setQuery("");
+              setQuery(undefined);
             }
           }
         }}
@@ -209,14 +211,14 @@ function ProviderPresetPicker({ controlId, presets, selected, selectedName, onSe
         const id = textOf(preset.providerId);
         const name = textOf(preset.name) || id;
         const iconUrl = textOf(preset.iconUrl);
-        return <WebuiButton key={id} variant="selectable-row" size="regular" type="button" role="option" aria-selected={selected === id} className="webui-provider-picker-option" onClick={() => { onSelect(preset); setOpen(false); setQuery(""); }}><span className="webui-provider-picker-icon">{iconUrl ? <img src={iconUrl} alt="" /> : name.slice(0, 1)}</span><span className="webui-provider-picker-option-name">{name}</span>{selected === id ? <span className="webui-provider-picker-check" aria-hidden="true"><IconCheck size={14} stroke={1.7} /></span> : null}</WebuiButton>;
+        return <WebuiButton key={id} variant="selectable-row" size="regular" type="button" role="option" aria-selected={selected === id} className="webui-provider-picker-option" onClick={() => { onSelect(preset); setOpen(false); setQuery(undefined); }}><span className="webui-provider-picker-icon">{iconUrl ? <img src={iconUrl} alt="" /> : name.slice(0, 1)}</span><span className="webui-provider-picker-option-name">{name}</span>{selected === id ? <span className="webui-provider-picker-check" aria-hidden="true"><IconCheck size={14} stroke={1.7} /></span> : null}</WebuiButton>;
       }) : (
         // 没有匹配项是一个要被听到的状态，播报通道交给共享契约。
         <FeedbackLiveRegion className="webui-provider-picker-empty">没有匹配的提供商</FeedbackLiveRegion>
       )}
     </div>
     <div className="webui-provider-picker-other">
-      <WebuiButton variant="selectable-row" size="inline" type="button" role="option" aria-selected={selected === "__other__"} className="webui-provider-picker-other-option" data-testid="settings-provider-other-option" onMouseDown={(event) => event.preventDefault()} onClick={() => { onSelect(); setOpen(false); setQuery(""); }}><span className="webui-provider-picker-other-icon" aria-hidden="true"><IconPlus size={16} stroke={1.7} /></span><span>其他</span></WebuiButton>
+      <WebuiButton variant="selectable-row" size="inline" type="button" role="option" aria-selected={selected === "__other__"} className="webui-provider-picker-other-option" data-testid="settings-provider-other-option" onMouseDown={(event) => event.preventDefault()} onClick={() => { onSelect(); setOpen(false); setQuery(undefined); }}><span className="webui-provider-picker-other-icon" aria-hidden="true"><IconPlus size={16} stroke={1.7} /></span><span>其他</span></WebuiButton>
     </div>
   </WebuiDropdown>;
 }
@@ -244,6 +246,8 @@ export function ProviderFormPanel({
   // modal that holds it, and the modal would close under the user.
   const [selectedPresetId, setSelectedPresetId] = useState<string>();
   const [apiFormatOpen, setApiFormatOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
   // The API formats the runtime accepts, plus whatever a saved provider carries
   // if this build does not know it: an edit must not silently rewrite it.
   // A field error the view can decide on its own: the endpoint is a URL, and a
@@ -278,11 +282,20 @@ export function ProviderFormPanel({
       onRegisterAddProviderAction(() => openNewProviderRef.current());
       return () => onRegisterAddProviderAction(undefined);
     }, [onRegisterAddProviderAction]);
-    // The dialog closes only on a successful delete; a refusal stays beside it,
-    // in the editor's error channel.
+    // Deletion is a list action, so it uses the list-level provider command
+    // directly instead of the editor's remove command (which requires an open draft).
     const confirmDeleteProvider = async () => {
-      await editor.remove();
-      if (!editor.getSnapshot().error) setProviderPendingDelete(undefined);
+      if (!providerPendingDelete || deleteBusy) return;
+      setDeleteBusy(true);
+      setDeleteError(undefined);
+      try {
+        await commands.deleteProvider(textOf(providerPendingDelete.providerId));
+        setProviderPendingDelete(undefined);
+      } catch (error) {
+        setDeleteError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setDeleteBusy(false);
+      }
     };
     const toggleModel = async (providerId: string, model: WebuiModelProviderModelEntry, enabled: boolean) => {
       // The intent, not the array: the owner applies it to its own pending
@@ -357,11 +370,11 @@ export function ProviderFormPanel({
         </WebuiStack>
         </form>
       </WebuiDialog>
-      <WebuiDialog id="provider-delete" open={providerPendingDelete !== undefined} title={`删除供应商“${textOf(providerPendingDelete?.name)}”吗？`} description="删除后将移除该供应商下的所有模型选项。" onClose={() => setProviderPendingDelete(undefined)} dismissOnEscape={!formBusy} portalTarget={portalTarget} width="compact" role="alertdialog" footer={<WebuiDialogActions>
-        <WebuiButton variant="secondary" disabled={formBusy} onClick={() => setProviderPendingDelete(undefined)}>取消</WebuiButton>
-        <WebuiButton variant="danger" disabled={formBusy} onClick={() => void confirmDeleteProvider()}>{formBusy ? "删除中…" : "删除"}</WebuiButton>
+      <WebuiDialog id="provider-delete" open={providerPendingDelete !== undefined} title={`删除供应商“${textOf(providerPendingDelete?.name)}”吗？`} description="删除后将移除该供应商下的所有模型选项。" onClose={() => { if (!deleteBusy) { setDeleteError(undefined); setProviderPendingDelete(undefined); } }} dismissOnEscape={!deleteBusy} portalTarget={portalTarget} width="compact" role="alertdialog" footer={<WebuiDialogActions>
+        <WebuiButton variant="secondary" disabled={deleteBusy} onClick={() => { setDeleteError(undefined); setProviderPendingDelete(undefined); }}>取消</WebuiButton>
+        <WebuiButton variant="danger" disabled={deleteBusy} onClick={() => void confirmDeleteProvider()}>{deleteBusy ? "删除中…" : "删除"}</WebuiButton>
       </WebuiDialogActions>}>
-        {formError ? <FeedbackError message={formError} /> : null}
+        {deleteError ? <FeedbackError message={deleteError} /> : null}
       </WebuiDialog>
   </>;
 }

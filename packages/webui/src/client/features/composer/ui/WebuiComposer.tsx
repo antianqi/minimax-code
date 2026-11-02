@@ -71,10 +71,6 @@ import {
   useWebuiSettingsWorkflows,
   useWebuiSettingsWorkflowsState,
 } from "../../../bindings/use-query-state.js";
-import {
-  useWebuiWorkspaceFiles,
-  useWebuiWorkspaceQueriesState,
-} from "../../../bindings/use-query-state.js";
 import { type WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
 import {
   useWebuiGoalOwner,
@@ -87,9 +83,7 @@ import { useComposerInput } from "../bindings/use-composer-input.js";
 import { useComposerAttachments } from "../bindings/use-composer-attachments.js";
 import {
   useWebuiApplicationOptional,
-  useWebuiSessionStoreSnapshot,
 } from "../../../bindings/application-context.js";
-import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.public.js";
 
 import type {
@@ -106,9 +100,6 @@ import type {
 } from "../../../../shared/contracts/interactions.js";
 import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
 import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
-import type {
-  WebuiWorkspaceFile,
-} from "../../../../shared/contracts/workspace.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import { formatUsageResetLabel } from "../../../features/account/projection/usage.public.js";
 import { WebuiGoalBanner } from "../../../features/goal/ui/GoalBanner.public.js";
@@ -171,18 +162,6 @@ const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
  *  it — an inline default would be a fresh array every render. */
 const EMPTY_WORKSPACE_DIRS: readonly string[] = [];
 
-function flattenWorkspaceFiles(files: readonly WebuiWorkspaceFile[]): readonly { readonly path: string; readonly name: string; readonly type?: string }[] {
-  const flattened: { path: string; name: string; type?: string }[] = [];
-  const visit = (items: readonly WebuiWorkspaceFile[]) => {
-    for (const item of items) {
-      flattened.push({ path: item.path, name: item.name, ...(item.type ? { type: item.type } : {}) });
-      if (item.children) visit(item.children);
-    }
-  };
-  visit(files);
-  return flattened;
-}
-
 /**
  * Directory browser behind the composer's "选择新项目".
  *
@@ -216,7 +195,6 @@ export function WebuiComposer({
   onSessionCreated,
   teamModeOff,
   workspaceDir,
-  onSelectSession,
   onOpenPluginManagement,
   seedAttachment,
 }: {
@@ -275,7 +253,6 @@ export function WebuiComposer({
    * and receives rows it already recognises.
    */
   readonly workspaceDir?: string;
-  readonly onSelectSession?: (sessionId: string) => void;
   readonly onOpenPluginManagement?: (area: "plugins" | "skills") => void;
 }): ReactElement {
 
@@ -346,18 +323,6 @@ export function WebuiComposer({
   // Published by the plugins/composer owner; a read model the composer consumes
   // rather than a prop the shell relays.
   const pluginCatalogue = application?.composerPluginCatalogue;
-  // Sessions' published read model: the one catalog the store holds, resolved to
-  // the flat page. The child sessions the mention menu lists
-  // are entries of it, so the component reads them rather than receiving a page.
-  const sessionCatalog = useWebuiSessionStoreSnapshot().catalog;
-  const sessions = useMemo(
-    () => selectWebuiCatalogFlatPage(sessionCatalog).sessions,
-    [sessionCatalog],
-  );
-  // The composer renders a file tree, so it takes the files contract — not
-  // the whole workspace, and not a git mutation it has no view for.
-  const workspaceFileCommands = useWebuiWorkspaceFiles();
-  const workspaceFileTree = useWebuiWorkspaceQueriesState().fileTree;
   const composerSnapshot = controllerSnapshot.composer;
   // The input modes are the composer's own state, kept by its owner.
   const goalMode = composerSnapshot.modes.goal;
@@ -429,7 +394,6 @@ export function WebuiComposer({
   const [pluginsError, setPluginsError] = useState<string>();
   const [skillsMenuLoading, setSkillsMenuLoading] = useState(false);
   const [skillsMenuError, setSkillsMenuError] = useState<string>();
-  const [workspaceFiles, setWorkspaceFiles] = useState<readonly { readonly path: string; readonly name: string; readonly type?: string }[]>([]);
   // The mention range is the composer's own state; the slash range is derived
   // (`commandRange` below), so only this half is state.
   const mentionRange = composerSnapshot.mentionRange;
@@ -571,31 +535,6 @@ export function WebuiComposer({
       .finally(() => { if (!cancelled) setSkillsMenuLoading(false); });
     return () => { cancelled = true; };
   }, [composerMenu, pluginCatalogue, readSlashSkills]);
-
-  useEffect(() => {
-    // The directory listing is `workspace`'s capability: the composer asks its
-    // owner and reads the answer from the owner's state rather than holding
-    // the operation itself.
-    if (!mentionRange || !workspaceDir || !workspaceFileCommands?.canListFileTree) {
-      setWorkspaceFiles([]);
-      return undefined;
-    }
-    workspaceFileCommands.loadFileTree(workspaceDir);
-    return undefined;
-  }, [mentionRange !== undefined, workspaceDir, workspaceFileCommands]);
-
-  useEffect(() => {
-    if (mentionRange === undefined) {
-      setWorkspaceFiles([]);
-      return;
-    }
-    if (workspaceFileTree.error) {
-      setInteractionError(workspaceFileTree.error);
-      return;
-    }
-    if (workspaceFileTree.workspaceDir !== workspaceDir) return;
-    setWorkspaceFiles(flattenWorkspaceFiles(workspaceFileTree.files).slice(0, 100));
-  }, [mentionRange !== undefined, workspaceDir, workspaceFileTree]);
 
   /**
    * The view's half of a steering re-read: after one lands, the composer's goal
@@ -759,13 +698,6 @@ export function WebuiComposer({
           .map((plugin) => ({ kind: "plugin" as const, name: plugin.name, label: plugin.displayName, detail: plugin.description, section: "插件" })),
         { kind: "local-file" as const, label: "添加本地文件", section: "本地资源" },
         { kind: "local-folder" as const, label: "添加本地文件夹", section: "本地资源" },
-        ...workspaceFiles
-          .filter((file) => `${file.name} ${file.path}`.toLocaleLowerCase().includes(mentionQuery))
-          .map((file) => ({ kind: "file" as const, path: file.path, label: file.path, section: "项目文件" })),
-        ...sessions
-          .filter((session) => session.parentSessionId === sessionId)
-          .filter((session) => `${session.title ?? session.agentName} ${session.agentName}`.toLocaleLowerCase().includes(mentionQuery))
-          .map((session) => ({ kind: "agent" as const, session, label: session.title ?? session.agentName, section: "子 Agent" })),
       ]
     : [];
   useEffect(() => {
@@ -834,10 +766,6 @@ export function WebuiComposer({
       replaceMention(`@${choice.name}`);
       return;
     }
-    if (choice.kind === "file") {
-      replaceMention(`@${choice.path}`);
-      return;
-    }
     if (choice.kind === "local-file") {
       replaceMention("");
       fileInputRef.current?.click();
@@ -848,12 +776,6 @@ export function WebuiComposer({
       folderInputRef.current?.click();
       return;
     }
-    if (!onSelectSession) {
-      setInteractionError("子 Agent 切换暂不可用");
-      return;
-    }
-    replaceMention("");
-    onSelectSession(choice.session.sessionId);
   };
   const changePermissionMode = async (mode: WebuiPermissionMode) => {
     if (!settingsWorkflows?.canWritePermissionMode) return;

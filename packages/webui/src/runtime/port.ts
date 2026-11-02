@@ -26,11 +26,12 @@ import type {
   WebuiChannelConfigCheckRequest,
   WebuiChannelConfigCheckResult,
   WebuiChannelConnectRequest,
-  WebuiChannelDisconnectRequest,
+  WebuiChannelConnectionList,
+  WebuiChannelConnectionRequest,
   WebuiChannelMessageFilter,
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
-  WebuiChannelStatus,
+  WebuiChannelPrepareRequest,
   WebuiChannelWechatBindStartRequest,
   WebuiChannelWechatBindStartResult,
   WebuiChannelWechatBindStatusRequest,
@@ -776,9 +777,17 @@ export interface WebuiHarnessPort {
    * `runtime/channel-bridge.ts`), so the member is unconditionally present on the port the service
    * binds to.
    */
-  listChannelStatus(): Promise<WebuiChannelStatus>;
+  listChannelConnections(): Promise<WebuiChannelConnectionList>;
+  prepareChannelConnection(
+    request: WebuiChannelPrepareRequest,
+  ): Promise<WebuiChannelOperationResult>;
   connectChannel(request: WebuiChannelConnectRequest): Promise<WebuiChannelOperationResult>;
-  disconnectChannel(request: WebuiChannelDisconnectRequest): Promise<WebuiChannelOperationResult>;
+  disconnectChannelConnection(
+    request: WebuiChannelConnectionRequest,
+  ): Promise<WebuiChannelOperationResult>;
+  deleteChannelConnection(
+    request: WebuiChannelConnectionRequest,
+  ): Promise<WebuiChannelOperationResult>;
   checkChannelConfig(
     request: WebuiChannelConfigCheckRequest,
   ): Promise<WebuiChannelConfigCheckResult>;

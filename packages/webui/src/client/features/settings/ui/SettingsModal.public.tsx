@@ -35,9 +35,7 @@ import { useWebuiSessionStoreContext } from "../../../bindings/application-conte
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { BrowserSettingsPage } from "../../browser/ui/BrowserSettingsPage.public.js";
-import { SshPanel } from "../../ssh/ui/SshPanel.public.js";
-import { RemoteControlDevices } from "../../remote-control/ui/RemoteControlDevices.public.js";
-import { useWebuiSshOwner } from "../../../bindings/ssh-owner-context.js";
+import { ConnectionSettingsPage } from "./ConnectionSettingsPage.js";
 import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, SETTINGS_GROUPS } from "../projection/settings-view.js";
 import type { SettingsTabKey } from "../projection/settings-view.js";
 import { DEFAULT_SHORTCUT_BINDINGS, parseShortcutBindings, serializeShortcutBindings, SHORTCUT_STORAGE_KEY } from "../../../projection/common/shortcuts.js";
@@ -173,7 +171,6 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   const models = modelsState.models.value ?? [];
   const account = accountState.account.value;
   const archived = archivedState.sessions;
-  const sshOwner = useWebuiSshOwner();
   const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "desktop");
   const [query, setQuery] = useState("");
   const [theme, setTheme] = useState(() => stored("webui-theme", "light", storage));
@@ -294,14 +291,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
               {active === "shortcuts" ? <ShortcutsSettings bindings={shortcuts} onChange={setShortcuts} onReset={() => setShortcuts(DEFAULT_SHORTCUT_BINDINGS)} /> : null}
               {active === "browser" ? <BrowserSettingsPage /> : null}
               {active === "usage" ? <UsageModelSettings sessionId={sessionId} /> : null}
-              {active === "connection" ? (
-                <>
-                  {/* The Desktop keeps the phone link and the SSH hosts in the same
-                    * connection tab; the 远程 page's 设置 entry opens this one. */}
-                  <RemoteControlDevices />
-                  {sshOwner ? <SshPanel owner={sshOwner} /> : null}
-                </>
-              ) : null}
+              {active === "connection" ? <ConnectionSettingsPage /> : null}
               {active === "account" ? <AccountUsageSettings /> : null}
               {active === "archived" ? (
                 <ArchivedSessionsPage

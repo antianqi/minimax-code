@@ -797,14 +797,20 @@ export interface WebuiRuntimeHostHandle {
    * into one `capability_unavailable` refusal rather than an empty client list
    * that reads as "nothing is bound".
    */
-  readonly listChannelStatus?: () => Promise<
-    import("../../shared/contracts/channel.js").WebuiChannelStatus
+  readonly listChannelConnections?: () => Promise<
+    import("../../shared/contracts/channel.js").WebuiChannelConnectionList
   >;
+  readonly prepareChannelConnection?: (
+    request: import("../../shared/contracts/channel.js").WebuiChannelPrepareRequest,
+  ) => Promise<import("../../shared/contracts/channel.js").WebuiChannelOperationResult>;
   readonly connectChannel?: (
     request: import("../../shared/contracts/channel.js").WebuiChannelConnectRequest,
   ) => Promise<import("../../shared/contracts/channel.js").WebuiChannelOperationResult>;
-  readonly disconnectChannel?: (
-    request: import("../../shared/contracts/channel.js").WebuiChannelDisconnectRequest,
+  readonly disconnectChannelConnection?: (
+    request: import("../../shared/contracts/channel.js").WebuiChannelConnectionRequest,
+  ) => Promise<import("../../shared/contracts/channel.js").WebuiChannelOperationResult>;
+  readonly deleteChannelConnection?: (
+    request: import("../../shared/contracts/channel.js").WebuiChannelConnectionRequest,
   ) => Promise<import("../../shared/contracts/channel.js").WebuiChannelOperationResult>;
   readonly checkChannelConfig?: (
     request: import("../../shared/contracts/channel.js").WebuiChannelConfigCheckRequest,

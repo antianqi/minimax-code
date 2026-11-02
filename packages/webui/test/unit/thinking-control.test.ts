@@ -64,13 +64,12 @@ describe("thinking control — the level the model chip names", () => {
     expect(chipLevelLabel([], undefined)).toBe("");
   });
 
-  it("names nothing for an absent or stale record", () => {
-    // The engine's default has no level to print, and a level the model does
-    // not offer is a cross-model leftover — printing either would put a word
-    // in the chip that nothing can honour.
-    expect(chipLevelLabel(DEPTH, "")).toBe("");
-    expect(chipLevelLabel(DEPTH, undefined)).toBe("");
-    expect(chipLevelLabel(DEPTH, "turbo")).toBe("");
+  it("echoes the default for an absent or stale depth record", () => {
+    // The model panel puts the thumb at the engine-controlled default when no
+    // valid level is recorded, so the bottom chip must name that same state.
+    expect(chipLevelLabel(DEPTH, "")).toBe("默认");
+    expect(chipLevelLabel(DEPTH, undefined)).toBe("默认");
+    expect(chipLevelLabel(DEPTH, "turbo")).toBe("默认");
   });
 });
 

@@ -22,9 +22,6 @@ import type {
   WebuiSshStatus,
 } from "../../../../shared/contracts/ssh.js";
 
-/** No host has been added and enabled yet. Desktop's `no_connections`. */
-export const WEBUI_SSH_NO_CONNECTIONS_TEXT =
-  "还没有已添加并启用的 SSH 主机。请先在「设置 > 连接 > SSH」中添加并启用一个主机。";
 /** The config file holds no host. Desktop's `no_hosts`. */
 export const WEBUI_SSH_NO_HOSTS_TEXT =
   "没有找到主机。请先在 ~/.ssh/config 中添加 SSH 主机。";
@@ -92,6 +89,57 @@ export function webuiSshStatusLabel(status: WebuiSshStatus): string {
     default:
       return "未知";
   }
+}
+
+/**
+ * The status dot's colour.
+ *
+ * The Desktop's own rule, read off a live row: a host that is switched off, idle or still
+ * connecting wears the neutral tertiary glyph, a host that answered wears the success glyph, and
+ * anything else wears the error glyph. The dot is the row's only colour signal, so a host in
+ * `probe_failed` must never look like a host that is up.
+ */
+export function webuiSshStatusDotClass(status: WebuiSshStatus, enabled: boolean): string {
+  if (!enabled || status === "disabled" || status === "idle" || status === "connecting" || status === "reconnecting") {
+    return "bg-icon_default_tertiary";
+  }
+  if (status === "connected" || status === "ready") return "bg-text_status_success";
+  return "bg-text_status_error";
+}
+
+/*
+ * The Desktop's copy for the connection page's SSH half.
+ *
+ * The wording is the Desktop's own (`ssh.connection.*` in its locale catalogue), so the two
+ * clients say the same thing about the same host. The Desktop builds a few of these from a
+ * template, so the templated ones are functions rather than constants.
+ */
+export const WEBUI_SSH_ADD = "添加";
+export const WEBUI_SSH_ADD_CONNECTION_TITLE = "添加 SSH 连接";
+export const WEBUI_SSH_EDIT_CONNECTION_TITLE = "编辑 SSH 连接";
+export const WEBUI_SSH_MANUAL_ADD = "手动添加";
+export const WEBUI_SSH_DISCOVERING = "正在读取 SSH 配置…";
+export const WEBUI_SSH_NO_CANDIDATES =
+  "没有发现可添加的主机，请先在 ~/.ssh/config 中配置具体的 Host。";
+export const WEBUI_SSH_EMPTY_TITLE = "通过 SSH 连接远程服务器";
+export const WEBUI_SSH_EMPTY_DESCRIPTION = "连接远程服务器，在远端读取文件、运行命令和执行任务";
+export const WEBUI_SSH_NEW_REMOTE_PROJECT = "新建远程项目";
+export const WEBUI_SSH_MORE = "更多";
+export const WEBUI_SSH_MENU_SETTINGS = "设置";
+export const WEBUI_SSH_MENU_LOGIN = "登录";
+export const WEBUI_SSH_MENU_DELETE = "删除";
+export const WEBUI_SSH_OPEN_TERMINAL = "打开终端";
+/** Why the login command cannot run here. */
+export const WEBUI_SSH_LOGIN_UNAVAILABLE = "这个运行时没有远端账号授权能力，登录暂不可用。";
+
+/** The switch's name: `启用或停用 {{alias}}`. */
+export function webuiSshToggleLabel(alias: string): string {
+  return `启用或停用 ${alias}`;
+}
+
+/** The name button's label: `查看 {{name}} 的连接详情`. */
+export function webuiSshViewDetailsLabel(name: string): string {
+  return `查看 ${name} 的连接详情`;
 }
 
 /** Where a host lives, in one line. */
@@ -172,6 +220,75 @@ export function webuiSshDiscoveryEmptyText(discovery: WebuiSshDiscovery | undefi
 }
 
 /**
+ * The values a host named in `~/.ssh/config` is reached with.
+ *
+ * `config` is what the config file resolves for the alias, `saved` is the override the host
+ * carries now.
+ */
+export interface WebuiSshEndpointValues {
+  readonly hostname?: string;
+  readonly user?: string;
+  readonly port?: number;
+  readonly identityFile?: string;
+}
+
+/**
+ * The override one field carries.
+ *
+ * An empty field follows the config. A field left at the value the host is reached with keeps
+ * the override it has. A field set back to the config's own value drops the override, so the host
+ * follows the config again. Anything else is an override the person asked for.
+ *
+ * This is Desktop's own rule for a host named in the config file
+ * (`ssh-runtime/connection-service.js`, `updatedEndpoint`): a value that is `null` in the
+ * update request means "no override".
+ */
+export function webuiSshOverrideValue(
+  typed: string,
+  saved: string | undefined,
+  config: string | undefined,
+): string | undefined {
+  if (typed === "") return undefined;
+  const effective = saved ?? config ?? "";
+  if (typed === effective) return saved;
+  if (config !== undefined && typed === config) return undefined;
+  return typed;
+}
+
+/** The same rule for a port, whose value is a number. */
+export function webuiSshOverridePort(
+  typed: string,
+  saved: number | undefined,
+  config: number | undefined,
+): number | undefined {
+  if (typed === "") return undefined;
+  const parsed = Number.parseInt(typed, 10);
+  if (!Number.isInteger(parsed)) return undefined;
+  const effective = saved ?? config ?? 22;
+  if (parsed === effective) return saved;
+  if (config !== undefined && parsed === config) return undefined;
+  return parsed;
+}
+
+/**
+ * The port a person typed, when it is one this runtime will use.
+ *
+ * An empty field means "no port". A field that cannot be read is refused rather than dropped:
+ * a port that is silently ignored is a connection that lands on a different port than the one
+ * the person named, and Desktop refuses the same value outright
+ * (`ssh-runtime/connection-service.js`, `parseCreateInput`).
+ */
+export function webuiSshPortInputError(typed: string): string | undefined {
+  const text = typed.trim();
+  if (text === "") return undefined;
+  const parsed = Number.parseInt(text, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    return "端口必须是 1 到 65535 之间的数字。";
+  }
+  return undefined;
+}
+
+/**
  * The one sentence a failure gets.
  *
  * The runtime answers with a code (`invalid_input`, `connection_not_found`, …); the code is mapped
@@ -181,6 +298,8 @@ export function webuiSshErrorMessage(code: string | undefined, fallback?: string
   switch (code) {
     case "invalid_input":
       return "输入不合法，请检查主机地址、端口和路径。";
+    case "host_not_configured":
+      return "这个主机不在 ~/.ssh/config 里。";
     case "connection_not_found":
       return "没有找到这个 SSH 主机。";
     case "project_not_found":

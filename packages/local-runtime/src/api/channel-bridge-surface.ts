@@ -32,6 +32,58 @@ export interface LocalChannelBridgeStatusView {
   readonly clients: readonly LocalChannelBridgeClientView[];
 }
 
+/**
+ * One Channel Connection, as the 接入 IM pane draws it.
+ *
+ * A bot is a Connection whether or not it is bound: `state` is what decides the card shape, so a
+ * bot waiting for its QR scan is `configured`/`authorizing` rather than absent from the list.
+ */
+export interface LocalChannelBridgeConnectionView {
+  readonly connectionId: string;
+  readonly channel: string;
+  readonly agentName: string;
+  /** Null means the user explicitly chose no project. */
+  readonly projectKey: string | null;
+  readonly state: "configured" | "authorizing" | "bound" | "error";
+  /** The platform binding, once the bot is bound. */
+  readonly binding?: {
+    readonly bindingId: string;
+    readonly channel: string;
+    readonly externalId: string;
+    /** The platform's display name for the bot, when the adapter knows one. */
+    readonly label?: string;
+    readonly currentSessionId?: string;
+    readonly createdAt: number;
+    readonly updatedAt: number;
+  };
+  readonly errorCode?: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+export interface LocalChannelBridgeConnectionList {
+  readonly connections: readonly LocalChannelBridgeConnectionView[];
+}
+
+/** The bot a create flow is adding, and the platform it is adding it for. */
+export interface LocalChannelBridgePrepareRequest {
+  readonly platform: string;
+  /** The agent the bot talks to, when the caller names one. */
+  readonly agent?: string;
+}
+
+export interface LocalChannelBridgePrepareView {
+  readonly ok: boolean;
+  readonly connection?: LocalChannelBridgeConnectionView;
+  readonly error?: string;
+  readonly code?: string;
+}
+
+/** Which bot a Connection mutation acts on. */
+export interface LocalChannelBridgeConnectionRequest {
+  readonly connectionId: string;
+}
+
 /** The outcome of one bind or unbind, as the route reported it. */
 export interface LocalChannelBridgeMutationView {
   readonly ok: boolean;
@@ -53,6 +105,8 @@ export interface LocalChannelBridgeConnectRequest {
   readonly name: string;
   readonly appId?: string;
   readonly appSecret?: string;
+  /** The prepared Connection this bind belongs to, when the client created one first. */
+  readonly connectionId?: string;
 }
 
 export interface LocalChannelBridgeDisconnectRequest {
@@ -73,6 +127,8 @@ export interface LocalChannelBridgeMessageFilterRequest extends LocalChannelBrid
 export interface LocalChannelBridgeWechatBindStartRequest {
   readonly name: string;
   readonly agent?: string;
+  /** The Connection this authorization belongs to, when the bot already exists. */
+  readonly connectionId?: string;
 }
 
 export interface LocalChannelBridgeWechatBindStartView {
@@ -102,6 +158,25 @@ export interface LocalChannelBridgeWechatBindStatusView {
 export interface LocalChannelBridgeSurface {
   /** The bound IM clients, in the runtime's own order. */
   listStatus(): Promise<LocalChannelBridgeStatusView>;
+  /**
+   * The Channel Connections: one row per bot, whether or not it is bound.
+   *
+   * This is what the 接入 IM pane lists. `listStatus` answers the narrower question — which
+   * transport clients are bound — and a bot still waiting for its QR scan is not one of them.
+   */
+  listConnections(): Promise<LocalChannelBridgeConnectionList>;
+  /** Creates the bot a create flow is adding, before its platform authorization. */
+  prepareConnection(
+    request: LocalChannelBridgePrepareRequest,
+  ): Promise<LocalChannelBridgePrepareView>;
+  /** 解除连接: unbinds the bot's platform binding and keeps the bot in the list. */
+  disconnectConnection(
+    request: LocalChannelBridgeConnectionRequest,
+  ): Promise<LocalChannelBridgeMutationView>;
+  /** 删除Bot: removes the bot, after tearing down whatever it held on its platform. */
+  deleteConnection(
+    request: LocalChannelBridgeConnectionRequest,
+  ): Promise<LocalChannelBridgeMutationView>;
   connect(request: LocalChannelBridgeConnectRequest): Promise<LocalChannelBridgeMutationView>;
   disconnect(request: LocalChannelBridgeDisconnectRequest): Promise<LocalChannelBridgeMutationView>;
   checkConfig(request: LocalChannelBridgeAgentRequest): Promise<LocalChannelBridgeConfigView>;
@@ -243,6 +318,64 @@ function messageFilterView(body: Record<string, unknown>): LocalChannelBridgeMes
   };
 }
 
+const CONNECTION_STATES: readonly LocalChannelBridgeConnectionView["state"][] = [
+  "configured",
+  "authorizing",
+  "bound",
+  "error",
+];
+
+/**
+ * One Connection as the route serialized it.
+ *
+ * A row without a readable identity or state is dropped rather than guessed: a bot drawn under a
+ * made-up name is worse than a list that is short by one, and the list's own count is not a fact
+ * the pane needs.
+ */
+function connectionView(value: unknown): LocalChannelBridgeConnectionView | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const connectionId = readString(record.connectionId);
+  const channel = readString(record.channel);
+  const agentName = readString(record.agentName);
+  const state = readString(record.state);
+  if (connectionId === undefined || channel === undefined || agentName === undefined) return undefined;
+  if (state === undefined || !CONNECTION_STATES.includes(state as LocalChannelBridgeConnectionView["state"])) {
+    return undefined;
+  }
+  const projectKey = record.projectKey;
+  const binding = record.binding;
+  const bindingRecord = binding && typeof binding === "object" ? (binding as Record<string, unknown>) : undefined;
+  const bindingId = bindingRecord ? readString(bindingRecord.bindingId) : undefined;
+  const externalId = bindingRecord ? readString(bindingRecord.externalId) : undefined;
+  const label = bindingRecord ? readString(bindingRecord.label) : undefined;
+  const currentSessionId = bindingRecord ? readString(bindingRecord.currentSessionId) : undefined;
+  const errorCode = readString(record.errorCode);
+  return {
+    connectionId,
+    channel,
+    agentName,
+    projectKey: typeof projectKey === "string" ? projectKey : null,
+    state: state as LocalChannelBridgeConnectionView["state"],
+    ...(bindingId !== undefined && externalId !== undefined
+      ? {
+          binding: {
+            bindingId,
+            channel: readString(bindingRecord!.channel) ?? channel,
+            externalId,
+            ...(label === undefined ? {} : { label }),
+            ...(currentSessionId === undefined ? {} : { currentSessionId }),
+            createdAt: typeof bindingRecord!.createdAt === "number" ? bindingRecord!.createdAt : 0,
+            updatedAt: typeof bindingRecord!.updatedAt === "number" ? bindingRecord!.updatedAt : 0,
+          },
+        }
+      : {}),
+    ...(errorCode === undefined ? {} : { errorCode }),
+    createdAt: typeof record.createdAt === "number" ? record.createdAt : 0,
+    updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : 0,
+  };
+}
+
 export function createLocalChannelBridgeSurface(
   deps: LocalChannelBridgeDependencies,
 ): LocalChannelBridgeSurface {
@@ -266,6 +399,81 @@ export function createLocalChannelBridgeSurface(
       };
     },
 
+    listConnections: async () => {
+      requireEnabled(deps);
+      const { body } = await forwardRoute(deps, "GET", "connections");
+      const list = Array.isArray(body.connections) ? body.connections : [];
+      return {
+        connections: list.flatMap((entry) => {
+          const view = connectionView(entry);
+          return view === undefined ? [] : [view];
+        }),
+      };
+    },
+
+    prepareConnection: async (request) => {
+      requireEnabled(deps);
+      const { body } = await forwardRoute(deps, "POST", "connections/prepare", {
+        body: {
+          channel: request.platform,
+          ...(request.agent === undefined ? {} : { agentName: request.agent }),
+        },
+      });
+      const view = connectionView(body.connection);
+      const error = readString(body.error);
+      const code = readString(body.code);
+      return {
+        ok: view !== undefined,
+        ...(view === undefined ? {} : { connection: view }),
+        ...(error === undefined ? {} : { error }),
+        ...(code === undefined ? {} : { code }),
+      };
+    },
+
+    disconnectConnection: async (request) => {
+      requireEnabled(deps);
+      const { body } = await forwardRoute(
+        deps,
+        "DELETE",
+        `connections/${encodeURIComponent(request.connectionId)}/binding`,
+      );
+      // 解除连接 answers with the bot's new state, not with an `ok` flag: the bot still exists, so
+      // the binding that was deleted is what the verdict turns on.
+      const error = readString(body.error);
+      const code = readString(body.code);
+      const deletedNothing = body.deleted === false;
+      return {
+        ok: body.deleted === true,
+        ...(error === undefined
+          ? deletedNothing
+            ? { error: "No IM bot binding was stored under that id." }
+            : {}
+          : { error }),
+        ...(code === undefined ? {} : { code }),
+      };
+    },
+
+    deleteConnection: async (request) => {
+      requireEnabled(deps);
+      const { body } = await forwardRoute(
+        deps,
+        "DELETE",
+        `connections/${encodeURIComponent(request.connectionId)}`,
+      );
+      const error = readString(body.error);
+      const code = readString(body.code);
+      const deletedNothing = body.deleted === false;
+      return {
+        ok: body.deleted === true,
+        ...(error === undefined
+          ? deletedNothing
+            ? { error: "No IM bot was stored under that id." }
+            : {}
+          : { error }),
+        ...(code === undefined ? {} : { code }),
+      };
+    },
+
     connect: async (request) => {
       requireEnabled(deps);
       const { body } = await forwardRoute(deps, "POST", "connect", {
@@ -273,6 +481,7 @@ export function createLocalChannelBridgeSurface(
           name: request.name,
           ...(request.appId === undefined ? {} : { appId: request.appId }),
           ...(request.appSecret === undefined ? {} : { appSecret: request.appSecret }),
+          ...(request.connectionId === undefined ? {} : { connectionId: request.connectionId }),
         },
       });
       return mutationFailure(body);
@@ -325,6 +534,7 @@ export function createLocalChannelBridgeSurface(
         body: {
           name: request.name,
           ...(request.agent === undefined ? {} : { agentName: request.agent }),
+          ...(request.connectionId === undefined ? {} : { connectionId: request.connectionId }),
         },
       });
       const sessionId = readString(body.sessionId);

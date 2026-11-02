@@ -355,7 +355,22 @@
   }
 
   .webui-composer-mention-option {
-    align-items: flex-start;
+    align-items: center;
+    flex-direction: row;
+    gap: var(--spacing_8);
+  }
+
+  .webui-composer-mention-icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    color: var(--icon_default_secondary);
+  }
+
+  .webui-composer-mention-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
     flex-direction: column;
     gap: var(--spacing_2);
   }

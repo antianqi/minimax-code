@@ -195,7 +195,10 @@ export const webuiOperationResultCodecs: WebuiOperationResultCodecs = {
   },
   createUserModelProvider: providerOutcome("createUserModelProvider"),
   updateUserModelProvider: providerOutcome("updateUserModelProvider"),
-  deleteUserModelProvider: providerOutcome("deleteUserModelProvider"),
+  // The host contract returns void for deletion; retain support for runtimes
+  // that provide an explicit outcome object as well.
+  deleteUserModelProvider: (body) =>
+    body === undefined ? undefined : providerOutcome("deleteUserModelProvider")(body),
   testUserModelProvider: providerOutcome("testUserModelProvider"),
   testUserModel: providerOutcome("testUserModel"),
   discoverUserModelsCandidate: providerOutcome("discoverUserModelsCandidate"),

@@ -96,15 +96,21 @@ class FullPort implements WebuiHarnessPort {
     return { items: [], hasMore: false };
   }
 
-  // The 接入 IM surface. The port requires the six members, so a fake that claims the whole
-  // port has to answer them; none of these suites registers an IM channel operation.
-  async listChannelStatus() {
-    return { clients: [] };
+  // The 接入 IM surface. The port requires these members, so a fake that claims the whole port
+  // has to answer them; none of these suites registers an IM channel operation.
+  async listChannelConnections() {
+    return { connections: [] };
+  }
+  async prepareChannelConnection(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
   }
   async connectChannel(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   }
-  async disconnectChannel(): Promise<never> {
+  async disconnectChannelConnection(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  }
+  async deleteChannelConnection(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   }
   async checkChannelConfig(): Promise<never> {
@@ -114,6 +120,12 @@ class FullPort implements WebuiHarnessPort {
     throw new Error("this port has no IM channel bridge");
   }
   async updateChannelMessageFilter(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  }
+  async startChannelWechatBind(): Promise<never> {
+    throw new Error("this port has no IM channel bridge");
+  }
+  async getChannelWechatBindStatus(): Promise<never> {
     throw new Error("this port has no IM channel bridge");
   }
 

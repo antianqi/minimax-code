@@ -5,9 +5,15 @@
 //
 // The password field is a one-shot: it is handed to the host for the first handshake and is not
 // kept in the browser.
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 
 import type { WebuiSshSaveConnectionRequest } from "../../../../shared/contracts/ssh.js";
+import {
+  webuiSshOverridePort,
+  webuiSshOverrideValue,
+  webuiSshPortInputError,
+  type WebuiSshEndpointValues,
+} from "../projection/ssh-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiField, WebuiRadio, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
@@ -15,13 +21,33 @@ import { WebuiInline } from "../../../ui/layout-primitives.js";
 export interface SshHostFormProps {
   readonly onSubmit: (request: WebuiSshSaveConnectionRequest) => void;
   readonly onCancel: () => void;
-  /** The host the person picked in the discovered list, if any. */
+  /**
+   * The host being edited, when the form edits one.
+   *
+   * A saved host's alias is its name: Desktop's editor shows the alias as text and does not
+   * offer to change it, and a changed alias here would save a second host and leave the first
+   * one behind. The values here are the ones the host is reached with, so the form opens on
+   * them.
+   */
   readonly initial?: {
     readonly alias: string;
     readonly hostname?: string;
     readonly user?: string;
     readonly port?: number;
     readonly identityFile?: string;
+  };
+  /**
+   * The values `~/.ssh/config` resolves for this alias, and the overrides the saved host
+   * carries.
+   *
+   * A field the person leaves alone keeps the override it has; a field they set back to the
+   * config's own value drops the override and follows the config again. This is Desktop's rule
+   * for a host named in `~/.ssh/config` (`ssh-runtime/connection-service.js`,
+   * `updatedEndpoint`).
+   */
+  readonly override?: {
+    readonly config?: WebuiSshEndpointValues;
+    readonly saved?: WebuiSshEndpointValues;
   };
   readonly error?: string;
   readonly busy?: boolean;
@@ -37,28 +63,74 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
   const [username, setUsername] = useState(initial?.user ?? "");
   const [identityFile, setIdentityFile] = useState(initial?.identityFile ?? "");
   const [password, setPassword] = useState("");
+  /** What the form itself refuses, next to what the runtime answered. */
+  const [formError, setFormError] = useState<string | undefined>(undefined);
+
+  // The editor opens before the config file has been read, so the values it shows arrive
+  // afterwards. The fields follow them.
+  const initialSignature = JSON.stringify(props.initial ?? null);
+  const editing = props.initial !== undefined;
+  useEffect(() => {
+    const value = (JSON.parse(initialSignature) ?? {}) as {
+      readonly alias?: string;
+      readonly hostname?: string;
+      readonly user?: string;
+      readonly port?: number;
+      readonly identityFile?: string;
+    };
+    setAlias(value.alias ?? "");
+    setHost(value.hostname ?? "");
+    setPort(value.port === undefined ? "" : String(value.port));
+    setUsername(value.user ?? "");
+    setIdentityFile(value.identityFile ?? "");
+  }, [initialSignature]);
 
   const submit = (): void => {
-    const portNumber = port.trim() === "" ? undefined : Number.parseInt(port.trim(), 10);
+    setFormError(undefined);
+    const portProblem = webuiSshPortInputError(port);
+    if (portProblem) {
+      // A port that cannot be read is refused here: the runtime would drop it, and the
+      // connection would land on a different port than the one that was named.
+      setFormError(portProblem);
+      return;
+    }
+    const aliasValue = alias.trim();
+    const hostValue = host.trim();
+    const userValue = username.trim();
+    const identityValue = identityFile.trim();
+    const portText = port.trim();
+    const portNumber = portText === "" ? undefined : Number.parseInt(portText, 10);
+    // A host named in `~/.ssh/config` follows the config file unless a value is overridden on
+    // purpose; a host typed in by hand carries everything it needs.
+    const config = kind === "ssh_config" ? props.override?.config : undefined;
+    const saved = kind === "ssh_config" ? props.override?.saved : undefined;
+    const hostOverride = webuiSshOverrideValue(hostValue, saved?.hostname, config?.hostname);
+    const userOverride = webuiSshOverrideValue(userValue, saved?.user, config?.user);
+    const identityOverride = webuiSshOverrideValue(
+      identityValue,
+      saved?.identityFile,
+      config?.identityFile,
+    );
+    const portOverride = webuiSshOverridePort(portText, saved?.port, config?.port);
     const request: WebuiSshSaveConnectionRequest = {
-      alias: alias.trim(),
+      alias: aliasValue,
       ...(displayName.trim() === "" ? {} : { displayName: displayName.trim() }),
       endpoint:
         kind === "ssh_config"
           ? {
               kind: "ssh_config",
-              alias: alias.trim(),
-              ...(host.trim() === "" ? {} : { host: host.trim() }),
-              ...(portNumber === undefined || Number.isNaN(portNumber) ? {} : { port: portNumber }),
-              ...(username.trim() === "" ? {} : { username: username.trim() }),
-              ...(identityFile.trim() === "" ? {} : { identityFile: identityFile.trim() }),
+              alias: aliasValue,
+              ...(hostOverride === undefined ? {} : { host: hostOverride }),
+              ...(portOverride === undefined ? {} : { port: portOverride }),
+              ...(userOverride === undefined ? {} : { username: userOverride }),
+              ...(identityOverride === undefined ? {} : { identityFile: identityOverride }),
             }
           : {
               kind: "manual",
-              host: host.trim(),
+              host: hostValue,
               ...(portNumber === undefined || Number.isNaN(portNumber) ? {} : { port: portNumber }),
-              ...(username.trim() === "" ? {} : { username: username.trim() }),
-              ...(identityFile.trim() === "" ? {} : { identityFile: identityFile.trim() }),
+              ...(userValue === "" ? {} : { username: userValue }),
+              ...(identityValue === "" ? {} : { identityFile: identityValue }),
             },
       ...(password === "" ? {} : { password }),
     };
@@ -107,6 +179,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               data-webui-ssh-field="alias"
               placeholder="例如：production"
               value={alias}
+              readOnly={editing}
               onChange={(event) => setAlias(event.target.value)}
               className="mt-0.5"
             />
@@ -205,9 +278,9 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
           )}
         />
       </div>
-      {props.error
+      {formError ?? props.error
         ? <p data-webui-ssh-form-error="true" className="mt-2 text-xs text-text_default_secondary">
-          {props.error}
+          {formError ?? props.error}
         </p>
         : null}
       <WebuiInline gap="small" className="mt-2">

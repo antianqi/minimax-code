@@ -5,6 +5,8 @@
 // instead of quoted. Nothing here builds a shell string — the remote side is quoted by
 // `quoteRemoteShellArg` in `command.ts` — but a value that is not a host name has no business
 // becoming an argument either.
+import path from "node:path";
+
 import { SshRuntimeError } from "./errors.js";
 
 /** OpenSSH's askpass reads at most 1024 bytes, including the terminating newline. */
@@ -45,6 +47,36 @@ export function isSafeAbsoluteLocalPath(value: string): boolean {
   if (value.length === 0 || value.length > 4096) return false;
   if (hasControlCharacter(value)) return false;
   return /^(?:\/[\s\S]+|[A-Za-z]:[\\/][\s\S]+)$/u.test(value);
+}
+
+/**
+ * A path to a private key, as an absolute path on this machine.
+ *
+ * OpenSSH expands a leading `~` itself, so `~/.ssh/id_ed25519` names a real key — the form
+ * offers it as an example, and `ssh -G` reports it in that shape. A stored record has to keep
+ * naming the same file on every later run, and `~` only means something while the home
+ * directory is known, so the expansion happens here, at the gate a save request passes through,
+ * and the stored path is the expanded one.
+ *
+ * This is Desktop's own rule (`ssh-runtime/connection-service.js`, `parseIdentityFile`): a
+ * leading `~` is expanded, everything else has to be an absolute path already.
+ *
+ * `undefined` means the value is not a path this runtime will use.
+ */
+export function normalizeSshIdentityFile(
+  value: string,
+  homeDirectory: string,
+): string | undefined {
+  const input = value.trim();
+  if (input === "") return undefined;
+  const expanded =
+    input === "~"
+      ? homeDirectory
+      : input.startsWith("~/") || input.startsWith("~\\")
+        ? path.resolve(homeDirectory, input.slice(2))
+        : input;
+  if (!path.isAbsolute(expanded)) return undefined;
+  return isSafeAbsoluteLocalPath(expanded) ? expanded : undefined;
 }
 
 /**

@@ -10,6 +10,8 @@
 //     `connected` that nobody verified.
 //   * **A password is staged, never stored.** It arrives with the save request, it is kept in
 //     memory for the handshake, and it never reaches the browser again.
+import os from "node:os";
+
 import { buildRemoteProbeCommand, buildSshArgs, SSH_PROBE_MARKER } from "./command.js";
 import type { SshAskpassService } from "./askpass.js";
 import type { SshCredentialStore } from "./credentials.js";
@@ -18,15 +20,16 @@ import type { SshProjectRepository } from "./project-repository.js";
 import type { SshTransport } from "./transport.js";
 import type {
   SshConnectionRecord,
+  SshDiscoveryRecord,
   SshEndpointRecord,
   SshProbeRecord,
 } from "./types.js";
 import {
-  isSafeAbsoluteLocalPath,
   isSafeSshAlias,
   isSafeSshHostname,
   isSafeSshPort,
   isSafeSshUser,
+  normalizeSshIdentityFile,
 } from "./validators.js";
 
 export interface SshSaveConnectionInput {
@@ -65,6 +68,10 @@ export interface SshConnectionServiceOptions {
   readonly transport: SshTransport;
   readonly credentials: SshCredentialStore;
   readonly askpass?: SshAskpassService;
+  /** The home directory a `~` in a key path is expanded against. */
+  readonly homeDirectory?: () => string;
+  /** The hosts `~/.ssh/config` declares, for the alias check. */
+  readonly discoverHosts?: () => Promise<SshDiscoveryRecord>;
 }
 
 const PROBE_TIMEOUT_MS = 20_000;
@@ -74,6 +81,29 @@ export function createSshConnectionService(
 ): SshConnectionService {
   /** The probes in flight, so two handshakes for one host do not overlap. */
   const probing = new Set<string>();
+  const homeDirectory = options.homeDirectory ?? os.homedir;
+
+  /**
+   * Whether `~/.ssh/config` still declares this alias.
+   *
+   * A host named in the config file cannot be reached by any other route, so an alias the
+   * config does not declare is refused rather than left to fail as an unknown host name.
+   * Desktop checks the same thing before it connects (`ssh-runtime/connection-service.js`,
+   * `validateConnection`).
+   *
+   * `unknown` means the config could not be read, or was never there: the runtime says
+   * nothing about the alias then, and the handshake is left to answer.
+   */
+  const configAliasState = async (alias: string): Promise<"present" | "absent" | "unknown"> => {
+    if (!options.discoverHosts) return "unknown";
+    try {
+      const discovery = await options.discoverHosts();
+      if (!discovery.configFound || discovery.error !== undefined) return "unknown";
+      return discovery.hosts.some((host) => host.alias === alias) ? "present" : "absent";
+    } catch {
+      return "unknown";
+    }
+  };
 
   const probe = async (connection: SshConnectionRecord): Promise<SshProbeRecord> => {
     const password = options.credentials.get(connection.alias);
@@ -98,9 +128,24 @@ export function createSshConnectionService(
     if (!connection.enabled) {
       return { alias, status: "disabled", detail: "这个主机已停用。" };
     }
+    if (connection.endpoint.kind === "ssh_config" && (await configAliasState(alias)) === "absent") {
+      return { alias, status: "probe_failed", detail: "这个主机不在 ~/.ssh/config 里。" };
+    }
     probing.add(alias);
     try {
-      return await probe(connection);
+      const probed = await probe(connection);
+      // The verdict is written back to the record: a probe the host list cannot see is a
+      // probe that never happened.
+      const lastError = probed.status === "connected" ? undefined : probed.detail;
+      await options.repository.save({
+        alias: connection.alias,
+        displayName: connection.displayName,
+        endpoint: connection.endpoint,
+        enabled: connection.enabled,
+        status: probed.status,
+        ...(lastError === undefined ? {} : { lastError }),
+      });
+      return probed;
     } finally {
       probing.delete(alias);
     }
@@ -114,8 +159,11 @@ export function createSshConnectionService(
       if (!isSafeSshAlias(alias)) {
         return { success: false, error: "invalid_input" };
       }
-      const endpoint = readEndpoint(input.endpoint);
+      const endpoint = readEndpoint(input.endpoint, homeDirectory());
       if (!endpoint) return { success: false, error: "invalid_input" };
+      if (endpoint.kind === "ssh_config" && (await configAliasState(alias)) === "absent") {
+        return { success: false, error: "host_not_configured" };
+      }
       if (input.password !== undefined) {
         try {
           options.credentials.stage(alias, input.password);
@@ -127,7 +175,7 @@ export function createSshConnectionService(
       const existing = await options.repository.get(alias);
       const enabled = input.enabled ?? existing?.enabled ?? true;
       const displayName = input.displayName?.trim() || existing?.displayName || alias;
-      const saved = await options.repository.save({
+      await options.repository.save({
         alias,
         displayName,
         endpoint,
@@ -138,20 +186,13 @@ export function createSshConnectionService(
       const probed = await runProbe(alias);
       // The stored record carries the probe's verdict, so the host list and the probe answer
       // agree: a host that could not be reached is listed as `probe_failed`, not as saved-and-fine.
-      const lastError = probed.status === "connected" ? undefined : probed.detail;
-      const connection: SshConnectionRecord = {
-        ...saved,
-        status: probed.status,
-        ...(lastError === undefined ? {} : { lastError }),
+      const connection = (await options.repository.get(alias)) ?? {
+        alias,
+        displayName,
+        endpoint,
+        enabled,
+        status: enabled ? "idle" : "disabled",
       };
-      await options.repository.save({
-        alias: connection.alias,
-        displayName: connection.displayName,
-        endpoint: connection.endpoint,
-        enabled: connection.enabled,
-        status: connection.status,
-        ...(connection.lastError === undefined ? {} : { lastError: connection.lastError }),
-      });
       return { success: true, connection, probe: probed };
     },
 
@@ -160,7 +201,13 @@ export function createSshConnectionService(
       const connection = await options.repository.get(alias);
       if (!connection) return { success: false, error: "connection_not_found" };
       const saved = await options.repository.setEnabled(alias, enabled, enabled ? "idle" : "disabled");
-      return { success: true, connection: saved };
+      if (!enabled) return { success: true, connection: saved };
+      // Enabling a host is a request to use it, so the runtime answers whether it can be
+      // reached. Desktop seeds the host's connection when it is switched on; here the probe is
+      // that connection, and the list shows what it answered.
+      const probed = await runProbe(alias);
+      const verified = await options.repository.get(alias);
+      return { success: true, connection: verified ?? saved, probe: probed };
     },
 
     async remove(alias) {
@@ -177,24 +224,40 @@ export function createSshConnectionService(
   };
 }
 
-/** The endpoint a save request carries, when it is one this runtime accepts. */
-function readEndpoint(value: SshEndpointRecord | undefined): SshEndpointRecord | undefined {
+/**
+ * The endpoint a save request carries, when it is one this runtime accepts.
+ *
+ * A key path is expanded here, so a request may name it the way OpenSSH itself writes it
+ * (`~/.ssh/id_ed25519`) and the record holds the absolute path afterwards.
+ *
+ * For a host named in `~/.ssh/config` the alias is enough: OpenSSH resolves the host, the
+ * user, the port and the key from the config file when it is asked for that alias. The
+ * overrides a request carries are the ones the person changed on purpose, and Desktop stores
+ * nothing else (`ssh-runtime/connection-service.js`, `createPendingConnection`).
+ */
+function readEndpoint(
+  value: SshEndpointRecord | undefined,
+  homeDirectory: string,
+): SshEndpointRecord | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   if (value.kind === "ssh_config") {
     const alias = value.alias?.trim();
     if (!alias || !isSafeSshAlias(alias)) return undefined;
     if (value.host !== undefined && !isSafeSshHostname(value.host)) return undefined;
     if (value.port !== undefined && !isSafeSshPort(value.port)) return undefined;
-    if (value.identityFile !== undefined && !isSafeAbsoluteLocalPath(value.identityFile)) {
-      return undefined;
-    }
+    if (value.username !== undefined && !isSafeSshUser(value.username)) return undefined;
+    const identityFile =
+      value.identityFile === undefined
+        ? undefined
+        : normalizeSshIdentityFile(value.identityFile, homeDirectory);
+    if (value.identityFile !== undefined && identityFile === undefined) return undefined;
     return {
       kind: "ssh_config",
       alias,
       ...(value.host === undefined ? {} : { host: value.host }),
       ...(value.port === undefined ? {} : { port: value.port }),
       ...(value.username === undefined ? {} : { username: value.username }),
-      ...(value.identityFile === undefined ? {} : { identityFile: value.identityFile }),
+      ...(identityFile === undefined ? {} : { identityFile }),
     };
   }
   if (value.kind !== "manual") return undefined;
@@ -202,15 +265,17 @@ function readEndpoint(value: SshEndpointRecord | undefined): SshEndpointRecord |
   if (!host || !isSafeSshHostname(host)) return undefined;
   if (value.username !== undefined && !isSafeSshUser(value.username)) return undefined;
   if (value.port !== undefined && !isSafeSshPort(value.port)) return undefined;
-  if (value.identityFile !== undefined && !isSafeAbsoluteLocalPath(value.identityFile)) {
-    return undefined;
-  }
+  const identityFile =
+    value.identityFile === undefined
+      ? undefined
+      : normalizeSshIdentityFile(value.identityFile, homeDirectory);
+  if (value.identityFile !== undefined && identityFile === undefined) return undefined;
   return {
     kind: "manual",
     host,
     ...(value.port === undefined ? {} : { port: value.port }),
     ...(value.username === undefined ? {} : { username: value.username }),
-    ...(value.identityFile === undefined ? {} : { identityFile: value.identityFile }),
+    ...(identityFile === undefined ? {} : { identityFile }),
   };
 }
 

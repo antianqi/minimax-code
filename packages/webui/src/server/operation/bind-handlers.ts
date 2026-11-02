@@ -113,10 +113,12 @@ import {
 import {
   checkChannelConfigOperation,
   connectChannelOperation,
-  disconnectChannelOperation,
+  deleteChannelConnectionOperation,
+  disconnectChannelConnectionOperation,
   getChannelMessageFilterOperation,
   getChannelWechatBindStatusOperation,
-  listChannelStatusOperation,
+  listChannelConnectionsOperation,
+  prepareChannelConnectionOperation,
   startChannelWechatBindOperation,
   updateChannelMessageFilterOperation,
 } from "./channel.js";
@@ -591,9 +593,14 @@ export const WEBUI_OPERATION_BINDINGS = {
   // assemble the channel service has no bridge, and the adapter refuses with one
   // `capability_unavailable` instead of answering an empty client list that reads as "nothing is
   // bound".
-  listChannelStatus: bind("channels")("listChannelStatus")("listChannelStatus")({
-    operation: listChannelStatusOperation,
+  listChannelConnections: bind("channels")("listChannelConnections")("listChannelConnections")({
+    operation: listChannelConnectionsOperation,
     args: () => [],
+    result: identity,
+  }),
+  prepareChannelConnection: bind("channels")("prepareChannelConnection")("prepareChannelConnection")({
+    operation: prepareChannelConnectionOperation,
+    args: (body) => [body],
     result: identity,
   }),
   connectChannel: bind("channels")("connectChannel")("connectChannel")({
@@ -601,8 +608,13 @@ export const WEBUI_OPERATION_BINDINGS = {
     args: (body) => [body],
     result: identity,
   }),
-  disconnectChannel: bind("channels")("disconnectChannel")("disconnectChannel")({
-    operation: disconnectChannelOperation,
+  disconnectChannelConnection: bind("channels")("disconnectChannelConnection")("disconnectChannelConnection")({
+    operation: disconnectChannelConnectionOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  deleteChannelConnection: bind("channels")("deleteChannelConnection")("deleteChannelConnection")({
+    operation: deleteChannelConnectionOperation,
     args: (body) => [body],
     result: identity,
   }),

@@ -212,9 +212,11 @@ export const LIST_CRON_TASK_RUNS_OPERATION_NAME = "listCronTaskRuns" as const;
  * authorization pair `wechat/bind/start` + `wechat/bind/status`) as named operations, so the
  * browser never learns a route path.
  */
-export const LIST_CHANNEL_STATUS_OPERATION_NAME = "listChannelStatus" as const;
+export const LIST_CHANNEL_CONNECTIONS_OPERATION_NAME = "listChannelConnections" as const;
+export const PREPARE_CHANNEL_CONNECTION_OPERATION_NAME = "prepareChannelConnection" as const;
 export const CONNECT_CHANNEL_OPERATION_NAME = "connectChannel" as const;
-export const DISCONNECT_CHANNEL_OPERATION_NAME = "disconnectChannel" as const;
+export const DISCONNECT_CHANNEL_CONNECTION_OPERATION_NAME = "disconnectChannelConnection" as const;
+export const DELETE_CHANNEL_CONNECTION_OPERATION_NAME = "deleteChannelConnection" as const;
 export const CHECK_CHANNEL_CONFIG_OPERATION_NAME = "checkChannelConfig" as const;
 export const GET_CHANNEL_MESSAGE_FILTER_OPERATION_NAME = "getChannelMessageFilter" as const;
 export const UPDATE_CHANNEL_MESSAGE_FILTER_OPERATION_NAME = "updateChannelMessageFilter" as const;
@@ -368,11 +370,12 @@ import type {
   WebuiChannelConfigCheckRequest,
   WebuiChannelConfigCheckResult,
   WebuiChannelConnectRequest,
-  WebuiChannelDisconnectRequest,
+  WebuiChannelConnectionList,
+  WebuiChannelConnectionRequest,
   WebuiChannelMessageFilter,
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
-  WebuiChannelStatus,
+  WebuiChannelPrepareRequest,
   WebuiChannelWechatBindStartRequest,
   WebuiChannelWechatBindStartResult,
   WebuiChannelWechatBindStatusRequest,
@@ -1013,11 +1016,21 @@ export interface OperationSpec {
   /**
    * The 接入 IM surface.
    *
-   * One projection of the runtime's channel-bridge routes. The response is the WebUI's own status
-   * shape, not the runtime's route body: the runtime keys clients by name and reports each one's
-   * platform, and `shared/contracts/channel.ts` is the only shape the browser may name.
+   * One projection of the runtime's channel-bridge routes. The response is the WebUI's own shape,
+   * not the runtime's route body: the runtime keeps a bot's identity in its Connection store, and
+   * `shared/contracts/channel.ts` is the only shape the browser may name.
    */
-  listChannelStatus: { request: undefined; response: WebuiChannelStatus };
+  listChannelConnections: { request: undefined; response: WebuiChannelConnectionList };
+  /**
+   * Creating the bot a create flow is adding.
+   *
+   * Desktop creates the bot first and authorizes it second, which is why a bot that has never been
+   * authorized still appears in the list.
+   */
+  prepareChannelConnection: {
+    request: WebuiChannelPrepareRequest;
+    response: WebuiChannelOperationResult;
+  };
   /**
    * Binding one IM client.
    *
@@ -1028,8 +1041,14 @@ export interface OperationSpec {
     request: WebuiChannelConnectRequest;
     response: WebuiChannelOperationResult;
   };
-  disconnectChannel: {
-    request: WebuiChannelDisconnectRequest;
+  /** 解除连接: unbinds one bot's platform binding, keeping the bot in the list. */
+  disconnectChannelConnection: {
+    request: WebuiChannelConnectionRequest;
+    response: WebuiChannelOperationResult;
+  };
+  /** 删除Bot: removes one bot, after tearing down its platform side. */
+  deleteChannelConnection: {
+    request: WebuiChannelConnectionRequest;
     response: WebuiChannelOperationResult;
   };
   /** Whether one agent's IM channel is configured on this host. */

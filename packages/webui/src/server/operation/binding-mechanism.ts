@@ -155,9 +155,11 @@ export type WebuiOperationPort = Pick<
   | "readMiniAppAgentSession"
   | "createMiniAppAgentSession"
   | "runCommand"
-  | "listChannelStatus"
+  | "listChannelConnections"
+  | "prepareChannelConnection"
   | "connectChannel"
-  | "disconnectChannel"
+  | "disconnectChannelConnection"
+  | "deleteChannelConnection"
   | "checkChannelConfig"
   | "getChannelMessageFilter"
   | "updateChannelMessageFilter"
@@ -281,9 +283,11 @@ export interface RuntimeGroups {
    */
   readonly channels: Pick<
     WebuiHarnessPort,
-    | "listChannelStatus"
+    | "listChannelConnections"
+    | "prepareChannelConnection"
     | "connectChannel"
-    | "disconnectChannel"
+    | "disconnectChannelConnection"
+    | "deleteChannelConnection"
     | "checkChannelConfig"
     | "getChannelMessageFilter"
     | "updateChannelMessageFilter"

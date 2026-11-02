@@ -1,21 +1,22 @@
 // The 接入 IM business's transport seam.
 //
-// The six members are optional on purpose: a build whose transport does not carry them yet leaves
-// a member `undefined`, and the owner turns that into one stated refusal instead of a crash or an
-// empty list that reads as "no IM client is bound".
+// The members are optional on purpose: a build whose transport does not carry them yet leaves a
+// member `undefined`, and the owner turns that into one stated refusal instead of a crash or an
+// empty list that reads as "no IM bot exists".
 //
 // The request and response types are the shared wire DTOs. This file may not name the runtime's
-// channel views — `shared/contracts/channel.ts` is what the browser is allowed to know, and the
+// connection views — `shared/contracts/channel.ts` is what the browser is allowed to know, and the
 // adapter behind the harness is where the conversion happens.
 import type {
   WebuiChannelConfigCheckRequest,
   WebuiChannelConfigCheckResult,
   WebuiChannelConnectRequest,
-  WebuiChannelDisconnectRequest,
+  WebuiChannelConnectionList,
+  WebuiChannelConnectionRequest,
   WebuiChannelMessageFilter,
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
-  WebuiChannelStatus,
+  WebuiChannelPrepareRequest,
   WebuiChannelWechatBindStartRequest,
   WebuiChannelWechatBindStartResult,
   WebuiChannelWechatBindStatusRequest,
@@ -23,12 +24,22 @@ import type {
 } from "../../../../shared/contracts/channel.js";
 
 export interface ChannelPort {
-  readonly listChannelStatus?: () => Promise<WebuiChannelStatus>;
+  /** The bots this runtime knows, bound or waiting for their authorization. */
+  readonly listChannelConnections?: () => Promise<WebuiChannelConnectionList>;
+  /** Creates the bot a create flow is adding, before its platform authorization. */
+  readonly prepareChannelConnection?: (
+    request: WebuiChannelPrepareRequest,
+  ) => Promise<WebuiChannelOperationResult>;
   readonly connectChannel?: (
     request: WebuiChannelConnectRequest,
   ) => Promise<WebuiChannelOperationResult>;
-  readonly disconnectChannel?: (
-    request: WebuiChannelDisconnectRequest,
+  /** 解除连接: unbinds one bot, keeping it in the list. */
+  readonly disconnectChannelConnection?: (
+    request: WebuiChannelConnectionRequest,
+  ) => Promise<WebuiChannelOperationResult>;
+  /** 删除Bot: removes one bot. */
+  readonly deleteChannelConnection?: (
+    request: WebuiChannelConnectionRequest,
   ) => Promise<WebuiChannelOperationResult>;
   readonly checkChannelConfig?: (
     request: WebuiChannelConfigCheckRequest,
@@ -40,10 +51,10 @@ export interface ChannelPort {
     request: WebuiChannelMessageFilterRequest,
   ) => Promise<WebuiChannelMessageFilter>;
   /**
-   * Starts the WeChat authorization the create flow shows a QR for.
+   * Starts the WeChat authorization one bot's card shows a QR for.
    *
-   * The runtime's own route (`wechat/bind/start`) already answers it; this member is how the
-   * browser reaches it.
+   * The runtime's own route (`wechat/bind/start`) already answers it, and it accepts the bot's
+   * connection when the bot already exists; this member is how the browser reaches it.
    */
   readonly startChannelWechatBind?: (
     request: WebuiChannelWechatBindStartRequest,

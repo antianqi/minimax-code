@@ -16,9 +16,9 @@ import { PluginImportDialog } from "./PluginImportDialog.js";
 import { PluginItemDialog } from "./PluginItemDialog.js";
 import { projectWebuiPluginCatalogue } from "../projection/catalogue-view.js";
 import {
+  buildPluginMarketplaceSections,
   PluginMarketplace,
   PluginMarketplaceFilters,
-  marketplaceCategoryLabel,
 } from "./PluginMarketplace.js";
 import {
   PluginManagementFilters,
@@ -40,7 +40,6 @@ type PluginCatalogueSelection = {
   readonly area: Area;
   readonly view: "market" | "personal";
   readonly query: string;
-  readonly category: string;
 };
 type PluginDetailIdentity = {
   readonly kind: "mcp-server";
@@ -60,8 +59,7 @@ const sameSelection = (
 ): boolean =>
   left.area === right.area &&
   left.view === right.view &&
-  left.query === right.query &&
-  left.category === right.category;
+  left.query === right.query;
 
 export function PluginCatalogue({
   initialArea = "plugins",
@@ -78,13 +76,13 @@ export function PluginCatalogue({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
+  const pluginPageRef = useRef<HTMLElement>(null);
   const selectionRef = useRef<PluginCatalogueSelection>({
     area,
     view,
     query,
-    category,
   });
-  selectionRef.current = { area, view, query, category };
+  selectionRef.current = { area, view, query };
   const dialogAttachmentRef = useRef(0);
   const pluginPreviewRequestRef = useRef(0);
   const [showAllCatalogue, setShowAllCatalogue] = useState(true);
@@ -133,9 +131,6 @@ export function PluginCatalogue({
    * this response" and the label falls back to a bare 「查看全部技能」. */
   const marketSkillTotal = listing.skillTotal ?? null;
   const tagDefinitions = listing.tagDefinitions ?? [];
-  const selectedTag = category.startsWith("tag:")
-    ? tagDefinitions.find((tag) => `tag:${tag.key}` === category)
-    : undefined;
   const busy = listing.loading || (area !== "apps" && snapshot.mutating);
   const error = localError || snapshot.mutationError || listing.error || "";
   const reload = async (): Promise<void> => {
@@ -144,15 +139,15 @@ export function PluginCatalogue({
         workflows?.loadListing({ area: "plugins", view: "personal", query, category: "" }),
         miniAppCatalogue.refresh(),
       ]);
-    } else await workflows?.loadListing({ area, view, query, category });
+    } else await workflows?.loadListing({ area, view, query, category: "" });
   };
   useEffect(() => {
     if (area === "apps") {
       void workflows?.loadListing({ area: "plugins", view: "personal", query, category: "" });
       return;
     }
-    void workflows?.loadListing({ area, view, query, category });
-  }, [area, view, query, category, workflows]);
+    void workflows?.loadListing({ area, view, query, category: "" });
+  }, [area, view, query, workflows]);
   const catalogueView = useMemo(
     () =>
       projectWebuiPluginCatalogue({
@@ -180,7 +175,61 @@ export function PluginCatalogue({
    * says "this is the marketplace page rather than a management list" — the
    * two-column card grid, the shared 768px measure and the 「查看全部」 preview
    * are all keyed off it, which is what keeps 技能 laid out exactly like 插件. */
-  const { isMarketCatalogue, marketNoun, marketTotal } = catalogueView;
+  const { isMarketCatalogue, marketTotal } = catalogueView;
+  const marketplaceSections = useMemo(
+    () => area === "plugins" && view === "market"
+      ? buildPluginMarketplaceSections(catalogueView.rows, tagDefinitions, query)
+      : [],
+    [area, catalogueView.rows, query, tagDefinitions, view],
+  );
+  useEffect(() => {
+    if (!isMarketCatalogue || area !== "plugins" || marketplaceSections.length === 0) return;
+    const container = pluginPageRef.current;
+    if (!container) return;
+    const sections = marketplaceSections.flatMap((section) => {
+      const element = [...container.querySelectorAll<HTMLElement>("[data-plugin-category-section]")]
+        .find((candidate) => candidate.dataset.pluginCategorySection === section.value);
+      return element ? [{ value: section.value, element }] : [];
+    });
+    if (!sections.length) return;
+    setCategory((current) => sections.some((section) => section.value === current) ? current : sections[0]!.value);
+    let frame = 0;
+    const update = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const containerTop = container.getBoundingClientRect().top;
+        const toolbar = container.querySelector<HTMLElement>(".webui-plugin-page-controls");
+        const threshold = containerTop + (toolbar?.getBoundingClientRect().height ?? 0) + 8;
+        let active = sections[0]!.value;
+        for (const section of sections) {
+          if (section.element.getBoundingClientRect().top > threshold) break;
+          active = section.value;
+        }
+        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+          active = sections.at(-1)!.value;
+        }
+        setCategory(active);
+      });
+    };
+    container.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => {
+      container.removeEventListener("scroll", update);
+      cancelAnimationFrame(frame);
+    };
+  }, [area, isMarketCatalogue, marketplaceSections]);
+  const scrollToMarketplaceCategory = (value: string): void => {
+    const container = pluginPageRef.current;
+    const element = [...(container?.querySelectorAll<HTMLElement>("[data-plugin-category-section]") ?? [])]
+      .find((candidate) => candidate.dataset.pluginCategorySection === value);
+    if (!container || !element) return;
+    setCategory(value);
+    const controlsHeight = container.querySelector<HTMLElement>(".webui-plugin-page-controls")?.offsetHeight ?? 0;
+    container.scrollTo({
+      top: container.scrollTop + element.getBoundingClientRect().top - container.getBoundingClientRect().top - controlsHeight - 8,
+      behavior: "smooth",
+    });
+  };
   // When the total is unknown the affordance is still offered once the fetched
   // page itself overflows the preview, so the control is never gated on a
   // number this response could not supply.
@@ -331,6 +380,7 @@ export function PluginCatalogue({
 
   return (
     <WebuiPage
+      ref={pluginPageRef}
       as="section"
       kind="content"
       loading={listing.loading}
@@ -468,10 +518,11 @@ export function PluginCatalogue({
         </div>
       </header>
       <PluginPageLayout
-        sidebar={isMarketCatalogue && area === "plugins" ? (
+        categories={isMarketCatalogue && area === "plugins" ? (
           <PluginMarketplaceFilters
+            sections={marketplaceSections}
             category={category}
-            onCategoryChange={setCategory}
+            onCategorySelect={scrollToMarketplaceCategory}
           />
         ) : managementOpen ? (
           <PluginManagementFilters
@@ -488,11 +539,6 @@ export function PluginCatalogue({
         query={query}
         onQueryChange={setQuery}
       >
-      {isMarketCatalogue ? (
-        <h2 className="webui-plugin-market-heading">
-          {selectedTag?.displayName ?? (category ? marketplaceCategoryLabel(category) : undefined) ?? marketNoun}
-        </h2>
-      ) : null}
       {area === "plugins" && view === "personal" && !managementOpen ? (
         <h2 className="webui-plugin-market-heading">插件</h2>
       ) : null}
@@ -646,30 +692,11 @@ export function PluginCatalogue({
             marketTotal={marketTotal}
             visibleMarketTotal={visibleMarketTotal}
             loading={listing.loading}
+            sections={marketplaceSections}
             showAll={showAllCatalogue}
             onToggleAll={() => setShowAllCatalogue((value) => !value)}
             onIntent={(intent) => void mutate(intent)}
           />
-          {area === "plugins" && !category && tagDefinitions.map((tag) => {
-            const taggedRows = catalogueView.rows.filter((row) =>
-              Array.isArray(row.source.tags) && row.source.tags.some((entry: unknown) =>
-                !!entry && typeof entry === "object" && (entry as { key?: unknown }).key === tag.key));
-            return taggedRows.length ? (
-              <section key={tag.key} aria-label={tag.displayName}>
-                <h2 className="webui-plugin-market-heading">{tag.displayName}</h2>
-                <PluginMarketplace
-                  area="plugins"
-                  rows={taggedRows}
-                  marketTotal={taggedRows.length}
-                  visibleMarketTotal={taggedRows.length}
-                  showAll
-                  onToggleAll={() => {}}
-                  hideToggle
-                  onIntent={(intent) => void mutate(intent)}
-                />
-              </section>
-            ) : null;
-          })}
         </>
       ) : area === "apps" ? (
         /* The installed plugin catalogue supplies Mini App identity and icons;

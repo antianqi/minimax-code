@@ -1,5 +1,6 @@
 import { useId, type ReactElement } from "react";
 import { IconFileCode } from "@tabler/icons-react";
+import { MarketplaceCategory } from "@mavis/protocol/local";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
@@ -15,24 +16,51 @@ import {
 } from "../../plugins/ui/PluginRow.public.js";
 
 const MARKET_PREVIEW_COUNT = 8;
-const MINIAPP_CATEGORY = { id: "tag:miniapp", label: "Mini App" } as const;
-const categories: readonly { id: string; label: string }[] = [
-  { id: "", label: "全部" },
-  { id: "office", label: "办公" },
-  { id: "studio", label: "创作" },
-  { id: "design_and_sites", label: "设计与网站" },
-  { id: "code", label: "代码" },
-  { id: "business", label: "商业" },
-  { id: "sales", label: "销售" },
-  { id: "productivity", label: "效率" },
-  { id: "tools", label: "工具" },
-  { id: "science_and_healthcare", label: "科学与医疗" },
-  { id: "education", label: "教育" },
-  { id: "other", label: "其他" },
+const categoryDefinitions: readonly { value: number; label: string }[] = [
+  { value: MarketplaceCategory.OFFICE, label: "办公" },
+  { value: MarketplaceCategory.STUDIO, label: "创作" },
+  { value: MarketplaceCategory.DESIGN_AND_SITES, label: "设计与网站" },
+  { value: MarketplaceCategory.CODE, label: "代码" },
+  { value: MarketplaceCategory.BUSINESS, label: "商业" },
+  { value: MarketplaceCategory.SALES, label: "销售" },
+  { value: MarketplaceCategory.PRODUCTIVITY, label: "效率" },
+  { value: MarketplaceCategory.SCIENCE_AND_HEALTHCARE, label: "科学与医疗" },
+  { value: MarketplaceCategory.EDUCATION, label: "教育" },
+  { value: MarketplaceCategory.OTHER, label: "其他" },
 ];
 
-export function marketplaceCategoryLabel(category: string): string | undefined {
-  return categories.find((item) => item.id === category)?.label;
+export interface PluginMarketplaceSection {
+  readonly value: string;
+  readonly label: string;
+  readonly rows: readonly WebuiPluginCatalogueRow[];
+}
+
+export function buildPluginMarketplaceSections(
+  rows: readonly WebuiPluginCatalogueRow[],
+  tags: readonly { readonly key: string; readonly displayName: string }[],
+  query: string,
+): PluginMarketplaceSection[] {
+  const sections: PluginMarketplaceSection[] = [];
+  if (!query) sections.push({ value: "featured", label: "精选", rows: rows.slice(0, 40) });
+  for (const tag of tags) {
+    const tagged = rows.filter((row) => Array.isArray(row.source.tags) && row.source.tags.some(
+      (entry: unknown) => !!entry && typeof entry === "object" && (entry as { key?: unknown }).key === tag.key,
+    ));
+    if (tagged.length) sections.push({ value: `tag:${tag.key}`, label: tag.displayName, rows: tagged });
+  }
+  for (const definition of categoryDefinitions) {
+    const matching = rows.filter((row) => {
+      const category = row.source.category;
+      if (definition.value === MarketplaceCategory.OTHER) {
+        return typeof category !== "number" || !categoryDefinitions.some((item) => item.value === category)
+          ? true
+          : category === definition.value;
+      }
+      return category === definition.value;
+    });
+    if (matching.length) sections.push({ value: `category:${definition.value}`, label: definition.label, rows: matching });
+  }
+  return sections;
 }
 
 function PluginMarketCard({
@@ -129,26 +157,24 @@ function PluginMarketCard({
 }
 
 export function PluginMarketplaceFilters({
+  sections,
   category,
-  onCategoryChange,
+  onCategorySelect,
 }: {
+  readonly sections: readonly PluginMarketplaceSection[];
   readonly category: string;
-  readonly onCategoryChange: (category: string) => void;
+  readonly onCategorySelect: (category: string) => void;
 }): ReactElement {
   return (
     <nav className="webui-plugin-category-filter" aria-label="市场分类">
-      {[
-        categories[0],
-        MINIAPP_CATEGORY,
-        ...categories.slice(1),
-      ].map((item) => (
+      {sections.map((item) => (
         <WebuiButton
           variant="segmented"
           size="inline-dense"
           type="button"
-          key={item.id}
-          aria-pressed={category === item.id}
-          onClick={() => onCategoryChange(item.id)}
+          key={item.value}
+          aria-pressed={category === item.value}
+          onClick={() => onCategorySelect(item.value)}
         >
           {item.label}
         </WebuiButton>
@@ -166,6 +192,7 @@ export function PluginMarketplace({
   onIntent,
   hideToggle = false,
   loading = false,
+  sections,
 }: {
   readonly area: "plugins" | "skills";
   readonly rows: readonly WebuiPluginCatalogueRow[];
@@ -176,9 +203,56 @@ export function PluginMarketplace({
   readonly onIntent: (intent: WebuiPluginIntent) => void;
   readonly hideToggle?: boolean;
   readonly loading?: boolean;
+  readonly sections?: readonly PluginMarketplaceSection[];
 }): ReactElement {
   const noun = area === "skills" ? "技能" : "插件";
   const expandedListId = useId();
+  if (sections) {
+    return loading ? <PluginMarketSkeleton /> : sections.length === 0 ? <FeedbackEmpty title="暂无内容" /> : (
+      <>
+        {sections.map((section) => (
+          <section
+            key={section.value}
+            aria-label={section.label}
+            data-plugin-category-section={section.value}
+            className="webui-plugin-market-section"
+          >
+            <h2 className="webui-plugin-market-heading">{section.label}</h2>
+            <PluginRowList className="webui-plugin-grid">
+              {section.rows.slice(0, section.value === "featured" ? MARKET_PREVIEW_COUNT : undefined).map((row, index) => (
+                <PluginMarketCard area={area} row={row} index={index} onIntent={onIntent} key={`${area}-${section.value}-${row.name || index}`} />
+              ))}
+              {section.value === "featured" && section.rows.length > MARKET_PREVIEW_COUNT ? (
+                <WebuiDisclosure
+                  id={expandedListId}
+                  open={showAll}
+                  mountOnOpen
+                  className="webui-plugin-grid webui-plugin-expanded-list"
+                  data-testid="webui-plugin-expanded-list"
+                >
+                  {section.rows.slice(MARKET_PREVIEW_COUNT).map((row, index) => (
+                    <PluginMarketCard area={area} row={row} index={index + MARKET_PREVIEW_COUNT} onIntent={onIntent} key={`${area}-featured-expanded-${row.name || index}`} />
+                  ))}
+                </WebuiDisclosure>
+              ) : null}
+            </PluginRowList>
+            {section.value === "featured" && !hideToggle && section.rows.length > MARKET_PREVIEW_COUNT ? (
+              <WebuiButton
+                variant="quiet-secondary"
+                size="content"
+                className="webui-plugin-show-all"
+                aria-expanded={showAll}
+                aria-controls={expandedListId}
+                onClick={onToggleAll}
+              >
+                {showAll ? `收起${noun}` : marketTotal === null ? `查看全部${noun}` : `查看全部 ${marketTotal} 个`}
+              </WebuiButton>
+            ) : null}
+          </section>
+        ))}
+      </>
+    );
+  }
   return (
     <WebuiSkeletonProjection loading={false}>
       <>

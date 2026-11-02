@@ -21,7 +21,7 @@
   .webui-settings-nav-item { display: flex; width: 100%; align-items: center; gap: var(--spacing_8); text-align: left; }
   /* Secondary, not tertiary: the field's own text and placeholder are read against
      a surface, and tertiary measures 2.15:1 there. */
-  .webui-settings-search { display: flex; height: 36px; align-items: center; gap: var(--spacing_8); padding: 0 var(--spacing_8); border: 1px solid var(--border_default); border-radius: var(--radius_8); color: var(--text_default_secondary); }
+  .webui-settings-search { margin-bottom: var(--spacing_16); }
   .webui-settings-group { margin-top: 0; }
   .webui-settings-nav > .webui-settings-group:first-child { margin-top: var(--spacing_24); }
   .webui-settings-group h3 { margin: 0 0 var(--spacing_6); color: var(--text_default_tertiary); font-weight: var(--weight_medium); }
@@ -36,8 +36,7 @@
 
   /* Code review (Review 审查模式 / 修复建议+跳转). */
   .webui-review-totals { display: flex; align-items: center; gap: var(--spacing_8); margin-bottom: var(--spacing_12); color: var(--text_default_secondary); font-size: var(--size_12); }
-  .webui-review-search { display: flex; min-width: 0; height: 38px; align-items: center; gap: var(--spacing_8); margin-bottom: var(--spacing_12); border: 1px solid var(--border_default); border-radius: 12px; padding: 0 12px; background: var(--bg_default_primary); color: var(--text_default_secondary); }
-  .webui-review-search:focus-within { border-color: var(--border_accent); }
+  .webui-review-search { margin-bottom: var(--spacing_12); }
   .webui-review-clear { flex: none; }
   .webui-review-files { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
   .webui-review-file { overflow: hidden; border-radius: var(--radius_12); }

@@ -2,7 +2,8 @@ import type { ChangeEvent, ComponentProps, ReactElement, ReactNode, RefObject } 
 import { WebuiProjectList } from "./SessionRail.js";
 import { RailRow } from "./RailRow.js";
 import { WebuiIconBrand, WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSchedule, WebuiIconSessionImport, WebuiIconSites } from "../../../shell/icons.js";
-import { WebuiFileInput, WebuiTextInput } from "../../../ui/field.js";
+import { IconSearch } from "@tabler/icons-react";
+import { WebuiFileInput, WebuiSearchBox } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiPage } from "../../../ui/page.js";
@@ -81,13 +82,15 @@ export function SessionRailRegion(props: {
           </div>
         </div>
         {props.searchOpen ? <div className="flex-shrink-0 px-4 pb-px pt-1" data-webui-rail-fixed-row="true">
-          <WebuiTextInput
-            appearance="boxed"
-            controlSize="dense"
-            className="w-full"
-            id="webui-rail-search" ref={props.searchInputRef} type="text" role="searchbox"
-            data-webui-rail-search-input="true" aria-label="搜索会话" placeholder="搜索会话"
-            value={props.searchQuery} onChange={(event) => props.setSearchQuery(event.target.value)}
+          <WebuiSearchBox
+            icon={<IconSearch />}
+            id="webui-rail-search"
+            inputRef={props.searchInputRef}
+            data-webui-rail-search-input="true"
+            label="搜索会话"
+            placeholder="搜索会话"
+            value={props.searchQuery}
+            onChange={(event) => props.setSearchQuery(event.target.value)}
             onKeyDown={(event) => { if (event.key !== "Escape") return; event.preventDefault(); props.closeSearch(); }}
           />
         </div> : null}

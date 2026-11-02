@@ -13,7 +13,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconChevronDown, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconMicrophone, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
-import { WebuiSearchField, WebuiSelect, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiSearchBox, WebuiSelect, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
@@ -235,15 +235,19 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
               <Icon name="back" />
               <span>返回应用</span>
             </WebuiButton>
-            <div className="webui-settings-search">
-              <Icon name="search" />
-              <WebuiTextInput appearance="bare" controlSize="dense" className="flex-1" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索设置..." aria-label="搜索设置" />
-              {query ? (
+            <WebuiSearchBox
+              icon={<SearchIcon />}
+              label="搜索设置"
+              placeholder="搜索设置..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="webui-settings-search"
+              trailing={query ? (
                 <WebuiIconButton label="清空设置搜索" tone="bare" className="webui-settings-search-clear" onClick={() => setQuery("")}>
                   <Icon name="close" />
                 </WebuiIconButton>
               ) : null}
-            </div>
+            />
             <nav aria-label="设置分类" className="webui-settings-nav">
               {groups.length ? (
                 groups.map((group) => (
@@ -478,7 +482,7 @@ function ArchivedSessionsPage({ sessions, canDelete, canUnarchive, onDelete, onU
     <SettingsPage testId="settings-archived-page">
       {actionError ? <FeedbackError message={actionError} className="webui-archived-error" /> : null}
       <div className="webui-archived-filters">
-        <WebuiSearchField appearance="compact" icon={<SearchIcon />} label="搜索已归档聊天" placeholder="搜索已归档聊天" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <WebuiSearchBox icon={<SearchIcon />} label="搜索已归档聊天" placeholder="搜索已归档聊天" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
       {filtered.length ? (
         [...grouped].map(([path, rows]) => (

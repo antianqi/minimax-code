@@ -4,45 +4,36 @@ import { expect } from "@playwright/test";
 
 import { openApp, screenshotOptions, test } from "./harness.mjs";
 
-test("marketplace and management share a left category rail and centered content layout", async ({ page }) => {
+test("marketplace and management share horizontal categories beneath search", async ({ page }) => {
   await openApp(page, "#session=A");
   await page.getByRole("button", { name: "插件" }).first().click();
 
   const layout = page.locator(".webui-plugin-page-layout");
-  const marketSidebar = layout.locator(".webui-plugin-page-sidebar");
   const marketSearch = layout.locator(".webui-plugin-page-search");
   const marketContent = layout.locator(".webui-plugin-page-content");
   await expect(layout).toBeVisible();
   await expect(page.getByRole("navigation", { name: "市场分类" })).toBeVisible();
   await expect(marketSearch.getByLabel("搜索插件")).toBeVisible();
   const marketGeometry = await layout.evaluate((element) => {
-    const sidebar = element.querySelector(".webui-plugin-page-sidebar").getBoundingClientRect();
-    const main = element.querySelector(".webui-plugin-page-main").getBoundingClientRect();
     const search = element.querySelector(".webui-plugin-page-search").getBoundingClientRect();
+    const categories = element.querySelector(".webui-plugin-page-categories").getBoundingClientRect();
     const content = element.querySelector(".webui-plugin-page-content").getBoundingClientRect();
-    const grid = getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean);
     return {
-      columns: grid.length,
-      sidebarBeforeMain: sidebar.right <= main.left,
-      searchInsideMain: search.left >= main.left && search.right <= main.right,
+      rowDirection: getComputedStyle(element.querySelector(".webui-plugin-category-filter")).flexDirection,
+      searchBeforeCategories: search.bottom <= categories.top,
       contentAfterSearch: content.top >= search.bottom,
-      contentCentered: Math.abs(content.left + content.width / 2 - (main.left + main.width / 2)) < 2,
+      contentCentered: Math.abs(content.left + content.width / 2 - (element.getBoundingClientRect().left + element.getBoundingClientRect().width / 2)) < 2,
       categoryTextSize: Number.parseFloat(getComputedStyle(element.querySelector(".webui-plugin-category-filter .webui-mavis-button")).fontSize),
       selectedCategoryWidth: element.querySelector(".webui-plugin-category-filter .webui-mavis-button[aria-pressed=true]").getBoundingClientRect().width,
-      sidebarTop: Math.round(sidebar.top),
-      sidebarPosition: getComputedStyle(element.querySelector(".webui-plugin-page-sidebar")).position,
     };
   });
   expect(marketGeometry).toEqual({
-    columns: 2,
-    sidebarBeforeMain: true,
-    searchInsideMain: true,
+    rowDirection: "row",
+    searchBeforeCategories: true,
     contentAfterSearch: true,
     contentCentered: true,
     categoryTextSize: 14,
     selectedCategoryWidth: expect.any(Number),
-    sidebarTop: expect.any(Number),
-    sidebarPosition: "sticky",
   });
   expect(marketGeometry.selectedCategoryWidth).toBeLessThan(120);
   const captureDir = process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR;
@@ -55,24 +46,21 @@ test("marketplace and management share a left category rail and centered content
   await expect(page.getByRole("navigation", { name: "插件管理分类" })).toBeVisible();
   await expect(layout.locator(".webui-plugin-page-search").getByLabel("搜索插件")).toBeVisible();
   const managementGeometry = await layout.evaluate((element) => {
-    const sidebar = element.querySelector(".webui-plugin-page-sidebar").getBoundingClientRect();
-    const main = element.querySelector(".webui-plugin-page-main").getBoundingClientRect();
     const search = element.querySelector(".webui-plugin-page-search").getBoundingClientRect();
+    const categories = element.querySelector(".webui-plugin-page-categories").getBoundingClientRect();
     const content = element.querySelector(".webui-plugin-page-content").getBoundingClientRect();
     return {
-      sidebarBeforeMain: sidebar.right <= main.left,
-      searchInsideMain: search.left >= main.left && search.right <= main.right,
+      rowDirection: getComputedStyle(element.querySelector(".webui-plugin-category-filter")).flexDirection,
+      searchBeforeCategories: search.bottom <= categories.top,
       contentAfterSearch: content.top >= search.bottom,
-      contentCentered: Math.abs(content.left + content.width / 2 - (main.left + main.width / 2)) < 2,
-      sidebarPosition: getComputedStyle(element.querySelector(".webui-plugin-page-sidebar")).position,
+      contentCentered: Math.abs(content.left + content.width / 2 - (element.getBoundingClientRect().left + element.getBoundingClientRect().width / 2)) < 2,
     };
   });
   expect(managementGeometry).toEqual({
-    sidebarBeforeMain: true,
-    searchInsideMain: true,
+    rowDirection: "row",
+    searchBeforeCategories: true,
     contentAfterSearch: true,
     contentCentered: true,
-    sidebarPosition: "sticky",
   });
   if (captureDir) {
     await page.screenshot({ path: join(captureDir, "plugin-management.png"), fullPage: true });
@@ -80,15 +68,13 @@ test("marketplace and management share a left category rail and centered content
 
   await page.setViewportSize({ width: 480, height: 900 });
   const narrowGeometry = await layout.evaluate((element) => {
-    const sidebar = element.querySelector(".webui-plugin-page-sidebar");
-    const main = element.querySelector(".webui-plugin-page-main");
+    const categories = element.querySelector(".webui-plugin-category-filter");
     return {
-      direction: getComputedStyle(element.querySelector(".webui-plugin-category-filter")).flexDirection,
+      direction: getComputedStyle(categories).flexDirection,
       noHorizontalOverflow: element.scrollWidth <= element.clientWidth,
-      sidebarBeforeMain: sidebar.getBoundingClientRect().right <= main.getBoundingClientRect().left,
     };
   });
-  expect(narrowGeometry).toEqual({ direction: "column", noHorizontalOverflow: true, sidebarBeforeMain: true });
+  expect(narrowGeometry).toEqual({ direction: "row", noHorizontalOverflow: true });
   if (captureDir) {
     await page.screenshot({ path: join(captureDir, "plugin-management-narrow.png"), fullPage: true });
   }
@@ -138,7 +124,7 @@ test("plugin loading skeleton follows the card and action geometry", async ({ pa
   await expect(skeleton).toHaveCount(0);
 });
 
-test("marketplace groups and filters Mini Apps from the returned tags", async ({ page }) => {
+test("marketplace categories scroll to available sections without filtering the listing", async ({ page }) => {
   await page.addInitScript(() => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
     window.__WEBUI_FIXTURE_SETUP__.push(() => {
@@ -146,8 +132,8 @@ test("marketplace groups and filters Mini Apps from the returned tags", async ({
         pluginTotal: 2,
         tagDefinitions: [{ key: "miniapp", displayName: "Mini App" }],
         plugins: [
-          { name: "board", displayName: "Board", tags: [{ key: "miniapp", displayName: "Mini App" }] },
-          { name: "other", displayName: "Other" },
+          { name: "board", displayName: "Board", category: 1, tags: [{ key: "miniapp", displayName: "Mini App" }] },
+          { name: "other", displayName: "Other", category: 2 },
         ],
       });
       window.__fixture.setPluginManagementResult("listInstalledPlugins", { plugins: [] });
@@ -158,11 +144,15 @@ test("marketplace groups and filters Mini Apps from the returned tags", async ({
   const group = page.getByRole("region", { name: "Mini App" });
   await expect(group).toContainText("Board");
   await expect(group).not.toContainText("Other");
+  const requestCount = await page.evaluate(() => window.__fixture.requests.filter((entry) =>
+    entry.operation === "pluginManagement" && entry.body.action === "listMarketplacePlugins").length);
   await page.getByRole("navigation", { name: "市场分类" }).getByRole("button", { name: "Mini App" }).click();
-  await expect(page.locator(".webui-plugin-grid")).toContainText("Board");
-  await expect(page.locator(".webui-plugin-grid")).not.toContainText("Other");
-  await page.getByRole("navigation", { name: "市场分类" }).getByRole("button", { name: "效率" }).click();
-  await expect(page.getByRole("heading", { name: "效率" })).toBeVisible();
+  await expect(group).toBeInViewport();
+  await expect(page.getByRole("navigation", { name: "市场分类" }).getByRole("button", { name: "Mini App" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-plugin-category-section="category:2"]')).toContainText("Other");
+  const requestCountAfter = await page.evaluate(() => window.__fixture.requests.filter((entry) =>
+    entry.operation === "pluginManagement" && entry.body.action === "listMarketplacePlugins").length);
+  expect(requestCountAfter).toBe(requestCount);
   await page.locator(".webui-plugin-grid").getByRole("button", { name: "安装" }).first().click();
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((entry) =>
     entry.operation === "pluginManagement" && entry.body.action === "installPlugin" && entry.body.input?.pluginName === "board"))).toBe(true);
@@ -256,10 +246,10 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   await openApp(page, "#session=A");
   await page.getByRole("button", { name: "插件" }).first().click();
 
-  const cards = page.locator(".webui-plugin-grid .webui-plugin-row");
+  const cards = page.locator('[data-plugin-category-section="featured"] .webui-plugin-grid .webui-plugin-row');
   await expect(cards).toHaveCount(10);
   await expect(cards.nth(9)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "插件" }).last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "精选" }).last()).toBeVisible();
   const installedActionInset = await cards.first().getByRole("button", { name: "已安装" }).evaluate((button) => {
     const row = button.closest(".webui-plugin-row");
     return row.getBoundingClientRect().right - button.getBoundingClientRect().right;

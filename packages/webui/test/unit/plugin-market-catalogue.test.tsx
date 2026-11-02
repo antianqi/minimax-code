@@ -27,7 +27,8 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PluginCatalogue } from "../../src/client/features/plugins/ui/PluginCatalogue.js";
-import { marketplaceCategoryLabel, PluginMarketplaceFilters } from "../../src/client/features/plugins/ui/PluginMarketplace.js";
+import { buildPluginMarketplaceSections, PluginMarketplaceFilters } from "../../src/client/features/plugins/ui/PluginMarketplace.js";
+import { MarketplaceCategory } from "@mavis/protocol/local";
 import { projectWebuiPluginCatalogue } from "../../src/client/features/plugins/projection/catalogue-view.js";
 import type { WebuiPluginRow } from "../../src/client/features/plugins/contracts/plugin-rows.js";
 const marketplace = (initialArea: "plugins" | "skills"): string =>
@@ -54,24 +55,58 @@ const owner = squashWhitespace(
 );
 
 describe("plugin marketplace catalogue", () => {
-  it("renders the server-provided Mini App category as a selectable market filter", () => {
+  it("builds Desktop ordered sections from available tags and category data", () => {
+    const rows = projectWebuiPluginCatalogue({
+      data: [
+        { name: "board", category: MarketplaceCategory.OFFICE, tags: [{ key: "miniapp" }] },
+        { name: "studio", category: MarketplaceCategory.STUDIO },
+        { name: "tools", category: MarketplaceCategory.TOOLS },
+      ],
+      query: "",
+      area: "plugins",
+      view: "market",
+      pluginTotal: 3,
+      skillTotal: null,
+    }).rows;
+    const sections = buildPluginMarketplaceSections(rows, [
+      { key: "miniapp", displayName: "Mini App" },
+      { key: "empty", displayName: "Empty" },
+    ], "");
+    expect(sections.map(({ value, label }) => [value, label])).toEqual([
+      ["featured", "精选"],
+      ["tag:miniapp", "Mini App"],
+      [`category:${MarketplaceCategory.OFFICE}`, "办公"],
+      [`category:${MarketplaceCategory.STUDIO}`, "创作"],
+      [`category:${MarketplaceCategory.OTHER}`, "其他"],
+    ]);
+    expect(sections.find(({ value }) => value === "featured")?.rows.map(({ name }) => name)).toEqual([
+      "board", "studio", "tools",
+    ]);
+    expect(sections.find(({ value }) => value === `category:${MarketplaceCategory.OTHER}`)?.rows.map(({ name }) => name)).toEqual(["tools"]);
+  });
+  it("hides Featured while searching and does not show empty tag or category sections", () => {
+    const rows = projectWebuiPluginCatalogue({
+      data: [{ name: "board", category: MarketplaceCategory.OFFICE }],
+      query: "board",
+      area: "plugins",
+      view: "market",
+      pluginTotal: 1,
+      skillTotal: null,
+    }).rows;
+    expect(buildPluginMarketplaceSections(rows, [{ key: "empty", displayName: "Empty" }], "board").map(({ value }) => value))
+      .toEqual([`category:${MarketplaceCategory.OFFICE}`]);
+  });
+  it("renders only supplied Desktop sections as anchor navigation", () => {
     const html = renderToStaticMarkup(createElement(PluginMarketplaceFilters, {
+      sections: [
+        { value: "featured", label: "精选", rows: [] },
+        { value: "tag:miniapp", label: "Mini App", rows: [] },
+      ],
       category: "tag:miniapp",
-      onCategoryChange: () => {},
+      onCategorySelect: () => {},
     }));
     expect(html).toContain('aria-pressed="true">Mini App</button>');
-  });
-  it("uses Desktop marketplace taxonomy keys and labels", () => {
-    expect(marketplaceCategoryLabel("studio")).toBe("创作");
-    expect(marketplaceCategoryLabel("tools")).toBe("工具");
-    expect(marketplaceCategoryLabel("creative")).toBeUndefined();
-  });
-  it("renders Mini App with the fixed categories before market metadata loads", () => {
-    const html = marketplace("plugins");
-    const categoryNav = html.match(/<nav[^>]*aria-label="市场分类"[^>]*>(.*?)<\/nav>/u)?.[1] ?? "";
-    expect(categoryNav).toContain('aria-pressed="false">Mini App</button>');
-    expect(categoryNav.indexOf("Mini App")).toBeGreaterThan(categoryNav.indexOf("全部"));
-    expect(categoryNav.indexOf("Mini App")).toBeLessThan(categoryNav.indexOf("办公"));
+    expect(html).not.toContain(">全部</button>");
   });
   it("offers 插件 and 技能 instead of 市场 and 个人", () => {
     const html = marketplace("plugins");
@@ -107,8 +142,8 @@ describe("plugin marketplace catalogue", () => {
   });
 
   it("labels each page for what it lists", () => {
-    expect(marketplace("plugins")).toContain(">插件</h2>");
-    expect(marketplace("skills")).toContain(">技能</h2>");
+    expect(marketplace("plugins")).toContain('aria-pressed="true">插件</button>');
+    expect(marketplace("skills")).toContain('aria-pressed="true">技能</button>');
   });
 });
 

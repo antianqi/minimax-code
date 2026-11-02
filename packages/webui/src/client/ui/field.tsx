@@ -15,6 +15,7 @@ import {
   forwardRef,
   useId,
   type InputHTMLAttributes,
+  type Ref,
   type ReactElement,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -111,15 +112,20 @@ export const WebuiFileInput = forwardRef<
 });
 
 export interface WebuiSearchFieldProps {
-  readonly icon: ReactNode;
+  readonly icon?: ReactNode;
   readonly label: string;
   readonly value: string;
   readonly onChange: NonNullable<InputHTMLAttributes<HTMLInputElement>["onChange"]>;
   readonly placeholder?: string;
-  readonly appearance?: "regular" | "compact";
   /** Surface placement only; the search control's appearance stays shared. */
   readonly className?: string;
+  readonly inputClassName?: string;
+  readonly trailing?: ReactNode;
   readonly testId?: string;
+  readonly id?: string;
+  readonly inputRef?: Ref<HTMLInputElement>;
+  readonly onKeyDown?: InputHTMLAttributes<HTMLInputElement>["onKeyDown"];
+  readonly [attribute: `data-${string}`]: string | undefined;
 }
 
 /** A labelled search control with the shared icon, field and focus-within treatment. */
@@ -129,27 +135,38 @@ export function WebuiSearchField({
   value,
   onChange,
   placeholder,
-  appearance = "regular",
   className,
+  inputClassName,
+  trailing,
   testId,
+  id,
+  inputRef,
+  onKeyDown,
+  ...dataAttributes
 }: WebuiSearchFieldProps): ReactElement {
   return (
     <WebuiSkeletonProjection>
-      <label
-        className={`webui-search-field webui-search-field--${appearance}${className ? ` ${className}` : ""}`}
-        data-testid={testId}
+      <div
+        className={`webui-search-field${className ? ` ${className}` : ""}`}
       >
-        <span className="webui-search-field-icon" aria-hidden="true">{icon}</span>
+        {icon ? <span className="webui-search-field-icon" aria-hidden="true">{icon}</span> : null}
         <WebuiTextInput
           appearance="bare"
           controlSize="dense"
-          className="webui-search-field-control"
+          className={`webui-search-field-control${inputClassName ? ` ${inputClassName}` : ""}`}
+          id={id}
+          ref={inputRef}
+          role="searchbox"
           aria-label={label}
+          data-testid={testId}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
+          onKeyDown={onKeyDown}
+          {...dataAttributes}
         />
-      </label>
+        {trailing ? <span className="webui-search-field-trailing">{trailing}</span> : null}
+      </div>
     </WebuiSkeletonProjection>
   );
 }

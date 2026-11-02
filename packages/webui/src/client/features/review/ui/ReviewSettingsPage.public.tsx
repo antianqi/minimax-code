@@ -14,7 +14,7 @@ import {
   type ReactElement,
 } from "react";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiTextInput } from "../../../ui/field.js";
+import { WebuiSearchBox } from "../../../ui/field.js";
 import { WebuiDisclosure } from "../../../ui/page.js";
 
 import {
@@ -270,19 +270,16 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
       <span className="webui-diff-add">{`+${state.totals.additions}`}</span>
       <span className="webui-diff-del">{`-${state.totals.deletions}`}</span>
     </div> : null}
-    {state.status === "ready" ? <div className="webui-review-search">
-      <SearchIcon />
-      <WebuiTextInput
-        appearance="bare"
-        className="min-w-0 flex-1"
-        aria-label="在变更里搜索"
-        placeholder="在变更里搜索"
-        data-testid="review-search-input"
-        value={state.query}
-        onChange={(event) => onQueryChange?.(event.target.value)}
-      />
-      {filterActive ? <WebuiButton variant="quiet-secondary" size="inline-tiny" className="webui-review-clear" data-testid="review-search-clear" onClick={() => onClearFilters?.()}>清除</WebuiButton> : null}
-    </div> : null}
+    {state.status === "ready" ? <WebuiSearchBox
+      icon={<SearchIcon />}
+      label="在变更里搜索"
+      placeholder="在变更里搜索"
+      testId="review-search-input"
+      value={state.query}
+      onChange={(event) => onQueryChange?.(event.target.value)}
+      className="webui-review-search"
+      trailing={filterActive ? <WebuiButton variant="quiet-secondary" size="inline-tiny" className="webui-review-clear" data-testid="review-search-clear" onClick={() => onClearFilters?.()}>清除</WebuiButton> : null}
+    /> : null}
     {state.searchPending && !loading ? <FeedbackLiveRegion className="webui-review-loading">正在搜索…</FeedbackLiveRegion> : null}
     {note || state.error ? (
       // A failure is announced; a note is not. The two are different states,

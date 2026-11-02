@@ -316,7 +316,8 @@
   .webui-turn-review-hunk { grid-column: 1 / -1; padding: 1px var(--spacing_12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .webui-turn-review-unavailable, .webui-turn-review-empty { padding: var(--spacing_16); color: var(--text_default_tertiary); font-size: var(--size_14); }
   .webui-workspace-review-status { flex: 0 0 auto; margin: 0; border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-workspace-review-search { display: flex; flex: 0 0 auto; gap: var(--spacing_8); border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
+  .webui-workspace-review-search { display: flex; flex: 0 0 auto; align-items: center; gap: var(--spacing_8); border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
+  .webui-workspace-review-search .webui-search-field { flex: 1 1 auto; }
   .webui-file-preview-line-active { display: inline-block; width: 100%; background: var(--bg_interaction_tertiary_selected); }
 
   /* The panel controls live in the session header row now.

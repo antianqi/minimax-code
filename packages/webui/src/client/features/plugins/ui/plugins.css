@@ -171,49 +171,55 @@
     color: var(--text_default_secondary);
   }
   .webui-plugin-category-filter {
-    max-width: none;
-    flex-direction: column;
-    align-items: flex-start;
+    display: flex;
+    width: max-content;
+    min-width: 100%;
+    flex-direction: row;
+    align-items: center;
     gap: var(--spacing_4);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
   }
+  .webui-plugin-category-filter::-webkit-scrollbar { display: none; }
   .webui-plugin-page-layout {
-    display: grid;
+    display: block;
     width: min(1200px, 100%);
-    grid-template-columns: 208px minmax(0, 1fr);
-    align-items: start;
-    gap: var(--spacing_24);
     margin: 16px auto 0;
-  }
-  .webui-plugin-page-layout:not(.has-sidebar) {
-    grid-template-columns: minmax(0, 1fr);
   }
   .webui-plugin-management.is-marketplace .webui-plugin-page-layout {
     box-sizing: border-box;
     padding: 0 var(--spacing_16);
   }
-  .webui-plugin-page-sidebar,
   .webui-plugin-page-main {
     min-width: 0;
   }
-  .webui-plugin-page-sidebar {
-    padding-top: var(--spacing_4);
+  .webui-plugin-page-controls {
     position: sticky;
-    top: 52px;
-    align-self: start;
+    top: 0;
+    z-index: 4;
+    background: var(--bg_default_primary);
+    padding: 0 var(--spacing_16) var(--spacing_8);
   }
   .webui-plugin-category-filter > .webui-mavis-button {
-    width: auto;
-    max-width: 100%;
+    width: max-content;
+    max-width: none;
+    flex: 0 0 auto;
     justify-content: space-between;
     text-align: left;
-    white-space: normal;
+    white-space: nowrap;
     font-size: var(--size_14);
     padding-right: var(--spacing_12);
     padding-left: var(--spacing_12);
   }
   .webui-plugin-page-search {
     max-width: 832px;
-    margin: 0 auto var(--spacing_20);
+    margin: 0 auto var(--spacing_12);
+  }
+  .webui-plugin-page-categories {
+    max-width: 832px;
+    margin: 0 auto;
+    overflow: hidden;
   }
   .webui-plugin-page-content {
     width: 100%;
@@ -228,15 +234,18 @@
     max-width: 768px;
     row-gap: var(--spacing_12);
   }
-  .webui-plugin-management.is-managing .webui-plugin-page-sidebar {
-    top: 88px;
-  }
   .webui-plugin-market-heading {
     max-width: 768px;
     margin: 40px auto 12px;
     font-size: var(--size_16);
     font-weight: 600;
     line-height: var(--line_height_26);
+  }
+  .webui-plugin-market-section {
+    scroll-margin-top: 108px;
+  }
+  .webui-plugin-market-section + .webui-plugin-market-section .webui-plugin-market-heading {
+    margin-top: 28px;
   }
   .webui-mavis-button.webui-plugin-show-all {
     display: flex;
@@ -617,19 +626,12 @@
     .webui-plugin-categories {
       overflow-x: auto;
     }
-    .webui-plugin-page-layout {
-      grid-template-columns: 148px minmax(0, 1fr);
-      gap: var(--spacing_12);
-    }
-    .webui-plugin-page-sidebar,
-    .webui-plugin-management.is-managing .webui-plugin-page-sidebar {
-      top: 52px;
-    }
     .webui-plugin-category-filter > .webui-mavis-button {
       min-width: 0;
       padding-right: var(--spacing_10);
       padding-left: var(--spacing_10);
     }
+    .webui-plugin-page-controls { padding-right: 0; padding-left: 0; }
     .webui-plugin-grid {
       grid-template-columns: 1fr;
     }

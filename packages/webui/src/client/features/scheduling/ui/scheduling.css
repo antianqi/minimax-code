@@ -1,0 +1,352 @@
+@layer components {
+  .webui-scheduling-layout {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    padding: 0;
+  }
+
+  .webui-scheduling-sidebar {
+    display: flex;
+    width: clamp(272px, 24vw, 328px);
+    min-width: 248px;
+    min-height: 0;
+    flex: 0 0 clamp(272px, 24vw, 328px);
+    flex-direction: column;
+    border-right: 1px solid var(--border_default);
+    background: var(--bg_default_secondary);
+  }
+
+  .webui-scheduling-sidebar-header {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing_8);
+    border-bottom: 1px solid var(--border_default);
+    padding: 0 var(--spacing_20);
+  }
+
+  .webui-scheduling-sidebar-header h1 {
+    margin: 0;
+    color: var(--text_default_primary);
+    font-size: var(--size_20);
+    font-weight: 500;
+    line-height: var(--line_height_28);
+  }
+
+  .webui-scheduling-sidebar-content {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--spacing_16);
+    overflow-y: auto;
+    padding: var(--spacing_16) var(--spacing_12);
+  }
+
+  .webui-scheduling-new {
+    min-height: 38px;
+    justify-content: flex-start;
+    gap: var(--spacing_8);
+    padding-inline: var(--spacing_8);
+    font-weight: 500;
+  }
+
+  .webui-scheduling-search { width: 100%; }
+
+  .webui-scheduling-list-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing_8);
+    color: var(--text_default_secondary);
+    font-size: var(--size_13, var(--size_14));
+    font-weight: 500;
+  }
+
+  .webui-scheduling-task-list { min-height: 0; }
+
+  .webui-scheduling-task-option {
+    display: flex;
+    width: 100%;
+    min-height: 62px;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing_8);
+    border-radius: var(--radius_12);
+    padding: var(--spacing_10, var(--spacing_8)) var(--spacing_12);
+    text-align: left;
+  }
+
+  .webui-scheduling-task-option-copy,
+  .webui-scheduling-template-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--spacing_4);
+  }
+
+  .webui-scheduling-task-name {
+    overflow: hidden;
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .webui-scheduling-task-time,
+  .webui-scheduling-card-note {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_18);
+  }
+
+  .webui-scheduling-task-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: var(--radius_full);
+    background: var(--icon_default_tertiary);
+  }
+
+  .webui-scheduling-task-dot.is-enabled,
+  .webui-scheduling-enabled-badge.is-enabled .webui-scheduling-task-dot {
+    background: var(--bg_status_positive);
+  }
+
+  .webui-scheduling-sidebar-empty {
+    padding: 0 var(--spacing_8);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_13, var(--size_14));
+  }
+
+  .webui-scheduling-host-hint {
+    margin: auto 0 0;
+    border-top: 1px solid var(--border_default);
+    padding: var(--spacing_12) var(--spacing_8) 0;
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_18);
+  }
+
+  .webui-scheduling-main {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: auto;
+    background: var(--bg_default_primary);
+    padding: clamp(var(--spacing_24), 5vw, var(--spacing_64));
+  }
+
+  .webui-scheduling-empty-state {
+    width: min(100%, 920px);
+    margin: auto;
+    text-align: center;
+  }
+
+  .webui-scheduling-empty-icon {
+    display: inline-flex;
+    width: 64px;
+    height: 64px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border_default);
+    border-radius: var(--radius_full);
+    background: var(--bg_grouped_secondary);
+    color: var(--icon_default_accent);
+  }
+
+  .webui-scheduling-empty-state h2 {
+    margin: var(--spacing_12) 0 var(--spacing_4);
+    color: var(--text_default_primary);
+    font-size: var(--size_24);
+    font-weight: 500;
+    line-height: var(--line_height_36);
+  }
+
+  .webui-scheduling-empty-state > p {
+    margin: 0;
+    color: var(--text_default_secondary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_22);
+  }
+
+  .webui-scheduling-template-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing_16);
+    margin-top: var(--spacing_48);
+    text-align: left;
+  }
+
+  .webui-scheduling-template-card {
+    display: flex;
+    min-width: 0;
+    min-height: 116px;
+    align-items: center;
+    gap: var(--spacing_16);
+    border: 1px dashed var(--border_default);
+    border-radius: var(--radius_24);
+    background: var(--bg_default_primary);
+    padding: var(--spacing_20);
+    white-space: normal;
+  }
+
+  .webui-scheduling-template-icon {
+    display: flex;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius_12);
+    background: var(--bg_grouped_secondary);
+    color: var(--icon_default_secondary);
+  }
+
+  .webui-scheduling-template-title {
+    color: var(--text_default_primary);
+    font-size: var(--size_16);
+    font-weight: 500;
+    line-height: var(--line_height_22);
+  }
+
+  .webui-scheduling-template-description {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+  }
+
+  .webui-scheduling-detail {
+    width: min(100%, 880px);
+    margin: 0 auto;
+  }
+
+  .webui-scheduling-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing_16);
+    border-bottom: 1px solid var(--border_default);
+    padding-bottom: var(--spacing_24);
+  }
+
+  .webui-scheduling-detail-eyebrow,
+  .webui-scheduling-card-label {
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_18);
+  }
+
+  .webui-scheduling-detail-header h2 {
+    overflow: hidden;
+    margin: var(--spacing_4) 0;
+    color: var(--text_default_primary);
+    font-size: var(--size_24);
+    font-weight: 500;
+    line-height: var(--line_height_36);
+    text-overflow: ellipsis;
+  }
+
+  .webui-scheduling-detail-header p {
+    margin: 0;
+    color: var(--text_default_secondary);
+    font-size: var(--size_14);
+  }
+
+  .webui-scheduling-enabled-badge {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--spacing_8);
+    border: 1px solid var(--border_default);
+    border-radius: var(--radius_full);
+    background: var(--bg_grouped_secondary);
+    padding: var(--spacing_6) var(--spacing_12);
+    color: var(--text_default_secondary);
+    font-size: var(--size_12);
+  }
+
+  .webui-scheduling-enabled-badge.is-enabled { color: var(--text_status_success); }
+
+  .webui-scheduling-detail-actions { flex-wrap: wrap; padding: var(--spacing_16) 0 var(--spacing_24); }
+
+  .webui-scheduling-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing_12);
+    margin-bottom: var(--spacing_16);
+  }
+
+  .webui-scheduling-info-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--spacing_6);
+    padding: var(--spacing_16);
+  }
+
+  .webui-scheduling-info-card strong {
+    overflow-wrap: anywhere;
+    color: var(--text_default_primary);
+    font-size: var(--size_16);
+    font-weight: 500;
+  }
+
+  .webui-scheduling-prompt-card,
+  .webui-scheduling-history-card { margin-bottom: var(--spacing_16); padding: var(--spacing_20); }
+
+  .webui-scheduling-prompt-card h3,
+  .webui-scheduling-history-card h3 {
+    margin: 0 0 var(--spacing_8);
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    font-weight: 500;
+  }
+
+  .webui-scheduling-prompt-card p {
+    margin: 0;
+    color: var(--text_default_secondary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_22);
+    white-space: pre-wrap;
+  }
+
+  .webui-scheduling-run-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing_12);
+    color: var(--text_default_secondary);
+    font-size: var(--size_12);
+  }
+
+  .webui-scheduling-detail-empty { margin: auto; }
+
+  .webui-dialog-surface[data-testid="webui-scheduling-editor-dialog"] { width: min(760px, calc(100vw - 32px)); }
+  .webui-dialog-surface[data-testid="webui-scheduling-editor-dialog"] .webui-dialog-body { max-height: min(72vh, 680px); }
+
+  @media (max-width: 820px) {
+    .webui-scheduling-sidebar { width: 260px; min-width: 220px; flex-basis: 260px; }
+    .webui-scheduling-main { padding: var(--spacing_24); }
+    .webui-scheduling-template-grid { gap: var(--spacing_12); margin-top: var(--spacing_32); }
+    .webui-scheduling-template-card { min-height: 104px; gap: var(--spacing_12); padding: var(--spacing_16); }
+  }
+
+  @media (max-width: 620px) {
+    .webui-scheduling-layout { flex-direction: column; }
+    .webui-scheduling-sidebar { width: 100%; min-width: 0; max-height: 44%; flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--border_default); }
+    .webui-scheduling-sidebar-header { min-height: 56px; }
+    .webui-scheduling-sidebar-content { gap: var(--spacing_8); padding: var(--spacing_8); }
+    .webui-scheduling-main { min-height: 0; padding: var(--spacing_20) var(--spacing_16); }
+    .webui-scheduling-empty-state { margin-block: var(--spacing_24); }
+    .webui-scheduling-template-grid,
+    .webui-scheduling-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { formatWebuiCredits, recordOf, textOf } from "../../../contracts/value-readers.js";
 import { useWebuiModelsWorkflows, useWebuiModelsWorkflowsState, useWebuiSettingsWorkflows, useWebuiSettingsWorkflowsState } from "../../../bindings/use-query-state.js";
 import { useWebuiAccountWorkflows, useWebuiAccountWorkflowsState } from "../../../features/account/bindings/use-account-workflows.public.js";
@@ -96,6 +96,10 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const [oauthError, setOauthError] = useState<string>();
   const [oauthLoginId, setOauthLoginId] = useState<string>();
   const [providerPendingDelete, setProviderPendingDelete] = useState<WebuiModelProviderView>();
+  const [addProviderAction, setAddProviderAction] = useState<() => void>();
+  const registerAddProviderAction = useCallback((action?: () => void) => {
+    setAddProviderAction(() => action);
+  }, []);
 
   // Committed read state, derived from the owner snapshots.
   const quota = accountState.usage.result;
@@ -215,7 +219,8 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
 
 
   return <SettingsPage testId="settings-usage-model">
-    <WebuiInline gap="medium" className="h-8">
+    <WebuiInline gap="medium" justify="between" className="min-h-8 flex-wrap">
+      <WebuiInline gap="medium" className="h-8">
       <WebuiDropdown
         open={sourceMenuOpen}
         onOpen={() => setSourceMenuOpen(true)}
@@ -239,7 +244,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
                 <WebuiButton
                   {...buttonProps}
                   ref={ref}
-                  variant="segmented"
+                  variant="plain"
                   size="compact"
                   aria-pressed={sourceTab !== "custom"}
                   data-testid="settings-usage-source-tab"
@@ -271,6 +276,17 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
       </WebuiDropdown>
       <div className="h-3 w-[0.5px] bg-border_default" />
       <WebuiButton variant="segmented" size="compact" aria-pressed={sourceTab === "custom"} className="h-8 rounded-[8px] px-3 text-[14px] font-medium leading-5" onClick={() => setSourceTab("custom")}>自定义模型</WebuiButton>
+      </WebuiInline>
+      {sourceTab === "custom" ? <WebuiInline gap="small" className="ml-auto">
+        <WebuiButton variant="outline-highlight" size="compact" disabled={!models?.canManageProviders || !addProviderAction} onClick={() => addProviderAction?.()}>添加模型</WebuiButton>
+        {oauth?.state === "connected" ? <>
+          <span className="self-center text-[13px] text-text_default_secondary">Codex OAuth 已连接</span>
+          <WebuiButton variant="outline-highlight" size="compact" disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</WebuiButton>
+        </> : <>
+          <WebuiButton variant="outline-highlight" size="compact" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</WebuiButton>
+          {oauthLoginId ? <WebuiButton variant="outline-highlight" size="compact" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</WebuiButton> : null}
+        </>}
+      </WebuiInline> : null}
     </WebuiInline>
 
     {sourceTab === "token-plan" ? <WebuiStack as="section" gap="roomy" className="w-full" data-testid="settings-usage-token-plan">
@@ -304,10 +320,11 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
           setProviderActionError={setProviderActionError}
           editor={editor}
           snapshot={providerEditorSnapshot}
+          onRegisterAddProviderAction={registerAddProviderAction}
           providerPendingDelete={providerPendingDelete}
           setProviderPendingDelete={setProviderPendingDelete}
         />
-        {oauthError ? <FeedbackError message={oauthError} /> : oauth?.state === "connected" ? <WebuiInline gap="medium"><span>Codex OAuth 已连接</span><WebuiButton variant="outline" size="inline" disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</WebuiButton></WebuiInline> : <WebuiInline gap="small"><WebuiButton variant="surface-quiet" size="inline" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</WebuiButton>{oauthLoginId ? <WebuiButton variant="quiet-secondary" size="inline" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</WebuiButton> : null}</WebuiInline>}
+        {oauthError ? <FeedbackError message={oauthError} /> : null}
       </>}
     </WebuiStack> : null}
   </SettingsPage>;

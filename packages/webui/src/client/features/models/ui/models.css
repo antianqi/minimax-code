@@ -33,7 +33,7 @@
   .webui-provider-picker-other { flex: 0 0 auto; margin-top: 4px; border-top: 1px solid var(--border_default); padding: 4px 0; }
   .webui-provider-picker-other-option { width: 100%; height: 32px; padding-inline: 12px; color: var(--text_default_secondary); text-align: left; }
   .webui-provider-picker-other-icon { display: flex; width: 24px; height: 24px; flex: 0 0 24px; align-items: center; justify-content: center; }
-  .webui-provider-form-headers { padding-top: 8px; }
+  .webui-provider-form-headers { padding-block: 8px; }
   .webui-provider-form-header-row { min-width: 0; }
   /* The model list: one card per model, each carrying its own fields. */
   .webui-provider-form-models { padding-top: 8px; }

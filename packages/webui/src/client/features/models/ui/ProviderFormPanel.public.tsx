@@ -16,7 +16,7 @@
 // write will actually send. The editor and its commands arrive as props — the provider CRUD
 // is `models`' duty, not `settings`'.
 
-import { useRef, useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -115,6 +115,7 @@ export interface WebuiProviderFormPanelProps {
   readonly setProviderActionError: (message?: string) => void;
   readonly editor: WebuiProviderEditor;
   readonly snapshot: WebuiProviderEditorSnapshot;
+  readonly onRegisterAddProviderAction: (action?: () => void) => void;
   readonly providerPendingDelete?: WebuiModelProviderView;
   readonly setProviderPendingDelete: Dispatch<SetStateAction<WebuiModelProviderView | undefined>>;
 }
@@ -222,7 +223,7 @@ function ProviderPresetPicker({ controlId, presets, selected, selectedName, onSe
 
 export function ProviderFormPanel({
   providers, presets, commands, setProviderActionError,
-  editor, snapshot,
+  editor, snapshot, onRegisterAddProviderAction,
   providerPendingDelete, setProviderPendingDelete,
 }: WebuiProviderFormPanelProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
@@ -271,6 +272,12 @@ export function ProviderFormPanel({
       try { await commands.loadPresets(); }
       catch (error) { setProviderActionError(error instanceof Error ? error.message : String(error)); }
     };
+    const openNewProviderRef = useRef<() => void>(() => {});
+    openNewProviderRef.current = () => { void openProviderForm(); };
+    useEffect(() => {
+      onRegisterAddProviderAction(() => openNewProviderRef.current());
+      return () => onRegisterAddProviderAction(undefined);
+    }, [onRegisterAddProviderAction]);
     // The dialog closes only on a successful delete; a refusal stays beside it,
     // in the editor's error channel.
     const confirmDeleteProvider = async () => {
@@ -322,7 +329,6 @@ export function ProviderFormPanel({
           }}><SortableContext items={ids} strategy={verticalListSortingStrategy}><div className="w-full rounded-[16px] bg-bg_grouped_tertiary p-1">{models.map((model, index) => <SortableModelRow key={ids[index]} id={ids[index]!} model={model} onTest={() => void commands.testModel({ providerId: id, modelId: textOf(model.modelId) })} onToggle={(enabled) => void toggleModel(id, model, enabled)} />)}</div></SortableContext></DndContext> : null}
         </WebuiStack>;
       })}
-      <WebuiButton variant="plain" className="h-9 w-fit px-3" disabled={!commands.canManageProviders} onClick={() => void openProviderForm()}>添加模型</WebuiButton>
       <WebuiDialog id="provider-form" open={showProviderForm} title={editingProvider ? "编辑提供商" : "添加模型"} onClose={() => editor.close()} dismissOnEscape portalTarget={portalTarget} width="standard" footer={<>
         <WebuiInline as="label" className="webui-provider-form-footer-leading"><WebuiCheckbox checked={skipTest} onChange={(event) => editor.setSkipConnectionTest(event.target.checked)} />跳过连通检测</WebuiInline>
         <WebuiDialogActions>
@@ -346,7 +352,7 @@ export function ProviderFormPanel({
             <WebuiInline justify="between" gap="medium" className="webui-provider-form-models-header"><span className="text-[14px] font-medium leading-5 text-text_default_primary">模型</span><WebuiInline gap="small"><WebuiButton variant="outline-secondary" size="compact" onClick={() => editor.addModel()}>添加模型</WebuiButton><WebuiButton variant="quiet-highlight" size="compact" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</WebuiButton></WebuiInline></WebuiInline>
             {draftModels.length ? draftModels.map((model, index) => <ProviderModelCard key={model.id} model={model} index={index} busy={formBusy} onChange={(patch) => editor.changeModel(model.id, patch)} onTest={() => void editor.testModel(model.id)} onRemove={() => editor.removeModel(model.id)} />) : <FeedbackEmpty className="webui-provider-form-models-empty" title={"请至少添加一个模型"} />}
           </WebuiStack>
-          <WebuiStack gap="small" className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <WebuiInline key={header.id} gap="small" className="webui-provider-form-header-row"><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton></WebuiInline>)}<WebuiButton variant="outline-secondary" size="compact" onClick={() => editor.addHeader()}><IconPlus aria-hidden="true" size={16} stroke={1.7} /> 添加 Header</WebuiButton></WebuiStack>
+          <WebuiStack gap="small" className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <WebuiInline key={header.id} gap="small" className="webui-provider-form-header-row"><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton></WebuiInline>)}<WebuiButton variant="outline-secondary" size="compact" className="w-fit self-start" onClick={() => editor.addHeader()}><IconPlus aria-hidden="true" size={16} stroke={1.7} /> 添加 Header</WebuiButton></WebuiStack>
           {formError ? <FeedbackError message={formError} className="webui-provider-form-error" /> : null}
         </WebuiStack>
         </form>

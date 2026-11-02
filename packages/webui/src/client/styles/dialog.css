@@ -160,6 +160,10 @@
     height: 36px;
     min-height: 36px;
   }
+  .webui-dialog-surface .webui-field-control > .webui-dropdown > * {
+    height: 36px;
+    min-height: 36px;
+  }
   .webui-dialog-surface .webui-field-label {
     color: var(--text_default_secondary);
     font-size: var(--size_14);

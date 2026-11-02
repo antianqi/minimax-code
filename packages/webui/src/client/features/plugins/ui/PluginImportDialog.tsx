@@ -1,7 +1,7 @@
 // The Git-import dialog: the marketplace's "从 Git 仓库导入插件" surface.
 //
-// It is rendered by the catalogue's existing conditional, so it mounts and unmounts on the same
-// condition it always did, and it owns no state: the URL, the preview and the busy/error flags are
+// The catalogue keeps its shared dialog instance mounted and drives its open state, while it owns no
+// form state: the URL, the preview and the busy/error flags are
 // the catalogue's, which is what keeps a failed preview from discarding what the user typed
 // (`previewPlugin` sets the error and leaves the preview alone) and a failed import from closing the
 // dialog (`importPlugin` closes and clears only after `mutate` reports success).
@@ -15,6 +15,7 @@ import { WebuiDialog } from "../../../ui/dialog.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 
 export interface PluginImportDialogProps {
+  readonly open: boolean;
   readonly url: string;
   /** A keystroke clears the preview: the shown package no longer answers the URL. */
   readonly onUrlChange: (value: string) => void;
@@ -26,12 +27,13 @@ export interface PluginImportDialogProps {
   readonly onClose: () => void;
 }
 
-export function PluginImportDialog({ url, onUrlChange, preview, error, busy, onPreview, onImport, onClose }: PluginImportDialogProps): ReactElement {
+export function PluginImportDialog({ open, url, onUrlChange, preview, error, busy, onPreview, onImport, onClose }: PluginImportDialogProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   const portalTarget = dom.portalTarget();
   return (
       <WebuiDialog
         id="plugin-import-dialog"
+        open={open}
         title="从 Git 仓库导入插件"
         description="输入 GitHub 插件仓库或子目录 URL"
         onClose={onClose}

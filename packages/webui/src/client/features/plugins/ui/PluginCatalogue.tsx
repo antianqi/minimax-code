@@ -670,17 +670,16 @@ export function PluginCatalogue({
           onPrepareMcp={(item) => void prepareMcp(item)}
         />
       )}
-      {dialog ? (
-        <PluginItemDialog
-          dialog={dialog}
+      <PluginItemDialog
+          open={dialog !== null}
+          dialog={dialog ?? "mcp"}
           editing={editing}
           onSubmit={mutate}
           {...(onChatWithAgent ? { onChatWithAgent } : {})}
           onClose={detachItemDialog}
         />
-      ) : null}
-      {pluginImportDialog ? (
-        <PluginImportDialog
+      <PluginImportDialog
+          open={pluginImportDialog}
           url={pluginUrl}
           onUrlChange={(value) => {
             attachPluginImportDialog();
@@ -694,7 +693,6 @@ export function PluginCatalogue({
           onImport={() => void importPlugin()}
           onClose={detachPluginImportDialog}
         />
-      ) : null}
     </WebuiPage>
   );
 }

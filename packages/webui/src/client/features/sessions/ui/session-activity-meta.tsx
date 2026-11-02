@@ -8,7 +8,7 @@ import {
   type WebuiSessionActivityMap,
 } from "../projection/session-activity.js";
 import type { WebuiClientSession } from "../contracts/session-view.js";
-import { FeedbackAnnouncement } from "../../../ui/feedback.js";
+import { FeedbackAnnouncement, WebuiSpinner } from "../../../ui/feedback.js";
 
 /**
  * The right-hand end of a rail row: a spinner while a turn holds the session,
@@ -37,11 +37,9 @@ export function SessionActivityMeta({
     <span className="webui-rail-session-meta">
       {busy ? (
         <>
-          {/* The ring is this rail's own: it is 10px, not the family's 14px,
-              and the family brings a visible label the rail row has no room
-              for. What the rail owes the reader is the announcement, and that
-              is the shared contract's. */}
-          <span className="webui-feedback-spinner webui-rail-spinner" aria-hidden="true" />
+          {/* The rail uses the shared compact ring and supplies only a local
+              hook so its row can hide it when the row actions appear. */}
+          <WebuiSpinner size="compact" className="webui-rail-spinner" />
           <FeedbackAnnouncement
             message={busy.busyReason === "compaction" ? "正在压缩上下文" : "正在运行"}
           />

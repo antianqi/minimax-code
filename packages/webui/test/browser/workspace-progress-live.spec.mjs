@@ -63,6 +63,38 @@ const panelText = (page) =>
     return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : null;
   });
 
+test("the workspace commit dialog completes the shared exit motion before unmounting", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setResponse("getWorkspaceEnvironment", {
+    isGitRepo: true,
+    branch: "synthetic-dialog-motion",
+    changedFiles: 1,
+    insertions: 1,
+    deletions: 0,
+    lineStatsStatus: "skipped",
+  }));
+  await openApp(page);
+  await attachLiveTurn(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  await page.getByRole("button", { name: "提交或推送" }).click();
+  const dialog = page.getByRole("dialog", { name: "提交或推送" });
+  await expect(dialog).toBeVisible();
+  await page.evaluate(() => {
+    window.__commitDialogMotion = [];
+    for (const eventName of ["animationstart", "animationend"]) {
+      document.addEventListener(eventName, (event) => {
+        if (event.target?.classList?.contains("webui-dialog-surface") && event.animationName === "webui-motion-surface-exit") {
+          window.__commitDialogMotion.push(eventName);
+        }
+      }, true);
+    }
+  });
+  await page.getByRole("button", { name: "取消" }).click();
+  await expect.poll(() => page.evaluate(() => window.__commitDialogMotion)).toContain("animationstart");
+  await expect.poll(() => page.evaluate(() => window.__commitDialogMotion)).toContain("animationend");
+  await expect(dialog).toHaveCount(0, { timeout: 500 });
+});
+
 /** Start a turn the way the runtime does, so the client attaches a stream
  *  without going through the composer. */
 async function attachLiveTurn(page) {

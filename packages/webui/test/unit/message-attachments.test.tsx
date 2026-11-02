@@ -38,6 +38,8 @@ describe("MessageAttachments", () => {
     );
     expect(html).toContain('data-testid="message-attachments"');
     expect(html).toContain('data-testid="message-attachment-image"');
+    expect(html).toContain('class="webui-mavis-button webui-motion-feedback');
+    expect(html).toContain('type="button"');
     expect(html).toContain('data-testid="message-attachment-image-img"');
     expect(html).toContain('data-testid="message-attachment-file"');
     expect(html).toContain('src="https://example.test/diagram.png"');

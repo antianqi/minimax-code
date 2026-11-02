@@ -38,6 +38,7 @@ export const WebuiTextInput = forwardRef<HTMLInputElement, WebuiTextInputProps>(
 ): ReactElement {
   const classes = [
     "webui-control",
+    "webui-motion-feedback",
     controlSize === "compact" ? "webui-control--compact" : "",
     controlSize === "dense" ? "webui-control--dense" : "",
     appearance === "bare" ? "webui-control--bare" : "",
@@ -66,7 +67,7 @@ export const WebuiTextarea = forwardRef<
   if (useWebuiPageLoading()) {
     return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-control webui-control--multiline ${controlSize === "compact" ? "webui-control--compact" : ""} ${controlSize === "large" ? "webui-control--large" : ""} ${controlSize === "document" ? "webui-control--document" : ""} ${appearance === "document" ? "webui-control--document-appearance" : ""} ${className ?? ""}`} style={props.style} />;
   }
-  return <textarea {...props} ref={ref} className={["webui-control", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
+  return <textarea {...props} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
 });
 
 /** The shared native select control, including its focus and disabled states. */
@@ -80,7 +81,7 @@ export const WebuiSelect = forwardRef<HTMLSelectElement, WebuiSelectProps>(funct
   { controlSize = "regular", appearance = "boxed", className, ...props },
   ref,
 ): ReactElement {
-  const classes = ["webui-control", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "dense" ? "webui-control--dense" : "", appearance === "custom-chevron" ? "webui-control--custom-chevron" : "", className].filter(Boolean).join(" ");
+  const classes = ["webui-control", "webui-motion-feedback", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "dense" ? "webui-control--dense" : "", appearance === "custom-chevron" ? "webui-control--custom-chevron" : "", className].filter(Boolean).join(" ");
   if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape ${classes}`} style={props.style} />;
   return <select {...props} ref={ref} className={classes} />;
 });
@@ -90,7 +91,7 @@ export const WebuiCheckbox = forwardRef<
   Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & { readonly className?: string }
 >(function WebuiCheckbox({ className, ...props }, ref): ReactElement {
   if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-checkbox ${className ?? ""}`} style={props.style} />;
-  return <input {...props} ref={ref} type="checkbox" className={["webui-checkbox", className].filter(Boolean).join(" ")} />;
+  return <input {...props} ref={ref} type="checkbox" className={["webui-checkbox", "webui-motion-feedback", className].filter(Boolean).join(" ")} />;
 });
 
 export const WebuiRadio = forwardRef<
@@ -98,7 +99,7 @@ export const WebuiRadio = forwardRef<
   Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & { readonly className?: string }
 >(function WebuiRadio({ className, ...props }, ref): ReactElement {
   if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-radio ${className ?? ""}`} style={props.style} />;
-  return <input {...props} ref={ref} type="radio" className={["webui-radio", className].filter(Boolean).join(" ")} />;
+  return <input {...props} ref={ref} type="radio" className={["webui-radio", "webui-motion-feedback", className].filter(Boolean).join(" ")} />;
 });
 
 /** A visually hidden native file picker, triggered by its owning surface's button. */

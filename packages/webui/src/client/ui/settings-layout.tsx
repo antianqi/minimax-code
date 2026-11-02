@@ -22,7 +22,7 @@
 
 import { useState, type ReactElement, type ReactNode } from "react";
 import { WebuiButton } from "./button.js";
-import { useWebuiPageLoading, WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
+import { useWebuiPageLoading, WebuiPage, WebuiSkeletonProjection, WebuiTooltip } from "./page.js";
 
 /**
  * The page frame: one centred column, the width every settings page shares.
@@ -162,9 +162,9 @@ export function InfoHint({ text, testId }: { readonly text: string; readonly tes
       <WebuiButton variant="plain" size="inline" data-testid={testId} className="webui-settings-info-hint" aria-label={text}>
         i
       </WebuiButton>
-      <WebuiMotion as="span" kind="tooltip" data-webui-tooltip-visible={visible ? "true" : "false"} aria-hidden="true" className="webui-settings-info-hint-bubble">
+      <WebuiTooltip as="span" visible={visible} aria-hidden="true" className="webui-settings-info-hint-bubble">
         {text}
-      </WebuiMotion>
+      </WebuiTooltip>
     </span>
   );
 }

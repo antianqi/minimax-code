@@ -220,12 +220,7 @@
     left: 0;
     z-index: 90;
     width: min(280px, 80vw);
-    transform: translateX(-100%);
     box-shadow: 12px 0 32px rgb(10 10 10 / 12%);
-  }
-
-  [data-webui-shell="two-column"][data-webui-rail-mode="drawer"][data-webui-rail-open="true"] .webui-rail {
-    transform: translateX(0);
   }
 
   /* The scrim behind an open drawer. It takes the surface's clicks, so the

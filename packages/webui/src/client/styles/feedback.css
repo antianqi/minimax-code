@@ -60,6 +60,7 @@
     gap: 8px;
   }
   .webui-feedback-spinner {
+    display: inline-block;
     width: 14px;
     height: 14px;
     border: 2px solid var(--border_default);
@@ -71,6 +72,13 @@
     animation-duration: var(--webui-motion-duration-loading);
     animation-timing-function: linear;
     animation-iteration-count: infinite;
+  }
+  .webui-feedback-spinner--compact {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    border: 2px solid var(--icon_default_accent);
+    border-top-color: transparent;
   }
   @keyframes webui-feedback-spin {
     to {

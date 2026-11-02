@@ -238,32 +238,32 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
         </WebuiInline>
       ) : null}
     </SettingsSection>
-    {historyOpen ? (
-      <ResetCardHistoryDialog
-        history={history}
-        onClose={() => account?.closeResetCardHistory()}
-        onLoadMore={() => void account?.loadMoreResetCardHistory()}
-      />
-    ) : null}
-    {selected ? (
-      <ResetCardConfirmDialog
-        card={selected}
-        phase={phase}
-        onConfirm={() => void account?.redeemResetCard()}
-        onCancel={() => account?.clearResetCardSelection()}
-      />
-    ) : null}
+    <ResetCardHistoryDialog
+      open={historyOpen}
+      history={history}
+      onClose={() => account?.closeResetCardHistory()}
+      onLoadMore={() => void account?.loadMoreResetCardHistory()}
+    />
+    <ResetCardConfirmDialog
+      open={selected !== undefined}
+      card={selected}
+      phase={phase}
+      onConfirm={() => void account?.redeemResetCard()}
+      onCancel={() => account?.clearResetCardSelection()}
+    />
     </>
   );
 }
 
 function ResetCardConfirmDialog({
+  open,
   card,
   phase,
   onConfirm,
   onCancel,
 }: {
-  readonly card: WebuiResetCardView;
+  readonly open: boolean;
+  readonly card?: WebuiResetCardView;
   readonly phase: WebuiResetCardPhase;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
@@ -273,6 +273,7 @@ function ResetCardConfirmDialog({
   return (
     <ResetCardPortal>
       <SettingsDialog
+        open={open}
         title={WEBUI_RESET_CARD_COPY.confirmTitle}
         testId="settings-usage-reset-card-confirm"
         onClose={onCancel}
@@ -296,7 +297,7 @@ function ResetCardConfirmDialog({
         <p className="text-[13px] leading-5 text-text_default_secondary">
           {WEBUI_RESET_CARD_COPY.confirmDescription}
         </p>
-        <p className="text-[13px] leading-5 text-text_default_primary">{formatResetCardName(card)}</p>
+        {card ? <p className="text-[13px] leading-5 text-text_default_primary">{formatResetCardName(card)}</p> : null}
         {status ? (
           <p
             className="text-[12px] leading-4 text-text_default_secondary"
@@ -311,10 +312,12 @@ function ResetCardConfirmDialog({
 }
 
 function ResetCardHistoryDialog({
+  open,
   history,
   onClose,
   onLoadMore,
 }: {
+  readonly open: boolean;
   readonly history: WebuiResetCardState["history"];
   readonly onClose: () => void;
   readonly onLoadMore: () => void;
@@ -322,6 +325,7 @@ function ResetCardHistoryDialog({
   return (
     <ResetCardPortal>
       <SettingsDialog
+        open={open}
         title={WEBUI_RESET_CARD_COPY.historyTitle}
         testId="settings-usage-reset-card-history-dialog"
         onClose={onClose}

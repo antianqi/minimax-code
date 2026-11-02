@@ -42,9 +42,8 @@ export function SessionRailRegion(props: {
       as="aside"
       kind={props.drawer ? "drawer" : "panel"}
       loading={props.projectList.loading}
-      motion={{ kind: "disclosure" }}
-      aria-hidden={props.drawer && !props.drawerOpen ? true : undefined}
-      ref={(element) => element?.toggleAttribute("inert", Boolean(props.drawer && !props.drawerOpen))}
+      visible={props.drawer ? props.drawerOpen ?? false : true}
+      motion={{ kind: props.drawer ? "surface" : "disclosure" }}
       aria-label="Primary navigation"
       data-webui-shell-region="rail"
       data-webui-rail-width={props.collapsed ? "64" : "240"}

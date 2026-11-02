@@ -14,7 +14,8 @@ import type {
 import { formatUsageResetLabel } from "../projection/usage.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiPage, WebuiSkeleton } from "../../../ui/page.js";
+import { WebuiSkeleton } from "../../../ui/page.js";
+import { WebuiFlyoutSurface } from "../../../ui/Dropdown.js";
 
 export interface UsageState {
   readonly status: "idle" | "loading" | "ready" | "error";
@@ -204,10 +205,12 @@ function UsageReady({
 
 /** The usage sub-panel: skeleton / error+retry / signed-out / content states. */
 export function UsagePanel({
+  present,
   state,
   onRetry,
   onLogin,
 }: {
+  readonly present: boolean;
   readonly state: UsageState;
   readonly onRetry: () => void;
   /** Opens the account login dialog from the signed-out usage block. */
@@ -217,7 +220,7 @@ export function UsagePanel({
     // The shared surface, not the shared skeleton: this panel opens on hover,
     // focus or click and cannot be dismissed from inside itself, so it needs no
     // trigger and no outside-press handling — only the shared look and motion.
-    <WebuiPage as="div" kind="dialog" className="webui-user-menu-usage-panel webui-dropdown-surface" role="dialog" aria-label="用量">
+    <WebuiFlyoutSurface present={present} kind="dialog" className="webui-user-menu-usage-panel" role="dialog" aria-label="用量" data-testid="usage-popover">
       {state.status === "loading" ? <UsageSkeleton animated /> : null}
       {state.status === "idle" ? <UsageSkeleton /> : null}
       {state.status === "error" ? (
@@ -233,6 +236,6 @@ export function UsagePanel({
         </WebuiStack>
       ) : null}
       {state.status === "ready" ? <UsageReady result={state.result} onLogin={onLogin} /> : null}
-    </WebuiPage>
+    </WebuiFlyoutSurface>
   );
 }

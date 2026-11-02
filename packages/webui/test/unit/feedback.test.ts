@@ -15,6 +15,7 @@ import {
   FeedbackError,
   FeedbackProgress,
   FeedbackSkeleton,
+  WebuiSpinner,
 } from "../../src/client/ui/feedback.js";
 
 const render = (element: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(element);
@@ -49,6 +50,14 @@ describe("determinate and indeterminate are different things", () => {
     expect(html).toContain("正在保存");
     expect(html).not.toContain("progressbar");
     expect(html).not.toContain("aria-valuenow");
+    expect(html).toContain('class="webui-feedback-spinner"');
+  });
+
+  it("the shared spinner owns its motion and supports the rail scale", () => {
+    const regular = render(createElement(WebuiSpinner, {}));
+    const compact = render(createElement(WebuiSpinner, { size: "compact", className: "webui-rail-spinner" }));
+    expect(regular).toBe('<span aria-hidden="true" class="webui-feedback-spinner"></span>');
+    expect(compact).toBe('<span aria-hidden="true" class="webui-feedback-spinner webui-feedback-spinner--compact webui-rail-spinner"></span>');
   });
 
   it("clamps a value the caller got wrong instead of announcing nonsense", () => {

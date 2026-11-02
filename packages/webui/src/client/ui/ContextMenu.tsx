@@ -15,7 +15,7 @@
 import { useCallback, useState, type ReactElement } from "react";
 import { WebuiIconContextChevron } from "../shell/icons.js";
 import { placeWebuiContextMenu } from "../projection/common/context-menu.js";
-import { WebuiDropdown, type WebuiDropdownPlacementArgs } from "./Dropdown.js";
+import { WebuiDropdown, WebuiFlyoutSurface, type WebuiDropdownPlacementArgs } from "./Dropdown.js";
 import { WebuiMenuItem, WebuiMenuSeparator } from "./menu-item.js";
 
 export type WebuiContextMenuItem =
@@ -105,10 +105,10 @@ export function WebuiContextMenu({
           >
             {item.label}
           </WebuiMenuItem>
-          {hasSubmenu && openSubmenu === item.key ? (
-            <div className="webui-context-menu-submenu webui-dropdown-surface" role="menu">
+          {hasSubmenu ? (
+            <WebuiFlyoutSurface present={openSubmenu === item.key} className="webui-context-menu-submenu" role="menu">
               {renderItems(item.submenu ?? [])}
-            </div>
+            </WebuiFlyoutSurface>
           ) : null}
         </div>
       );

@@ -82,13 +82,15 @@ function projectSkeleton(node: ReactNode): ReactNode {
   });
 }
 
-export type WebuiPageElement = "article" | "aside" | "div" | "main" | "section";
+export type WebuiPageElement = "article" | "aside" | "button" | "div" | "main" | "section";
 
 export interface WebuiPageProps extends HTMLAttributes<HTMLElement> {
   readonly inert?: boolean;
   readonly as?: WebuiPageElement;
   readonly loading?: boolean;
   readonly loadingLabel?: string;
+  /** Keep a page-like surface mounted while hiding it with shared motion. */
+  readonly visible?: boolean;
   /** Keep a page-like surface mounted until its shared exit animation ends. */
   readonly present?: boolean;
   readonly kind?: "content" | "dialog" | "drawer" | "panel" | "settings";
@@ -97,6 +99,8 @@ export interface WebuiPageProps extends HTMLAttributes<HTMLElement> {
     readonly state?: WebuiMotionState;
     readonly direction?: WebuiMotionDirection;
   };
+  readonly type?: "button" | "reset" | "submit";
+  readonly onExitComplete?: () => void;
   readonly className?: string;
   readonly children?: ReactNode;
 }
@@ -108,12 +112,14 @@ export const WebuiPage = forwardRef<HTMLElement, WebuiPageProps>(
       as = "main",
       loading = false,
       loadingLabel = "正在加载",
+      visible = true,
       present = true,
       kind = "content",
       motion,
       className,
       children,
       onAnimationEnd,
+      onExitComplete,
       inert,
       ...attributes
     },
@@ -130,6 +136,7 @@ export const WebuiPage = forwardRef<HTMLElement, WebuiPageProps>(
     }, [hasExitAnimation, present]);
     if (!mounted) return null;
     const exiting = !present;
+    const hidden = !visible || exiting || Boolean(inert);
     const handleAnimationEnd = (event: AnimationEvent<HTMLElement>) => {
       onAnimationEnd?.(event);
       if (
@@ -138,12 +145,13 @@ export const WebuiPage = forwardRef<HTMLElement, WebuiPageProps>(
         hasExitAnimation
       ) {
         setMounted(false);
+        onExitComplete?.();
       }
     };
     const setPageRef = (element: HTMLElement | null) => {
       if (typeof ref === "function") ref(element);
       else if (ref) ref.current = element;
-      element?.toggleAttribute("inert", exiting || Boolean(inert));
+      element?.toggleAttribute("inert", hidden);
     };
     return (
       <PageLoadingContext.Provider value={loading}>
@@ -153,7 +161,7 @@ export const WebuiPage = forwardRef<HTMLElement, WebuiPageProps>(
             ...attributes,
             ref: setPageRef,
             "aria-busy": loading || attributes["aria-busy"] || undefined,
-            "aria-hidden": exiting ? true : attributes["aria-hidden"],
+            "aria-hidden": hidden ? true : attributes["aria-hidden"],
             onAnimationEnd: handleAnimationEnd,
             style:
               exiting && motion?.kind === "panel"
@@ -167,6 +175,7 @@ export const WebuiPage = forwardRef<HTMLElement, WebuiPageProps>(
                   }
                 : attributes.style,
             "data-webui-page": kind,
+            "data-webui-page-visible": kind === "drawer" ? String(visible) : undefined,
             "data-webui-page-loading": loading ? "true" : undefined,
             ...(motion === undefined
               ? {}
@@ -235,6 +244,7 @@ export type WebuiMotionSlotKind =
   | "feedback"
   | "feedback-clip"
   | "feedback-opacity"
+  | "panel-layout"
   | "progress";
 
 export interface WebuiMotionSlotProps {
@@ -250,6 +260,7 @@ const WEBUI_MOTION_SLOT_CLASSES: Record<WebuiMotionSlotKind, string> = {
   feedback: "webui-motion-feedback",
   "feedback-clip": "webui-motion-feedback-clip",
   "feedback-opacity": "webui-motion-feedback-opacity",
+  "panel-layout": "webui-motion-panel-layout",
   progress: "webui-motion-progress",
 };
 
@@ -331,6 +342,38 @@ export const WebuiMotion = forwardRef<HTMLElement, WebuiMotionProps>(
   },
 );
 
+export interface WebuiTooltipProps extends Omit<WebuiMotionProps, "kind" | "state"> {
+  readonly visible: boolean;
+}
+
+/** A tooltip with shared visibility, accessibility and motion behavior. */
+export const WebuiTooltip = forwardRef<HTMLElement, WebuiTooltipProps>(
+  function WebuiTooltip(
+    {
+      as = "span",
+      visible,
+      className,
+      inert,
+      "aria-hidden": ariaHidden,
+      ...attributes
+    },
+    ref,
+  ): ReactElement {
+    return (
+      <WebuiMotion
+        {...attributes}
+        as={as}
+        kind="tooltip"
+        ref={ref}
+        data-webui-tooltip-visible={visible ? "true" : "false"}
+        aria-hidden={ariaHidden ?? !visible}
+        inert={inert ?? !visible}
+        className={className}
+      />
+    );
+  },
+);
+
 export interface WebuiDisclosureProps extends Omit<WebuiMotionProps, "kind" | "state"> {
   readonly open: boolean;
   readonly axis?: "horizontal" | "vertical";
@@ -365,7 +408,13 @@ export const WebuiDisclosure = forwardRef<HTMLElement, WebuiDisclosureProps>(
     const disclosureStyle = {
       ...style,
       ...(axis === "horizontal" && !open
-        ? { flexBasis: 0, minWidth: 0, overflow: "hidden", width: 0 }
+        ? {
+            borderInlineStartWidth: 0,
+            flexBasis: 0,
+            minWidth: 0,
+            overflow: "hidden",
+            width: 0,
+          }
         : {}),
     };
     const content = <div className="webui-disclosure-content">{!mountOnOpen || hasOpened || open ? children : null}</div>;

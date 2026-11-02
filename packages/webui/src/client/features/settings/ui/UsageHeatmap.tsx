@@ -15,7 +15,7 @@ import { createPortal } from "react-dom";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { useDialogLayer } from "../../../ui/overlay-listeners.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiMotion } from "../../../ui/page.js";
+import { WebuiTooltip } from "../../../ui/page.js";
 import type {
   WebuiUsageHeatmapCell,
   WebuiUsageHeatmapModel,
@@ -178,12 +178,10 @@ export function UsageHeatmap({
       </div>
       {portalTarget
         ? createPortal(
-            <WebuiMotion
+            <WebuiTooltip
               as="div"
-              kind="tooltip"
+              visible={hovered !== null}
               className="webui-account-usage-cell-tip"
-              data-webui-tooltip-visible={hovered ? "true" : "false"}
-              aria-hidden={!hovered}
               style={{
                 left: (hovered ?? tooltipCell)?.left ?? 0,
                 top: (hovered ?? tooltipCell)?.top ?? 0,
@@ -201,7 +199,7 @@ export function UsageHeatmap({
                     : "无用量"
                   : null}
               </div>
-            </WebuiMotion>,
+            </WebuiTooltip>,
             portalTarget,
           )
         : null}

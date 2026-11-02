@@ -140,6 +140,7 @@ export function SettingsSavedNotice({
  * because the list it floats over competes with the list it holds.
  */
 export function SettingsDialog({
+  open = true,
   title,
   children,
   footer,
@@ -149,6 +150,7 @@ export function SettingsDialog({
   variant = "default",
   dismissOnMaskClick = false,
 }: {
+  readonly open?: boolean;
   readonly title: string;
   readonly children: ReactNode;
   readonly footer?: ReactNode;
@@ -175,7 +177,7 @@ export function SettingsDialog({
   const dialogId = useId();
   if (variant === "preview") {
     return (
-      <SettingsPreviewDialog title={title} onClose={onClose} testId={testId}>
+      <SettingsPreviewDialog open={open} title={title} onClose={onClose} testId={testId}>
         {children}
       </SettingsPreviewDialog>
     );
@@ -184,6 +186,7 @@ export function SettingsDialog({
   return (
     <WebuiDialog
       id={`settings-dialog-${dialogId}`}
+      open={open}
       title={title}
       onClose={onClose}
       width={width === "wide" ? "standard" : "compact"}
@@ -199,11 +202,13 @@ export function SettingsDialog({
 }
 
 function SettingsPreviewDialog({
+  open,
   title,
   children,
   onClose,
   testId,
 }: {
+  readonly open: boolean;
   readonly title: string;
   readonly children: ReactNode;
   readonly onClose: () => void;
@@ -211,7 +216,7 @@ function SettingsPreviewDialog({
 }): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   return (
-    <WebuiDialog id="settings-preview" title={title} onClose={onClose} dismissOnEscape dismissOnBackdrop portalTarget={dom.portalTarget()} width="standard" testId={testId}>
+    <WebuiDialog id="settings-preview" open={open} title={title} onClose={onClose} dismissOnEscape dismissOnBackdrop portalTarget={dom.portalTarget()} width="standard" testId={testId}>
       {children}
     </WebuiDialog>
   );

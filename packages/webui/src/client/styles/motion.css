@@ -42,7 +42,7 @@
   }
   /* feedback — a control answers input. */
   .webui-motion-feedback {
-    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-property: accent-color, color, background-color, border-color, box-shadow, opacity, outline-color, transform;
     transition-duration: var(--webui-motion-duration-feedback);
     transition-timing-function: var(--webui-motion-ease-standard);
   }
@@ -66,6 +66,13 @@
     animation-duration: var(--webui-motion-duration-popup-exit);
     animation-timing-function: var(--webui-motion-ease-exit);
     animation-fill-mode: forwards;
+  }
+  .webui-motion[data-webui-motion="surface"][data-webui-page="drawer"] {
+    transform: translateX(-100%);
+    transition: transform var(--webui-motion-duration-surface) var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="surface"][data-webui-page="drawer"][data-webui-page-visible="true"] {
+    transform: translateX(0);
   }
   /* disclosure — a region opens or closes. */
   .webui-motion-disclosure {
@@ -122,7 +129,7 @@
     animation-fill-mode: forwards;
   }
   .webui-motion[data-webui-motion="disclosure"] {
-    transition-property: flex-basis, grid-template-rows, height, max-height, opacity, transform, visibility, width;
+    transition-property: border-inline-start-width, flex-basis, grid-template-rows, height, max-height, opacity, transform, visibility, width;
     transition-duration: var(--webui-motion-duration-disclosure);
     transition-timing-function: var(--webui-motion-ease-standard);
   }

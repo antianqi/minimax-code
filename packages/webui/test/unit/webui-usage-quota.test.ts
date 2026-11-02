@@ -308,7 +308,7 @@ describe("formatUsageResetLabel", () => {
 
 describe("UsagePanel states", () => {
   const render = (state: Parameters<typeof UsagePanel>[0]["state"]) =>
-    renderToStaticMarkup(createElement(UsagePanel, { state, onRetry: () => undefined }));
+    renderToStaticMarkup(createElement(UsagePanel, { present: true, state, onRetry: () => undefined }));
 
   it("shows the animated skeleton while loading", () => {
     const html = render({ status: "loading" });

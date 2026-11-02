@@ -136,6 +136,20 @@ test("the menu draws above the dialog it belongs to", async ({ page }) => {
   expect(stacking?.popupZ ?? 0).toBeGreaterThanOrEqual(stacking?.surfaceZ ?? 0);
 });
 
+test("shared menu items use the shared feedback transition for hover", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openManager(page);
+  const items = await openMenu(page);
+  const item = items.filter({ hasText: "删除" }).first();
+
+  await expect(item).toHaveClass(/webui-motion-feedback/u);
+  expect(await item.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.12s");
+  const before = await item.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await item.hover();
+  await expect.poll(() => item.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(before);
+});
+
 test("the click after a dismissal reaches what is underneath", async ({ page }) => {
   await openManager(page);
   await openMenu(page);
@@ -206,7 +220,21 @@ test("closing the dialog returns focus to the control that opened it", async ({ 
       .filter((element) => element !== surface.parentElement)
       .every((element) => element.inert),
   )).toBe(true);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.evaluate(() => {
+    window.__memoryDialogExitEnded = false;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-dialog-mask") &&
+        event.animationName === "webui-motion-surface-exit"
+      ) {
+        window.__memoryDialogExitEnded = true;
+      }
+    }, { capture: true });
+  });
   await page.keyboard.press("Escape");
+  await expect.poll(() => page.evaluate(() => window.__memoryDialogExitEnded)).toBe(true);
   await expect(dialog(page)).toHaveCount(0);
   await expect(opener).toBeFocused();
   await expect.poll(() => page.locator("#webui-root").evaluate((element) => element.inert)).toBe(true);

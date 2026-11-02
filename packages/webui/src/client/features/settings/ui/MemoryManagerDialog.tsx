@@ -54,7 +54,9 @@ export const MEMORY_DELETE_CONFIRM = {
   confirm: "删除",
 } as const;
 
-export interface MemoryManagerDialogProps {  readonly getAgentMemory?: (request?: {
+export interface MemoryManagerDialogProps {
+  readonly open: boolean;
+  readonly getAgentMemory?: (request?: {
     readonly includeContent?: boolean;
   }) => Promise<WebuiAgentMemoryView>;
   readonly setAgentMemory?: (request: {
@@ -79,6 +81,7 @@ export interface MemoryManagerDialogProps {  readonly getAgentMemory?: (request?
  * content this panel exists to show.
  */
 export function MemoryManagerDialog({
+  open,
   getAgentMemory,
   setAgentMemory,
   onClose,
@@ -109,6 +112,11 @@ export function MemoryManagerDialog({
   // alone, so it cannot close over the confirmation's state.
   const confirmOpenRef = useRef(false);
   confirmOpenRef.current = confirmingDelete;
+  useEffect(() => {
+    if (open) return;
+    setMenuOpen(false);
+    setConfirmingDelete(false);
+  }, [open]);
 
   const load = useCallback(async (reader: NonNullable<MemoryManagerDialogProps["getAgentMemory"]>) => {
     setLoading(true);
@@ -166,8 +174,8 @@ export function MemoryManagerDialog({
   }, [getAgentMemory]);
   useEffect(() => {
     const reader = readerRef.current;
-    if (reader) void load(reader);
-  }, [load]);
+    if (open && reader) void load(reader);
+  }, [load, open]);
 
   /**
    * The save predicate: `!loading && !saving && draft !== baseline &&
@@ -329,10 +337,22 @@ export function MemoryManagerDialog({
   const dialog = (
     <WebuiDialog
       id="memory-manager"
+      open={open}
       title="记忆摘要"
       headerActions={menu}
       closeTestId="agent-memory-close"
       onClose={onClose}
+      onExitComplete={() => {
+        setDraft(undefined);
+        setBaseline(undefined);
+        setUpdatedAt(undefined);
+        setFilePath(undefined);
+        setFileSize(0);
+        setError(undefined);
+        setSaved(false);
+        setMenuOpen(false);
+        setConfirmingDelete(false);
+      }}
       dismissOnEscape={!menuOpen}
       dismissOnBackdrop
       portalTarget={dom.portalTarget()}
@@ -415,9 +435,10 @@ export function MemoryManagerDialog({
    * opened it, so nothing focuses it and the keyboard stays on a menu item that
    * has since unmounted.
    */
-  const confirm = confirmingDelete ? (
+  const confirm = (
     <WebuiDialog
       id="memory-manager-confirm"
+      open={confirmingDelete}
       parentLayerId="memory-manager"
       title={MEMORY_DELETE_CONFIRM.title}
       description={MEMORY_DELETE_CONFIRM.body}
@@ -450,6 +471,6 @@ export function MemoryManagerDialog({
     >
       <></>
     </WebuiDialog>
-  ) : null;
+  );
   return <>{dialog}{confirm}</>;
 }

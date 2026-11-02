@@ -111,4 +111,24 @@ test("a session switch keeps the retained goal while its re-read is unanswered",
   await expect(disclosure).toHaveAttribute("aria-hidden", "true");
   await expect(disclosure).toHaveAttribute("inert", "");
   await expect.poll(() => disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.getByTestId("thread-goal-banner-clear").click();
+  const clearDialog = page.getByRole("dialog", { name: "删除目标？" });
+  await expect(clearDialog).toBeVisible();
+  await page.evaluate(() => {
+    window.__goalDialogExitEnded = false;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-dialog-mask") &&
+        event.animationName === "webui-motion-surface-exit"
+      ) {
+        window.__goalDialogExitEnded = true;
+      }
+    }, { capture: true });
+  });
+  await clearDialog.getByRole("button", { name: "取消" }).click();
+  await expect.poll(() => page.evaluate(() => window.__goalDialogExitEnded)).toBe(true);
+  await expect(clearDialog).toHaveCount(0);
 });

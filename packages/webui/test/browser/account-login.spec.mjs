@@ -71,6 +71,28 @@ test("the user menu opens the login page, and 登录 starts the device flow", as
   await expect(page.locator('[data-testid="account-login-status"]')).toContainText("已登录");
 });
 
+test("the account login page completes its shared surface exit on Escape", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await openFromUserMenu(page, "user-menu-account-login");
+  const login = page.locator('[data-testid="account-login-page-overlay"]');
+  await page.evaluate(() => {
+    window.__accountLoginExitAnimation = undefined;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-account-login-page-overlay")
+      ) {
+        window.__accountLoginExitAnimation = event.animationName;
+      }
+    }, { capture: true });
+  });
+
+  await page.keyboard.press("Escape");
+  await expect.poll(() => page.evaluate(() => window.__accountLoginExitAnimation))
+    .toBe("webui-motion-surface-exit");
+  await expect(login).toHaveCount(0);
+});
+
 test("切换账号 signs the current account out before offering a sign-in", async ({ page }) => {
   await openApp(page, "#session=A");
   await page.evaluate(() =>
@@ -105,12 +127,16 @@ test("the signed-out usage block carries a 登录 button into the same page", as
 test("usage loading applies the shared pulse animation to each skeleton shape", async ({ page }) => {
   await configureFixture(page, () => window.__fixture.delayEvery("getUsageQuota", {}));
   await openApp(page, "#session=A");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect.poll(() =>
     page.evaluate(() => window.__fixture.pending.some((item) => item.operation === "getUsageQuota")),
   ).toBe(true);
   await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
   await page.locator('[data-testid="user-menu-usage"]').click();
 
+  const popover = page.getByTestId("usage-popover");
+  await expect(popover).toHaveAttribute("data-webui-motion", "surface");
+  await expect(popover).toHaveAttribute("data-webui-motion-state", "enter");
   const skeletons = page.locator('[data-testid="usage-popover-loading"] .webui-skeleton--pulse.webui-motion-loading');
   await expect(skeletons).toHaveCount(8);
   await expect.poll(() => skeletons.first().evaluate((element) => getComputedStyle(element).animationName))
@@ -118,6 +144,10 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
 
   await page.evaluate(() => window.__fixture.resolveAllPending("getUsageQuota", {}, { signedIn: false }));
   await expect(page.locator('[data-testid="usage-sign-in-button"]')).toBeVisible();
+  await page.mouse.move(1, 1);
+  await expect(popover).toHaveAttribute("data-webui-motion-state", "exit");
+  expect(await popover.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-motion-surface-exit");
+  await expect(popover).toHaveCount(0, { timeout: 500 });
 });
 
 test("the legal notice names the account's own documents", async ({ page }) => {

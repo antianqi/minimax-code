@@ -141,7 +141,7 @@
   }
   /* A hover fly-out, so it is not a dropdown — but it is the same surface:
    * the background, border, radius, shadow and motion come from
-   * `webui-dropdown-surface` in `styles/dropdown.css`, and only this panel's
+   * `WebuiFlyoutSurface` in the shared dropdown layer, and only this panel's
    * own box and typography stay here. */
   .webui-user-menu-usage-panel {
     position: absolute;

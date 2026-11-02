@@ -102,6 +102,81 @@ test.describe("the layout adapts to the width it has", () => {
     });
   }
 
+  test("the narrow navigation drawer uses the shared page transform transition", async ({ page }) => {
+    await page.setViewportSize({ width: 480, height: 900 });
+    await configureFixture(page, () => undefined);
+    await openApp(page, "#session=A");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+
+    const rail = page.locator(".webui-rail");
+    const drawerWidth = await rail.evaluate((element) => element.getBoundingClientRect().width);
+    await expect(rail).toHaveAttribute("data-webui-page-visible", "false");
+    await expect(rail).toHaveAttribute("aria-hidden", "true");
+    expect(await rail.evaluate((element) => element.hasAttribute("inert"))).toBe(true);
+    expect(await rail.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain("transform");
+    expect(await rail.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.18s");
+    expect(await rail.evaluate((element) => getComputedStyle(element).transform)).not.toBe("none");
+    await page.getByRole("button", { name: "展开导航栏" }).click();
+    const scrim = page.getByRole("button", { name: "关闭导航栏" });
+    await expect(scrim).toHaveAttribute("data-webui-motion", "surface");
+    await expect(scrim).toHaveAttribute("data-webui-motion-state", "enter");
+    await expect(rail).toHaveAttribute("data-webui-page-visible", "true");
+    await expect(rail).not.toHaveAttribute("aria-hidden", "true");
+    expect(await rail.evaluate((element) => element.hasAttribute("inert"))).toBe(false);
+    await page.waitForTimeout(70);
+    const openTransform = await rail.evaluate((element) => getComputedStyle(element).transform);
+    const openX = Number(openTransform.match(/^matrix\([^,]+,[^,]+,[^,]+,[^,]+,([^,]+)/u)?.[1] ?? NaN);
+    expect(openX).toBeGreaterThan(-drawerWidth);
+    expect(openX).toBeLessThan(0);
+    await page.waitForTimeout(140);
+    expect(await rail.evaluate((element) => getComputedStyle(element).transform)).toBe("matrix(1, 0, 0, 1, 0, 0)");
+
+    await page.evaluate(() => {
+      window.__railScrimExitAnimation = undefined;
+      document.addEventListener("animationend", (event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.hasAttribute("data-webui-rail-scrim")
+        ) {
+          window.__railScrimExitAnimation = event.animationName;
+        }
+      }, { capture: true });
+    });
+    await page.mouse.click(400, 400);
+    await expect(rail).toHaveAttribute("data-webui-page-visible", "false");
+    await expect(rail).toHaveAttribute("aria-hidden", "true");
+    expect(await rail.evaluate((element) => element.hasAttribute("inert"))).toBe(true);
+    await page.waitForTimeout(70);
+    const closeTransform = await rail.evaluate((element) => getComputedStyle(element).transform);
+    const closeX = Number(closeTransform.match(/^matrix\([^,]+,[^,]+,[^,]+,[^,]+,([^,]+)/u)?.[1] ?? NaN);
+    expect(closeX).toBeLessThan(0);
+    expect(closeX).toBeGreaterThan(-drawerWidth);
+    await expect.poll(() => page.evaluate(() => window.__railScrimExitAnimation)).toBe("webui-motion-surface-exit");
+    await expect(scrim).toHaveCount(0);
+    await page.waitForTimeout(140);
+    expect(await rail.evaluate((element) => getComputedStyle(element).transform)).toBe(`matrix(1, 0, 0, 1, ${-drawerWidth}, 0)`);
+  });
+
+  test("the wide navigation rail uses the shared disclosure transition when collapsed", async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 900 });
+    await configureFixture(page, () => undefined);
+    await openApp(page, "#session=A");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+
+    const rail = page.locator(".webui-rail");
+    expect(await rail.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain("width");
+    expect(await rail.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.16s");
+    const expandedWidth = await rail.evaluate((element) => element.getBoundingClientRect().width);
+    await page.getByRole("button", { name: "收起导航栏" }).click();
+    await expect(rail).toHaveAttribute("data-webui-rail-width", "64");
+    await page.waitForTimeout(70);
+    const widthDuringCollapse = await rail.evaluate((element) => element.getBoundingClientRect().width);
+    expect(widthDuringCollapse).toBeLessThan(expandedWidth);
+    expect(widthDuringCollapse).toBeGreaterThan(64);
+    await page.waitForTimeout(130);
+    expect(await rail.evaluate((element) => element.getBoundingClientRect().width)).toBe(64);
+  });
+
   test("the header row's parts do not overlap each other", async ({ page }) => {
     await page.setViewportSize({ width: 480, height: 900 });
     await configureFixture(page, () => undefined);
@@ -180,7 +255,7 @@ test.describe("the layout adapts to the width it has", () => {
     await openApp(page, "#session=A");
 
     const motion = page.locator(".webui-progress-panel-motion");
-    await expect(motion).toHaveClass(/is-open/);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "enter");
 
     // The card is anchored to the window rather than to the surface, so the
     // surface's width does not decide where it stands.
@@ -240,20 +315,31 @@ test.describe("the layout adapts to the width it has", () => {
 
   test("a closed progress panel reserves no width at all", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await configureFixture(page, () => undefined);
     await openApp(page, "#session=A");
 
     const motion = page.locator(".webui-progress-panel-motion");
-    await expect(motion).toHaveClass(/is-open/);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "enter");
     const layout = page.locator('[data-webui-session-layout="true"]');
     expect(await layout.evaluate((element) => getComputedStyle(element).paddingRight)).toBe("312px");
+    const layoutMotion = await layout.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { property: style.transitionProperty, duration: style.transitionDuration };
+    });
+    expect(layoutMotion.property).toContain("padding-inline-end");
+    expect(layoutMotion.duration).toBe("0.18s");
 
     await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "环境信息与进度" }).click();
-    await expect(motion).not.toHaveClass(/is-open/);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "exit");
+    await page.waitForTimeout(60);
+    const inFlightPadding = await layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingRight));
+    expect(inFlightPadding).toBeGreaterThan(0);
+    expect(inFlightPadding).toBeLessThan(312);
 
     // The card's width animates to nothing and the gutter it had reserved goes
     // with it, so the conversation gets the space back.
-    await expect.poll(async () => (await motion.boundingBox()).width).toBe(0);
+    await expect(motion).toHaveCount(0);
     await expect
       .poll(async () => layout.evaluate((element) => getComputedStyle(element).paddingRight))
       .toBe("0px");
@@ -265,13 +351,12 @@ test.describe("the layout adapts to the width it has", () => {
     await openApp(page, "#session=A");
 
     const motion = page.locator(".webui-progress-panel-motion");
-    await expect(motion).toHaveClass(/is-open/);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "enter");
 
     // Opening the workspace panel closes the progress panel: one tool region
     // gives way, the other takes the space.
     await openPanel(page);
-    await expect(motion).not.toHaveClass(/is-open/);
-    await expect.poll(async () => (await motion.boundingBox()).width).toBe(0);
+    await expect(motion).toHaveCount(0);
   });
 
   test("the progress panel closes itself where the conversation cannot spare its gutter", async ({ page }) => {
@@ -285,8 +370,7 @@ test.describe("the layout adapts to the width it has", () => {
       // gutter instead of on top of the text. Below the width the conversation
       // cannot spare that gutter, so the card takes itself away.
       const motion = page.locator(".webui-progress-panel-motion");
-      await expect(motion).not.toHaveClass(/is-open/);
-      await expect.poll(async () => (await motion.boundingBox()).width).toBe(0);
+      await expect(motion).toHaveCount(0);
 
       // The control says so rather than pretending to work.
       const toggle = page.getByTestId("workspace-panel-controls").getByRole("button", { name: "环境信息与进度" });
@@ -300,24 +384,24 @@ test.describe("the layout adapts to the width it has", () => {
     await openApp(page, "#session=A");
 
     const motion = page.locator(".webui-progress-panel-motion");
-    await expect(motion).toHaveClass(/is-open/);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "enter");
 
     // The window narrows: the card has nowhere to go but on top of the text,
     // so it takes itself away.
     await page.setViewportSize({ width: 1024, height: 900 });
-    await expect(motion).not.toHaveClass(/is-open/);
-    await expect.poll(async () => (await motion.boundingBox()).width).toBe(0);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "exit");
+    await expect(motion).toHaveCount(0);
 
     // It stays away when the window widens again: it does not come back on its
     // own over the text it was just closing for.
     await page.setViewportSize({ width: 1440, height: 900 });
-    await expect(motion).not.toHaveClass(/is-open/);
+    await expect(motion).toHaveCount(0);
 
     // And it can be opened by hand, now that there is room for it.
     const toggle = page.getByTestId("workspace-panel-controls").getByRole("button", { name: "环境信息与进度" });
     await expect(toggle).not.toHaveAttribute("aria-disabled", "true");
     await toggle.click();
-    await expect(motion).toHaveClass(/is-open/);
+    await expect(motion).toHaveAttribute("data-webui-motion-state", "enter");
   });
 
   test("the composer's controls do not share a line they cannot both fit on", async ({ page }) => {

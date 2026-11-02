@@ -33,6 +33,7 @@ const SHARED_ANIMATION_ENGINE_IMPORTS = new Map([["lottie-web", "ui/feedback.tsx
 const MOTION_DECLARATION = /(?:^|[;{]\s*)(?:transition(?:-[a-z-]+)?|animation(?:-[a-z-]+)?)\s*:/u;
 const MOTION_UTILITY = /^(?:transition(?:-|$)|duration-|ease-|animate-|rotate-)/u;
 const COMPONENT_OWNED_MOTION_CLASSES = new Set([
+  "webui-motion",
   "webui-motion-disclosure",
   "webui-motion-disclosure-transform",
   "webui-motion-feedback",
@@ -40,9 +41,30 @@ const COMPONENT_OWNED_MOTION_CLASSES = new Set([
   "webui-motion-feedback-opacity",
   "webui-motion-loading",
   "webui-motion-loading-pulse",
+  "webui-motion-panel-layout",
   "webui-motion-progress",
   "webui-motion-surface-enter",
   "webui-motion-surface-exit",
+]);
+const SHARED_COMPONENT_CLASSES = new Map([
+  ["webui-flyout-surface", { component: "WebuiFlyoutSurface", owner: "ui/Dropdown.tsx" }],
+  ["webui-dropdown-surface", { component: "WebuiFlyoutSurface", owner: "ui/Dropdown.tsx" }],
+  ["webui-feedback-spinner", { component: "WebuiSpinner", owner: "ui/feedback.tsx" }],
+]);
+const MOTION_COMPONENT_IMPLEMENTATION_FILES = new Set([
+  "ui/Dropdown.tsx",
+  "ui/ToggleSwitch.tsx",
+  "ui/button.tsx",
+  "ui/feedback.tsx",
+  "ui/field.tsx",
+  "ui/menu-item.tsx",
+  "ui/page.tsx",
+]);
+const SHARED_FEEDBACK_CONTROLS = new Set([
+  "ui/ToggleSwitch.tsx",
+  "ui/button.tsx",
+  "ui/field.tsx",
+  "ui/menu-item.tsx",
 ]);
 const INTERACTIVE_TRANSFORM_UTILITY = /^(?:-?(?:scale|translate)-|transform(?:-|$))/u;
 const ARBITRARY_MOTION_PROPERTY = /(?:^|[\[:])(?:animation|transition)\s*:/u;
@@ -152,9 +174,20 @@ export function sourceMotionOwnershipProblems(file, text) {
       for (const token of value.split(/\s+/u).filter(Boolean)) {
         const utility = token.slice(token.lastIndexOf(":") + 1);
         const interactiveVariant = INTERACTIVE_VARIANT.test(token);
-        if (file.startsWith("features/") && COMPONENT_OWNED_MOTION_CLASSES.has(utility)) {
+        const sharedComponent = SHARED_COMPONENT_CLASSES.get(utility);
+        if (sharedComponent && file !== sharedComponent.owner) {
           problems.push(
-            `${file}: source names ${JSON.stringify(utility)} directly; use WebuiMotionSlot or WebuiDisclosure`,
+            `${file}: source names ${JSON.stringify(utility)} directly; use ${sharedComponent.component}`,
+          );
+        }
+        if (!MOTION_COMPONENT_IMPLEMENTATION_FILES.has(file) && COMPONENT_OWNED_MOTION_CLASSES.has(utility)) {
+          const owner = utility === "webui-motion"
+            ? "WebuiMotion or WebuiPage"
+            : utility === "webui-motion-disclosure"
+              ? "WebuiMotionSlot or WebuiDisclosure"
+              : "WebuiMotionSlot";
+          problems.push(
+            `${file}: source names ${JSON.stringify(utility)} directly; use ${owner}`,
           );
         }
         if (
@@ -174,6 +207,29 @@ export function sourceMotionOwnershipProblems(file, text) {
   }
 
   function inspect(node) {
+    if (
+      file !== "ui/button.tsx" &&
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.attributes.properties.some((attribute) =>
+        ts.isJsxAttribute(attribute) &&
+        attribute.name.getText(sourceFile) === "role" &&
+        attribute.initializer &&
+        ts.isStringLiteral(attribute.initializer) &&
+        attribute.initializer.text === "button",
+      )
+    ) {
+      problems.push(`${file}: custom role=button bypasses shared button semantics and feedback motion; use WebuiButton`);
+    }
+    if (
+      file !== "ui/page.tsx" &&
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText(sourceFile) === "WebuiDialog" &&
+      !node.attributes.properties.some((attribute) =>
+        ts.isJsxAttribute(attribute) && attribute.name.getText(sourceFile) === "open",
+      )
+    ) {
+      problems.push(`${file}: WebuiDialog must receive an explicit open state so its shared exit motion can finish`);
+    }
     if (ts.isJsxOpeningElement(node) && node.tagName.getText(sourceFile) === "details") {
       problems.push(`${file}: native <details> bypasses the shared disclosure layout and motion contract`);
     }
@@ -182,6 +238,15 @@ export function sourceMotionOwnershipProblems(file, text) {
       ["animate", "animateMotion", "animateTransform"].includes(node.tagName.getText(sourceFile))
     ) {
       problems.push(`${file}: inline SVG animation bypasses the shared motion component`);
+    }
+    if (
+      file !== "ui/page.tsx" &&
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.attributes.properties.some((attribute) =>
+        ts.isJsxAttribute(attribute) && attribute.name.getText(sourceFile) === "data-webui-motion",
+      )
+    ) {
+      problems.push(`${file}: data-webui-motion is owned by WebuiMotion or WebuiPage; use the shared component`);
     }
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const moduleName = node.moduleSpecifier.text;
@@ -243,6 +308,11 @@ export function sourceMotionOwnershipProblems(file, text) {
   return problems;
 }
 
+export function sharedFeedbackControlProblems(file, text) {
+  if (!SHARED_FEEDBACK_CONTROLS.has(file) || text.includes("webui-motion-feedback")) return [];
+  return [`${file}: shared controls must opt into the common feedback motion family`];
+}
+
 export function featureRotationOwnershipProblems(file, text) {
   if (!file.startsWith("features/")) return [];
   const staticFeatureRotations = [
@@ -274,6 +344,18 @@ export function featureInteractionTransformOwnershipProblems(file, text) {
     if (/\b(?:transform|translate|scale|rotate)\s*:/u.test(declarations)) {
       problems.push(`${file}: interaction transforms belong to a shared motion family`);
     }
+  }
+  return problems;
+}
+
+export function disabledTransitionOwnershipProblems(file, text) {
+  const problems = [];
+  for (const [, selector, declarations] of text.matchAll(/([^{}]+)\{([^{}]*)\}/gs)) {
+    if (!/\btransition(?:-property)?\s*:\s*none\s*;/u.test(declarations)) continue;
+    const isEmptyRange =
+      file === "styles/motion.css" &&
+      selector.includes('.webui-motion[data-webui-motion="range"][data-empty="true"]');
+    if (!isEmptyRange) problems.push(`${file}: disabling a shared transition requires a motion-family exception`);
   }
   return problems;
 }
@@ -310,6 +392,7 @@ async function checkMotionOwnership(inventory) {
     problems.push(...featureRotationOwnershipProblems(file, stylesheet));
     problems.push(...featureSmoothScrollOwnershipProblems(file, stylesheet));
     problems.push(...featureInteractionTransformOwnershipProblems(file, stylesheet));
+    problems.push(...disabledTransitionOwnershipProblems(file, stylesheet));
     if (!MOTION_DECLARATION.test(stylesheet)) continue;
     if (file.startsWith("features/") && !BUSINESS_MOTION_STYLESHEET_EXCEPTIONS.has(file)) {
       problems.push(
@@ -338,6 +421,7 @@ async function checkMotionOwnership(inventory) {
     const fileProblems = sourceMotionOwnershipProblems(file, text);
     rawUtilityClasses += fileProblems.filter((problem) => problem.includes("raw source motion utility")).length;
     problems.push(...fileProblems);
+    problems.push(...sharedFeedbackControlProblems(file, text));
     for (const asset of animationAssetImports(file, text)) {
       const owners = importedAnimationAssets.get(asset) ?? [];
       owners.push(file);

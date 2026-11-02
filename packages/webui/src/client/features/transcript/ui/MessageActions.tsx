@@ -193,6 +193,7 @@ export function WebuiMessageActions({
 }
 
 export function WebuiRewindDialog({
+  open,
   messageId,
   preview,
   loading,
@@ -201,6 +202,7 @@ export function WebuiRewindDialog({
   onClose,
   onConfirm,
 }: {
+  readonly open: boolean;
   readonly messageId: string;
   readonly preview?: WebuiGetSessionRewindPreviewResult;
   readonly loading: boolean;
@@ -213,7 +215,7 @@ export function WebuiRewindDialog({
   const files = preview?.turns.flatMap((turn) => turn.files) ?? [];
   const turns = preview?.turns.length ?? 1;
   return (
-    <WebuiDialog id="rewind-dialog" title="回退" description={files.length > 0 ? `${turns} 轮对话将会回退 · ${files.length} 个文件将被修改。` : `${turns} 轮对话将会回退，不涉及任何文件改动。`} onClose={onClose} dismissOnEscape portalTarget={dom.portalTarget()} testId="rewind-preview-dialog" dataAttributes={{ "data-message-id": messageId }} width="compact" footer={<WebuiDialogActions>
+    <WebuiDialog id="rewind-dialog" open={open} title="回退" description={files.length > 0 ? `${turns} 轮对话将会回退 · ${files.length} 个文件将被修改。` : `${turns} 轮对话将会回退，不涉及任何文件改动。`} onClose={onClose} dismissOnEscape portalTarget={dom.portalTarget()} testId="rewind-preview-dialog" dataAttributes={{ "data-message-id": messageId }} width="compact" footer={<WebuiDialogActions>
       <WebuiButton variant="secondary" onClick={onClose} disabled={busy}>取消</WebuiButton>
       <WebuiButton variant="secondary" onClick={() => onConfirm(false)} disabled={busy} data-testid="rewind-confirm-only">仅回退对话</WebuiButton>
       {files.length > 0 ? <WebuiButton variant="danger" onClick={() => onConfirm(true)} disabled={busy} data-testid="rewind-confirm-with-files">回退对话和文件</WebuiButton> : null}

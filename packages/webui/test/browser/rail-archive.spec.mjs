@@ -35,6 +35,24 @@ const lastBody = (page, operation) =>
     operation,
   );
 
+test("the rail context-menu flyout uses the shared surface exit lifecycle", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await sessionRow(page, "B").first().click({ button: "right", position: { x: 40, y: 16 } });
+
+  const submenu = page.locator(".webui-context-menu-submenu");
+  await menuItem(page, "复制").hover();
+  await expect(submenu).toBeVisible();
+  await expect(submenu).toHaveAttribute("data-webui-motion", "surface");
+  await expect(submenu).toHaveAttribute("data-webui-motion-state", "enter");
+
+  await menuItem(page, "归档").hover();
+  await expect(submenu).toHaveAttribute("data-webui-motion-state", "exit");
+  expect(await submenu.evaluate((node) => getComputedStyle(node).animationName)).toBe("webui-motion-surface-exit");
+  await expect(submenu).toHaveCount(0, { timeout: 500 });
+});
+
 /** Opens settings the way a user does: the user menu, then 设置. */
 async function openSettings(page) {
   await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();

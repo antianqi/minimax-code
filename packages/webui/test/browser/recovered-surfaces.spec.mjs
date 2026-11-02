@@ -35,6 +35,7 @@ test("the sign-in row renders seven days instead of tripping the error boundary"
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await openApp(page, "#session=A");
   await openUserMenu(page);
 
@@ -45,6 +46,17 @@ test("the sign-in row renders seven days instead of tripping the error boundary"
   await expect(page.locator('[data-testid="signin-card"]')).toBeVisible();
   await expect(page.locator('[data-testid="signin-day-1"]')).toBeVisible();
   await expect(page.locator('[data-testid="signin-day-7"]')).toBeVisible();
+  const creditsInfo = page.getByRole("button", { name: "关于签到积分" });
+  await creditsInfo.hover();
+  const tooltip = page.locator('[role="tooltip"]');
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toHaveAttribute("data-webui-motion", "tooltip");
+  await expect(tooltip).toHaveAttribute("data-webui-tooltip-visible", "true");
+  await expect.poll(() => tooltip.evaluate((element) => getComputedStyle(element).transitionDuration))
+    .toContain("0.12s");
+  await page.locator("[data-testid='signin-card']").hover({ position: { x: 12, y: 12 } });
+  await expect(tooltip).toHaveAttribute("aria-hidden", "true");
+  await expect(tooltip).toHaveAttribute("inert", "");
   // No error card, and no card-level error panel either: a degraded panel is
   // allowed, a crashed one is not.
   await expect(boundary(page)).toHaveCount(0);
@@ -52,16 +64,49 @@ test("the sign-in row renders seven days instead of tripping the error boundary"
   expect(pageErrors).toEqual([]);
 });
 
+test("the sign-in flyout completes its shared surface exit when another account panel opens", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openApp(page, "#session=A");
+  await openUserMenu(page);
+  await page.locator(".webui-user-menu-signin-anchor").hover();
+
+  const signinPanel = page.getByRole("dialog", { name: "每日签到" });
+  await expect(signinPanel).toHaveAttribute("data-webui-motion-state", "enter");
+  await page.evaluate(() => {
+    window.__signinFlyoutExitAnimation = undefined;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-user-menu-signin-panel")
+      ) {
+        window.__signinFlyoutExitAnimation = event.animationName;
+      }
+    }, { capture: true });
+  });
+
+  await page.locator('[data-testid="user-menu-usage"]').click();
+  await expect.poll(() => page.evaluate(() => window.__signinFlyoutExitAnimation))
+    .toBe("webui-motion-surface-exit");
+  await expect(signinPanel).toHaveCount(0);
+});
+
 test("the workspace picker opens 选择新项目 without tripping the error boundary", async ({ page }) => {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.emulateMedia({ reducedMotion: "no-preference" });
 
   // The project row renders only on the home surface — the bar is inside
   // `!sessionLayout`. Opening `#session=A` puts the composer in a session,
   // where there is no workspace bar to click at all.
   await openApp(page, "");
   await page.locator(".webui-workspace-bar-trigger").click();
-  await page.getByRole("option", { name: "选择新项目" }).click();
+  const chooseNew = page.getByRole("option", { name: "选择新项目" });
+  expect(await chooseNew.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.12s");
+  const idleBackground = await chooseNew.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await chooseNew.hover();
+  await expect.poll(() => chooseNew.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(idleBackground);
+  await chooseNew.click();
 
   // The fixture answers an honest listing, and the owner normalises what
   // comes back before the view sees it: a body that is not a listing degrades
@@ -72,6 +117,22 @@ test("the workspace picker opens 选择新项目 without tripping the error boun
   await expect(page.locator(".webui-composer-menu-empty")).toBeVisible();
   await expect(boundary(page)).toHaveCount(0);
   expect(pageErrors).toEqual([]);
+
+  await page.evaluate(() => {
+    window.__workspaceBrowserExitAnimation = undefined;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.matches(".webui-workspace-menu--desktop")
+      ) {
+        window.__workspaceBrowserExitAnimation = event.animationName;
+      }
+    }, { capture: true });
+  });
+  await browser.getByRole("button", { name: "取消" }).click();
+  await expect.poll(() => page.evaluate(() => window.__workspaceBrowserExitAnimation))
+    .toBe("webui-motion-surface-exit");
+  await expect(browser).toHaveCount(0);
 });
 
 test("choosing a permission mode survives the write-then-read-back check", async ({ page }) => {

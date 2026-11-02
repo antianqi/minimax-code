@@ -13,7 +13,7 @@ import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.
 import { WebuiGoalBanner } from "../../src/client/features/goal/ui/GoalBanner.public.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
 import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
-import { WebuiMotionSlot } from "../../src/client/ui/page.js";
+import { WebuiMotionSlot, WebuiTooltip } from "../../src/client/ui/page.js";
 import { projectWebuiDiffFile } from "../../src/client/projection/common/diff-workspace-boundary.js";
 import { projectWebuiUnifiedDiffLines } from "../../src/client/features/workspace/projection/panel-projection.js";
 import {
@@ -586,5 +586,39 @@ describe("shared motion slot", () => {
     expect(markup).toBe(
       '<span class="existing-layout webui-motion-disclosure-transform is-rotated-90">arrow</span>',
     );
+  });
+
+  it("applies the shared panel-layout transition to the existing layout element", () => {
+    const markup = renderToStaticMarkup(
+      createElement(WebuiMotionSlot, {
+        kind: "panel-layout",
+        children: createElement("div", { className: "conversation-layout" }),
+      }),
+    );
+    expect(markup).toBe('<div class="conversation-layout webui-motion-panel-layout"></div>');
+  });
+
+  it("owns tooltip visibility and reduced interactivity through the shared component", () => {
+    const hidden = renderToStaticMarkup(
+      createElement(WebuiTooltip, {
+        visible: false,
+        children: "details",
+      }),
+    );
+    expect(hidden).toContain('data-webui-motion="tooltip"');
+    expect(hidden).toContain('data-webui-tooltip-visible="false"');
+    expect(hidden).toContain('aria-hidden="true"');
+
+    const visible = renderToStaticMarkup(
+      createElement(WebuiTooltip, {
+        visible: true,
+        "aria-hidden": true,
+        children: "details",
+      }),
+    );
+    expect(visible).toContain('data-webui-tooltip-visible="true"');
+    // A caller can keep a visual hint out of the accessibility tree when its
+    // trigger already carries the complete accessible name.
+    expect(visible).toContain('aria-hidden="true"');
   });
 });

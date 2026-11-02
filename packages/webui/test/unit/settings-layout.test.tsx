@@ -67,7 +67,7 @@ describe("the shared settings skeleton", () => {
         </SettingsSection>
       </SettingsPage>,
     );
-    expect(markup).toContain('class="webui-settings-page"');
+    expect(markup).toMatch(/class="[^"]*\bwebui-settings-page\b[^"]*"/u);
     expect(markup).toContain('class="webui-settings-section"');
     expect(markup).toContain('class="webui-settings-card"');
     expect(markup).toContain('class="webui-settings-row"');
@@ -101,10 +101,10 @@ describe("the shared settings skeleton", () => {
 
   it("is the frame the settings pages render in", () => {
     const worktree = renderToStaticMarkup(<WebuiWorktreePanel workspaces={[]} />);
-    expect(worktree).toContain('class="webui-settings-page"');
+    expect(worktree).toMatch(/class="[^"]*\bwebui-settings-page\b[^"]*"/u);
     expect(worktree).toContain('class="webui-settings-section"');
     const usage = renderToStaticMarkup(<UsageModelSettings />);
-    expect(usage).toContain('class="webui-settings-page"');
+    expect(usage).toMatch(/class="[^"]*\bwebui-settings-page\b[^"]*"/u);
   });
 
   it("leaves no settings page drawing a frame of its own", () => {

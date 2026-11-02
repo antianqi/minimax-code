@@ -187,14 +187,14 @@ export function MessageItem({
   };
   // The dialog is rendered conditionally, so the layer is only active while it is
   // on screen: an inactive layer casts no vote.
-  const forkDialog = forkOpen ? (
-    <WebuiDialog id="fork-dialog" title="复制为新会话" description={forkOptions?.unavailableReason ?? "保留当前上下文，在新会话中继续"} onClose={() => setForkOpen(false)} dismissOnEscape portalTarget={dom.portalTarget()} testId="fork-dialog" width="compact" footer={<WebuiDialogActions>
+  const forkDialog = (
+    <WebuiDialog id="fork-dialog" open={forkOpen} title="复制为新会话" description={forkOptions?.unavailableReason ?? "保留当前上下文，在新会话中继续"} onClose={() => setForkOpen(false)} dismissOnEscape portalTarget={dom.portalTarget()} testId="fork-dialog" width="compact" footer={<WebuiDialogActions>
       <WebuiButton variant="secondary" onClick={() => setForkOpen(false)} disabled={mutationBusy}>取消</WebuiButton>
       <WebuiButton variant="primary" onClick={confirmFork} disabled={mutationBusy || forkOptions?.canFork === false}>复制并进入</WebuiButton>
     </WebuiDialogActions>}>
         <WebuiTextInput aria-label="会话名称" value={forkTitle} onChange={(event) => { forkTitleEdited.current = true; setForkTitle(event.target.value); }} placeholder="使用简短且不同的名称，便于识别" disabled={forkOptions?.canFork === false} />
     </WebuiDialog>
-  ) : null;
+  );
   const renderedForkDialog = forkDialog;
   if (role === "user") {
     return (
@@ -237,7 +237,7 @@ export function MessageItem({
               </div>
             </div>}
             {!editing ? <WebuiMessageActions {...actionProps} /> : null}
-            {rewindOpen ? <WebuiRewindDialog messageId={messageId} preview={rewindPreview} loading={rewindLoading} error={mutationError} busy={mutationBusy} onClose={() => setRewindOpen(false)} onConfirm={confirmRewind} /> : null}
+            <WebuiRewindDialog open={rewindOpen} messageId={messageId} preview={rewindPreview} loading={rewindLoading} error={mutationError} busy={mutationBusy} onClose={() => setRewindOpen(false)} onConfirm={confirmRewind} />
           </WebuiStack>
         </WebuiInline>
       </div>

@@ -186,7 +186,7 @@ export function AccountLoginPage({
 
   const links = webuiAccountLegalLinks(scope);
   const portalTarget = dom.portalTarget();
-  if (!open || !portalTarget) return null;
+  if (!portalTarget) return null;
 
   const busy = phase.kind === "opening" || phase.kind === "awaiting";
   const subtitle =
@@ -355,6 +355,7 @@ export function AccountLoginPage({
     <WebuiPage
       as="div"
       kind="dialog"
+      present={open}
       motion={{ kind: "surface", state: "enter", direction: "none" }}
       className="webui-account-login-page-overlay"
       role="dialog"

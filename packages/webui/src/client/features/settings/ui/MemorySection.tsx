@@ -171,14 +171,13 @@ export function MemorySection({
       {error ? (
         <FeedbackError message=<>error</> className="webui-settings-error" testId="memory-error" />
       ) : null}
-      {managing ? (
-        <MemoryManagerDialog
+      <MemoryManagerDialog
+          open={managing}
           getAgentMemory={getAgentMemory}
           setAgentMemory={setAgentMemory}
           onClose={closeManager}
           {...(onCreateInSession ? { onCreateInSession } : {})}
         />
-      ) : null}
     </SettingsSection>
   );
 }

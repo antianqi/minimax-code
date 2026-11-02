@@ -62,6 +62,11 @@ The caller keeps its own open state. The skeleton never opens or closes on its
 own; it renders the open state, and keeps the popup mounted long enough for the
 exit animation to play.
 
+`WebuiFlyoutSurface` owns the same surface and presence motion for a fly-out
+that stays positioned inside its parent menu. The caller supplies whether it
+is present, its menu content and its local positioning rules; it does not add
+the surface animation or implement the exit lifetime itself.
+
 ## The anchor
 
 The anchor is a rectangle in viewport space, and there are three ways to name
@@ -175,9 +180,9 @@ the send button is the user still working.
 
 A hover fly-out is not a dropdown: there is no trigger to toggle and no outside
 press to dismiss it, because it has to stay open while the pointer is on it. It
-is still the same *surface*, so it carries `.webui-dropdown-surface` and gets
-the same look and the same motion. It keeps its own positioning: it hangs off
-a menu row, inside the menu.
+uses `WebuiFlyoutSurface` to get the shared surface and enter/exit lifecycle.
+The feature controls hover/focus state and local positioning: the fly-out
+hangs off a menu row, inside the menu.
 
 ## What a feature's stylesheet may say
 

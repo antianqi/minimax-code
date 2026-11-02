@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { WebuiIconHomeBrand } from "./icons.js";
 import { WebuiWorkspacePanelControls } from "../features/workspace/ui/WorkspacePanelControls.js";
 import { WebuiInline, WebuiStack } from "../ui/layout-primitives.js";
-import { WebuiSkeletonProjection } from "../ui/page.js";
+import { WebuiMotionSlot, WebuiSkeletonProjection } from "../ui/page.js";
 
 /** Conversation column layout; Shell supplies already-owned feature surfaces and named navigation actions. */
 export function ConversationSurface(props: {
@@ -70,73 +70,75 @@ export function ConversationSurface(props: {
               ) : null}
             </div>
           </div>
-          <div
-            className={
-              props.home
-                ? "flex min-h-0 w-full flex-1 flex-col items-center relative overflow-hidden"
-                : `webui-motion-panel-layout flex min-h-0 w-full flex-1 flex-col items-center relative overflow-hidden pt-spacing_24 ${props.progressOpen ? "webui-session-has-progress-panel" : ""}`
-            }
-            data-webui-home-content={props.home ? "true" : "false"}
-            data-webui-session-layout={!props.home ? "true" : undefined}
-          >
-            {props.home ? (
-              <div
-                aria-hidden="true"
-                className="h-[clamp(96px,24vh,240px)] w-full shrink"
-              />
-            ) : null}
-            <WebuiStack
-              gap="small"
-              align="center"
+          <WebuiMotionSlot kind="panel-layout">
+            <div
               className={
                 props.home
-                  ? "w-full max-w-[743px] shrink-0 px-4"
-                  : "webui-session-layout flex-1"
+                  ? "flex min-h-0 w-full flex-1 flex-col items-center relative overflow-hidden"
+                  : `flex min-h-0 w-full flex-1 flex-col items-center relative overflow-hidden pt-spacing_24 ${props.progressOpen ? "webui-session-has-progress-panel" : ""}`
               }
+              data-webui-home-content={props.home ? "true" : "false"}
+              data-webui-session-layout={!props.home ? "true" : undefined}
             >
               {props.home ? (
-                <WebuiStack
-                  gap="small"
-                  align="center"
-                  className="text-center [@media(max-height:300px)]:hidden"
-                >
-                  <div className="group/avatar relative size-[94px] flex-shrink-0">
-                    <div className="webui-hero-avatar relative h-full w-full overflow-visible rounded-full bg-bg_grouped_tertiary">
-                      <WebuiInline
-                        as="span"
-                        justify="center"
-                        className="absolute inset-0 overflow-hidden rounded-full"
-                      >
-                        <WebuiIconHomeBrand className="h-full w-full" />
-                      </WebuiInline>
-                    </div>
-                  </div>
-                  <h1 className="text-[28px] font-medium leading-tight text-text_default_primary">
-                    MiniMax Code Web，让工作更简单。
-                  </h1>
-                </WebuiStack>
+                <div
+                  aria-hidden="true"
+                  className="h-[clamp(96px,24vh,240px)] w-full shrink"
+                />
               ) : null}
-              {props.usageBanner}
-              {props.connectionStatus}
-              <div
+              <WebuiStack
+                gap="small"
+                align="center"
                 className={
                   props.home
-                    ? "contents"
-                    : "webui-session-scroll-viewport flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden"
+                    ? "w-full max-w-[743px] shrink-0 px-4"
+                    : "webui-session-layout flex-1"
                 }
-                data-webui-session-scroll={props.home ? undefined : "true"}
               >
-                {props.composerAndTranscript}
-                {!props.home ? (
-                  <div
-                    className="webui-session-bottom-padding w-full shrink-0"
-                    data-testid="message-bottom-padding"
-                    data-webui-session-bottom-padding="true"
-                  />
+                {props.home ? (
+                  <WebuiStack
+                    gap="small"
+                    align="center"
+                    className="text-center [@media(max-height:300px)]:hidden"
+                  >
+                    <div className="group/avatar relative size-[94px] flex-shrink-0">
+                      <div className="webui-hero-avatar relative h-full w-full overflow-visible rounded-full bg-bg_grouped_tertiary">
+                        <WebuiInline
+                          as="span"
+                          justify="center"
+                          className="absolute inset-0 overflow-hidden rounded-full"
+                        >
+                          <WebuiIconHomeBrand className="h-full w-full" />
+                        </WebuiInline>
+                      </div>
+                    </div>
+                    <h1 className="text-[28px] font-medium leading-tight text-text_default_primary">
+                      MiniMax Code Web，让工作更简单。
+                    </h1>
+                  </WebuiStack>
                 ) : null}
-              </div>
-            </WebuiStack>
-          </div>
+                {props.usageBanner}
+                {props.connectionStatus}
+                <div
+                  className={
+                    props.home
+                      ? "contents"
+                      : "webui-session-scroll-viewport flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden"
+                  }
+                  data-webui-session-scroll={props.home ? undefined : "true"}
+                >
+                  {props.composerAndTranscript}
+                  {!props.home ? (
+                    <div
+                      className="webui-session-bottom-padding w-full shrink-0"
+                      data-testid="message-bottom-padding"
+                      data-webui-session-bottom-padding="true"
+                    />
+                  ) : null}
+                </div>
+              </WebuiStack>
+            </div>
+          </WebuiMotionSlot>
         </WebuiStack>
         {!props.home ? props.progressPanel : null}
         {!props.home ? props.workspacePanel : null}

@@ -157,17 +157,17 @@ export function WebuiComposerProjectRow({
             </span>
           </WebuiButton>
         </WebuiDropdown>
-        {browserOpen ? (
-          <WebuiPage
-            as="div"
-            kind="dialog"
-            motion={{ kind: "surface", state: "enter", direction: "down" }}
-            role="dialog"
-            aria-label="选择项目目录"
-            data-overlay-layer={browserLayerId}
-            data-webui-workspace-browser-dialog="true"
-            className="webui-workspace-menu webui-workspace-menu--desktop"
-          >
+        <WebuiPage
+          as="div"
+          kind="dialog"
+          present={browserOpen}
+          motion={{ kind: "surface", state: "enter", direction: "down" }}
+          role="dialog"
+          aria-label="选择项目目录"
+          data-overlay-layer={browserLayerId}
+          data-webui-workspace-browser-dialog="true"
+          className="webui-workspace-menu webui-workspace-menu--desktop"
+        >
             <WebuiWorkspaceDirectoryBrowser
               initialDir={projectDir}
               onSelect={(dir) => {
@@ -176,8 +176,7 @@ export function WebuiComposerProjectRow({
               }}
               onCancel={() => setBrowserOpen(false)}
             />
-          </WebuiPage>
-        ) : null}
+        </WebuiPage>
       </div>
     </div>
   );

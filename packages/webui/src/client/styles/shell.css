@@ -146,10 +146,6 @@
     text-align: left;
     font-size: var(--size_14);
     line-height: var(--line_height_20);
-    /* Hover ownership changes on every pointer move. A fade leaves the
-     * previous row painted while the next row is entering, which reads as
-     * two adjacent hover states. */
-    transition: none;
   }
   .webui-workspace-menu--desktop .webui-workspace-option--desktop {
     border-radius: var(--radius_8);

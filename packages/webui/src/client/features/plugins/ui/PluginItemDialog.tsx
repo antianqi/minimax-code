@@ -21,6 +21,7 @@ import { SkillForm } from "./SkillForm.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
 
 export interface PluginItemDialogProps {
+  readonly open: boolean;
   readonly dialog: "mcp" | "agent" | "skill";
   readonly editing: Row | undefined;
   /** Run one command and report whether it succeeded. */
@@ -36,6 +37,7 @@ const TITLE: Readonly<Record<PluginItemDialogProps["dialog"], string>> = {
 };
 
 export function PluginItemDialog({
+  open,
   dialog,
   editing,
   onSubmit,
@@ -47,6 +49,7 @@ export function PluginItemDialog({
   return (
       <WebuiDialog
         id="plugin-item-dialog"
+        open={open}
         title={editing ? `编辑${TITLE[dialog]}` : `添加${TITLE[dialog]}`}
         description={dialog === "mcp"
           ? "配置 MiniMax Code 如何连接到这个 server"

@@ -25,7 +25,7 @@ import { formatUsageResetLabel } from "../../account/projection/usage.public.js"
 import { WebuiDropdown, type WebuiDropdownPlacementArgs } from "../../../ui/Dropdown.js";
 import { FeedbackProgress } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot } from "../../../ui/page.js";
+import { WebuiDisclosure, WebuiMotionSlot, WebuiTooltip } from "../../../ui/page.js";
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 
 export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
@@ -319,14 +319,13 @@ export function ContextUsageIndicator({ usage, usageQuota, planModel }: {
         because the button's own label already announces it, and a bubble that
         duplicates what assistive technology was just told is read twice.
       */}
-      <WebuiMotion as="span" kind="tooltip"
+      <WebuiTooltip as="span" visible={hovered && !open}
         className="webui-context-usage-label"
         aria-hidden="true"
         data-webui-context-usage-label={hovered && !open ? "true" : "false"}
-        data-webui-tooltip-visible={hovered && !open ? "true" : "false"}
       >
         上下文窗口
-      </WebuiMotion>
+      </WebuiTooltip>
     </div>
   );
 }

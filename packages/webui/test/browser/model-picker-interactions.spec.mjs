@@ -55,6 +55,7 @@ test("clicking a model in the list selects it", async ({ page }) => {
   // The bug this pins: a row that did nothing when clicked. The panel is one
   // popup now, so there is no second dismissal to swallow the press.
   await openApp(page, "#session=A");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await chip(page).click();
 
   const panel = page.getByRole("dialog");
@@ -67,9 +68,13 @@ test("clicking a model in the list selects it", async ({ page }) => {
     page.locator('[data-webui-model-list-group="other-provider"]'),
   ).toContainText("Other Model");
 
-  await page
-    .locator('[data-webui-model-list-row="other-provider/other-model/"]')
-    .click();
+  const modelRow = page.locator('[data-webui-model-list-row="other-provider/other-model/"]');
+  expect(await modelRow.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.12s");
+  const idleBackground = await modelRow.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await modelRow.hover();
+  await expect.poll(() => modelRow.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(idleBackground);
+  await modelRow.click();
 
   // The panel closed, and the choice reached the runtime as ONE write. The
   // fixture is a runtime that answers without re-reading the catalogue, so the

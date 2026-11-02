@@ -23,6 +23,7 @@ import type { WebuiComposerPluginSummary } from "../../../features/plugins/appli
 import type { WebuiSlashSkillSummary } from "./slash-palette.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiMenuItem, WebuiMenuSeparator } from "../../../ui/menu-item.js";
+import { WebuiFlyoutSurface } from "../../../ui/Dropdown.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 export type WebuiComposerMenu = "root" | "skills" | "plugins";
@@ -126,20 +127,17 @@ export function WebuiComposerMenus({
         <WebuiMenuItem className="webui-composer-menu-item" icon={<WebuiIconCommandGoal />} onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onGoal(); }}>目标</WebuiMenuItem>
         <WebuiMenuItem className="webui-composer-menu-item" icon={<WebuiIconCommandPlan />} onMouseEnter={() => { if (menu && menu !== "root") onMenuChange("root"); }} onFocus={() => { if (menu && menu !== "root") onMenuChange("root"); }} onClick={() => { onMenuChange(undefined); onPlan(); }}>计划</WebuiMenuItem>
       </div>
-      {menu === "skills" ? (
-        <div className="webui-composer-menu webui-dropdown-surface" role="menu" aria-label="技能" data-webui-composer-menu="skills" data-webui-composer-submenu="skills">
+      <WebuiFlyoutSurface present={menu === "skills"} className="webui-composer-menu" role="menu" aria-label="技能" data-webui-composer-menu="skills" data-webui-composer-submenu="skills">
           {skillsLoading ? <FeedbackEmpty className="webui-composer-menu-empty" title={"正在加载技能…"} /> : skillsError ? <FeedbackError message={skillsError} className="webui-composer-menu-empty" /> : skills.length ? skills.map((skill) => <WebuiMenuItem key={skill.name} className="webui-composer-menu-item" onClick={() => { onMenuChange(undefined); onInsertSkill(skill.name); }}>{skill.displayName ?? skill.name}</WebuiMenuItem>) : <FeedbackEmpty className="webui-composer-menu-empty" title={"没有已安装的技能"} />}
           <WebuiMenuSeparator />
           <WebuiMenuItem className="webui-composer-menu-item" onClick={() => { onMenuChange(undefined); onOpenPluginManagement?.("skills"); }}>管理技能</WebuiMenuItem>
           <WebuiMenuItem className="webui-composer-menu-item" onClick={() => { onMenuChange(undefined); onOpenPluginManagement?.("skills"); }}>添加技能</WebuiMenuItem>
-        </div>
-      ) : menu === "plugins" ? (
-        <div className="webui-composer-menu webui-dropdown-surface" role="menu" aria-label="插件" data-webui-composer-menu="plugins" data-webui-composer-submenu="plugins">
+      </WebuiFlyoutSurface>
+      <WebuiFlyoutSurface present={menu === "plugins"} className="webui-composer-menu" role="menu" aria-label="插件" data-webui-composer-menu="plugins" data-webui-composer-submenu="plugins">
           {pluginsLoading ? <FeedbackEmpty className="webui-composer-menu-empty" title={"正在加载插件…"} /> : pluginsError ? <FeedbackError message={pluginsError} className="webui-composer-menu-empty" /> : plugins.length ? plugins.map((plugin) => <WebuiMenuItem key={plugin.name} className="webui-composer-menu-item" title={plugin.description} onClick={() => { onMenuChange(undefined); onInsertPlugin(plugin.name); }}>{plugin.displayName}</WebuiMenuItem>) : <div className="webui-composer-menu-empty">{pluginsAvailable ? "没有已安装的插件" : "插件目录暂不可用"}</div>}
           <WebuiMenuSeparator />
           <WebuiMenuItem className="webui-composer-menu-item" onClick={() => { onMenuChange(undefined); onOpenPluginManagement?.("plugins"); }}>添加插件</WebuiMenuItem>
-        </div>
-      ) : null}
+      </WebuiFlyoutSurface>
     </div>
   );
 }

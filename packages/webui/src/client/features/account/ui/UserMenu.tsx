@@ -459,20 +459,20 @@ export function UserMenu({
               >
                 每日签到
               </WebuiMenuItem>
-              {signinOpen ? (
-                <WebuiPage
-                  as="div"
-                  kind="dialog"
-                  loading={signin.loading}
-                  motion={{
-                    kind: "surface",
-                    state: "enter",
-                    direction: "right",
-                  }}
-                  className="webui-user-menu-signin-panel"
-                  role="dialog"
-                  aria-label={SIGNIN.title}
-                >
+              <WebuiPage
+                as="div"
+                kind="dialog"
+                present={signinOpen}
+                loading={signin.loading}
+                motion={{
+                  kind: "surface",
+                  state: "enter",
+                  direction: "right",
+                }}
+                className="webui-user-menu-signin-panel"
+                role="dialog"
+                aria-label={SIGNIN.title}
+              >
                   <SigninCard
                     panel={signin.panel}
                     loading={signin.loading}
@@ -486,8 +486,7 @@ export function UserMenu({
                       loadUsage();
                     }}
                   />
-                </WebuiPage>
-              ) : null}
+              </WebuiPage>
             </div>
             <div
               className="webui-user-menu-usage-anchor"
@@ -512,17 +511,16 @@ export function UserMenu({
               >
                 用量
               </WebuiMenuItem>
-              {usageOpen ? (
-                <UsagePanel
-                  state={usage}
-                  onRetry={() => loadUsage(true)}
-                  onLogin={() => {
-                    setOpen(false);
-                    setLoginMode("sign-in");
-                    setLoginOpen(true);
-                  }}
-                />
-              ) : null}
+              <UsagePanel
+                present={usageOpen}
+                state={usage}
+                onRetry={() => loadUsage(true)}
+                onLogin={() => {
+                  setOpen(false);
+                  setLoginMode("sign-in");
+                  setLoginOpen(true);
+                }}
+              />
             </div>
           </div>
         </WebuiDropdown>

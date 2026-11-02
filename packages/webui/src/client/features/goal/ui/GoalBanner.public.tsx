@@ -4,7 +4,7 @@
 // the existing WebUI goal contract while the visual surface keeps a compact
 // status/actions layout.
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -37,17 +37,21 @@ function GoalResumeIcon(): ReactElement {
 }
 
 export function WebuiGoalClearDialog({
+  open,
   busy,
   error,
   portalTarget,
   onCancel,
   onConfirm,
+  onExitComplete,
 }: {
+  readonly open: boolean;
   readonly busy: boolean;
   readonly error?: string;
   readonly portalTarget: HTMLElement | null;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
+  readonly onExitComplete: () => void;
 }): ReactElement {
   /**
    * The confirmation is a layer, so the coordinator answers Escape and the
@@ -64,10 +68,12 @@ export function WebuiGoalClearDialog({
   return (
     <WebuiDialog
       id="goal-clear-confirm"
+      open={open}
       title="删除目标？"
       description="删除目标后，目标模式会关闭，转为普通模式继续。"
       portalTarget={portalTarget}
       onClose={onCancel}
+      onExitComplete={onExitComplete}
       dismissOnEscape={!busy}
       dismissOnBackdrop={!busy}
       testId="goal-clear-confirm"
@@ -112,6 +118,7 @@ export function WebuiGoalBanner({
   const [dismissedGoalKey, setDismissedGoalKey] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const clearSucceeded = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   useEffect(() => {
     setObjectiveExpanded(false);
@@ -154,21 +161,25 @@ export function WebuiGoalBanner({
     setError(undefined);
     void clearGoal({ sessionId: goal.sessionId })
       .then(() => {
+        clearSucceeded.current = true;
         setConfirmClear(false);
-        onCleared?.();
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)))
       .finally(() => setBusy(false));
   };
-  const clearDialog = confirmClear
-    ? <WebuiGoalClearDialog
+  const clearDialog = <WebuiGoalClearDialog
+      open={confirmClear}
       busy={busy}
       error={error}
       portalTarget={dom.portalTarget()}
       onCancel={() => { setConfirmClear(false); setError(undefined); }}
       onConfirm={clear}
-    />
-    : null;
+      onExitComplete={() => {
+        if (!clearSucceeded.current) return;
+        clearSucceeded.current = false;
+        onCleared?.();
+      }}
+    />;
   return (
     <section className="webui-goal-banner" data-testid="thread-goal-banner" data-goal-status={status}>
       <div className="webui-goal-banner-row">

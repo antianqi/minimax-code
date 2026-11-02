@@ -25,6 +25,7 @@ export interface WebuiDialogProps {
   readonly footer?: ReactNode;
   readonly footerClassName?: string;
   readonly onClose: () => void;
+  readonly onExitComplete?: () => void;
   readonly closeLabel?: string;
   readonly closeTestId?: string;
   readonly dismissOnEscape?: boolean;
@@ -62,6 +63,7 @@ export function WebuiDialog({
   footer,
   footerClassName,
   onClose,
+  onExitComplete,
   closeLabel = "关闭",
   closeTestId,
   dismissOnEscape = false,
@@ -140,6 +142,7 @@ export function WebuiDialog({
   const finishExit = (event: React.AnimationEvent<HTMLDivElement>) => {
     if (event.currentTarget !== event.target || motionState !== "exit") return;
     setPresent(false);
+    onExitComplete?.();
   };
 
   const dialog = (

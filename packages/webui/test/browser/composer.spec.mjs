@@ -32,6 +32,18 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => { if (message.type() === "error") console.error("BROWSER_CONSOLE_ERROR", message.text()); });
 });
 
+test("shared text fields use the shared feedback transition contract", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openApp(page, "#session=A");
+
+  const field = page.locator('textarea[name="content"]');
+  await expect(field).toHaveClass(/webui-motion-feedback/u);
+  expect(await field.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.12s");
+  const properties = await field.evaluate((element) => getComputedStyle(element).transitionProperty);
+  expect(properties).toContain("border-color");
+  expect(properties).toContain("outline-color");
+});
+
 function composer(page) {
   return page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
 }
@@ -141,6 +153,7 @@ test("the composer's popups are placed by the shared layer, inside the viewport"
 
 test("the composer's second-level menu has an opaque shared surface", async ({ page }) => {
   await openApp(page, "#session=A");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
 
   await page.locator('[data-testid="composer-add-menu"]').click();
   const root = page.locator(".webui-dropdown-popup.webui-composer-menu-stack");
@@ -148,6 +161,8 @@ test("the composer's second-level menu has an opaque shared surface", async ({ p
     const submenu = page.locator(`[data-webui-composer-submenu="${name}"]`);
     await page.locator(`[data-webui-composer-submenu-trigger="${name}"]`).hover();
     await expect(submenu).toBeVisible();
+    await expect(submenu).toHaveAttribute("data-webui-motion", "surface");
+    await expect(submenu).toHaveAttribute("data-webui-motion-state", "enter");
 
     const [rootBackground, submenuBackground] = await Promise.all([
       root.evaluate((node) => getComputedStyle(node).backgroundColor),
@@ -155,6 +170,11 @@ test("the composer's second-level menu has an opaque shared surface", async ({ p
     ]);
     expect(submenuBackground, `${name} submenu has an opaque surface`).not.toBe("rgba(0, 0, 0, 0)");
     expect(submenuBackground, `${name} submenu matches the root menu surface`).toBe(rootBackground);
+
+    await root.getByRole("menuitem", { name: "添加文件或图片" }).hover();
+    await expect(submenu).toHaveAttribute("data-webui-motion-state", "exit");
+    expect(await submenu.evaluate((node) => getComputedStyle(node).animationName)).toBe("webui-motion-surface-exit");
+    await expect(submenu).toHaveCount(0, { timeout: 500 });
   }
 });
 

@@ -371,10 +371,11 @@ export function AccountUsageShareAction(): ReactElement | null {
           分享
         </WebuiInline>
       </SettingsButton>
-      {portalTarget && open
+      {portalTarget
         ? createPortal(
             <>
               <SettingsDialog
+                open={open}
                 title="分享"
                 variant="preview"
                 dismissOnMaskClick

@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { compareMotion, featureInteractionTransformOwnershipProblems, featureRotationOwnershipProblems, featureSmoothScrollOwnershipProblems, scanStylesheet, sourceMotionOwnershipProblems } from "../../../../scripts/check-webui-motion.mjs";
+import { compareMotion, disabledTransitionOwnershipProblems, featureInteractionTransformOwnershipProblems, featureRotationOwnershipProblems, featureSmoothScrollOwnershipProblems, scanStylesheet, sharedFeedbackControlProblems, sourceMotionOwnershipProblems } from "../../../../scripts/check-webui-motion.mjs";
 
 const clientRoot = new URL("../../src/client/", import.meta.url);
 const motionCss = readFileSync(new URL("styles/motion.css", clientRoot), "utf8");
@@ -68,6 +68,24 @@ describe("the motion inventory", () => {
     expect(problems).toContain("a.css: recorded @keyframes fade-in no longer appears");
   });
 
+  it("keeps shared buttons, menu items, switches and fields on the feedback motion family", () => {
+    for (const file of ["ui/ToggleSwitch.tsx", "ui/button.tsx", "ui/field.tsx", "ui/menu-item.tsx"]) {
+      expect(sharedFeedbackControlProblems(file, `export function Control() {}`)).toEqual([
+        `${file}: shared controls must opt into the common feedback motion family`,
+      ]);
+      expect(sharedFeedbackControlProblems(file, `className="webui-motion-feedback"`)).toEqual([]);
+    }
+    expect(sharedFeedbackControlProblems("features/example/ui/Control.tsx", "export function Control() {}"))
+      .toEqual([]);
+  });
+
+  it("rejects shared styles that silently disable interaction transitions", () => {
+    expect(disabledTransitionOwnershipProblems("styles/shell.css", ".option { transition: none; }"))
+      .toEqual(["styles/shell.css: disabling a shared transition requires a motion-family exception"]);
+    expect(disabledTransitionOwnershipProblems("styles/motion.css", '.webui-motion[data-webui-motion="range"][data-empty="true"] { transition: none; }'))
+      .toEqual([]);
+  });
+
   it("keeps animation engines, Web Animations API and SVG animation behind shared motion components", () => {
     expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `import lottie from "lottie-web";`))
       .toContain("features/example/ui/Widget.tsx: lottie-web playback belongs in the shared ui/feedback.tsx component");
@@ -80,9 +98,27 @@ describe("the motion inventory", () => {
     expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<Chevron className="webui-motion-disclosure-transform rotate-90" />`))
       .toContain('features/example/ui/Widget.tsx: source uses raw motion utility "rotate-90"; use a shared motion component or an approved exception');
     expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<Chevron className="webui-motion-disclosure-transform" />`))
-      .toContain('features/example/ui/Widget.tsx: source names "webui-motion-disclosure-transform" directly; use WebuiMotionSlot or WebuiDisclosure');
+      .toContain('features/example/ui/Widget.tsx: source names "webui-motion-disclosure-transform" directly; use WebuiMotionSlot');
     expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="webui-motion-feedback" />`))
-      .toContain('features/example/ui/Widget.tsx: source names "webui-motion-feedback" directly; use WebuiMotionSlot or WebuiDisclosure');
+      .toContain('features/example/ui/Widget.tsx: source names "webui-motion-feedback" directly; use WebuiMotionSlot');
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="webui-motion" data-webui-motion="panel" data-webui-motion-state="exit" />`))
+      .toContain('features/example/ui/Widget.tsx: source names "webui-motion" directly; use WebuiMotion or WebuiPage');
+    expect(sourceMotionOwnershipProblems("shell/ConversationSurface.tsx", `<div className="webui-motion-panel-layout" />`))
+      .toContain('shell/ConversationSurface.tsx: source names "webui-motion-panel-layout" directly; use WebuiMotionSlot');
+    expect(sourceMotionOwnershipProblems("shell/WebuiClientFoundationApp.tsx", `<div className="webui-motion-feedback-opacity" />`))
+      .toContain('shell/WebuiClientFoundationApp.tsx: source names "webui-motion-feedback-opacity" directly; use WebuiMotionSlot');
+    expect(sourceMotionOwnershipProblems("features/account/ui/Widget.tsx", `<span className="webui-feedback-spinner" />`))
+      .toContain('features/account/ui/Widget.tsx: source names "webui-feedback-spinner" directly; use WebuiSpinner');
+    expect(sourceMotionOwnershipProblems("ui/feedback.tsx", `<span className="webui-feedback-spinner" />`))
+      .toEqual([]);
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div data-webui-motion="panel" />`))
+      .toContain("features/example/ui/Widget.tsx: data-webui-motion is owned by WebuiMotion or WebuiPage; use the shared component");
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="webui-flyout-surface" />`))
+      .toContain('features/example/ui/Widget.tsx: source names "webui-flyout-surface" directly; use WebuiFlyoutSurface');
+    expect(sourceMotionOwnershipProblems("ui/ContextMenu.tsx", `<div className="webui-dropdown-surface" />`))
+      .toContain('ui/ContextMenu.tsx: source names "webui-dropdown-surface" directly; use WebuiFlyoutSurface');
+    expect(sourceMotionOwnershipProblems("ui/Dropdown.tsx", `<div className="webui-flyout-surface" />`))
+      .toEqual([]);
     expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="hover:scale-105" />`))
       .toContain('features/example/ui/Widget.tsx: source uses raw motion utility "hover:scale-105"; use a shared motion component or an approved exception');
     expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div className="hover:-translate-x-1" />`))
@@ -100,6 +136,15 @@ describe("the motion inventory", () => {
     expect(featureInteractionTransformOwnershipProblems("features/example/ui/widget.css", `.widget:hover .thumb { scale: 1.08; }`))
       .toContain("features/example/ui/widget.css: interaction transforms belong to a shared motion family");
     expect(sourceMotionOwnershipProblems("ui/feedback.tsx", `import lottie from "lottie-web";`)).toEqual([]);
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<div role="button" tabIndex={0} onClick={activate} />`))
+      .toContain("features/example/ui/Widget.tsx: custom role=button bypasses shared button semantics and feedback motion; use WebuiButton");
+  });
+
+  it("requires business dialogs to expose their shared open/exit state", () => {
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<WebuiDialog title="Confirm" onClose={close}><p>Body</p></WebuiDialog>`))
+      .toContain("features/example/ui/Widget.tsx: WebuiDialog must receive an explicit open state so its shared exit motion can finish");
+    expect(sourceMotionOwnershipProblems("features/example/ui/Widget.tsx", `<WebuiDialog open={open} title="Confirm" onClose={close}><p>Body</p></WebuiDialog>`))
+      .toEqual([]);
   });
 });
 

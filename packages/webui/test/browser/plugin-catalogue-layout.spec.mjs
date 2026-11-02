@@ -195,6 +195,50 @@ test("Skill add form is centered, usable and submits through plugin management",
   await expect(dialog).toHaveCount(0);
 });
 
+test("the plugin item dialog completes its shared exit before unmounting", async ({ page }) => {
+  await openManagement(page);
+  await page.getByRole("menuitem", { name: "录入技能" }).click();
+  const dialog = page.getByRole("dialog", { name: "技能" });
+  await expect(dialog).toBeVisible();
+  await page.evaluate(() => {
+    window.__pluginItemDialogExitEnded = false;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-dialog-mask") &&
+        event.animationName === "webui-motion-surface-exit"
+      ) {
+        window.__pluginItemDialogExitEnded = true;
+      }
+    }, { capture: true });
+  });
+  await dialog.getByRole("button", { name: "关闭" }).click();
+  await expect.poll(() => page.evaluate(() => window.__pluginItemDialogExitEnded)).toBe(true);
+  await expect(dialog).toHaveCount(0);
+});
+
+test("the Git import dialog completes its shared exit before unmounting", async ({ page }) => {
+  await openManagement(page);
+  await page.getByRole("menuitem", { name: "从 Git 仓库导入插件" }).click();
+  const dialog = page.getByRole("dialog", { name: "从 Git 仓库导入插件" });
+  await expect(dialog).toBeVisible();
+  await page.evaluate(() => {
+    window.__pluginImportDialogExitEnded = false;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-dialog-mask") &&
+        event.animationName === "webui-motion-surface-exit"
+      ) {
+        window.__pluginImportDialogExitEnded = true;
+      }
+    }, { capture: true });
+  });
+  await dialog.getByRole("button", { name: "关闭" }).click();
+  await expect.poll(() => page.evaluate(() => window.__pluginImportDialogExitEnded)).toBe(true);
+  await expect(dialog).toHaveCount(0);
+});
+
 test("Agent add form is centered, fields are aligned and backdrop dismissal works", async ({ page }) => {
   await page.addInitScript(() => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];

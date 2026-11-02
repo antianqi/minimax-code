@@ -34,6 +34,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
@@ -65,6 +66,34 @@ export type {
   WebuiDropdownSide,
   WebuiDropdownWidth,
 };
+
+export interface WebuiFlyoutSurfaceProps extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
+  readonly present: boolean;
+  readonly kind?: "content" | "dialog";
+  readonly children: ReactNode;
+}
+
+/** A positioned flyout surface with the shared enter, exit and presence contract. */
+export function WebuiFlyoutSurface({
+  present,
+  kind = "content",
+  className,
+  children,
+  ...attributes
+}: WebuiFlyoutSurfaceProps): ReactElement | null {
+  return (
+    <WebuiPage
+      {...attributes}
+      as="div"
+      kind={kind}
+      present={present}
+      motion={{ kind: "surface", state: "enter", direction: "right" }}
+      className={`webui-flyout-surface${className ? ` ${className}` : ""}`}
+    >
+      {children}
+    </WebuiPage>
+  );
+}
 
 /**
  * How long the exit animation runs.

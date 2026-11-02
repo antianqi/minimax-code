@@ -16,9 +16,9 @@
 // renderer URL. When `src` is missing the component falls back to the
 // "broken-image placeholder" so callers never see a half-rendered tile.
 
-import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { IconEye, IconFileText, IconPhoto } from "@tabler/icons-react";
-import { WebuiIconButton } from "../../../ui/button.js";
+import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
 
@@ -39,17 +39,6 @@ function activate(
   onPreview?: (attachment: MessageAttachment) => void,
 ) {
   onPreview?.(attachment);
-}
-
-function handleKeyDown(
-  event: KeyboardEvent<HTMLDivElement>,
-  attachment: MessageAttachment,
-  onPreview?: (attachment: MessageAttachment) => void,
-): void {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    activate(attachment, onPreview);
-  }
 }
 
 function AttachmentImage(props: {
@@ -89,18 +78,17 @@ function AttachmentImage(props: {
   }
 
   return (
-    <div
-      className="cursor-pointer"
-      role="button"
-      tabIndex={0}
+    <WebuiButton
+      variant="selectable-row"
+      size="inline"
+      className={`cursor-pointer overflow-hidden rounded-xl p-0 ${
+        isSingle ? "h-full w-full" : "h-20 w-20"
+      }`}
       onClick={() => activate(attachment, onPreview)}
-      onKeyDown={(event) => handleKeyDown(event, attachment, onPreview)}
       data-testid="message-attachment-image"
     >
       <div
-        className={`relative overflow-hidden rounded-xl ${
-          isSingle ? "w-full h-full" : "w-20 h-20"
-        }`}
+        className="relative h-full w-full overflow-hidden rounded-xl"
       >
         <img
           src={src}
@@ -110,7 +98,7 @@ function AttachmentImage(props: {
           data-testid="message-attachment-image-img"
         />
       </div>
-    </div>
+    </WebuiButton>
   );
 }
 

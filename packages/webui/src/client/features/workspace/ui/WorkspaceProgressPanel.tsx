@@ -99,7 +99,8 @@ export function WebuiSubagentsPanel({ subagents, collapsed = false, onToggle, on
   </WorkspaceProgressSection>;
 }
 
-function WorkspaceCommitDialog({ environment, workspaceDir, mutateGit, onClose }: {
+function WorkspaceCommitDialog({ open, environment, workspaceDir, mutateGit, onClose }: {
+  readonly open: boolean;
   readonly environment: WebuiWorkspaceEnvironment;
   readonly workspaceDir: string;
   readonly mutateGit: (request: WebuiWorkspaceGitMutationRequest) => Promise<Record<string, unknown>>;
@@ -121,7 +122,7 @@ function WorkspaceCommitDialog({ environment, workspaceDir, mutateGit, onClose }
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)))
       .finally(() => setBusy(false));
   };
-  return <WebuiDialog id="workspace-commit-dialog" title={PROGRESS_COPY.commit} onClose={onClose} dismissOnEscape portalTarget={dom.portalTarget()} width="compact" footer={<WebuiDialogActions>
+  return <WebuiDialog id="workspace-commit-dialog" open={open} title={PROGRESS_COPY.commit} onClose={onClose} dismissOnEscape portalTarget={dom.portalTarget()} width="compact" footer={<WebuiDialogActions>
     <WebuiButton variant="secondary" onClick={onClose} disabled={busy}>取消</WebuiButton>
     {hasChanges ? <WebuiButton variant="secondary" onClick={() => submit("commit")} disabled={busy || !message.trim()}>提交</WebuiButton> : null}
     <WebuiButton variant="primary" onClick={() => submit(hasChanges ? "commitAndPush" : "push")} disabled={busy || (hasChanges && !message.trim())}>{hasChanges ? "提交并推送" : "推送"}</WebuiButton>
@@ -190,7 +191,7 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
           {environmentError ? <FeedbackError message=<>环境信息加载失败：{environmentError}</> className="webui-environment-loading" /> : environment || pending ? <WebuiSkeletonProjection loading={pending}>{environmentBody}</WebuiSkeletonProjection> : null}
         </>
     </WorkspaceProgressSection>
-    {commitOpen && environment && workspaceDir && queries?.canMutateGit ? <WorkspaceCommitDialog environment={environment} workspaceDir={workspaceDir} mutateGit={queries.mutateGit} onClose={() => setCommitOpen(false)} /> : null}
+    {environment && workspaceDir && queries?.canMutateGit ? <WorkspaceCommitDialog open={commitOpen} environment={environment} workspaceDir={workspaceDir} mutateGit={queries.mutateGit} onClose={() => setCommitOpen(false)} /> : null}
   </>;
 }
 

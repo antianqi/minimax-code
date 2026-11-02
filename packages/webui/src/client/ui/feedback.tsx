@@ -267,6 +267,18 @@ export function FeedbackProgress({
   );
 }
 
+/** The shared indeterminate ring. Callers choose its scale, never its animation. */
+export function WebuiSpinner({
+  size = "regular",
+  className,
+}: {
+  readonly size?: "compact" | "regular";
+  /** A caller's layout hook only; appearance and motion stay shared. */
+  readonly className?: string;
+}): ReactElement {
+  return <span aria-hidden="true" className={`webui-feedback-spinner${size === "compact" ? " webui-feedback-spinner--compact" : ""}${className ? ` ${className}` : ""}`} />;
+}
+
 /**
  * Work is happening and the amount is unknown.
  *
@@ -288,7 +300,7 @@ export function FeedbackBusy({
   return (
     <div className={`webui-feedback webui-feedback--busy${className ? ` ${className}` : ""}`} role={pageLoading ? undefined : "status"} data-testid={testId}>
       <WebuiSkeletonProjection>
-        <span aria-hidden="true" className="webui-feedback-spinner" />
+        <WebuiSpinner />
       </WebuiSkeletonProjection>
       <WebuiSkeletonProjection><span className="webui-feedback-busy-label">{label}</span></WebuiSkeletonProjection>
     </div>

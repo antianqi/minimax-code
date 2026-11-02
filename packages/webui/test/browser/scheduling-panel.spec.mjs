@@ -91,6 +91,7 @@ test.describe("the scheduled-task panel", () => {
   });
 
   test("runs a task now and shows the run, with a way into its session", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await openApp(page);
     await page.locator('[data-webui-nav-item="定时任务"]').click();
     const panel = page.locator('[data-webui-component="scheduling-panel"]');

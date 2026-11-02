@@ -72,7 +72,7 @@ export function WebuiMenuItem({
   disabled,
   ...rest
 }: WebuiMenuItemProps): ReactElement {
-  const classes = ["webui-menu-item", danger ? "webui-menu-item--danger" : "", className]
+  const classes = ["webui-menu-item", "webui-motion-feedback", danger ? "webui-menu-item--danger" : "", className]
     .filter((entry) => Boolean(entry && entry.length > 0))
     .join(" ");
   return (

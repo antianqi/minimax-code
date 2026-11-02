@@ -229,12 +229,26 @@ test("the account panel's 分享 action opens the share preview", async ({ page 
   await share.click();
   await expect(page.locator('[data-testid="account-usage-share-preview"]')).toBeVisible();
   await expect(page.locator('[data-testid="account-usage-share-card"]')).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.evaluate(() => {
+    window.__sharePreviewExitEnded = false;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-dialog-mask") &&
+        event.animationName === "webui-motion-surface-exit"
+      ) {
+        window.__sharePreviewExitEnded = true;
+      }
+    }, { capture: true });
+  });
 
   // The preview carries no close button of its own, so the scrim is the way
   // out: a click outside the card dismisses it. The click has to land on the
   // scrim itself, which is why the position is the corner rather than the
   // centre — the centre of the scrim is the card.
   await page.locator(".webui-dialog-mask").click({ position: { x: 8, y: 8 } });
+  await expect.poll(() => page.evaluate(() => window.__sharePreviewExitEnded)).toBe(true);
   await expect(page.locator('[data-testid="account-usage-share-preview"]')).toHaveCount(0);
 });
 

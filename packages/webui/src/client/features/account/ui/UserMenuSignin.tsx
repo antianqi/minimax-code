@@ -15,10 +15,10 @@ import {
   isSigninPanelClaimedToday,
 } from "@mavis/shared/daily-signin";
 import type { WebuiSigninPanelView } from "../../../../shared/contracts/account.js";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { FeedbackError, WebuiSpinner } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
-import { WebuiSkeletonProjection } from "../../../ui/page.js";
+import { WebuiSkeletonProjection, WebuiTooltip } from "../../../ui/page.js";
 
 export interface SigninState {
   readonly loading: boolean;
@@ -239,37 +239,45 @@ function SigninCreditsInfo({
 }): ReactElement {
   const [open, setOpen] = useState(false);
   return (
-    <span className="webui-signin-credits-anchor">
+    <span
+      className="webui-signin-credits-anchor"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
       <WebuiIconButton
         tone="bare"
         size="micro"
         label={SIGNIN.creditsAria}
         className="shrink-0"
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
       >
         <SigninInfoIcon />
       </WebuiIconButton>
-      {open ? (
-        <span role="tooltip" className="webui-signin-credits-tooltip">
-          <span className="text-xs leading-[18px]">
-            <span>{SIGNIN.creditsInfo} </span>
-            <WebuiButton
-              variant="plain"
-              size="inline-dense"
-              className="webui-signin-credits-link"
-              onClick={() => {
-                setOpen(false);
-                onNavigateToUsage();
-              }}
-            >
-              {SIGNIN.creditsLink}
-            </WebuiButton>
-          </span>
+      <WebuiTooltip
+        as="span"
+        visible={open}
+        inert={!open}
+        role="tooltip"
+        className="webui-signin-credits-tooltip"
+      >
+        <span className="text-xs leading-[18px]">
+          <span>{SIGNIN.creditsInfo} </span>
+          <WebuiButton
+            variant="plain"
+            size="inline-dense"
+            className="webui-signin-credits-link"
+            onClick={() => {
+              setOpen(false);
+              onNavigateToUsage();
+            }}
+          >
+            {SIGNIN.creditsLink}
+          </WebuiButton>
         </span>
-      ) : null}
+      </WebuiTooltip>
     </span>
   );
 }
@@ -387,10 +395,7 @@ export function SigninCard({
                           gap="micro"
                           className="min-w-0 max-w-full"
                         >
-                          <span
-                            className="webui-feedback-spinner"
-                            aria-hidden="true"
-                          />
+                          <WebuiSpinner />
                           <span className="truncate">{SIGNIN.claiming}</span>
                         </WebuiInline>
                       ) : (

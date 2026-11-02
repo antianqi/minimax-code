@@ -106,6 +106,7 @@ test("a pinned session row has one pin action and no duplicate pin marker", asyn
 });
 
 test("a running session title keeps its space before hover actions", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await openApp(page, "#session=A");
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
     (request) => request.operation === "watchEvents",
@@ -121,7 +122,12 @@ test("a running session title keeps its space before hover actions", async ({ pa
   const metadata = row.locator(".webui-rail-session-meta");
   const label = row.locator(".webui-project-session-card > span:first-child");
   const actions = row.locator(".webui-session-row-actions");
-  await expect(metadata.locator(".webui-rail-spinner")).toBeVisible();
+  const spinner = metadata.locator(".webui-rail-spinner");
+  await expect(spinner).toBeVisible();
+  expect(await spinner.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { animationName: style.animationName, width: style.width, duration: style.animationDuration };
+  })).toEqual({ animationName: "webui-feedback-spin", width: "10px", duration: "1.2s" });
   const before = await metadata.boundingBox();
   const labelBeforeHover = await label.evaluate((element) => {
     const style = getComputedStyle(element);

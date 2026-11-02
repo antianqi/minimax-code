@@ -123,7 +123,7 @@ test("the workspace file tree uses the shared disclosure transition when a direc
   expect(await disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });
 
-test("hiding the file tree and closing its workspace panel use the shared panel exit", async ({ page }) => {
+test("the file tree uses the shared horizontal disclosure while its workspace panel uses panel exit", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);
   await openFilePanel(page);
@@ -131,25 +131,36 @@ test("hiding the file tree and closing its workspace panel use the shared panel 
 
   const fileTreePanel = page.locator(".webui-workspace-file-tree-panel");
   const workspacePanel = page.getByTestId("workspace-panel");
-  await page.getByRole("button", { name: "隐藏文件树" }).click();
-  await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "exit");
-  const fileTreeExit = await fileTreePanel.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return { name: style.animationName, duration: style.animationDuration };
-  });
+  await expect(fileTreePanel).toHaveAttribute("data-webui-motion", "disclosure");
+  await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "expand");
+  expect(await fileTreePanel.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain("width");
+  expect(await fileTreePanel.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.16s");
+  const fileTreeWidth = await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width);
 
-  await expect(fileTreePanel).toHaveCount(0);
+  await page.getByRole("button", { name: "隐藏文件树" }).click();
+  await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "collapse");
+  await expect(fileTreePanel).toHaveAttribute("aria-hidden", "true");
+  await page.waitForTimeout(70);
+  const fileTreeWidthDuringCollapse = await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width);
+  expect(fileTreeWidthDuringCollapse).toBeGreaterThan(0);
+  expect(fileTreeWidthDuringCollapse).toBeLessThan(fileTreeWidth);
+  await page.waitForTimeout(130);
+  expect(await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width)).toBe(0);
+
   await page.getByRole("button", { name: "显示文件树" }).click();
-  await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "enter");
+  await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "expand");
+  await page.waitForTimeout(200);
+  expect(await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width)).toBe(fileTreeWidth);
+
   await page.getByRole("button", { name: "关闭面板" }).click();
   await expect(workspacePanel).toHaveAttribute("data-webui-motion-state", "exit");
   const workspacePanelExit = await workspacePanel.evaluate((element) => {
     const style = getComputedStyle(element);
     return { name: style.animationName, duration: style.animationDuration };
   });
+  await expect(workspacePanel).toHaveCount(0);
 
-  expect(fileTreeExit).toEqual({ name: "webui-motion-panel-exit", duration: "0.18s" });
-  expect(workspacePanelExit).toEqual(fileTreeExit);
+  expect(workspacePanelExit).toEqual({ name: "webui-motion-panel-exit", duration: "0.18s" });
 });
 
 test("an open preview tab survives leaving the session and coming back", async ({

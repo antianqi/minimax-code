@@ -7,6 +7,36 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => { if (message.type() === "error") console.error("BROWSER_CONSOLE_ERROR", message.text()); });
 });
 
+test("assistant image attachments use the shared button feedback motion", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{
+      msgId: "assistant-attachment-motion",
+      role: "assistant",
+      msgContent: "Synthetic image attachment",
+      attachments: [{
+        id: "attachment-image-motion",
+        type: "image",
+        file_name: "pixel.png",
+        src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      }],
+      timestamp: 1_700_000_000_006,
+    }],
+    hasMore: false,
+  }));
+  await page.goto("/#session=A");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  const attachment = page.getByTestId("message-attachment-image");
+  await expect(attachment).toBeVisible();
+  await expect(attachment).toHaveRole("button");
+  await expect(attachment).toHaveClass(/webui-motion-feedback/u);
+  expect(await attachment.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.12s");
+  const idleBackground = await attachment.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await attachment.hover();
+  await expect.poll(() => attachment.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(idleBackground);
+});
+
 test("assistant copy and feedback controls update the selected message", async ({ page }) => {
   await configureFixture(page, () => window.__fixture.setPage("A", {
     messages: [{
@@ -87,6 +117,23 @@ test("assistant message fork requests the selected reply and enters the returned
   const dialog = page.getByTestId("fork-dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel("会话名称")).toHaveValue("Synthetic fork title");
+  await page.evaluate(() => {
+    window.__forkDialogExitEnded = false;
+    document.addEventListener("animationend", (event) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.classList.contains("webui-dialog-mask") &&
+        event.animationName === "webui-motion-surface-exit"
+      ) {
+        window.__forkDialogExitEnded = true;
+      }
+    }, { capture: true });
+  });
+  await dialog.getByRole("button", { name: "取消" }).click();
+  await expect.poll(() => page.evaluate(() => window.__forkDialogExitEnded)).toBe(true);
+  await expect(dialog).toHaveCount(0);
+  await actions.getByRole("button", { name: "复制为新会话" }).click();
+  await expect(dialog).toBeVisible();
   await dialog.getByLabel("会话名称").fill("Forked from selected answer");
   await dialog.getByRole("button", { name: "复制并进入" }).click();
 

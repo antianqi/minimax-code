@@ -25,7 +25,7 @@ import { WebuiWorkspacePanel } from "../features/workspace/ui/WorkspacePanels.js
 import { webuiRailIsDrawer, WEBUI_PROGRESS_PANEL_NARROW_QUERY } from "../ui/layout-thresholds.js";
 import { useOverlayLayer } from "../ui/overlay-coordinator.js";
 import { WebuiIconButton } from "../ui/button.js";
-import { WebuiPage } from "../ui/page.js";
+import { WebuiMotionSlot, WebuiPage } from "../ui/page.js";
 import { WebuiProgressOverviewPanel } from "../features/workspace/ui/WorkspaceProgressPanel.js";
 import {
   getWorkspacePanelSessionState,
@@ -1017,15 +1017,17 @@ export function WebuiClientFoundationApp(
         {/* The drawer's scrim. It closes the drawer and takes the surface's
           * clicks while it is open, so the content behind a drawer is not
           * reachable by tapping it. */}
-        {railDrawerOpen ? (
-          <button
-            type="button"
-            data-webui-rail-scrim="true"
-            aria-label="关闭导航栏"
-            onClick={() => setRailDrawerOpen(false)}
-            className="webui-rail-scrim"
-          />
-        ) : null}
+        <WebuiPage
+          as="button"
+          type="button"
+          kind="dialog"
+          present={railDrawerOpen}
+          motion={{ kind: "surface", state: "enter", direction: "none" }}
+          data-webui-rail-scrim="true"
+          aria-label="关闭导航栏"
+          onClick={() => setRailDrawerOpen(false)}
+          className="webui-rail-scrim"
+        />
 
         <div className="contents">
           {/* -------------------------------------------------------------- rail */}
@@ -1091,7 +1093,9 @@ export function WebuiClientFoundationApp(
             aria-orientation="vertical"
             aria-label="Resize navigation"
           >
-            <div className="webui-rail-grip webui-motion-feedback-opacity absolute left-1/2 top-1/2 h-12 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-text_default_tertiary opacity-0 group-hover:opacity-50" />
+            <WebuiMotionSlot kind="feedback-opacity">
+              <div className="webui-rail-grip absolute left-1/2 top-1/2 h-12 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-text_default_tertiary opacity-0 group-hover:opacity-50" />
+            </WebuiMotionSlot>
           </div>
 
           {/* -------------------------------------------------------------- main */}

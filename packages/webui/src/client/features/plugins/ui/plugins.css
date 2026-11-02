@@ -527,7 +527,6 @@
   .webui-plugin-form .webui-field.wide {
     grid-column: 1 / -1;
   }
-  .webui-plugin-form-content { min-height: 180px; resize: vertical; }
   .webui-mcp-advanced-button {
     align-self: flex-start;
     justify-self: flex-start;
@@ -540,11 +539,19 @@
   }
   .webui-mcp-form {
     display: flex;
-    min-height: 0;
+    /* Keep the dialog body at the form's normal working height in JSON mode too.
+     * The JSON textarea is a single short control by default, while the form
+     * mode contains several rows; without a shared floor the dialog collapses
+     * when the editor mode changes. */
+    min-height: 438px;
     flex: 1 1 auto;
     flex-direction: column;
     gap: var(--spacing_16) var(--spacing_20);
     padding: 0;
+  }
+  .webui-mcp-form > .webui-control--multiline {
+    flex: 1 1 auto;
+    min-height: 280px;
   }
   .webui-mcp-form-fields {
     display: grid;

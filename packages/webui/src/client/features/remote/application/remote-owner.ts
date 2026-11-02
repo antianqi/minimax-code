@@ -15,15 +15,6 @@ import {
 
 export interface WebuiRemoteSnapshot {
   readonly activeTab: WebuiRemoteTabValue;
-  /**
-   * Whether the SSH surface is showing in place of the tab body.
-   *
-   * The Desktop's pairing page carries an `SSH` link under its 连接 button, and
-   * that link opens the SSH host management. On the WebUI the SSH business
-   * lives in this package, so the link opens it here — one owner, and the page
-   * keeps its own state instead of reaching into another business.
-   */
-  readonly showSsh: boolean;
 }
 
 export interface WebuiRemoteOwner {
@@ -31,10 +22,6 @@ export interface WebuiRemoteOwner {
   readonly getSnapshot: () => WebuiRemoteSnapshot;
   /** Selects one tab. Selecting the tab that is already showing changes nothing. */
   readonly selectTab: (value: WebuiRemoteTabValue) => void;
-  /** Opens the SSH surface in place of the tab body. */
-  readonly openSsh: () => void;
-  /** Closes the SSH surface and returns to the tab that was showing. */
-  readonly closeSsh: () => void;
 }
 
 export interface CreateWebuiRemoteOwnerOptions {
@@ -48,7 +35,6 @@ export function createWebuiRemoteOwner(
   const listeners = new Set<() => void>();
   let snapshot: WebuiRemoteSnapshot = {
     activeTab: options.initialTab ?? WEBUI_REMOTE_DEFAULT_TAB,
-    showSsh: false,
   };
 
   const publish = (next: WebuiRemoteSnapshot): void => {
@@ -66,16 +52,8 @@ export function createWebuiRemoteOwner(
       // An unknown value is not a tab: the strip only offers the two, and
       // selecting something that does not exist must not blank the page.
       if (!WEBUI_REMOTE_TABS.some((tab) => tab.value === value)) return;
-      if (snapshot.activeTab === value && !snapshot.showSsh) return;
-      publish({ activeTab: value, showSsh: false });
-    },
-    openSsh: () => {
-      if (snapshot.showSsh) return;
-      publish({ activeTab: snapshot.activeTab, showSsh: true });
-    },
-    closeSsh: () => {
-      if (!snapshot.showSsh) return;
-      publish({ activeTab: snapshot.activeTab, showSsh: false });
+      if (snapshot.activeTab === value) return;
+      publish({ activeTab: value });
     },
   };
 }

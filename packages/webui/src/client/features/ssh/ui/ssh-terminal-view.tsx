@@ -58,6 +58,7 @@ export function SshTerminalView(props: SshTerminalViewProps): ReactElement {
             textSize="small"
             className="min-w-0 flex-1 font-mono"
             aria-label="终端输入"
+            placeholder="输入命令并按 Enter"
             data-webui-ssh-terminal-input="true"
             value={input}
             onChange={(event) => setInput(event.target.value)}

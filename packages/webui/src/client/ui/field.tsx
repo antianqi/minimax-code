@@ -64,11 +64,11 @@ export interface WebuiTextareaProps extends Omit<TextareaHTMLAttributes<HTMLText
 export const WebuiTextarea = forwardRef<
   HTMLTextAreaElement,
   WebuiTextareaProps
->(function WebuiTextarea({ controlSize = "regular", appearance = "default", className, ...props }, ref): ReactElement {
+>(function WebuiTextarea({ controlSize = "regular", appearance = "default", className, rows = 12, ...props }, ref): ReactElement {
   if (useWebuiPageLoading()) {
     return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-control webui-control--multiline ${controlSize === "compact" ? "webui-control--compact" : ""} ${controlSize === "large" ? "webui-control--large" : ""} ${controlSize === "document" ? "webui-control--document" : ""} ${appearance === "document" ? "webui-control--document-appearance" : ""} ${className ?? ""}`} style={props.style} />;
   }
-  return <textarea {...props} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
+  return <textarea {...props} rows={rows} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
 });
 
 /** The shared native select control, including its focus and disabled states. */

@@ -88,7 +88,7 @@ export function AgentForm({
         className="wide"
         label="系统提示词"
         control={(props) => (
-          <WebuiTextarea {...props} className="webui-plugin-form-content" value={prompt} placeholder="描述 Agent 应如何工作和回应" onChange={(event) => setPrompt(event.currentTarget.value)} />
+          <WebuiTextarea {...props} value={prompt} placeholder="描述 Agent 应如何工作和回应" onChange={(event) => setPrompt(event.currentTarget.value)} />
         )}
       />
       {/* The model belongs to the initial definition, which only a new agent

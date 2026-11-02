@@ -60,29 +60,76 @@ export const WEBUI_REMOTE_CONTROL_FEATURES: readonly {
 ];
 /** The button that starts the pairing flow. */
 export const WEBUI_REMOTE_CONTROL_CONNECT_LABEL = "连接";
-/** The SSH entry under the button. */
-export const WEBUI_REMOTE_CONTROL_SSH_LABEL = "SSH";
-/** The SSH entry's accessible name. */
-export const WEBUI_REMOTE_CONTROL_SSH_ARIA_LABEL = "通过 SSH 连接远程服务器";
+/** The button's label while a pairing code is being asked for. */
+export const WEBUI_REMOTE_CONTROL_CONNECTING_LABEL = "连接中…";
+/**
+ * The entry under the card's action.
+ *
+ * The Desktop 3.1.6 page links to its connection settings, not to SSH: the entry is
+ * `remote_control.settings_link` and it opens the settings app's 连接 tab, which carries the
+ * remote-control device list and the SSH hosts together.
+ */
+export const WEBUI_REMOTE_CONTROL_SETTINGS_LABEL = "设置";
+/** The settings entry's accessible name. */
+export const WEBUI_REMOTE_CONTROL_SETTINGS_ARIA_LABEL = "打开连接设置";
+/** The bound state's title: the phone is on the line. */
+export const WEBUI_REMOTE_CONTROL_CONNECTED_TITLE = "已连接";
+/** The bound state's title: the link exists but the phone is not on it. */
+export const WEBUI_REMOTE_CONTROL_DISCONNECTED_TITLE = "未连接";
+/** The bound state's title: the link exists and the phone's presence is not known. */
+export const WEBUI_REMOTE_CONTROL_BOUND_TITLE = "已绑定";
+/**
+ * The title for a host that cannot host a phone link.
+ *
+ * The Desktop's own wording for this state names a desktop version that is too old, which is
+ * not this host's reason: the WebUI's runtime either owns the remote-control bridge or it does
+ * not. The state keeps the Desktop's shape (one title, no card) and this host's reason.
+ */
+export const WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE =
+  "这个运行时无法托管手机远程控制（宿主没有远程控制能力）。";
 /** The two app-store marks under the card. */
 export const WEBUI_REMOTE_CONTROL_PLATFORM_MARKS: readonly {
   readonly key: "android" | "ios";
   readonly label: string;
+  /**
+   * Whether the host publishes a download QR code for this platform.
+   *
+   * The Desktop reads it from its native download config and shows the mark as a link that
+   * opens the QR code on hover. This host publishes no such config, so the mark carries the
+   * Desktop's disabled treatment rather than pretending a code is one hover away.
+   */
+  readonly enabled: boolean;
 }[] = [
-  { key: "android", label: "安卓" },
-  { key: "ios", label: "iOS" },
+  { key: "android", label: "安卓", enabled: false },
+  { key: "ios", label: "iOS", enabled: false },
 ];
 /** The minimum app version, said twice on the Desktop: as the group's name and as the line. */
 export const WEBUI_REMOTE_CONTROL_MINIMUM_VERSION = "支持移动端 App 4.15.0 及以上版本";
 
+/**
+ * Which page the Desktop shows.
+ *
+ * `unavailable` — this host cannot host a phone link at all, so the Desktop's lone title
+ * appears with no card. `unbound` — no phone is linked: the hero title and the 连接 button.
+ * `bound` — a phone is linked: the state title and the settings entry alone.
+ */
+export type WebuiRemoteControlPageState = "unavailable" | "unbound" | "bound";
+
 export interface WebuiRemoteControlPanelModel {
+  readonly state: WebuiRemoteControlPageState;
+  /** The hero title. It is the state's title, not a fixed headline. */
   readonly title: string;
   readonly subtitle: string;
   readonly features: readonly { readonly key: string; readonly text: string }[];
   readonly connectLabel: string;
-  readonly sshLabel: string;
-  readonly sshAriaLabel: string;
-  readonly platformMarks: readonly { readonly key: string; readonly label: string }[];
+  readonly connectingLabel: string;
+  readonly settingsLabel: string;
+  readonly settingsAriaLabel: string;
+  readonly platformMarks: readonly {
+    readonly key: string;
+    readonly label: string;
+    readonly enabled: boolean;
+  }[];
   readonly minimumVersion: string;
   /** The bridge's phase, as the browser knows it. */
   readonly phase: WebuiRemoteControlPhase;
@@ -92,16 +139,14 @@ export interface WebuiRemoteControlPanelModel {
   readonly pairingExpiresInSeconds?: number;
   /** True once the code's moment has passed; the code is then not shown at all. */
   readonly pairingExpired: boolean;
-  /** The linked device's name, when the host reports one. */
-  readonly connectedDevice?: string;
   /** The failure the page shows above the card. */
   readonly error?: string;
-  /** The producer-wide unbind waiting for the user's confirmation. */
-  readonly pendingUnbind?: WebuiRemoteControlPendingUnbind;
   /** Whether the 连接 button is live. */
   readonly canConnect: boolean;
-  /** Whether the page shows the linked device and the unbind action. */
-  readonly showsConnectedDevice: boolean;
+  /** Whether the card carries the 连接 button. */
+  readonly showsConnectButton: boolean;
+  /** Whether the card carries the settings entry. */
+  readonly showsSettingsLink: boolean;
 }
 
 /**
@@ -127,27 +172,45 @@ export function webuiRemoteControlPanelModel(
   // already forgotten.
   const pairingCode =
     phase === "pairing" && !pairingExpired && link?.pairingCode ? link.pairingCode : undefined;
-  const connectedDevice =
-    phase === "connected" || phase === "connecting" || phase === "reconnecting"
-      ? (link?.displayName ?? link?.deviceName)
-      : undefined;
+
+  // The Desktop shows one of three titles once a phone is linked: 已连接 when the phone is on
+  // the line, 未连接 when it is not, and 已绑定 when its presence is not known. Its
+  // mobileOnline flag carries that fact; the bridge's phase carries the same one.
+  const state: WebuiRemoteControlPageState =
+    snapshot.status === "unavailable"
+      ? "unavailable"
+      : phase === "connected" || phase === "connecting" || phase === "reconnecting"
+        ? "bound"
+        : "unbound";
+  const title =
+    state === "unavailable"
+      ? WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE
+      : state === "bound"
+        ? phase === "connected"
+          ? WEBUI_REMOTE_CONTROL_CONNECTED_TITLE
+          : phase === "reconnecting"
+            ? WEBUI_REMOTE_CONTROL_DISCONNECTED_TITLE
+            : WEBUI_REMOTE_CONTROL_BOUND_TITLE
+        : WEBUI_REMOTE_CONTROL_TITLE;
+
   return {
-    title: WEBUI_REMOTE_CONTROL_TITLE,
+    state,
+    title,
     subtitle: WEBUI_REMOTE_CONTROL_SUBTITLE,
     features: WEBUI_REMOTE_CONTROL_FEATURES,
     connectLabel: WEBUI_REMOTE_CONTROL_CONNECT_LABEL,
-    sshLabel: WEBUI_REMOTE_CONTROL_SSH_LABEL,
-    sshAriaLabel: WEBUI_REMOTE_CONTROL_SSH_ARIA_LABEL,
+    connectingLabel: WEBUI_REMOTE_CONTROL_CONNECTING_LABEL,
+    settingsLabel: WEBUI_REMOTE_CONTROL_SETTINGS_LABEL,
+    settingsAriaLabel: WEBUI_REMOTE_CONTROL_SETTINGS_ARIA_LABEL,
     platformMarks: WEBUI_REMOTE_CONTROL_PLATFORM_MARKS,
     minimumVersion: WEBUI_REMOTE_CONTROL_MINIMUM_VERSION,
     phase,
     ...(pairingCode === undefined ? {} : { pairingCode }),
     ...(pairingExpiresInSeconds === undefined ? {} : { pairingExpiresInSeconds }),
     pairingExpired,
-    ...(connectedDevice === undefined ? {} : { connectedDevice }),
     ...(snapshot.error === undefined ? {} : { error: snapshot.error }),
-    ...(snapshot.pendingUnbind === undefined ? {} : { pendingUnbind: snapshot.pendingUnbind }),
     canConnect: snapshot.status === "ready" || snapshot.status === "idle",
-    showsConnectedDevice: phase === "connected" || phase === "connecting" || phase === "reconnecting",
+    showsConnectButton: state === "unbound",
+    showsSettingsLink: state === "unbound" || state === "bound",
   };
 }

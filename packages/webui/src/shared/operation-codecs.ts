@@ -216,10 +216,6 @@ export const webuiOperationResultCodecs: WebuiOperationResultCodecs = {
     }
     return { skills: body.skills.filter(isRecord) as unknown as readonly WebuiSkillEntry[] };
   },
-  pluginManagement: (body) => {
-    if (isRecord(body)) return body;
-    throw malformed("pluginManagement", "the body is not an object");
-  },
 };
 
 /**

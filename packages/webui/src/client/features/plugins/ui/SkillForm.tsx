@@ -62,7 +62,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
         className="wide"
         label="内容"
         control={(props) => (
-          <WebuiTextarea {...props} controlSize="large" className="webui-plugin-form-content" value={content} placeholder="输入 Skill 的具体指令和步骤" onChange={(event) => setContent(event.currentTarget.value)} />
+          <WebuiTextarea {...props} controlSize="large" value={content} placeholder="输入 Skill 的具体指令和步骤" onChange={(event) => setContent(event.currentTarget.value)} />
         )}
       />
       <WebuiDialogActions>

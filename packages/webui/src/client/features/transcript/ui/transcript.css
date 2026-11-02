@@ -919,7 +919,7 @@
     color: var(--text_default_primary);
   }
 
-  .webui-user-inline-editor-control { width: 100%; min-height: 80px; resize: vertical; }
+  .webui-user-inline-editor-control { width: 100%; resize: vertical; }
 
   .webui-inline-editor-actions {
     display: flex;

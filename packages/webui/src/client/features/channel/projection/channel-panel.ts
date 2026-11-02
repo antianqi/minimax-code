@@ -34,10 +34,15 @@ export const WEBUI_CHANNEL_DEFAULT_AGENT_LABEL = "默认";
 /** The Desktop's copy for the sections the 接入 IM pane shows. */
 export const WEBUI_CHANNEL_SECTION_BIND = "绑定机器人";
 export const WEBUI_CHANNEL_STATE_BOUND = "已绑定";
+export const WEBUI_CHANNEL_STATE_UNBOUND = "未绑定";
 export const WEBUI_CHANNEL_SECTION_BIND_QR = "扫描二维码绑定";
 export const WEBUI_CHANNEL_SECTION_BIND_QR_REFRESH = "刷新二维码";
 export const WEBUI_CHANNEL_SECTION_BIND_QR_DESCRIPTION = "微信扫码授权以绑定MiniMax Code";
 export const WEBUI_CHANNEL_SECTION_BIND_QR_HINT = "机器人将自动绑定";
+export const WEBUI_CHANNEL_SECTION_BIND_BOUND_WECHAT = "已关联微信，可解除或新建 bot";
+export const WEBUI_CHANNEL_SECTION_BIND_BOUND_FEISHU = "已关联飞书，可解除或新建 bot";
+export const WEBUI_CHANNEL_SECTION_BIND_BOUND_TELEGRAM = "已关联 Telegram，可解除或新建 bot";
+export const WEBUI_CHANNEL_SECTION_UNBIND = "解除连接";
 export const WEBUI_CHANNEL_SECTION_AGENT = "选择 Agent";
 export const WEBUI_CHANNEL_SECTION_AGENT_DESCRIPTION = "用不同的 Agent 对话";
 export const WEBUI_CHANNEL_SECTION_WORKSPACE = "工作目录";
@@ -46,6 +51,19 @@ export const WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY = "未选项目";
 export const WEBUI_CHANNEL_SECTION_DELETE = "删除Bot";
 export const WEBUI_CHANNEL_SECTION_DELETE_DESCRIPTION = "从列表移除这个 Bot";
 export const WEBUI_CHANNEL_SECTION_DELETE_ACTION = "删除";
+export const WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_TITLE = "删除这个 Bot？";
+export const WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_DESCRIPTION =
+  "删除后将移除此 IM Bot，历史对话会保留。";
+/**
+ * The button that starts a new IM bot.
+ *
+ * The Desktop's `im_connect.create_im_bot`: the list's own action, under the rows.
+ */
+export const WEBUI_CHANNEL_CREATE_BOT_LABEL = "创建 IM Bot";
+/** The name the Desktop gives the WeChat bot. */
+export const WEBUI_CHANNEL_WECHAT_BOT_NAME = "ClawBot";
+/** The name a bot that carries no binding name gets. */
+export const WEBUI_CHANNEL_NEW_BOT_NAME = "新 Bot";
 export const WEBUI_CHANNEL_SECTION_FILTER = "附带工具调用";
 export const WEBUI_CHANNEL_SECTION_FILTER_DESCRIPTION = "在每条消息末尾附上工具调用列表。";
 
@@ -64,6 +82,13 @@ export interface WebuiChannelRow {
   readonly platformLabel: string;
   readonly agentLabel: string;
   readonly selected: boolean;
+  /**
+   * The name the list and the detail header show.
+   *
+   * The Desktop names a WeChat bot `ClawBot` and falls back to the binding's own label, and
+   * to `新 Bot` when it has none. The runtime's client name is this client's binding label.
+   */
+  readonly botName: string;
 }
 
 /** The platform's label, or the platform as it came when this module does not know it. */
@@ -82,7 +107,32 @@ export function webuiChannelRows(
     platformLabel: webuiChannelPlatformLabel(client.platform),
     agentLabel: client.agentName ?? WEBUI_CHANNEL_DEFAULT_AGENT_LABEL,
     selected: client.name === selectedName,
+    botName: webuiChannelBotName(client.platform, client.name),
   }));
+}
+
+/**
+ * The bot's name, as the Desktop names it.
+ *
+ * A WeChat bot is always `ClawBot` on the Desktop; every other bot carries its binding's
+ * label, and a bot with no label at all is `新 Bot`.
+ */
+export function webuiChannelBotName(platform: string, name: string): string {
+  if (platform === "wechat") return WEBUI_CHANNEL_WECHAT_BOT_NAME;
+  const trimmed = name.trim();
+  return trimmed === "" ? WEBUI_CHANNEL_NEW_BOT_NAME : trimmed;
+}
+
+/**
+ * The association's description for a bot that is already bound to a platform.
+ *
+ * The Desktop says which platform is associated, so a reader knows what 解除连接 will undo.
+ */
+export function webuiChannelAssociationLabel(platform: string): string {
+  if (platform === "wechat") return WEBUI_CHANNEL_SECTION_BIND_BOUND_WECHAT;
+  if (platform === "feishu") return WEBUI_CHANNEL_SECTION_BIND_BOUND_FEISHU;
+  if (platform === "telegram") return WEBUI_CHANNEL_SECTION_BIND_BOUND_TELEGRAM;
+  return WEBUI_CHANNEL_SECTION_BIND_QR;
 }
 
 /** Whether the selected client's agent has an IM channel configured on this host. */

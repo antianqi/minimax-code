@@ -62,20 +62,20 @@
     color: var(--text_default_tertiary);
   }
   .webui-control--multiline {
-    min-height: 180px;
+    min-height: 280px;
     resize: vertical;
   }
   .webui-control--multiline.webui-control--compact {
-    min-height: 72px;
+    min-height: 120px;
   }
   .webui-control--large {
-    min-height: 240px;
+    min-height: 360px;
   }
   .webui-control--document {
     height: auto;
     field-sizing: content;
-    min-height: 144px;
-    max-height: 200px;
+    min-height: 220px;
+    max-height: 360px;
     resize: none;
   }
   .webui-control--document-appearance {

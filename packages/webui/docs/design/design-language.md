@@ -392,6 +392,10 @@ contract owns; if no published size fits, the size is the contract's to add.
   and disabled states. `WebuiSearchField` owns the labelled icon/input composition and focus-within
   treatment shared by search surfaces. `WebuiFormLayout` and `WebuiFormActions` own the arrangement of a form.
   Feature code keeps submission, validation rules and business state.
+- **Multi-line text sizes** — `WebuiTextarea` defaults to a 280px minimum height; `compact` is 120px,
+  `large` is 360px, and `document` grows with its content between 220px and 360px. Use these shared
+  sizes instead of setting a smaller feature-local minimum height. Textareas hide scrollbar visuals
+  while keeping their content scrollable.
 - **The feedback family** — `FeedbackEmpty`, `FeedbackError`, `FeedbackSkeleton`, `FeedbackProgress`,
   `FeedbackBusy`, `FeedbackAnnouncement`, `FeedbackLiveRegion` and `FeedbackLoadingOverlay` own the
   announcement, with `useFeedbackActionLoading` as the one way a control tracks a promise it started.

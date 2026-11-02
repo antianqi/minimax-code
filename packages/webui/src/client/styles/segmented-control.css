@@ -1,0 +1,111 @@
+@layer components {
+  .webui-segmented-control {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 3px;
+    border-radius: 10px;
+    background: var(--bg_grouped_primary);
+    padding: 3px;
+  }
+
+  .webui-segmented-control__indicator {
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    left: 0;
+    width: 0;
+    border-radius: var(--radius_8);
+    background: var(--bg_grouped_secondary);
+    pointer-events: none;
+  }
+
+  .webui-segmented-control__radio-option,
+  .webui-segmented-control__button-option {
+    position: relative;
+    z-index: 1;
+  }
+
+  .webui-segmented-control__radio-option {
+    display: inline-flex;
+    height: 30px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius_8);
+    padding: 0 var(--spacing_8);
+    color: var(--text_default_secondary);
+    cursor: pointer;
+    font-size: var(--size_12);
+    line-height: var(--line_height_18);
+    white-space: nowrap;
+  }
+
+  .webui-segmented-control__radio-option:hover {
+    color: var(--text_default_primary);
+  }
+
+  .webui-segmented-control__radio-option.is-selected {
+    color: var(--text_default_primary);
+    font-weight: var(--weight_medium);
+  }
+
+  .webui-segmented-control__button-option.is-selected {
+    color: var(--text_default_primary);
+    font-weight: var(--weight_medium);
+  }
+
+  .webui-segmented-control__radio-option:has(input:focus-visible) {
+    outline: 2px solid var(--border_accent);
+    outline-offset: 1px;
+  }
+
+  .webui-segmented-control__radio {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  /*
+   * The page-header strip.
+   *
+   * The numbers are the Desktop's, measured with getComputedStyle on its live
+   * `ant-segmented mavis-segmented-page-header ant-segmented-sm`:
+   * a 30px track (2px padding, 2px gaps, 8px radius) holding 26px items at
+   * 14px/21px with a 6px radius and 12px side padding. Its track fill
+   * (rgb(245,245,245)) and selected fill (rgb(255,255,255)) are already this
+   * contract's `--bg_grouped_primary` and `--bg_grouped_secondary` roles.
+   *
+   * The item weight is 430 — the Desktop's antd label weight, which is
+   * lighter than this contract's `--weight_medium` and heavier than
+   * `--weight_regular`. It is written as a number because the token scale
+   * has no step between 400 and 500.
+   */
+  .webui-segmented-control--page-header {
+    gap: 2px;
+    border-radius: 8px;
+    padding: 2px;
+  }
+
+  .webui-segmented-control--page-header .webui-segmented-control__radio-option {
+    height: 26px;
+    border-radius: 6px;
+    padding: 0 var(--spacing_12);
+    font-size: var(--size_14);
+    line-height: 21px;
+    font-weight: 430;
+  }
+
+  .webui-segmented-control--page-header .webui-segmented-control__radio-option.is-selected {
+    font-weight: 430;
+  }
+
+  .webui-segmented-control--page-header .webui-segmented-control__indicator {
+    border-radius: 6px;
+  }
+}

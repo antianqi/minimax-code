@@ -4,32 +4,43 @@
 // published module may not re-export another module's symbol — so the pane lives here and is
 // published as itself rather than through a forwarding file.
 //
-// Split in two on purpose. `ChannelConnectPanelView` is a pure render of a snapshot, so a test can
-// pin every branch — the rows, the empty state, the load failure, the sections the runtime has no
-// route behind — through `renderToStaticMarkup` without a DOM (there is no jsdom in this
+// Split in two on purpose. `ChannelConnectPanelView` is a pure render of a snapshot, so a test
+// can pin every branch — the rows, the empty state, the load failure, the sections the runtime
+// has no route behind — through `renderToStaticMarkup` without a DOM (there is no jsdom in this
 // package). `ChannelConnectPanel` is the thin part that subscribes to the owner and reads once
 // when it opens.
 //
-// The pane is a bot list plus a detail pane, the way Desktop's 接入 IM tab is: a 220px list column
-// with one row per bound IM client (a status dot, the platform's icon, the client's name and the
-// platform's label) and, beside it, the selected client's sections. A section the runtime has no
-// route behind is rendered with Desktop's own copy and marked as not wired, never as if it
-// worked.
+// The pane is a bot list plus a detail card, the way Desktop 3.1.6's 接入 IM tab is: a 220px
+// list column with one row per IM client (a status dot, the platform's icon, the bot's name and
+// the platform's label) and, beside it, the selected bot's card — a rounded grouped surface
+// whose header carries the bot's name and state, and whose sections are the association, the
+// Agent, the working directory and the deletion. A section the runtime has no route behind is
+// rendered with Desktop's own copy and marked as not wired, never as if it worked.
+//
+// ## The four seams this repository does not have
+//
+// The connection list, the QR binding, the binding write and the bot deletion have no route
+// behind them here (packages/webui/docs/known-gaps.md §4a). Each of those renders Desktop's
+// markup with an `aria-disabled` state and no handler. The list itself is the exception: the
+// runtime's channel bridge does answer it, so the rows are real.
 import {
   IconBrandTelegram,
   IconBrandWechat,
+  IconChevronDown,
   IconMessageCircle,
   IconPlus,
-  IconRefresh,
+  IconFolder,
 } from "@tabler/icons-react";
 import { useEffect, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import type {
   WebuiChannelConnectRequest,
   WebuiChannelMessageFilterRequest,
 } from "../../../../shared/contracts/channel.js";
 import type { createWebuiChannelOwner, WebuiChannelSnapshot } from "../application/channel-owner.js";
 import {
+  WEBUI_CHANNEL_CREATE_BOT_LABEL,
   WEBUI_CHANNEL_EMPTY_TEXT,
   WEBUI_CHANNEL_FILTER_MODE_FULL,
   WEBUI_CHANNEL_FILTER_MODE_RESULT,
@@ -37,25 +48,30 @@ import {
   WEBUI_CHANNEL_NOT_WIRED,
   WEBUI_CHANNEL_SECTION_AGENT,
   WEBUI_CHANNEL_SECTION_AGENT_DESCRIPTION,
+  WEBUI_CHANNEL_SECTION_BIND,
   WEBUI_CHANNEL_SECTION_BIND_QR,
   WEBUI_CHANNEL_SECTION_BIND_QR_DESCRIPTION,
   WEBUI_CHANNEL_SECTION_BIND_QR_HINT,
   WEBUI_CHANNEL_SECTION_BIND_QR_REFRESH,
   WEBUI_CHANNEL_SECTION_DELETE,
   WEBUI_CHANNEL_SECTION_DELETE_ACTION,
+  WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_DESCRIPTION,
+  WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_TITLE,
   WEBUI_CHANNEL_SECTION_DELETE_DESCRIPTION,
   WEBUI_CHANNEL_SECTION_FILTER,
   WEBUI_CHANNEL_SECTION_FILTER_DESCRIPTION,
+  WEBUI_CHANNEL_SECTION_UNBIND,
   WEBUI_CHANNEL_SECTION_WORKSPACE,
   WEBUI_CHANNEL_SECTION_WORKSPACE_DESCRIPTION,
   WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY,
   WEBUI_CHANNEL_STATE_BOUND,
-  webuiChannelConfigLabel,
+  webuiChannelAssociationLabel,
   webuiChannelFilterModeLabel,
   webuiChannelRows,
   type WebuiChannelRow,
 } from "../projection/channel-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiDialog } from "../../../ui/dialog.js";
 import { WebuiField, WebuiFormActions, WebuiFormLayout, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 
@@ -73,6 +89,10 @@ export interface ChannelConnectPanelViewProps {
   readonly binding: boolean;
   readonly onOpenBinding: () => void;
   readonly onCloseBinding: () => void;
+  /** Whether the delete confirmation is open. */
+  readonly deleting: boolean;
+  readonly onOpenDelete: () => void;
+  readonly onCloseDelete: () => void;
 }
 
 /** The platform's icon. Feishu has no brand glyph in the icon set, so it gets a neutral one. */
@@ -86,7 +106,7 @@ function platformIcon(platform: string): ReactNode {
   return <IconMessageCircle aria-hidden="true" size={20} stroke={1.5} />;
 }
 
-/** One section of the detail pane, in Desktop's shape: a title, a description and its content. */
+/** One section of the detail card, in Desktop's shape: a title, a description and its content. */
 function DetailSection(props: {
   readonly title: string;
   readonly description: string;
@@ -120,11 +140,36 @@ function NotWired(): ReactElement {
 }
 
 /**
+ * A selector the Desktop draws as a dropdown trigger.
+ *
+ * The value it shows is real — the Agent the client is bound to, the working directory it keeps
+ * its conversations in — but choosing another one has no route behind it here, so the control
+ * carries the Desktop's shape, the `aria-disabled` state and no handler.
+ */
+function UnwiredSelect(props: {
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly testId: string;
+}): ReactElement {
+  return (
+    <WebuiInline
+      gap="small"
+      className="h-8 items-center rounded-lg border-[0.5px] border-border_default px-3 text-sm text-text_default_primary"
+      data-testid={props.testId}
+      aria-disabled="true"
+    >
+      {props.icon}
+      <span className="min-w-0 truncate">{props.label}</span>
+      <IconChevronDown aria-hidden="true" size={16} stroke={1.5} className="text-text_default_secondary" />
+    </WebuiInline>
+  );
+}
+
+/**
  * The bind form.
  *
  * It binds through the runtime's credential path (the channel bridge's `connect` route), because
- * that is the bind this repository's runtime serves. The QR path Desktop uses has no route here,
- * and the pane says so rather than offering a scan that cannot happen.
+ * that is the bind this repository's runtime actually serves.
  */
 function ChannelBindForm(props: {
   readonly onSubmit: (request: WebuiChannelConnectRequest) => void;
@@ -148,7 +193,7 @@ function ChannelBindForm(props: {
       }}
     >
       <WebuiFormLayout>
-        <p className="text-sm leading-5 text-text_default_primary">绑定机器人</p>
+        <p className="text-sm leading-5 text-text_default_primary">{WEBUI_CHANNEL_SECTION_BIND}</p>
         <WebuiField
           label="客户端名称"
           control={(props) => (
@@ -156,6 +201,7 @@ function ChannelBindForm(props: {
               {...props}
               data-webui-channel-bind-name="true"
               controlSize="compact"
+              placeholder="例如：团队飞书机器人"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -168,6 +214,7 @@ function ChannelBindForm(props: {
               {...props}
               data-webui-channel-bind-app-id="true"
               controlSize="compact"
+              placeholder="输入飞书 App ID"
               value={appId}
               onChange={(event) => setAppId(event.target.value)}
             />
@@ -180,15 +227,12 @@ function ChannelBindForm(props: {
               {...props}
               data-webui-channel-bind-app-secret="true"
               controlSize="compact"
-              type="password"
+              placeholder="输入飞书 App Secret"
               value={appSecret}
               onChange={(event) => setAppSecret(event.target.value)}
             />
           )}
         />
-        <p className="text-xs leading-4 text-text_default_tertiary">
-          {WEBUI_CHANNEL_SECTION_BIND_QR} · {WEBUI_CHANNEL_SECTION_BIND_QR_HINT}
-        </p>
         <WebuiFormActions>
           <WebuiButton variant="outline" size="inline" type="submit"
             data-webui-channel-bind-submit="true"
@@ -208,51 +252,90 @@ function ChannelBindForm(props: {
   );
 }
 
-/** The selected client's four sections, plus the message filter the runtime does route. */
+/** The selected bot's card: its header, the association, the Agent, the workspace and the deletion. */
 function ChannelDetail(props: {
   readonly row: WebuiChannelRow;
   readonly snapshot: WebuiChannelSnapshot;
   readonly onUnbind: (name: string) => void;
   readonly onUpdateFilter: (request: WebuiChannelMessageFilterRequest) => void;
+  readonly onOpenDelete: () => void;
 }): ReactElement {
   const filter = props.snapshot.filter;
   const filterKey = props.row.name;
   return (
-    <>
-      <DetailSection
-        testId="binding"
-        title={WEBUI_CHANNEL_STATE_BOUND}
-        description={`${props.row.platformLabel} · ${props.row.agentLabel}`}
+    <div className="rounded-2xl bg-bg_grouped_tertiary p-4" data-webui-component="channel-detail-card">
+      <header className="flex min-h-14 items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="truncate text-sm leading-5 text-text_default_primary">{props.row.botName}</h1>
+          <div className="mt-1 flex items-center gap-1.5 text-xs leading-4 text-text_default_secondary">
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-text_default_tertiary"
+              aria-hidden="true"
+            />
+            <span>{props.row.platformLabel}</span>
+            <span>{WEBUI_CHANNEL_STATE_BOUND}</span>
+          </div>
+        </div>
+      </header>
+
+      <section
+        className="border-t-[0.5px] border-border_default"
+        data-webui-channel-section="association"
       >
-        <WebuiStack gap="tight" align="end" className="text-right">
-          <span className="text-xs leading-4 text-text_default_secondary">
-            {WEBUI_CHANNEL_SECTION_BIND_QR} · {WEBUI_CHANNEL_SECTION_BIND_QR_DESCRIPTION}
-          </span>
-          <span className="text-xs leading-4 text-text_default_tertiary">
-            {WEBUI_CHANNEL_SECTION_BIND_QR_HINT}
-          </span>
-          <WebuiButton variant="outline" size="inline-dense" disabled
-            data-webui-channel-bind-refresh="true"
-            className="text-text_default_tertiary"
+        <div className="flex min-h-14 items-center justify-between gap-6 py-2">
+          <div className="min-w-0">
+            <p className="text-sm leading-5 text-text_default_primary">{WEBUI_CHANNEL_SECTION_BIND}</p>
+            <p className="mt-1 text-xs leading-4 text-text_default_secondary">
+              {webuiChannelAssociationLabel(props.row.platform)}
+            </p>
+          </div>
+          <WebuiInline gap="small" className="shrink-0">
+            <WebuiButton
+              variant="outline"
+              size="inline"
+              data-webui-channel-unbind="true"
+              onClick={() => props.onUnbind(props.row.name)}
+            >
+              {WEBUI_CHANNEL_SECTION_UNBIND}
+            </WebuiButton>
+          </WebuiInline>
+        </div>
+        <section
+          className="flex h-[176px] w-full items-center gap-4 py-2"
+          data-webui-channel-section="authorization"
+        >
+          <div
+            className="relative flex h-40 w-40 shrink-0 items-center justify-center rounded-xl bg-bg_default_primary p-[10px]"
+            data-testid="authorization-qr-container"
           >
-            <IconRefresh aria-hidden="true" size={14} stroke={1.5} />
-            {WEBUI_CHANNEL_SECTION_BIND_QR_REFRESH}
-          </WebuiButton>
-          <NotWired />
-        </WebuiStack>
-      </DetailSection>
+            <NotWired />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5" data-testid="authorization-copy">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center text-icon_default_primary">
+              {platformIcon(props.row.platform)}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm leading-5 text-text_default_secondary">
+                {WEBUI_CHANNEL_SECTION_BIND_QR_DESCRIPTION}
+              </p>
+              <p className="text-sm leading-5 text-text_default_secondary">
+                {WEBUI_CHANNEL_SECTION_BIND_QR_HINT}
+              </p>
+            </div>
+          </div>
+        </section>
+      </section>
 
       <DetailSection
         testId="agent"
         title={WEBUI_CHANNEL_SECTION_AGENT}
         description={WEBUI_CHANNEL_SECTION_AGENT_DESCRIPTION}
       >
-        <span
-          data-webui-channel-config="true"
-          className="text-xs text-text_default_secondary"
-        >
-          {props.row.agentLabel} · {webuiChannelConfigLabel(props.snapshot.config)}
-        </span>
+        <UnwiredSelect
+          icon={<IconMessageCircle aria-hidden="true" size={16} stroke={1.5} />}
+          label={props.row.agentLabel}
+          testId="web-agent-setting-value"
+        />
         <NotWired />
       </DetailSection>
 
@@ -261,9 +344,11 @@ function ChannelDetail(props: {
         title={WEBUI_CHANNEL_SECTION_WORKSPACE}
         description={WEBUI_CHANNEL_SECTION_WORKSPACE_DESCRIPTION}
       >
-        <span className="text-xs text-text_default_secondary">
-          {WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY}
-        </span>
+        <UnwiredSelect
+          icon={<IconFolder aria-hidden="true" size={16} stroke={1.5} />}
+          label={WEBUI_CHANNEL_SECTION_WORKSPACE_EMPTY}
+          testId="web-project-setting-value"
+        />
         <NotWired />
       </DetailSection>
 
@@ -308,14 +393,16 @@ function ChannelDetail(props: {
         title={WEBUI_CHANNEL_SECTION_DELETE}
         description={WEBUI_CHANNEL_SECTION_DELETE_DESCRIPTION}
       >
-        <WebuiButton variant="outline" size="inline" data-webui-channel-unbind="true"
-          onClick={() => props.onUnbind(props.row.name)}
-          className="text-text_status_error"
+        <WebuiButton
+          variant="danger"
+          size="inline"
+          data-webui-channel-delete="true"
+          onClick={props.onOpenDelete}
         >
           {WEBUI_CHANNEL_SECTION_DELETE_ACTION}
         </WebuiButton>
       </DetailSection>
-    </>
+    </div>
   );
 }
 
@@ -346,7 +433,7 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
                 aria-pressed={row.selected}
                 data-webui-channel-row={row.name}
                 onClick={() => props.onSelect(row.name)}
-                className="flex h-[62px] w-full items-center gap-2 rounded-lg py-2.5 pl-2 pr-3"
+                className="flex h-[62px] w-full items-center gap-2 rounded-lg py-2.5 pl-2 pr-3 text-left"
               >
                 <span
                   className="mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-text_default_tertiary"
@@ -357,7 +444,7 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="truncate text-sm font-medium leading-5 text-text_default_primary">
-                    {row.name}
+                    {row.botName}
                   </span>
                   <span className="truncate text-[13px] leading-[18px] text-text_default_secondary">
                     {row.platformLabel}
@@ -371,10 +458,10 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
             size="inline"
             data-webui-channel-new="true"
             onClick={props.onOpenBinding}
-            className="mt-2 flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left"
+            className="mt-3 flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm"
           >
             <IconPlus aria-hidden="true" size={16} stroke={1.5} />
-            新 Bot
+            <span className="min-w-0 flex-1 truncate">{WEBUI_CHANNEL_CREATE_BOT_LABEL}</span>
           </WebuiButton>
           {props.snapshot.status === "loading" ? (
             <p className="mt-2 text-xs text-text_default_tertiary">{WEBUI_CHANNEL_LOADING_TEXT}</p>
@@ -398,7 +485,7 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
         </aside>
 
         <section
-          className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
+          className="h-full min-h-0 w-[680px] min-w-0 overflow-y-auto overscroll-contain"
           data-webui-component="channel-connection-detail"
         >
           {props.binding ? (
@@ -413,6 +500,7 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
               snapshot={props.snapshot}
               onUnbind={props.onUnbind}
               onUpdateFilter={props.onUpdateFilter}
+              onOpenDelete={props.onOpenDelete}
             />
           )}
         </section>
@@ -428,28 +516,87 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
     props.owner.getSnapshot,
   );
   const [binding, setBinding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { dom } = useWebuiBrowserCapabilities();
+  const portalTarget = dom.portalTarget();
 
   useEffect(() => {
     void props.owner.load();
     return props.owner.startRefreshing();
   }, [props.owner]);
 
+  // The Desktop shows the first bot's detail as soon as the list has one, so the card is never
+  // an empty column beside a populated list.
+  useEffect(() => {
+    if (snapshot.selectedName !== undefined) return;
+    const first = snapshot.clients[0];
+    if (!first) return;
+    void props.owner.select(first.name);
+  }, [props.owner, snapshot.clients, snapshot.selectedName]);
+
+  const selected = snapshot.clients.find((client) => client.name === snapshot.selectedName);
+
   return (
-    <ChannelConnectPanelView
-      snapshot={snapshot}
-      onSelect={(name) => void props.owner.select(name)}
-      onBind={(request) => {
-        void props.owner.connect(request).then((result) => {
-          if (result.ok) setBinding(false);
-        });
-      }}
-      onUnbind={(name) => {
-        void props.owner.disconnect({ name, clearCredentials: true });
-      }}
-      onUpdateFilter={(request) => void props.owner.updateMessageFilter(request)}
-      binding={binding}
-      onOpenBinding={() => setBinding(true)}
-      onCloseBinding={() => setBinding(false)}
-    />
+    <>
+      <ChannelConnectPanelView
+        snapshot={snapshot}
+        onSelect={(name) => void props.owner.select(name)}
+        onBind={(request) => {
+          void props.owner.connect(request).then((result) => {
+            if (result.ok) setBinding(false);
+          });
+        }}
+        onUnbind={(name) => {
+          void props.owner.disconnect({ name, clearCredentials: true });
+        }}
+        onUpdateFilter={(request) => void props.owner.updateMessageFilter(request)}
+        binding={binding}
+        onOpenBinding={() => setBinding(true)}
+        onCloseBinding={() => setBinding(false)}
+        deleting={deleting}
+        onOpenDelete={() => setDeleting(true)}
+        onCloseDelete={() => setDeleting(false)}
+      />
+      {deleting && selected && portalTarget ? (
+        <WebuiDialog
+          id="channel-delete-bot"
+          open
+          role="alertdialog"
+          title={WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_TITLE}
+          description={WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_DESCRIPTION}
+          width="compact"
+          portalTarget={portalTarget}
+          testId="delete-connection-confirm"
+          onClose={() => setDeleting(false)}
+          footer={
+            <>
+              <WebuiButton
+                variant="secondary"
+                size="regular"
+                data-webui-channel-delete-cancel="true"
+                onClick={() => setDeleting(false)}
+              >
+                取消
+              </WebuiButton>
+              <WebuiButton
+                variant="danger"
+                size="regular"
+                data-webui-channel-delete-confirm="true"
+                onClick={() => {
+                  setDeleting(false);
+                  void props.owner.disconnect({ name: selected.name, clearCredentials: true });
+                }}
+              >
+                {WEBUI_CHANNEL_SECTION_DELETE_ACTION}
+              </WebuiButton>
+            </>
+          }
+        >
+          <span data-testid="delete-connection-confirm-description">
+            {WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_DESCRIPTION}
+          </span>
+        </WebuiDialog>
+      ) : null}
+    </>
   );
 }

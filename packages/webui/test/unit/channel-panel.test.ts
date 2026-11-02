@@ -20,6 +20,8 @@ import {
   WEBUI_CHANNEL_NOT_WIRED,
   WEBUI_CHANNEL_SECTION_DELETE,
   WEBUI_CHANNEL_SECTION_WORKSPACE,
+  webuiChannelAssociationLabel,
+  webuiChannelConfigLabel,
   webuiChannelPlatformLabel,
   webuiChannelRows,
 } from "../../src/client/features/channel/projection/channel-panel.js";
@@ -49,6 +51,9 @@ function view(snap: WebuiChannelSnapshot): string {
       binding: false,
       onOpenBinding: noop,
       onCloseBinding: noop,
+      deleting: false,
+      onOpenDelete: noop,
+      onCloseDelete: noop,
     }),
   );
 }
@@ -59,6 +64,12 @@ describe("the 接入 IM projection", () => {
     expect(webuiChannelPlatformLabel("feishu")).toBe("飞书");
     expect(webuiChannelPlatformLabel("telegram")).toBe("Telegram");
     expect(webuiChannelPlatformLabel("slack")).toBe("slack");
+  });
+
+  it("names the association after the platform the bot is bound to", () => {
+    expect(webuiChannelAssociationLabel("wechat")).toBe("已关联微信，可解除或新建 bot");
+    expect(webuiChannelAssociationLabel("feishu")).toBe("已关联飞书，可解除或新建 bot");
+    expect(webuiChannelAssociationLabel("telegram")).toBe("已关联 Telegram，可解除或新建 bot");
   });
 
   it("keys every row by the client's own name and falls back to the default agent", () => {
@@ -74,6 +85,7 @@ describe("the 接入 IM projection", () => {
         platformLabel: "飞书",
         agentLabel: "mavis",
         selected: false,
+        botName: "mavis",
       },
       {
         name: "wechat:mavis",
@@ -81,6 +93,7 @@ describe("the 接入 IM projection", () => {
         platformLabel: "微信",
         agentLabel: "默认",
         selected: true,
+        botName: "ClawBot",
       },
     ]);
   });
@@ -200,7 +213,9 @@ describe("the rendered 接入 IM pane", () => {
     expect(markup).toContain("飞书");
     expect(markup).toContain("微信");
     expect(markup).toContain('data-webui-channel-row="wechat:mavis"');
-    expect(markup).toContain("新 Bot");
+    // The Desktop names a WeChat bot ClawBot and every other bot after its binding.
+    expect(markup).toContain("ClawBot");
+    expect(markup).toContain("创建 IM Bot");
   });
 
   it("shows the empty state only for a successful empty read", () => {
@@ -221,7 +236,20 @@ describe("the rendered 接入 IM pane", () => {
     expect(markup).toContain('data-webui-channel-section="workspace"');
   });
 
-  it("shows the selected client's configuration state and message filter", () => {
+  it("shows the selected bot's card with the Desktop's header and sections", () => {
+    const markup = view(snapshot({ clients: [client()], selectedName: "mavis" }));
+
+    expect(markup).toContain('data-webui-component="channel-detail-card"');
+    expect(markup).toContain('data-webui-channel-section="association"');
+    expect(markup).toContain('data-webui-channel-section="agent"');
+    expect(markup).toContain('data-webui-channel-section="delete"');
+    expect(markup).toContain("绑定机器人");
+    expect(markup).toContain("已关联飞书，可解除或新建 bot");
+    expect(markup).toContain("微信扫码授权以绑定MiniMax Code");
+    expect(markup).toContain("机器人将自动绑定");
+  });
+
+  it("shows the selected client's message filter", () => {
     const markup = view(
       snapshot({
         clients: [client()],
@@ -231,8 +259,15 @@ describe("the rendered 接入 IM pane", () => {
       }),
     );
 
-    expect(markup).toContain("已配置");
     expect(markup).toContain("完整输出");
     expect(markup).toContain('data-webui-channel-filter-mode="full"');
+  });
+
+  it("names the agent's configuration state where the projection reads it", () => {
+    // The Desktop's Agent slot carries the selector alone, so the configuration state stays in
+    // the projection rather than in the slot.
+    expect(webuiChannelConfigLabel({ configured: true })).toBe("已配置");
+    expect(webuiChannelConfigLabel({ configured: false })).toBe("未配置");
+    expect(webuiChannelConfigLabel(undefined)).toBe("未读取");
   });
 });

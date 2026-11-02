@@ -55,6 +55,22 @@
       "disposition": "managed",
       "note": "the catalogue's filter menu"
     },
+    "features/plugins/ui/PluginManagementList.tsx": {
+      "disposition": "managed",
+      "note": "row action menus use one managed dropdown layer at a time"
+    },
+    "features/miniapp/ui/MiniAppAppsList.public.tsx": {
+      "disposition": "managed",
+      "note": "Mini App row action menus use the shared managed dropdown layer"
+    },
+    "features/channel/ui/ChannelConnectPanel.public.tsx": {
+      "disposition": "managed",
+      "note": "the bot deletion confirmation; a dismissal closes it"
+    },
+    "features/remote-control/ui/RemoteControlPanel.public.tsx": {
+      "disposition": "managed",
+      "note": "the pairing-code modal; a dismissal closes it"
+    },
     "features/plugins/ui/PluginImportDialog.tsx": {
       "disposition": "managed",
       "note": "a modal layer; a dismissal closes it"
@@ -74,6 +90,10 @@
     "features/settings/ui/settings-atoms.tsx": {
       "disposition": "managed",
       "note": "the settings dialog adapter renders the shared WebuiDialog shell; its close policy is passed to the shared coordinator registration"
+    },
+    "features/settings/ui/UsageModelSettings.tsx": {
+      "disposition": "managed",
+      "note": "the model-source menu registers with the coordinator as a layer of the settings page, which is itself a managed parent"
     },
     "features/transcript/ui/MessageActions.tsx": {
       "disposition": "managed",
@@ -98,6 +118,10 @@
     "ui/dialog.tsx": {
       "disposition": "managed",
       "note": "the shared public modal shell portals into the document body, registers with the coordinator, and delegates inertness/focus containment and restoration to the browser platform"
+    },
+    "ui/feedback.tsx": {
+      "disposition": "exception",
+      "boundary": "the pending-action overlay is feedback about one command, not a surface the reader opened: it has no dismissal of its own, so it does not register with the coordinator. It portals into the platform's portal target, covers the viewport while the action settles, and leaves with the action's result. It is inert to Escape and outside presses by construction, and a second action cannot start because the control that started it is disabled while it shows."
     }
   }
 }

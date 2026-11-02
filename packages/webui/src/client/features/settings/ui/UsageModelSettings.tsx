@@ -220,6 +220,8 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
         open={sourceMenuOpen}
         onOpen={() => setSourceMenuOpen(true)}
         onClose={() => setSourceMenuOpen(false)}
+        managed
+        managedLayerId="settings-usage-source-menu"
         role="menu"
         ariaLabel="选择模型来源"
         width="content"

@@ -7,7 +7,8 @@ import {
   useWebuiWorkspacePanelSurface,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
-import { WebuiIconAgent, WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconFile, WebuiIconRunLocation } from "../../../shell/icons.js";
+import { WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconFile, WebuiIconRunLocation } from "../../../shell/icons.js";
+import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
 import { WebuiField, WebuiTextarea } from "../../../ui/field.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
@@ -88,7 +89,7 @@ export function WebuiSubagentsPanel({ subagents, collapsed = false, onToggle, on
         {subagents.map((subagent) => {
           const label = subagent.title?.trim() || subagent.agentName;
           return <WebuiButton variant="selectable-row" size="rail" className="webui-subagent-row" key={subagent.sessionId} onClick={() => onMemberClick?.(subagent)}>
-            <WebuiIconAgent className="webui-subagent-avatar" />
+            <WebuiAgentAvatar agentName={subagent.agentName} size="compact" />
             <span className="min-w-0 flex-1 truncate text-left">{label}</span>
             <span className={`webui-subagent-status webui-subagent-status--${subagent.status}`} aria-label={subagent.status}>
               {subagent.status === "completed" ? <WebuiIconCheck className="size-3" /> : subagent.status === "error" ? "!" : "·"}
@@ -127,7 +128,7 @@ function WorkspaceCommitDialog({ open, environment, workspaceDir, mutateGit, onC
     {hasChanges ? <WebuiButton variant="secondary" onClick={() => submit("commit")} disabled={busy || !message.trim()}>提交</WebuiButton> : null}
     <WebuiButton variant="primary" onClick={() => submit(hasChanges ? "commitAndPush" : "push")} disabled={busy || (hasChanges && !message.trim())}>{hasChanges ? "提交并推送" : "推送"}</WebuiButton>
   </WebuiDialogActions>}>
-    {hasChanges ? <WebuiField className="webui-commit-dialog-label" label="提交说明" control={(props) => <WebuiTextarea {...props} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="输入提交说明" autoFocus />} /> : <p className="webui-commit-dialog-hint">当前没有未提交变更，将推送当前分支。</p>}
+    {hasChanges ? <WebuiField className="webui-commit-dialog-label" label="提交说明" control={(props) => <WebuiTextarea {...props} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="例如：修复搜索框样式" autoFocus />} /> : <p className="webui-commit-dialog-hint">当前没有未提交变更，将推送当前分支。</p>}
     {error ? <FeedbackError message={error} className="webui-commit-dialog-error" /> : null}
   </WebuiDialog>;
 }

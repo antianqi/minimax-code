@@ -44,7 +44,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
       <WebuiField
         label="名称"
         control={(props) => (
-          <WebuiTextInput {...props} value={name} onChange={(event) => setName(event.currentTarget.value)} />
+          <WebuiTextInput {...props} value={name} placeholder="例如：代码审查规范" onChange={(event) => setName(event.currentTarget.value)} />
         )}
       />
       <WebuiField
@@ -53,6 +53,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
           <WebuiTextInput
             {...props}
             value={description}
+            placeholder="例如：指导 Agent 按项目规范审查代码"
             onChange={(event) => setDescription(event.currentTarget.value)}
           />
         )}
@@ -61,7 +62,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
         className="wide"
         label="内容"
         control={(props) => (
-          <WebuiTextarea {...props} controlSize="large" className="webui-plugin-form-content" value={content} onChange={(event) => setContent(event.currentTarget.value)} />
+          <WebuiTextarea {...props} controlSize="large" className="webui-plugin-form-content" value={content} placeholder="输入 Skill 的具体指令和步骤" onChange={(event) => setContent(event.currentTarget.value)} />
         )}
       />
       <WebuiDialogActions>

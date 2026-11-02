@@ -26,6 +26,8 @@
 /* The field contract's arrangement (ADR 0028 § Shared contracts): a label, a
  * description, an error and a control, stacked or in a row. */
 @import "./field.css";
+@import "./agent-avatar.css";
+@import "./segmented-control.css";
 /* The feedback family's arrangement (ADR 0028 § Shared contracts): empty, error,
  * skeleton, progress, busy and announcement. */
 @import "./feedback.css";

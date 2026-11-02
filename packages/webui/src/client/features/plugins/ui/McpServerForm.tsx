@@ -24,6 +24,7 @@ import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiSelect, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
+import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDisclosure } from "../../../ui/page.js";
@@ -317,18 +318,20 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
 
   return (
     <div className="webui-mcp-form">
-      <div className="webui-mcp-mode">
-        <WebuiButton variant={jsonMode ? "plain" : "surface"} size="compact" aria-pressed={!jsonMode} onClick={() => (jsonMode ? toForm() : undefined)}>
-          表单
-        </WebuiButton>
-        <WebuiButton variant={jsonMode ? "surface" : "plain"} size="compact" aria-pressed={jsonMode} onClick={() => (jsonMode ? undefined : toJson())}>
-          JSON
-        </WebuiButton>
-      </div>
+      <WebuiSegmentedControl
+        ariaLabel="配置编辑模式"
+        options={[
+          { value: "form", label: "表单" },
+          { value: "json", label: "JSON" },
+        ]}
+        value={jsonMode ? "json" : "form"}
+        onChange={(mode) => (mode === "json" ? toJson() : toForm())}
+      />
       {jsonMode ? (
           <WebuiTextarea
           aria-label="MCP 配置 JSON"
           value={json}
+          placeholder={'{\n  "mcpServers": {}\n}'}
           onChange={(event) => setJson(event.currentTarget.value)}
         />
       ) : (
@@ -337,7 +340,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
             label="名称"
             required
             control={(props) => (
-              <WebuiTextInput {...props} required value={name} onChange={(event) => setName(event.currentTarget.value)} />
+              <WebuiTextInput {...props} required value={name} placeholder="例如：本地文件服务" onChange={(event) => setName(event.currentTarget.value)} />
             )}
           />
           <WebuiField
@@ -357,13 +360,13 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
                 label="命令"
                 required
                 control={(props) => (
-                  <WebuiTextInput {...props} required value={command} onChange={(event) => setCommand(event.currentTarget.value)} />
+                  <WebuiTextInput {...props} required value={command} placeholder="输入启动服务的命令" onChange={(event) => setCommand(event.currentTarget.value)} />
                 )}
               />
               <WebuiField
                 label="参数"
                 control={(props) => (
-                  <WebuiTextInput {...props} value={args} onChange={(event) => setArgs(event.currentTarget.value)} />
+                  <WebuiTextInput {...props} value={args} placeholder="输入命令参数，可留空" onChange={(event) => setArgs(event.currentTarget.value)} />
                 )}
               />
             </>
@@ -372,7 +375,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
               label="地址"
               required
               control={(props) => (
-                <WebuiTextInput {...props} required value={url} onChange={(event) => setUrl(event.currentTarget.value)} />
+                <WebuiTextInput {...props} required value={url} placeholder="https://example.com/mcp" onChange={(event) => setUrl(event.currentTarget.value)} />
               )}
             />
           )}
@@ -380,7 +383,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
             label="描述"
             className="webui-mcp-form-full-row"
             control={(props) => (
-              <WebuiTextInput {...props} value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
+              <WebuiTextInput {...props} value={description} placeholder="简要说明此服务的用途" onChange={(event) => setDescription(event.currentTarget.value)} />
             )}
           />
           <WebuiInline gap="medium" justify="between" className="webui-mcp-enabled">
@@ -404,14 +407,14 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
                 <WebuiField
                   label="环境变量"
                   control={(props) => (
-                    <WebuiTextarea {...props} value={env} onChange={(event) => setEnv(event.currentTarget.value)} />
+                    <WebuiTextarea {...props} value={env} placeholder={'KEY=value\nANOTHER_KEY=value'} onChange={(event) => setEnv(event.currentTarget.value)} />
                   )}
                 />
               ) : (
                 <WebuiField
                   label="请求头"
                   control={(props) => (
-                    <WebuiTextarea {...props} value={headers} onChange={(event) => setHeaders(event.currentTarget.value)} />
+                    <WebuiTextarea {...props} value={headers} placeholder={'{\n  "Authorization": "Bearer …"\n}'} onChange={(event) => setHeaders(event.currentTarget.value)} />
                   )}
                 />
               )}
@@ -421,6 +424,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
                   <WebuiTextInput
                     {...props}
                     value={timeoutMs}
+                    placeholder="30000"
                     onChange={(event) => setTimeoutMs(event.currentTarget.value)}
                   />
                 )}

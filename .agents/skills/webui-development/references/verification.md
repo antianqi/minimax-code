@@ -19,6 +19,11 @@ run aggregate gates or full suites by default; run a full gate only when the use
 | Changed TypeScript tests | `pnpm --filter @mavis/webui typecheck:test` |
 | Business behavior | Relevant declared Vitest file |
 | Imports, roles, publication, file movement | `pnpm check:webui-dependency` |
+| A client UI module added, moved or reclassified | `pnpm check:webui-presentation` |
+| A duration, easing, `@keyframes`, motion family or an animating component | `pnpm check:webui-motion` |
+| A dialog, popup, menu, tooltip or a changed dismissal path | `pnpm check:webui-overlays` |
+| A new announcement, empty/error/busy state, or a feedback migration | `pnpm check:webui-feedback` |
+| A shared control adopted, or a business stylesheet taking on a raw `button`/`input`/`select`/`textarea` selector | the raw-control ratchet in `pnpm test:webui` |
 | Rendered UI, CSS, theme or browser behavior | `pnpm build:webui` when the built artifact is affected, then only the relevant browser scenario; inspect actual screenshots for visual claims |
 | Bundle/entries | `pnpm build:webui` then `pnpm check:webui-boundary` |
 | npm package/launcher | `pnpm test:webui-package`; do not confuse local packaging with publishing |

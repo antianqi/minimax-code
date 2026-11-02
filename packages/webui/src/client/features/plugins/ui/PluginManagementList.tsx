@@ -1,12 +1,14 @@
-import type { ReactElement } from "react";
-import { IconFileCode, IconTrash } from "@tabler/icons-react";
+import { useState, type ReactElement, type ReactNode } from "react";
+import { IconDots, IconEdit, IconFileCode, IconServer, IconTrash } from "@tabler/icons-react";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { FeedbackEmpty, FeedbackSkeleton } from "../../../ui/feedback.js";
-import { WebuiButton } from "../../../ui/button.js";
-import { WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
+import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
+import { WebuiMenuItem } from "../../../ui/menu-item.js";
+import { WebuiSkeletonProjection } from "../../../ui/page.js";
 import {
   PluginRow,
   PluginRowActions,
@@ -74,6 +76,38 @@ export function PluginManagementList({
   ) => void | Promise<unknown>;
   readonly onPrepareMcp: (row: WebuiPluginCatalogueRow["source"]) => void | Promise<unknown>;
 }): ReactElement {
+  const [openMenuKey, setOpenMenuKey] = useState<string>();
+  const renderActionsMenu = (key: string, name: string, children: ReactNode): ReactElement => (
+    <WebuiDropdown
+      managed
+      managedLayerId={`plugin-management-row-actions-${key}`}
+      open={openMenuKey === key}
+      onOpen={() => setOpenMenuKey(key)}
+      onClose={() => setOpenMenuKey(undefined)}
+      role="menu"
+      ariaLabel={`${name}的更多操作`}
+      align="end"
+      collision="flip"
+      wrapperClassName="webui-plugin-row-actions-menu-anchor"
+      className="webui-plugin-row-actions-menu"
+      trigger={(triggerProps) => {
+        const { ref, ...rest } = triggerProps;
+        return (
+          <WebuiIconButton
+            label={`${name}的更多操作`}
+            tone="bare"
+            size="compact"
+            {...rest}
+            ref={ref}
+          >
+            <IconDots aria-hidden="true" size={18} stroke={1.7} />
+          </WebuiIconButton>
+        );
+      }}
+    >
+      {children}
+    </WebuiDropdown>
+  );
   return loading ? (
     <FeedbackSkeleton
       rows={12}
@@ -101,6 +135,7 @@ export function PluginManagementList({
               ? {}
               : { source: row.pluginSource }),
           });
+          const menuKey = `${area}-${name}`;
           return (
             <PluginRow
               hoverable
@@ -130,6 +165,8 @@ export function PluginManagementList({
                   </>
                 ) : area === "plugins" ? (
                   "▦"
+                ) : area === "mcp" ? (
+                  <IconServer aria-hidden="true" size={22} stroke={1.5} />
                 ) : (
                   "◇"
                 )}
@@ -142,66 +179,16 @@ export function PluginManagementList({
                 <span className="text-text_default_tertiary">
                   {row.appStatus}
                 </span>
-              ) : area === "mcp" ? (
-                <>
-                  <div className="webui-plugin-mcp-status">
-                    <span
-                      className={`text-size_12 ${row.mcpStatus.tone}`}
-                      data-webui-mcp-status={row.mcpStatus.key}
-                    >
-                      {row.mcpStatus.label}
-                    </span>
-                    {row.mcpStatus.reason ? (
-                      <small
-                        className="text-size_12 text-text_default_secondary"
-                        data-webui-mcp-status-reason={row.mcpStatus.key}
-                        title={row.mcpStatus.reason}
-                      >
-                        {row.mcpStatus.reason}
-                      </small>
-                    ) : null}
-                  </div>
-                  <PluginRowActions>
-                    <WebuiButton
-                      variant="secondary"
-                      size="compact"
-                      onClick={() => onPrepareMcp(item)}
-                    >
-                      编辑
-                    </WebuiButton>
-                    <WebuiButton
-                      variant="danger"
-                      size="compact"
-                      onClick={() =>
-                        onConfirmMutation("删除 MCP server", {
-                          kind: "deleteMcpServer",
-                          name,
-                        })
-                      }
-                    >
-                      删除
-                    </WebuiButton>
-                    <ToggleSwitch
-                      checked={isOn}
-                      label={`启用 ${name}`}
-                      onChange={() =>
-                        onMutate({
-                          kind: "setMcpServerEnabled",
-                          name,
-                          enabled: !isOn,
-                        })
-                      }
-                    />
-                  </PluginRowActions>
-                </>
-              ) : (
-                <PluginRowActions>
-                  <ToggleSwitch
-                    checked={isOn}
-                    label={`启用 ${name}`}
-                    onChange={() =>
-                      onMutate(
-                        area === "plugins"
+              ) : null}
+              <PluginRowActions>
+                <ToggleSwitch
+                  checked={isOn}
+                  label={`启用 ${name}`}
+                  onChange={() =>
+                    onMutate(
+                      area === "mcp"
+                        ? { kind: "setMcpServerEnabled", name, enabled: !isOn }
+                        : area === "plugins"
                           ? isOn
                             ? pluginIntent("disablePlugin")
                             : pluginIntent("enablePlugin")
@@ -213,45 +200,70 @@ export function PluginManagementList({
                                 ? { locationUri: row.locationUri }
                                 : {}),
                             },
-                      )
-                    }
-                  />
-                  {area === "plugins" ? (
-                    <WebuiButton
-                      variant="danger-soft"
-                      size="action"
-                      onClick={() =>
-                        onConfirmMutation("卸载插件", {
-                          kind: "uninstallPlugin",
-                          pluginName: name,
-                          ...(row.pluginSource === undefined
-                            ? {}
-                            : { source: row.pluginSource }),
-                        })
-                      }
+                    )
+                  }
+                />
+                {renderActionsMenu(menuKey, name, area === "mcp" ? (
+                  <>
+                    <WebuiMenuItem
+                      icon={<IconEdit size={18} stroke={1.7} />}
+                      onClick={() => {
+                        setOpenMenuKey(undefined);
+                        void onPrepareMcp(item);
+                      }}
                     >
-                      <IconTrash aria-hidden="true" size={18} stroke={1.7} />
-                      卸载
-                    </WebuiButton>
-                  ) : area === "skills" ? (
-                    <WebuiButton
-                      variant="danger"
-                      size="compact"
-                      onClick={() =>
-                        onConfirmMutation("删除技能", {
-                          kind: "deleteSkill",
-                          skillName: name,
-                          ...(row.locationUri
-                            ? { locationUri: row.locationUri }
-                            : {}),
-                        })
-                      }
+                      编辑
+                    </WebuiMenuItem>
+                    <WebuiMenuItem
+                      danger
+                      icon={<IconTrash size={18} stroke={1.7} />}
+                      onClick={() => {
+                        setOpenMenuKey(undefined);
+                        void onConfirmMutation("删除 MCP server", {
+                          kind: "deleteMcpServer",
+                          name,
+                        });
+                      }}
                     >
                       删除
-                    </WebuiButton>
-                  ) : null}
-                </PluginRowActions>
-              )}
+                    </WebuiMenuItem>
+                  </>
+                ) : area === "plugins" ? (
+                  <WebuiMenuItem
+                    danger
+                    icon={<IconTrash size={18} stroke={1.7} />}
+                    onClick={() => {
+                      setOpenMenuKey(undefined);
+                      void onConfirmMutation("卸载插件", {
+                        kind: "uninstallPlugin",
+                        pluginName: name,
+                        ...(row.pluginSource === undefined
+                          ? {}
+                          : { source: row.pluginSource }),
+                      });
+                    }}
+                  >
+                    卸载
+                  </WebuiMenuItem>
+                ) : (
+                  <WebuiMenuItem
+                    danger
+                    icon={<IconTrash size={18} stroke={1.7} />}
+                    onClick={() => {
+                      setOpenMenuKey(undefined);
+                      void onConfirmMutation("删除技能", {
+                        kind: "deleteSkill",
+                        skillName: name,
+                        ...(row.locationUri
+                          ? { locationUri: row.locationUri }
+                          : {}),
+                      });
+                    }}
+                  >
+                    删除
+                  </WebuiMenuItem>
+                ))}
+              </PluginRowActions>
             </PluginRow>
           );
         })}

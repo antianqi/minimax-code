@@ -40,7 +40,7 @@ Inspect the touched leaf's real implementation: application-level disposal does 
 
 ## Add a component or new business behavior
 
-For a presentation-only component, reuse its business's read model/commands and existing shared controls. Keep uncommitted forms and ephemeral display state local when appropriate. Select tokens, geometry and interaction states from [component-design-system.md](component-design-system.md) before styling.
+For a presentation-only component, reuse its business's read model/commands and the existing shared contracts in `src/client/ui/`. Keep uncommitted forms and ephemeral display state local when appropriate; keep the *appearance* out of the business. A business file that restates a shared control's class string, states, timing or pending behaviour is patching a contract it does not own: extend the contract when the need recurs, and record a business exception with its reason when it genuinely does not. Select tokens, geometry and interaction states from [component-design-system.md](component-design-system.md) before styling.
 
 For new business behavior, start from its command and resource contract, then implement the owner, wire the injected capability, add/update the binding and render it. Do not create directories or abstractions for stages that are unnecessary. When remote capability is needed, complete the operation path in [runtime.md](runtime.md); when an existing capability suffices, reuse it.
 

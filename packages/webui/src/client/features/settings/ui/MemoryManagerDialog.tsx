@@ -390,6 +390,7 @@ export function MemoryManagerDialog({
                   data-testid="agent-memory-textarea"
                   className="webui-personalization-textarea"
                   value={draft}
+                  placeholder="编辑 Agent 的工作记忆摘要"
                   spellCheck={false}
                   onChange={(event) => {
                     setDraft(event.target.value);

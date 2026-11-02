@@ -4,7 +4,6 @@
 
 import { type MouseEvent } from "react";
 import {
-  WebuiIconAgent,
   WebuiIconContextArchive,
   WebuiIconContextPin,
   WebuiIconMore,
@@ -16,6 +15,7 @@ import { type WebuiSessionActivityMap } from "../projection/session-activity.js"
 import { sessionLabel } from "../projection/rail-groups.js";
 import { SessionActivityMeta } from "./session-activity-meta.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot } from "../../../ui/page.js";
 
@@ -210,7 +210,7 @@ export function ProjectExpansion({
                                         onContextMenu={(event) => onSessionContextMenu(event, child, true)}
                                         className="webui-project-child-session-card text-text_default_primary"
                                       >
-                                        <WebuiIconAgent className="size-4 shrink-0" />
+                                        <WebuiAgentAvatar agentName={child.agentName} size="compact" />
                                         <WebuiMotionSlot kind="feedback-clip">
                                           <span className="min-w-0 flex-1 truncate">{sessionLabel(child)}</span>
                                         </WebuiMotionSlot>

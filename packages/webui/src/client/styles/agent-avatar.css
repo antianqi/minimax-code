@@ -1,0 +1,23 @@
+@layer components {
+  .webui-agent-avatar {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid var(--border_default);
+    border-radius: 50%;
+    background: var(--bg_grouped_secondary);
+    color: var(--text_default_secondary);
+  }
+  .webui-agent-avatar--tiny { width: 16px; height: 16px; }
+  .webui-agent-avatar--compact { width: 20px; height: 20px; }
+  .webui-agent-avatar--small { width: 32px; height: 32px; }
+  .webui-agent-avatar--large { width: 64px; height: 64px; }
+  .webui-agent-avatar > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .webui-agent-avatar-fallback { width: 70%; height: 70%; }
+}

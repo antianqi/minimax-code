@@ -638,6 +638,7 @@ export function WebuiBrowserToolbar({
           type="text"
           aria-label={TOOLBAR_COPY.urlLabel}
           data-testid="browser-toolbar-url"
+          placeholder="输入网址或搜索"
           value={address}
           disabled={disabled || !onNavigate}
           onChange={(event) => setAddress(event.currentTarget.value)}

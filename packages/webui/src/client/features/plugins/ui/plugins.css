@@ -40,7 +40,6 @@
   .webui-plugin-management.is-marketplace {
     padding: 0 0 48px;
   }
-  .webui-plugin-header-tabs,
   .webui-plugin-categories,
   .webui-plugin-category-filter,
   .webui-plugin-toolbar,
@@ -101,13 +100,6 @@
      * padding box, so padding on the right would not move it anyway. */
     padding-left: var(--spacing_16);
   }
-  /* The base segment sizing is tuned for the 960px management view; at the top
-   * of the marketplace it reads oversized. Explicit button sizing keeps the
-   * track compact regardless of the inherited line-height. */
-  .webui-plugin-management.is-marketplace .webui-plugin-header-tabs {
-    gap: var(--spacing_2);
-    padding: 3px;
-  }
   .webui-plugin-management.is-marketplace .webui-plugin-create-anchor {
     gap: var(--spacing_8);
   }
@@ -147,7 +139,6 @@
     font-size: var(--size_24);
     font-weight: 650;
   }
-  .webui-plugin-header-tabs,
   .webui-plugin-categories {
     border-radius: 10px;
     /* One step below the surface the control sits on. It was
@@ -201,6 +192,19 @@
     box-sizing: border-box;
     padding: 0 var(--spacing_16);
   }
+  /* The skill hub has no category rail. Give its search and results a centered
+   * content column and breathing room below the catalogue tabs. */
+  .webui-plugin-management.is-marketplace.is-skills .webui-plugin-page-layout {
+    padding-top: var(--spacing_24);
+  }
+  .webui-plugin-management.is-marketplace.is-skills .webui-plugin-page-main {
+    width: 100%;
+    max-width: 960px;
+    margin-inline: auto;
+  }
+  .webui-plugin-management.is-marketplace.is-skills .webui-plugin-page-search {
+    margin-inline: auto;
+  }
   .webui-plugin-page-main {
     display: flex;
     min-width: 0;
@@ -209,7 +213,7 @@
     overflow: hidden;
   }
   .webui-plugin-page-layout.has-categories > .webui-plugin-page-categories {
-    align-self: center;
+    align-self: start;
     min-width: 0;
     overflow: visible;
     padding-top: 0;
@@ -262,6 +266,9 @@
     max-width: 768px;
     margin-left: 0;
     row-gap: var(--spacing_12);
+  }
+  .webui-plugin-management.is-skills .webui-plugin-grid {
+    margin-inline: auto;
   }
   .webui-plugin-market-heading {
     max-width: 768px;
@@ -432,6 +439,17 @@
   .webui-plugin-actions {
     gap: var(--spacing_8);
   }
+  .webui-plugin-row-actions-menu-anchor {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+  }
+  .webui-plugin-row-actions-menu {
+    display: flex;
+    min-width: 208px;
+    flex-direction: column;
+    padding: var(--spacing_4);
+  }
   .webui-plugin-management.is-managing .webui-plugin-actions {
     gap: var(--spacing_6);
   }
@@ -497,42 +515,6 @@
   .webui-agent-avatar-field {
     grid-row: span 1;
   }
-  .webui-agent-avatar {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border: 1px solid var(--border_default);
-    border-radius: 50%;
-    background: var(--bg_grouped_secondary);
-  }
-  .webui-agent-avatar--small {
-    width: 32px;
-    height: 32px;
-    font-size: var(--size_20);
-  }
-  .webui-agent-avatar--large {
-    width: 64px;
-    height: 64px;
-    font-size: 36px;
-  }
-  .webui-agent-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .webui-agent-avatar .webui-agent-avatar-icon {
-    object-fit: contain;
-  }
-  .webui-agent-avatar .webui-agent-avatar-icon--small {
-    width: 22px;
-    height: 22px;
-  }
-  .webui-agent-avatar .webui-agent-avatar-icon--large {
-    width: 44px;
-    height: 44px;
-  }
   .webui-agent-model-field {
     grid-column: 1 / -1;
   }
@@ -546,14 +528,6 @@
     grid-column: 1 / -1;
   }
   .webui-plugin-form-content { min-height: 180px; resize: vertical; }
-  .webui-mcp-mode {
-    display: inline-flex;
-    align-self: flex-start;
-    gap: 3px;
-    border-radius: 10px;
-    background: var(--bg_grouped_primary);
-    padding: 3px;
-  }
   .webui-mcp-advanced-button {
     align-self: flex-start;
     justify-self: flex-start;

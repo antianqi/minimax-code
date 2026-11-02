@@ -29,15 +29,18 @@ import type {
   WebuiRemoteControlStatus,
 } from "../../../../shared/contracts/remote-control.js";
 import type { RemoteControlPort } from "../contracts/remote-control-port.js";
-import type {
-  WebuiRemoteControlOwnerStatus,
-  WebuiRemoteControlSnapshot,
+import {
+  WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE,
+  type WebuiRemoteControlOwnerStatus,
+  type WebuiRemoteControlSnapshot,
 } from "../projection/remote-control-panel.js";
 
 export type {
   WebuiRemoteControlOwnerStatus,
   WebuiRemoteControlSnapshot,
 } from "../projection/remote-control-panel.js";
+
+export { WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE as WEBUI_REMOTE_CONTROL_UNAVAILABLE };
 
 /** What a mutation answered. */
 export type WebuiRemoteControlMutation =
@@ -59,8 +62,6 @@ export interface WebuiRemoteControlOwner {
   readonly resolveUnbind: (confirmed: boolean) => Promise<WebuiRemoteControlMutation>;
 }
 
-export const WEBUI_REMOTE_CONTROL_UNAVAILABLE =
-  "这个运行时无法托管手机远程控制（宿主没有远程控制能力）。";
 export const WEBUI_REMOTE_CONTROL_READ_FAILED = "读取手机远程控制状态失败。";
 export const WEBUI_REMOTE_CONTROL_ACTION_FAILED = "操作手机远程控制失败。";
 export const WEBUI_REMOTE_CONTROL_STREAM_UNAVAILABLE =
@@ -106,7 +107,7 @@ export function createWebuiRemoteControlOwner(
     if (inFlight) return inFlight;
     const read = options.port.getRemoteControlStatus;
     if (!read) {
-      publish({ status: "unavailable", error: WEBUI_REMOTE_CONTROL_UNAVAILABLE });
+      publish({ status: "unavailable", error: WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE });
       return;
     }
     publish({ ...snapshot, status: "loading" });
@@ -182,8 +183,8 @@ export function createWebuiRemoteControlOwner(
     connect: async () => {
       const connect = options.port.connectRemoteControl;
       if (!connect) {
-        publish({ ...snapshot, status: "unavailable", error: WEBUI_REMOTE_CONTROL_UNAVAILABLE });
-        return { ok: false, message: WEBUI_REMOTE_CONTROL_UNAVAILABLE };
+        publish({ ...snapshot, status: "unavailable", error: WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE });
+        return { ok: false, message: WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE };
       }
       try {
         // The Desktop's 连接 button always re-arms the pairing flow, so a second phone can be
@@ -205,8 +206,8 @@ export function createWebuiRemoteControlOwner(
     disconnect: async (disconnectOptions) => {
       const disconnect = options.port.disconnectRemoteControl;
       if (!disconnect) {
-        publish({ ...snapshot, status: "unavailable", error: WEBUI_REMOTE_CONTROL_UNAVAILABLE });
-        return { ok: false, message: WEBUI_REMOTE_CONTROL_UNAVAILABLE };
+        publish({ ...snapshot, status: "unavailable", error: WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE });
+        return { ok: false, message: WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE };
       }
       try {
         const result = await disconnect({

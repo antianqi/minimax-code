@@ -5,7 +5,7 @@ import {
   useWebuiPluginWorkflows,
   useWebuiPluginWorkflowsState,
 } from "../../../bindings/use-query-state.js";
-import { WebuiIconAgent } from "../../../shell/icons.js";
+import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
 import {
@@ -37,6 +37,8 @@ import {
 } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiPage } from "../../../ui/page.js";
+import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
+import { scrollWebuiContainerTo } from "../../../bindings/browser-effects.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -230,10 +232,10 @@ export function PluginCatalogue({
       .find((candidate) => candidate.dataset.pluginCategorySection === value);
     if (!container || !element) return;
     setCategory(value);
-    container.scrollTo({
-      top: container.scrollTop + element.getBoundingClientRect().top - container.getBoundingClientRect().top - 8,
-      behavior: "smooth",
-    });
+    scrollWebuiContainerTo(
+      container,
+      container.scrollTop + element.getBoundingClientRect().top - container.getBoundingClientRect().top - 8,
+    );
   };
   // When the total is unknown the affordance is still offered once the fetched
   // page itself overflows the preview, so the control is never gated on a
@@ -390,7 +392,7 @@ export function PluginCatalogue({
       as="section"
       kind="content"
       aria-busy={listing.loading || undefined}
-      className={`webui-plugin-management ${managementOpen ? "is-managing" : "is-marketplace"}`}
+      className={`webui-plugin-management ${managementOpen ? "is-managing" : "is-marketplace"} ${area === "skills" ? "is-skills" : ""}`}
       data-testid="plugin-management"
     >
       {/* Two elements because the bar is pinned: the header is the sticky,
@@ -472,26 +474,16 @@ export function PluginCatalogue({
                * What is installed is no longer the 个人 half of a 市场/个人 pair —
                * that pair is gone. The 管理 button in the same button group opens
                * the management view, which is where installed plugins live. */}
-              <div className="webui-plugin-header-tabs" aria-label="插件与技能">
-                <WebuiButton
-                  variant="segmented"
-                  size="inline-dense"
-                  aria-pressed={area === "plugins"}
-                  className="min-w-[52px] h-7 px-[10px]"
-                  onClick={() => selectMarketCatalog("plugins")}
-                >
-                  插件
-                </WebuiButton>
-                <WebuiButton
-                  variant="segmented"
-                  size="inline-dense"
-                  aria-pressed={area === "skills"}
-                  className="min-w-[52px] h-7 px-[10px]"
-                  onClick={() => selectMarketCatalog("skills")}
-                >
-                  技能
-                </WebuiButton>
-              </div>
+              <WebuiSegmentedControl
+                ariaLabel="插件与技能"
+                className="min-w-0"
+                options={[
+                  { value: "plugins", label: "插件" },
+                  { value: "skills", label: "技能" },
+                ]}
+                value={area === "skills" ? "skills" : "plugins"}
+                onChange={(nextArea) => selectMarketCatalog(nextArea)}
+              />
               <div className="webui-plugin-create-anchor">
                 <WebuiIconButton
                   label="刷新插件市场"
@@ -569,13 +561,7 @@ export function PluginCatalogue({
                   setDialog("agent");
                 }}
               >
-                <span className="webui-agent-avatar webui-agent-avatar--small">
-                  {read(item, "avatarDataUrl").startsWith("data:image/") ? (
-                    <img src={read(item, "avatarDataUrl")} alt="" />
-                  ) : (
-                    <WebuiIconAgent className="webui-agent-avatar-icon webui-agent-avatar-icon--small" />
-                  )}
-                </span>
+                <WebuiAgentAvatar agent={item} size="small" />
                 <span>
                   {read(item, "displayName", "display_name") || nameOf(item)}
                 </span>
@@ -605,18 +591,7 @@ export function PluginCatalogue({
             <div className="webui-agent-fields">
               <div className="webui-agent-avatar-field">
                 头像
-                <span className="webui-agent-avatar webui-agent-avatar--large">
-                  {read(selectedAgent ?? {}, "avatarDataUrl").startsWith(
-                    "data:image/",
-                  ) ? (
-                    <img
-                      src={read(selectedAgent ?? {}, "avatarDataUrl")}
-                      alt="Agent 头像"
-                    />
-                  ) : (
-                    <WebuiIconAgent className="webui-agent-avatar-icon webui-agent-avatar-icon--large" />
-                  )}
-                </span>
+                <WebuiAgentAvatar agent={selectedAgent} size="large" />
               </div>
               <div>
                 名称

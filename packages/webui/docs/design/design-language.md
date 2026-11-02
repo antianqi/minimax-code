@@ -326,31 +326,47 @@ primary keeps the shared disabled state; its disabled fill is `rgb(173,173,173)`
 and `cursor: not-allowed` — the running 3.1.3 app's own values, taken from
 `--bg_interaction_primary_inactive` — and it does not define the enabled primary color.
 
-| Variant | Appearance | Paired size |
-| --- | --- | --- |
-| `secondary` | the filled grey action | `regular`, `compact`, `header` |
-| `surface` | the fill of the surface it sits on | `panel`, `dialog` |
-| `primary` | the filled call to action | `regular`, `header` |
-| `muted` | the filled-but-quiet save | `regular` |
-| `danger` | the destructive action | `regular`, `compact` |
-| `plain` | a button the surface already styles | `regular` |
-| `outline` | a hairline ring, primary label | `inline`, `inline-dense`, `inline-tiny` |
-| `outline-secondary` | a hairline ring, quieter label | `inline-dense`, `inline-tiny` |
-| `outline-highlight` | a hairline ring, quieter label that comes forward on hover | `inline` |
-| `quiet-highlight` | no ring, quieter label that comes forward on hover | `inline`, `inline-tiny` |
-| `quiet-secondary` | no ring, quieter label | `inline`, `inline-dense`, `inline-tiny` |
-| `quiet-subtle` | no ring, quietest label | `inline-tiny` |
-| `accent` | the filled call to action with the accent fill | `action` |
-| `grouped` | the grouped pill | `pill` |
+| Variant | Appearance |
+| --- | --- |
+| `secondary` | the filled grey action, one step deeper on hover |
+| `surface` | the fill of the surface it sits on, for an action row inside a grouped panel |
+| `primary` | the filled call to action: hover lifts in the light theme and dims to 80% in the dark one, and a disabled primary keeps the inactive fill rather than going transparent |
+| `muted` | the filled-but-quiet save: a fixed mid grey with a white label |
+| `danger` | the destructive filled action |
+| `danger-soft` | a destructive label on the neutral secondary fill: for a destructive action that must not outrank the surface's primary, such as removing one entry from a list the reader is editing |
+| `plain` | no fill, no ring, no padding: the surface paints it and the contract keeps focus and disabled |
+| `accent` | the accent-filled call to action |
+| `grouped` | the grouped pill on a grouped surface |
+| `send-action` | the round filled send control |
+| `segmented` | one segment of a segmented control; the chosen segment takes the tertiary selected fill through `aria-pressed` |
+| `selectable-row` | the row a list of destinations or of choices is made of |
+| `outline` | a hairline ring with the primary label |
+| `outline-secondary` | the same ring with the quieter label |
+| `outline-highlight` | the same ring whose quieter label comes forward on hover |
+| `quiet-highlight` | no ring, a quiet label that comes forward on hover |
+| `quiet-secondary` | no ring, a quiet label that stays quiet on hover |
+| `quiet-subtle` | no ring, the quietest label |
+| `surface-quiet` | no ring, a quiet label that takes the surface's own secondary fill on hover |
+| `quiet-action` | no ring, an icon-coloured action: hover takes the tertiary hover fill and a pressed state keeps the selected one |
+| `accent-toggle` | an accent icon label with no fill that takes a 10% accent tint while hovered or pressed |
 
-The `accent` and `grouped` appearances used to be declared by the interactions business as
-`.webui-button-primary` and `.webui-button-secondary`, and the account, transcript, composer, workspace
-and shell businesses rendered both. Two businesses writing the same call to action differently is the
-drift ADR 0028 exists to stop, so the two appearances became the shared contract's, and the class
-strings that named them are gone.
+A size is the geometry, and the sizes the client publishes are the ones its callers need: `regular` (36px, 80px minimum width), `compact` (30px, 12px label), `header` (30px, 13px label for a surface header), `panel` (44px minimum height, 96px minimum width for a feature's action row), `dialog` (30px inside a dialog footer), `inline`, `inline-dense` and `inline-tiny` (the three ring scales, no stated height), `action` (12px radius, paired with `accent`), `pill` and `pill-compact` (full radius, paired with `grouped`), `rail` (36px inside the left rail), `option` (a 38px chooser row), `row` (44px list row), `content` (no geometry of its own: the surface sizes it), `composer-action` (36×36), `menu-trigger` (48px, full width) and `heatmap-cell` (10×10). A caller that resizes one of these with utilities is re-deriving geometry the contract owns; if no published size fits, the size is the contract's to add.
+
+The two appearances that used to belong to the interactions business — `accent` and `grouped` — are in the table above as shared variants, and the class strings that named them are gone.
 
 The inline sizes state no height: their callers sized the control by its label, its padding and its
 border, and a stated height would squeeze the ringed ones by the two pixels their border takes.
+
+**A control owns the pending state of the command it starts.** `WebuiButton`, `WebuiIconButton` and
+`ToggleSwitch` take `loading` and `loadingLabel`. A caller either passes `loading` from the state it
+already tracks, or hands the control a promise-returning `onClick` / `onChange` and lets the shared
+`useFeedbackActionLoading` follow it; the two combine, so a caller's own flag and a tracked action
+never disagree. While pending the control sets `disabled`, reports `aria-busy`, and renders the shared
+`FeedbackLoadingOverlay`: a portalled viewport cover with a `role="dialog"` surface, a spinner and the
+label. The treatment belongs to the control for the same reason its focus ring does — a control that
+a caller has to remember to disable, and a business that has to draw its own spinner, is two places
+for one state to drift. A caller keeps what only it knows: the label's words, and what happens when
+the promise settles.
 
 `WebuiIconButton` publishes the sizes an icon-only control needs: `regular` (26px), `compact`
 (24px), `micro` (16px, for a glyph inside a 24px chip or a 32px row), `rail` (30px) and `panel`
@@ -359,6 +375,14 @@ contract owns; if no published size fits, the size is the contract's to add.
 
 ### The other contracts
 
+- **The segmented control** — `WebuiSegmentedControl` owns the compact shared track, the sliding
+  selected segment and its keyboard focus treatment. Callers provide options and controlled
+  selection; `mode="pressed"` exposes a labelled button group for view modes, while `mode="radio"`
+  keeps radio-group semantics for mutually exclusive destinations. The caller keeps the selected
+  value and its business action.
+- **The agent avatar** — `WebuiAgentAvatar` owns the shared circular avatar frame, size variants and
+  role-to-asset mapping. Agent catalogue cards, transcript delegation and joined-agent rows, project
+  child sessions and workspace subagent rows use it; callers supply agent identity and choose a size.
 - **The menu row** — `WebuiMenuItem` and `WebuiMenuSeparator` own a `role="menuitem"` row's label, its
   icon slot, its trailing slot and its disabled state.
 - **The field** — `WebuiField` owns the label, the description, the validation error and the wiring
@@ -369,11 +393,94 @@ contract owns; if no published size fits, the size is the contract's to add.
   treatment shared by search surfaces. `WebuiFormLayout` and `WebuiFormActions` own the arrangement of a form.
   Feature code keeps submission, validation rules and business state.
 - **The feedback family** — `FeedbackEmpty`, `FeedbackError`, `FeedbackSkeleton`, `FeedbackProgress`,
-  `FeedbackBusy`, `FeedbackAnnouncement` and `FeedbackLiveRegion` own the announcement. The family is
-  the only place in the client that authors `role="alert"`, `role="status"`, `role="progressbar"` or
-  `aria-live`; a surface whose state *is* the thing being announced uses `FeedbackLiveRegion`, and a
-  message with no visual form uses `FeedbackAnnouncement`. `FeedbackError` provides a named inline
-  layout for an error message with a retry action; callers do not add flex utilities to recreate it.
+  `FeedbackBusy`, `FeedbackAnnouncement`, `FeedbackLiveRegion` and `FeedbackLoadingOverlay` own the
+  announcement, with `useFeedbackActionLoading` as the one way a control tracks a promise it started.
+  The family is the only place in the client that authors `role="alert"`, `role="status"`,
+  `role="progressbar"`, `role="dialog"`-as-feedback or `aria-live`; a surface whose state *is* the
+  thing being announced uses `FeedbackLiveRegion`, a message with no visual form uses
+  `FeedbackAnnouncement`, and an action that must be awaited uses `FeedbackLoadingOverlay` through the
+  control's `loading` contract rather than a business-drawn spinner. `FeedbackError` provides a named
+  inline layout for an error message with a retry action; callers do not add flex utilities to recreate
+  it. `FeedbackSkeleton` takes `rows`, `widths`, `maxWidth`, `rowHeight` and `rowRadius` so a wider or
+  denser placeholder body stays the same contract; a caller that needs a different shape composes
+  `WebuiSkeleton` instead of writing pulse rules. All loading placeholders use the one solid-color pulse
+  and the shared reduced-motion policy — the account usage skeleton is an example of that treatment, not
+  an exception to it.
+- **The block surface** — `WebuiCard` owns a block's fill, hairline border, 16px radius and soft shadow;
+  a caller states its layout and, where it genuinely differs, its own radius or fill through utilities.
+
+## Page surfaces and loading
+
+[ADR 0029](../adr/0029-page-surfaces-share-layout-skeleton-and-motion-contracts.md) decides this
+contract; `client/ui/page.tsx` implements it.
+
+- **`WebuiPage` is a presentation boundary, not a layout.** A route page, a dialog, a drawer or a panel
+  uses it when the surface has page properties: `as` names the element, `kind` says which page surface it
+  is (`content`, `dialog`, `drawer`, `panel`, `settings`), `loading` and `loadingLabel` state whether its
+  data has arrived, `visible` and `present` keep a page-like surface mounted while the shared exit motion
+  runs, `motion` names a motion family and state, and `onExitComplete` is the point at which the caller
+  may unmount. The caller keeps its DOM structure, content, geometry, business state and lifetime;
+  adopting `WebuiPage` never means moving that structure into a shared component.
+- **The skeleton is projected from the layout the caller already wrote.** While `loading` is true,
+  `WebuiPage` replaces its children's text with text skeletons whose widths follow the label they
+  replace, images and icons with shapes, and controls with transparent shapes that keep their box —
+  so the page does not describe its loading state in a second, page-specific skeleton tree. Shared
+  structural components project their own part through `WebuiSkeletonProjection`, and a composed page
+  therefore covers structures it did not project node by node. The projection is decoration:
+  `aria-hidden` on the skeleton, one `role="status"` label for the reader.
+- **A loading placeholder is one shape vocabulary.** `WebuiSkeleton` owns `variant` (`text`, `control`,
+  `rect`, `shape`, `circle`, `pulse`), `width`, `height` and `animated`; `WebuiSkeletonGroup` owns a
+  stacked body of text rows; `FeedbackSkeleton` owns the labelled collection placeholder. None of them
+  exposes a pulse rule: the animation is `webui-skeleton-pulse` on the loading family, shared by every
+  skeleton in the client.
+
+## Motion
+
+The client's motion is one vocabulary with four families, declared in `client/styles/motion.css` and
+recorded in `docs/design/motion-inventory.json`. A surface that moves says which family it belongs to
+instead of choosing a number.
+
+| Family | When | Tokens |
+| --- | --- | --- |
+| `feedback` | a control answers hover, focus or press | 120ms, standard easing |
+| `surface` | a floating surface enters or leaves | 180ms to enter, 120ms to leave, the enter/exit easings |
+| `disclosure` | a region opens, closes or resizes | 160ms, standard easing |
+| `loading` | something indicates that work is in progress | 1.2s, linear, looping |
+
+- **The tokens are the only place a duration or an easing is written.** A rule that needs a value the
+  families do not carry is a distinct effect, and it is recorded with the reason it is not one of the
+  four.
+- **A component owns its motion; a caller names the state.** `WebuiMotion` renders a family for a state
+  and direction, `WebuiMotionSlot` applies a family to an element the caller already renders without
+  adding a wrapper (`feedback`, `feedback-clip`, `feedback-opacity`, `disclosure`,
+  `disclosure-transform` with a rotation value, `panel-layout`, `progress`), `WebuiDisclosure` owns
+  expand/collapse clipping and hidden-state behaviour, `WebuiTooltip` owns the tooltip's opacity,
+  visibility and offset, `WebuiPage` owns a page surface's presence and exit, and `WebuiButton`,
+  `WebuiIconButton`, `WebuiMenuItem` and `ToggleSwitch` opt into the feedback family themselves.
+  Business code does not name a shared motion class; the motion gate rejects it.
+- **Only one component drives an animation engine.** `WebuiLottie` owns Lottie's playback lifecycle and
+  the reduced-motion policy; a feature may supply its own asset, and must not import `lottie-web` or
+  call the Web Animations API itself.
+- **Programmatic scrolling has one policy.** A caller chooses the target and the alignment and uses
+  `bindings/browser-effects.ts` (`scrollWebuiTargetIntoView`, `scrollWebuiContainerTo`); whether the
+  move animates is the shared reduced-motion decision, not the feature's.
+- **Reduced motion is a policy, not a per-rule accident.** The media query collapses every token to the
+  shortest duration a browser still runs and stops iteration, so everything reading a token stops at
+  once. A rule that hard-codes a duration escapes that block, which is one reason the inventory gate
+  exists.
+- **Feature-owned motion is the exception and is named.** The approved ones are the account sign-in
+  success effect, the transcript's message entrance, turn-jump highlight and rose-loader art, and the
+  two feature stylesheets that carry them (`features/account/ui/account.css`,
+  `features/transcript/ui/transcript.css`). Static feature rotation, interaction transforms and smooth
+  scrolling are not approved anywhere.
+
+`pnpm check:webui-motion` compares the stylesheets and the inventory in both directions — a duration or
+`@keyframes` the inventory does not know fails, a recorded entry that has gone fails, and a value that
+claims a family while carrying another number fails — and rejects feature-owned timing declarations,
+raw motion utilities, `role="button"` on a hand-rolled control, `data-webui-motion` outside the shared
+components, native `<details>`, inline SVG animation, a `WebuiDialog` without an explicit `open` state,
+and an animation-engine import outside `ui/feedback.tsx`. It proves the vocabulary, not the rendered
+result: a passing gate is not evidence that anything animates correctly in a browser.
 
 ## The eight families
 

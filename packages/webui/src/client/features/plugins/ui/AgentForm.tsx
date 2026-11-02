@@ -75,20 +75,20 @@ export function AgentForm({
       <WebuiField
         label="名称"
         control={(props) => (
-          <WebuiTextInput {...props} value={name} onChange={(event) => setName(event.currentTarget.value)} />
+          <WebuiTextInput {...props} value={name} placeholder="例如：代码审查助手" onChange={(event) => setName(event.currentTarget.value)} />
         )}
       />
       <WebuiField
         label="描述"
         control={(props) => (
-          <WebuiTextInput {...props} value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
+          <WebuiTextInput {...props} value={description} placeholder="例如：帮助检查代码质量和潜在问题" onChange={(event) => setDescription(event.currentTarget.value)} />
         )}
       />
       <WebuiField
         className="wide"
         label="系统提示词"
         control={(props) => (
-          <WebuiTextarea {...props} className="webui-plugin-form-content" value={prompt} onChange={(event) => setPrompt(event.currentTarget.value)} />
+          <WebuiTextarea {...props} className="webui-plugin-form-content" value={prompt} placeholder="描述 Agent 应如何工作和回应" onChange={(event) => setPrompt(event.currentTarget.value)} />
         )}
       />
       {/* The model belongs to the initial definition, which only a new agent
@@ -97,7 +97,7 @@ export function AgentForm({
         <WebuiField
           label="模型"
           control={(props) => (
-            <WebuiTextInput {...props} value={model} onChange={(event) => setModel(event.currentTarget.value)} />
+            <WebuiTextInput {...props} value={model} placeholder="输入模型名称，留空使用默认模型" onChange={(event) => setModel(event.currentTarget.value)} />
           )}
         />
       )}

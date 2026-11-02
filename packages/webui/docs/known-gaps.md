@@ -114,21 +114,31 @@ shipped.
 
 ## 4a. The 接入 IM surface has four sections without a route behind them
 
-The 接入 IM tab is a bot list plus a detail pane. The list and the binding state are wired to the
-runtime's channel bridge. Four of the detail pane's sections are not, because this repository's runtime
-exposes no route for them:
+The 接入 IM tab is a bot list plus a detail card. The list is wired to the runtime's channel
+bridge. Four of the detail card's sections are not, because this repository's runtime exposes no
+route for them.
 
-| Section | What is missing |
-| --- | --- |
-| the bot list | the connection list (`GET /mavis/api/channel/connections/`, the prepare / binding-delete / delete / authorization-cancel calls) — the store exists (`LocalImConnectionStore.listViews`), the route does not |
-| the QR binding | `POST /channel-bridge/wechat/bind/start` and `GET .../bind/status`, which serve `扫描二维码绑定` / `刷新二维码` |
-| the Agent and working-directory choice | the binding write (`LocalChannelBindingWrite`: agentName, sessionId, strategy, pinned, routeRuleId, exactOwnerName, ownerInstanceId, projectKey, routingMode) |
-| 删除Bot | `store.deleteConnection` |
+Desktop 3.1.6 drives the card through the v2 channel-connection service, over the runtime
+transport, at these paths:
 
-Each of those renders as `Disabled (not yet wired)`: the Desktop's own markup and copy, an
+| Desktop action | Desktop 3.1.6 path | What is missing here |
+| --- | --- | --- |
+| list bots | `GET /minimax-desktop/api/v1/channel/connections` | the connection list route — the store exists (`LocalImConnectionStore.listViews`), the route does not |
+| the QR binding (WeChat) | `POST /minimax-desktop/api/v1/channel/wechat/bind`, `GET .../wechat/bind/status` | both calls; the Feishu pair is `POST /minimax-desktop/api/v1/lark/onboard/start`, `GET .../lark/onboard/status` |
+| the Agent and working-directory choice | `POST /minimax-desktop/api/v1/channel/connections/prepare` | the binding write (`LocalChannelBindingWrite`: agentName, sessionId, strategy, pinned, routeRuleId, exactOwnerName, ownerInstanceId, projectKey, routingMode) |
+| 删除Bot | `DELETE /minimax-desktop/api/v1/channel/connections/:connection_id` | `store.deleteConnection` |
+
+The Desktop's 解除连接 — `DELETE /minimax-desktop/api/v1/channel/connections/:connection_id/binding`
+— is the one of these the WebUI can serve, through the v1 channel bridge's own unbind call.
+
+Each unwired section renders as `Disabled (not yet wired)`: the Desktop's own markup and copy, an
 `aria-disabled` state, a neutral colour, and no handler. None of them fakes a success state. The
 seams are listed here rather than left implied, because the tab is otherwise indistinguishable from
 the Desktop's.
+
+The Desktop 3.1.6 tab also lists bots that are still waiting for their authorization, and it names
+a WeChat bot `ClawBot`. This repository's channel bridge only reports clients it has bound, so
+the list shows those and the pane names a WeChat client `ClawBot` the way the Desktop does.
 
 ## 5. Upstream open results need runtime conversion
 

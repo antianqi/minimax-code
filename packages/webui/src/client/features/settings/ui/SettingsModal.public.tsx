@@ -36,6 +36,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { BrowserSettingsPage } from "../../browser/ui/BrowserSettingsPage.public.js";
 import { SshPanel } from "../../ssh/ui/SshPanel.public.js";
+import { RemoteControlDevices } from "../../remote-control/ui/RemoteControlDevices.public.js";
 import { useWebuiSshOwner } from "../../../bindings/ssh-owner-context.js";
 import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, SETTINGS_GROUPS } from "../projection/settings-view.js";
 import type { SettingsTabKey } from "../projection/settings-view.js";
@@ -96,6 +97,14 @@ function Select({ value, onChange, disabled = false, wide = false, testId }: { r
 export interface SettingsModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
+  /**
+   * The tab the dialog opens on.
+   *
+   * The 远程 page's 设置 entry opens the connection tab, the way the Desktop's own entry opens
+   * its settings app at 连接. Without this the dialog would always open on the desktop tab and
+   * the entry would land the reader one step away from what they asked for.
+   */
+  readonly initialTab?: SettingsTabKey;
   readonly dataDir?: string;
   readonly version?: WebuiVersionInfo;
   readonly sessionId?: string;
@@ -113,7 +122,7 @@ export interface SettingsModalProps {
   readonly onCreateMemorySession?: (input: MemoryHandoff) => void;
 }
 
-export function SettingsModal({ open, onClose, dataDir, version, sessionId, workspaceDir, onOpenFileLine, onCreateMemorySession }: SettingsModalProps): ReactElement | null {
+export function SettingsModal({ open, onClose, initialTab, dataDir, version, sessionId, workspaceDir, onOpenFileLine, onCreateMemorySession }: SettingsModalProps): ReactElement | null {
   // The shell's settings modal is a layer in the client's order: it answers a
   // dismissal itself, so nothing behind it answers the same key or press.
   const layerId = useDialogLayer({
@@ -165,7 +174,7 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
   const account = accountState.account.value;
   const archived = archivedState.sessions;
   const sshOwner = useWebuiSshOwner();
-  const [active, setActive] = useState<SettingsTabKey>("desktop");
+  const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "desktop");
   const [query, setQuery] = useState("");
   const [theme, setTheme] = useState(() => stored("webui-theme", "light", storage));
   const [systemDark, setSystemDark] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
@@ -285,7 +294,14 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
               {active === "shortcuts" ? <ShortcutsSettings bindings={shortcuts} onChange={setShortcuts} onReset={() => setShortcuts(DEFAULT_SHORTCUT_BINDINGS)} /> : null}
               {active === "browser" ? <BrowserSettingsPage /> : null}
               {active === "usage" ? <UsageModelSettings sessionId={sessionId} /> : null}
-              {active === "connection" && sshOwner ? <SshPanel owner={sshOwner} /> : null}
+              {active === "connection" ? (
+                <>
+                  {/* The Desktop keeps the phone link and the SSH hosts in the same
+                    * connection tab; the 远程 page's 设置 entry opens this one. */}
+                  <RemoteControlDevices />
+                  {sshOwner ? <SshPanel owner={sshOwner} /> : null}
+                </>
+              ) : null}
               {active === "account" ? <AccountUsageSettings /> : null}
               {active === "archived" ? (
                 <ArchivedSessionsPage

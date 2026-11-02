@@ -2,8 +2,14 @@
 // state. Plugin metadata owns identity and icon projection; Mini App workflows
 // own lifecycle state and actions, the same runtime rows the launcher reads.
 
-import { useEffect, type ReactElement } from "react";
-import { IconTrash } from "@tabler/icons-react";
+import { useEffect, useState, type ReactElement } from "react";
+import {
+  IconDots,
+  IconExternalLink,
+  IconPlayerPlay,
+  IconPlayerStop,
+  IconTrash,
+} from "@tabler/icons-react";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -18,7 +24,10 @@ import {
 } from "../projection/miniapp-view.js";
 import { readWebuiPluginRow } from "../../plugins/contracts/plugin-rows.js";
 import { FeedbackBusy, FeedbackError } from "../../../ui/feedback.js";
-import { WebuiButton } from "../../../ui/button.js";
+import { WebuiIconButton } from "../../../ui/button.js";
+import { WebuiDropdown } from "../../../ui/Dropdown.js";
+import { WebuiMenuItem } from "../../../ui/menu-item.js";
+import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import {
   PluginRow,
   PluginRowActions,
@@ -53,6 +62,7 @@ export function MiniAppAppsList({
 }: MiniAppAppsListProps): ReactElement {
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
+  const [openMenuKey, setOpenMenuKey] = useState<string>();
   const { rows, loading, error } = state.listing;
   // The page's visibility is the platform's fact, not this component's: the
   // dependency rules keep `document` out of the bindings, and the browser port
@@ -224,102 +234,105 @@ export function MiniAppAppsList({
                     : ""}
                 </span>
                 <PluginRowActions>
-                  {row?.enabled ? (
-                    <>
-                      <WebuiButton
-                        variant="secondary"
-                        size="compact"
-                        type="button"
-                        data-testid={`miniapp-app-open-${row.pluginId}`}
-                        disabled={
-                          state.opening === row.pluginId || row.ownedElsewhere
-                        }
-                        title={
-                          row.ownedElsewhere
-                            ? `另一个客户端${row.ownerClient ? `（${row.ownerClient}）` : ""}正在运行此 Mini App`
-                            : undefined
-                        }
-                        onClick={() => workflows?.open(row.pluginId)}
-                      >
-                        {row.ownedElsewhere
-                          ? `其他客户端运行中${row.ownerClient ? `（${row.ownerClient}）` : ""}`
-                          : "打开"}
-                      </WebuiButton>
-                      {opened?.kind === "open" &&
-                      standaloneHref !== undefined ? (
-                        <WebuiButton
-                          variant="secondary"
+                  <ToggleSwitch
+                    checked={row?.enabled ?? item.enabled}
+                    label={`启用 ${item.name}`}
+                    onChange={(enabled) =>
+                      void workflows?.setPluginEnabled(item.pluginId, enabled)
+                    }
+                  />
+                  <WebuiDropdown
+                    managed
+                    managedLayerId={`miniapp-row-actions-${item.pluginId}`}
+                    open={openMenuKey === item.pluginId}
+                    onOpen={() => setOpenMenuKey(item.pluginId)}
+                    onClose={() => setOpenMenuKey(undefined)}
+                    role="menu"
+                    ariaLabel={`${item.name}的更多操作`}
+                    align="end"
+                    collision="flip"
+                    wrapperClassName="webui-plugin-row-actions-menu-anchor"
+                    className="webui-plugin-row-actions-menu"
+                    trigger={(triggerProps) => {
+                      const { ref, ...rest } = triggerProps;
+                      return (
+                        <WebuiIconButton
+                          label={`${item.name}的更多操作`}
+                          tone="bare"
                           size="compact"
-                          type="button"
-                          aria-label="查看"
-                          title="在独立标签页中查看 Mini App"
+                          {...rest}
+                          ref={ref}
+                        >
+                          <IconDots aria-hidden="true" size={18} stroke={1.7} />
+                        </WebuiIconButton>
+                      );
+                    }}
+                  >
+                    {row?.enabled ? (
+                      <>
+                        <WebuiMenuItem
+                          icon={<IconPlayerPlay size={18} stroke={1.7} />}
+                          data-testid={`miniapp-app-open-${row.pluginId}`}
+                          disabled={
+                            state.opening === row.pluginId || row.ownedElsewhere
+                          }
+                          title={
+                            row.ownedElsewhere
+                              ? `另一个客户端${row.ownerClient ? `（${row.ownerClient}）` : ""}正在运行此 Mini App`
+                              : undefined
+                          }
                           onClick={() => {
-                            window.open(
-                              standaloneHref,
-                              webuiMiniAppWindowName(row.pluginId),
-                            );
+                            setOpenMenuKey(undefined);
+                            void workflows?.open(row.pluginId);
                           }}
                         >
-                          查看
-                        </WebuiButton>
-                      ) : null}
-                      <WebuiButton
-                        variant="secondary"
-                        size="compact"
-                        type="button"
-                        disabled={!row.running && row.status !== "starting"}
-                        onClick={() => workflows?.stop(row.pluginId)}
-                      >
-                        停止
-                      </WebuiButton>
-                      <WebuiButton
-                        variant="danger-soft"
-                        size="action"
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`确定卸载 ${item.name}？`))
-                            void workflows?.uninstall(row.pluginId);
-                        }}
-                      >
-                        <IconTrash aria-hidden="true" size={18} stroke={1.7} />
-                        卸载
-                      </WebuiButton>
-                      <WebuiButton
-                        variant="secondary"
-                        size="compact"
-                        type="button"
-                        onClick={() =>
-                          void workflows?.setPluginEnabled(row.pluginId, false)
-                        }
-                      >
-                        停用
-                      </WebuiButton>
-                    </>
-                  ) : !item.enabled ? (
-                    <WebuiButton
-                      variant="secondary"
-                      size="compact"
-                      type="button"
-                      onClick={() =>
-                        void workflows?.setPluginEnabled(item.pluginId, true)
-                      }
-                    >
-                      启用
-                    </WebuiButton>
-                  ) : row ? (
-                    // A disabled package has nothing to start or stop; the one
-                    // action it has is the one that makes it startable again.
-                    <WebuiButton
-                      variant="secondary"
-                      size="compact"
-                      type="button"
-                      onClick={() =>
-                        void workflows?.setPluginEnabled(row.pluginId, true)
-                      }
-                    >
-                      启用
-                    </WebuiButton>
-                  ) : null}
+                          {row.ownedElsewhere
+                            ? `其他客户端运行中${row.ownerClient ? `（${row.ownerClient}）` : ""}`
+                            : "打开"}
+                        </WebuiMenuItem>
+                        {opened?.kind === "open" && standaloneHref !== undefined ? (
+                          <WebuiMenuItem
+                            icon={<IconExternalLink size={18} stroke={1.7} />}
+                            title="在独立标签页中查看 Mini App"
+                            onClick={() => {
+                              setOpenMenuKey(undefined);
+                              window.open(
+                                standaloneHref,
+                                webuiMiniAppWindowName(row.pluginId),
+                              );
+                            }}
+                          >
+                            查看
+                          </WebuiMenuItem>
+                        ) : null}
+                        <WebuiMenuItem
+                          icon={<IconPlayerStop size={18} stroke={1.7} />}
+                          disabled={!row.running && row.status !== "starting"}
+                          onClick={() => {
+                            setOpenMenuKey(undefined);
+                            void workflows?.stop(row.pluginId);
+                          }}
+                        >
+                          停止
+                        </WebuiMenuItem>
+                        <WebuiMenuItem
+                          danger
+                          icon={<IconTrash size={18} stroke={1.7} />}
+                          onClick={() => {
+                            setOpenMenuKey(undefined);
+                            if (window.confirm(`确定卸载 ${item.name}？`))
+                              void workflows?.uninstall(row.pluginId);
+                          }}
+                        >
+                          卸载
+                        </WebuiMenuItem>
+                      </>
+                    ) : (
+                      <WebuiMenuItem disabled icon={<IconPlayerPlay size={18} stroke={1.7} />}>
+                        当前没有可用操作
+                      </WebuiMenuItem>
+                    )}
+                  </WebuiDropdown>
                 </PluginRowActions>
               </PluginRow>
             );

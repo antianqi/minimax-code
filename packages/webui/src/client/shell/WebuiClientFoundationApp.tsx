@@ -76,6 +76,9 @@ import type { WebuiProjectGroup } from "../features/sessions/projection/rail-gro
 import { selectWebuiCatalogFlatPage, selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.public.js";
 import { WebuiPortSlicesProvider } from "../bindings/port-slices-context.js";
 import { WebuiSshOwnerProvider } from "../bindings/ssh-owner-context.js";
+import { WebuiRemoteControlOwnerProvider } from "../bindings/remote-control-owner-context.js";
+import { createPortal } from "react-dom";
+import { SettingsModal } from "../features/settings/ui/SettingsModal.public.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useWebuiApplicationOptional } from "../bindings/application-context.js";
@@ -885,6 +888,12 @@ export function WebuiClientFoundationApp(
    * is the one element that spans the whole window — so this is the one form
    * the shell measures rather than queries.
    */
+  // The 远程 page's 设置 entry opens the connection settings, the way the Desktop's own entry
+  // opens its settings app at 连接. The dialog is the shell's, so the entry and the settings
+  // business meet at one place.
+  const [connectionSettingsOpen, setConnectionSettingsOpen] = useState(false);
+  const openConnectionSettings = useCallback(() => setConnectionSettingsOpen(true), []);
+  const settingsPortalTarget = browserDom.portalTarget();
   const [railIsDrawer, setRailIsDrawer] = useState(false);
   const [railDrawerOpen, setRailDrawerOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -991,6 +1000,7 @@ export function WebuiClientFoundationApp(
         * component never has to fall back to the transport. */}
       <WebuiPortSlicesProvider slices={portSlices}>
         <WebuiSshOwnerProvider owner={application.sshOwner}>
+      <WebuiRemoteControlOwnerProvider owner={application.remoteControlOwner}>
     {/* The browser family owns its authorization, and the panel in the tool area
         and the settings page in the modal are different trees: only a provider
         above both of them gives them one answer. */}
@@ -1104,8 +1114,7 @@ export function WebuiClientFoundationApp(
                   render={renderRemoteBody({
                     channelOwner: application.channelOwner,
                     remoteControlOwner: application.remoteControlOwner,
-                    sshOwner: application.sshOwner,
-                    onOpenSsh: () => application.remoteOwner.openSsh(),
+                    onOpenSettings: openConnectionSettings,
                   })}
                 />
               </WebuiZoneBoundary>
@@ -1256,6 +1265,22 @@ export function WebuiClientFoundationApp(
         </div>
       </div>
     </div>
+      {connectionSettingsOpen && settingsPortalTarget ? createPortal(
+        <SettingsModal
+          open
+          initialTab="connection"
+          onClose={() => setConnectionSettingsOpen(false)}
+          dataDir={dataDir}
+          version={runtimeVersion}
+          sessionId={selectedSessionId}
+          workspaceDir={selectedSession?.workspaceDir}
+          onOpenFileLine={(path, line) => {
+            if (!selectedSessionId || !selectedSession?.workspaceDir) return;
+            dispatchWorkspacePanel({ type: "open-file", sessionId: selectedSessionId, workspaceDir: selectedSession.workspaceDir, path, lineStart: line, lineEnd: line });
+          }}
+        />,
+        settingsPortalTarget,
+      ) : null}
     </ArchonShell>
     </WebuiApplicationProvider>
     </WebuiSessionWorkflowsProvider>
@@ -1266,6 +1291,7 @@ export function WebuiClientFoundationApp(
     </WebuiAccountWorkflowsProvider>
     </WebuiWorkspaceQueriesProvider>
     </WebuiBrowserAuthorizationProvider>
+      </WebuiRemoteControlOwnerProvider>
       </WebuiSshOwnerProvider>
       </WebuiPortSlicesProvider>
     </>

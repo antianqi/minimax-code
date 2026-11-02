@@ -135,6 +135,7 @@
     padding: 0 var(--spacing_12);
   }
   .webui-search-field:focus-within { border-color: var(--border_accent); }
+  .webui-search-field-control:focus-visible { outline: none; }
   .webui-search-field-icon { display: flex; flex: none; align-items: center; }
   .webui-search-field-icon > svg {
     width: 16px;

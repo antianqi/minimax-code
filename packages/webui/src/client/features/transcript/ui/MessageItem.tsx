@@ -213,7 +213,7 @@ export function MessageItem({
           <WebuiStack gap="small" align="end" className="w-full">
             {editing ? (
               <WebuiStack gap="medium" className="webui-user-inline-editor" data-testid="user-message-inline-editor">
-                <WebuiTextarea aria-label="编辑" className="webui-user-inline-editor-control" value={editText} onChange={(event) => setEditText(event.target.value)} autoFocus />
+                <WebuiTextarea aria-label="编辑" className="webui-user-inline-editor-control" value={editText} placeholder="编辑消息内容" onChange={(event) => setEditText(event.target.value)} autoFocus />
                 <div className="webui-inline-editor-actions"><WebuiButton variant="secondary" onClick={() => setEditing(false)} disabled={mutationBusy}>取消</WebuiButton><WebuiButton variant="primary" onClick={submitEdit} disabled={mutationBusy || !editText.trim()}>发送</WebuiButton></div>
               </WebuiStack>
             ) : <div

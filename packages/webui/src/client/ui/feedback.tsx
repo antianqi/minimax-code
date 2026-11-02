@@ -24,6 +24,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactElement, typ
 import { createPortal } from "react-dom";
 import lottie from "lottie-web";
 import { useWebuiPageLoading, WebuiSkeleton, WebuiSkeletonProjection } from "./page.js";
+import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 
 export interface WebuiLottieProps {
   readonly play?: boolean;
@@ -363,7 +364,11 @@ export function FeedbackLoadingOverlay({
   readonly label?: string;
   readonly testId?: string;
 }): ReactElement | null {
-  if (!open || typeof document === "undefined") return null;
+  // The surface is portalled because a control can sit under an ancestor that
+  // clips or transforms what it contains, and the portal target belongs to the
+  // platform capability rather than to this module.
+  const portalTarget = useWebuiBrowserCapabilities().dom.portalTarget();
+  if (!open || !portalTarget) return null;
   return createPortal(
     <div className="webui-feedback-loading-overlay" data-testid={testId}>
       <div className="webui-feedback-loading-dialog" role="dialog" aria-modal="true" aria-label={label}>
@@ -371,7 +376,7 @@ export function FeedbackLoadingOverlay({
         <span className="webui-feedback-busy-label">{label}</span>
       </div>
     </div>,
-    document.body,
+    portalTarget,
   );
 }
 

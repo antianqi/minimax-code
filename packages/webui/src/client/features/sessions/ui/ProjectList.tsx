@@ -23,7 +23,7 @@ import {
 } from "../projection/rail-groups.js";
 import { ProjectExpansion } from "./project-expansion.js";
 import { SessionActivityMeta } from "./session-activity-meta.js";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { FeedbackAnnouncement, FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import {
@@ -127,7 +127,7 @@ export function ProjectList({
   if (catalogLoading) {
     return (
       <>
-        <span className="sr-only" role="status">正在加载项目和会话</span>
+        <FeedbackAnnouncement message="正在加载项目和会话" />
         <div className="webui-project-list-skeleton" aria-hidden="true">
           {[92, 100, 84, 100, 72, 94, 80, 100, 88, 96, 76].map((width, index) => (
             <WebuiSkeleton

@@ -94,6 +94,14 @@ component records the reason at the call site and in the presentation inventory.
 stylesheet selector to a named class so the stylesheet stops addressing raw elements is a separate
 job: it makes the ratchet possible, and it does not count as adopting the component.
 
+**A command that is still running is the control's state.** Pass `loading` (and `loadingLabel`) to
+`WebuiButton`, `WebuiIconButton` or `ToggleSwitch`, or give the control a promise-returning `onClick`
+and let `useFeedbackActionLoading` follow it; do not disable the control by hand or draw a local
+spinner. A page-like surface takes `WebuiPage` (`loading`, `kind`, `motion`, `present`) so its loading
+state is projected from the layout it already renders, and a surface that moves names a motion family
+through `WebuiMotion`, `WebuiMotionSlot`, `WebuiDisclosure` or `WebuiTooltip` instead of writing a
+transition. Both rules are gates: `pnpm check:webui-motion` and `pnpm check:webui-overlays`.
+
 **Adding a client UI module.** A new file under `features/*/ui/`, `shell/` or the shared `ui/` must
 be classified in `scripts/lib/webui-presentation-inventory.json`: one entry with its label, whether
 it is a surface or a concern, at least one of the eight families, and one of the four dispositions.

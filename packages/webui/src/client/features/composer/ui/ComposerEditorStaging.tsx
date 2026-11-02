@@ -163,6 +163,7 @@ export function WebuiComposerEditorStaging({
           appearance="bare"
           className="min-w-0 flex-1"
           aria-label="URL 引用"
+          placeholder="输入或粘贴 URL"
           value={reference.url}
           onChange={(event) => onChangeReference(reference.id, event.target.value)}
         />

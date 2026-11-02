@@ -41,7 +41,6 @@
   .webui-progress-row--pending .webui-progress-marker { background: var(--bg_default_secondary); color: var(--text_default_tertiary); }
   .webui-progress-row--cancelled .webui-progress-marker { background: var(--bg_default_secondary); color: var(--text_default_tertiary); }
   .webui-subagent-row { display: flex; min-height: 32px; width: 100%; align-items: center; gap: var(--spacing_8); padding: 0 var(--spacing_4); }
-  .webui-subagent-avatar { display: inline-flex; width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; }
   .webui-subagent-status { display: inline-flex; width: 18px; height: 18px; flex: 0 0 18px; align-items: center; justify-content: center; border-radius: 50%; color: var(--text_default_tertiary); font-size: var(--size_14); font-weight: var(--weight_medium); }
   .webui-subagent-status--completed { background: var(--icon_default_secondary); color: var(--text_default_inverted); }
   .webui-subagent-status--error { color: var(--text_label_danger_secondary_default); }

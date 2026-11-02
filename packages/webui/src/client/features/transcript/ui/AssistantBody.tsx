@@ -3,6 +3,7 @@
 
 import { useId, useState, type ReactElement } from "react";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
 import { WebuiIconAlertTriangle, WebuiIconChevronDown } from "../../../shell/icons.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
@@ -92,7 +93,7 @@ function renderActivityParts(
     } else if (part.type === "cognitive" || part.type === "compaction") {
       rows.push({ messageId, element: <WebuiThinkingBlock key={`${messageId}-${part.type}-${index}`} text={part.text} streaming={streaming} processingStartedAtMs={processingStartedAtMs} summaryLabel={part.type === "compaction" ? "上下文整理" : "思考过程"} showDetailHeading={part.type !== "compaction"} showStreamingStatus={false} initiallyExpanded={part.type === "cognitive"} /> });
     } else if (part.type === "delegation") {
-      rows.push({ messageId, element: <div className="webui-agent-delegation" key={`${messageId}-delegation-${index}`} data-webui-agent-activity="delegation" data-active={streaming && index === entries.length - 1 ? "true" : undefined}><span className="webui-agent-delegation-summary"><span className="webui-agent-delegation-avatar" aria-hidden="true">{String(part.message.fromAgent ?? "Agent").slice(0, 1).toUpperCase()}</span><span className="webui-agent-activity-title">{`${String(part.message.fromAgent ?? "Agent")} 发给 ${String(part.message.toAgent ?? "Agent")}`}</span></span>{typeof part.message.content === "string" ? <WebuiMarkdown source={part.message.content} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /> : null}</div> });
+      rows.push({ messageId, element: <div className="webui-agent-delegation" key={`${messageId}-delegation-${index}`} data-webui-agent-activity="delegation" data-active={streaming && index === entries.length - 1 ? "true" : undefined}><span className="webui-agent-delegation-summary"><WebuiAgentAvatar agentName={String(part.message.fromAgent ?? "Agent")} size="tiny" /><span className="webui-agent-activity-title">{`${String(part.message.fromAgent ?? "Agent")} 发给 ${String(part.message.toAgent ?? "Agent")}`}</span></span>{typeof part.message.content === "string" ? <WebuiMarkdown source={part.message.content} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /> : null}</div> });
     } else if (part.type === "agent_joined") {
       const agents: Record<string, unknown>[] = [];
       while (entries[index]?.part.type === "agent_joined") {
@@ -165,7 +166,7 @@ function WebuiAgentJoinedGroup({
                 data-testid="agent-task-row"
                 data-webui-agent-task-session={typeof agent.sessionId === "string" ? agent.sessionId : undefined}
               >
-                <span className="webui-agent-joined-avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+                <WebuiAgentAvatar agent={agent} size="compact" />
                 <span className="webui-agent-joined-name">@{name}</span>
                 <span className="webui-agent-joined-title">{title}</span>
               </div>

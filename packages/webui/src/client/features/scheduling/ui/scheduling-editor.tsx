@@ -62,6 +62,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
               controlSize="dense"
               type="text"
               data-webui-scheduling-field="name"
+              placeholder="例如：每日项目进展"
               value={draft.name}
               onChange={(event) => onChange({ name: event.target.value })}
             />
@@ -76,6 +77,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
                 controlSize="dense"
                 type="text"
                 data-webui-scheduling-field="agentName"
+                placeholder="输入要执行任务的 Agent 名称"
                 value={draft.agentName}
                 onChange={(event) => onChange({ agentName: event.target.value })}
               />
@@ -89,6 +91,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
               {...props}
               controlSize="compact"
               data-webui-scheduling-field="prompt"
+              placeholder="描述需要定期执行的任务"
               value={draft.prompt}
               rows={2}
               onChange={(event) => onChange({ prompt: event.target.value })}
@@ -122,6 +125,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
                 controlSize="dense"
                 type="text"
                 data-webui-scheduling-field="time"
+                placeholder="09:00"
                 value={draft.time}
                 onChange={(event) => onChange({ time: event.target.value })}
               />
@@ -137,6 +141,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
                 controlSize="dense"
                 type="text"
                 data-webui-scheduling-field="weekday"
+                placeholder="例如：1（周一）"
                 value={draft.weekday}
                 onChange={(event) => onChange({ weekday: event.target.value })}
               />
@@ -152,6 +157,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
                 controlSize="dense"
                 type="text"
                 data-webui-scheduling-field="minute"
+                placeholder="例如：0"
                 value={draft.minute}
                 onChange={(event) => onChange({ minute: event.target.value })}
               />
@@ -182,6 +188,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
                 controlSize="dense"
                 type="text"
                 data-webui-scheduling-field="expression"
+                placeholder="例如：0 9 * * 1-5"
                 value={draft.expression}
                 onChange={(event) => onChange({ expression: event.target.value })}
               />
@@ -196,6 +203,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
               controlSize="dense"
               type="text"
               data-webui-scheduling-field="model"
+              placeholder="输入模型名称，留空使用默认模型"
               value={draft.model}
               onChange={(event) => onChange({ model: event.target.value })}
             />
@@ -209,6 +217,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
               controlSize="dense"
               type="text"
               data-webui-scheduling-field="project"
+              placeholder="输入项目路径或名称，可留空"
               value={draft.project}
               onChange={(event) => onChange({ project: event.target.value })}
             />
@@ -222,6 +231,7 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
               controlSize="dense"
               type="text"
               data-webui-scheduling-field="sessionId"
+              placeholder="输入会话 ID，留空则每次新建"
               value={draft.sessionId}
               onChange={(event) => onChange({ sessionId: event.target.value })}
             />

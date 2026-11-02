@@ -89,6 +89,7 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
               type="text"
               data-webui-ssh-project-name="true"
               value={displayName}
+              placeholder="例如：前端项目"
               onChange={(event) => setDisplayName(event.target.value)}
               className="mt-0.5"
             />
@@ -105,6 +106,7 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
                 type="text"
                 data-webui-ssh-project-path="true"
                 value={path}
+                placeholder="例如：/home/user/project"
                 onChange={(event) => setPath(event.target.value)}
                 className="flex-1"
               />

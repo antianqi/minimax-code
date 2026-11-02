@@ -105,6 +105,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="text"
               data-webui-ssh-field="alias"
+              placeholder="例如：production"
               value={alias}
               onChange={(event) => setAlias(event.target.value)}
               className="mt-0.5"
@@ -120,6 +121,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="text"
               data-webui-ssh-field="displayName"
+              placeholder="例如：生产服务器"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
               className="mt-0.5"
@@ -134,6 +136,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="text"
               data-webui-ssh-field="host"
+              placeholder="主机名或 IP 地址"
               value={host}
               onChange={(event) => setHost(event.target.value)}
               className="mt-0.5"
@@ -148,6 +151,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="text"
               data-webui-ssh-field="port"
+              placeholder="22"
               value={port}
               onChange={(event) => setPort(event.target.value)}
               className="mt-0.5"
@@ -162,6 +166,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="text"
               data-webui-ssh-field="username"
+              placeholder="登录用户名"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               className="mt-0.5"
@@ -176,6 +181,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="text"
               data-webui-ssh-field="identityFile"
+              placeholder="例如：~/.ssh/id_ed25519"
               value={identityFile}
               onChange={(event) => setIdentityFile(event.target.value)}
               className="mt-0.5"
@@ -191,6 +197,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               controlSize="compact"
               type="password"
               data-webui-ssh-field="password"
+              placeholder="输入本次连接使用的密码"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="mt-0.5"

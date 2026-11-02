@@ -328,6 +328,8 @@ export function createWebuiPluginWorkflows(deps: {
   };
 
   const actions: WebuiPluginActions = createWebuiPluginActions(port);
+  const listingCache = new Map<string, WebuiPluginListingState>();
+  let hasStartedListing = false;
 
   /**
    * One typed dispatch.
@@ -351,8 +353,14 @@ export function createWebuiPluginWorkflows(deps: {
     left.query === right.query &&
     left.category === right.category;
 
+  const selectionKey = (selection: WebuiPluginSelection): string =>
+    JSON.stringify([selection.area, selection.view, selection.query, selection.category]);
+
   const loadListing = async (selection: WebuiPluginSelection): Promise<void> => {
     const version = bump("listing");
+    const cached = listingCache.get(selectionKey(selection));
+    const showInitialSkeleton = !cached && !hasStartedListing;
+    hasStartedListing = true;
     if (!port.pluginManagement) {
       set((current) => ({
         ...current,
@@ -373,39 +381,46 @@ export function createWebuiPluginWorkflows(deps: {
         ...current,
         listing: {
           selection,
-          rows: retained?.rows ?? [],
-          ...(retained?.pluginTotal !== undefined
-            ? { pluginTotal: retained.pluginTotal }
+          rows: cached?.rows ?? retained?.rows ?? [],
+          ...((cached?.pluginTotal ?? retained?.pluginTotal) !== undefined
+            ? { pluginTotal: cached?.pluginTotal ?? retained?.pluginTotal }
             : {}),
-          ...(retained?.tagDefinitions !== undefined
-            ? { tagDefinitions: retained.tagDefinitions }
+          ...((cached?.tagDefinitions ?? retained?.tagDefinitions) !== undefined
+            ? { tagDefinitions: cached?.tagDefinitions ?? retained?.tagDefinitions }
             : {}),
-          ...(retained?.skillTotal !== undefined
-            ? { skillTotal: retained.skillTotal }
+          ...((cached?.skillTotal ?? retained?.skillTotal) !== undefined
+            ? { skillTotal: cached?.skillTotal ?? retained?.skillTotal }
             : {}),
-          loading: true,
+          loading: showInitialSkeleton,
         },
       };
     });
     try {
       const composed = await composeListing(selection);
       if (!isCurrent("listing", version) || !sameSelection(state.listing.selection, selection)) return;
+      const nextListing: WebuiPluginListingState = {
+        selection,
+        rows: composed.rows,
+        loading: false,
+        ...(composed.pluginTotal !== undefined ? { pluginTotal: composed.pluginTotal } : {}),
+        ...(composed.tagDefinitions !== undefined ? { tagDefinitions: composed.tagDefinitions } : {}),
+        ...(composed.skillTotal !== undefined ? { skillTotal: composed.skillTotal } : {}),
+      };
+      listingCache.set(selectionKey(selection), nextListing);
       set((current) => ({
         ...current,
-        listing: {
-          selection,
-          rows: composed.rows,
-          loading: false,
-          ...(composed.pluginTotal !== undefined ? { pluginTotal: composed.pluginTotal } : {}),
-          ...(composed.tagDefinitions !== undefined ? { tagDefinitions: composed.tagDefinitions } : {}),
-          ...(composed.skillTotal !== undefined ? { skillTotal: composed.skillTotal } : {}),
-        },
+        listing: nextListing,
       }));
     } catch (reason) {
       if (!isCurrent("listing", version) || !sameSelection(state.listing.selection, selection)) return;
       set((current) => ({
         ...current,
-        listing: { selection, rows: [], loading: false, error: message(reason) },
+        listing: {
+          selection,
+          rows: cached?.rows ?? current.listing.rows,
+          loading: false,
+          error: message(reason),
+        },
       }));
     }
   };

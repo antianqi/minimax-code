@@ -382,7 +382,7 @@ export function PluginCatalogue({
       ref={pluginPageRef}
       as="section"
       kind="content"
-      loading={listing.loading}
+      aria-busy={listing.loading || undefined}
       className={`webui-plugin-management ${managementOpen ? "is-managing" : "is-marketplace"}`}
       data-testid="plugin-management"
     >
@@ -542,7 +542,7 @@ export function PluginCatalogue({
         <h2 className="webui-plugin-market-heading">插件</h2>
       ) : null}
       {error ? <FeedbackError message={error} testId="plugin-catalogue-error" /> : null}
-      {busy && !listing.loading ? (
+      {area === "agents" && listing.loading ? (
         <FeedbackBusy label="加载中…" />
       ) : area === "agents" ? (
         <div className="webui-agent-editor">

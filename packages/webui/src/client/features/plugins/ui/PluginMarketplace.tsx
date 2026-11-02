@@ -16,6 +16,7 @@ import {
 } from "../../plugins/ui/PluginRow.public.js";
 
 const MARKET_PREVIEW_COUNT = 8;
+const MARKET_SKELETON_WIDTHS = [100, 70, 82, 46, 70, 46, 95, 70, 100, 70, 82, 46] as const;
 const categoryDefinitions: readonly { value: number; label: string }[] = [
   { value: MarketplaceCategory.OFFICE, label: "办公" },
   { value: MarketplaceCategory.STUDIO, label: "创作" },
@@ -208,7 +209,7 @@ export function PluginMarketplace({
   const noun = area === "skills" ? "技能" : "插件";
   const expandedListId = useId();
   if (sections) {
-    return loading ? <FeedbackSkeleton rows={6} testId="plugin-market-skeleton" /> : sections.length === 0 ? <FeedbackEmpty title="暂无内容" /> : (
+    return loading ? <FeedbackSkeleton rows={12} widths={MARKET_SKELETON_WIDTHS} maxWidth={266} rowHeight={28} rowRadius={12} testId="plugin-market-skeleton" /> : sections.length === 0 ? <FeedbackEmpty title="暂无内容" /> : (
       <>
         {sections.map((section) => (
           <section
@@ -257,7 +258,7 @@ export function PluginMarketplace({
     <WebuiSkeletonProjection loading={false}>
       <>
         {loading ? (
-          <FeedbackSkeleton rows={6} testId="plugin-market-skeleton" />
+          <FeedbackSkeleton rows={12} widths={MARKET_SKELETON_WIDTHS} maxWidth={266} rowHeight={28} rowRadius={12} testId="plugin-market-skeleton" />
         ) : rows.length === 0 ? (
           <FeedbackEmpty title="暂无内容" />
         ) : (

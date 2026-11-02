@@ -171,12 +171,16 @@
   }
   .webui-plugin-category-filter {
     display: flex;
+    flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing_4);
+    align-items: flex-start;
+    justify-content: center;
+    gap: var(--spacing_8);
     overflow: visible;
+    box-sizing: border-box;
+    padding-block: var(--spacing_24);
     scrollbar-width: none;
   }
   .webui-plugin-category-filter::-webkit-scrollbar { display: none; }
@@ -205,10 +209,10 @@
     overflow: hidden;
   }
   .webui-plugin-page-layout.has-categories > .webui-plugin-page-categories {
-    align-self: start;
+    align-self: center;
     min-width: 0;
     overflow: visible;
-    padding-top: var(--spacing_32);
+    padding-top: 0;
   }
   .webui-plugin-page-controls {
     flex: 0 0 auto;
@@ -224,13 +228,16 @@
   }
   .webui-plugin-page-scroll::-webkit-scrollbar { display: none; }
   .webui-plugin-category-filter > .webui-mavis-button {
-    width: 100%;
-    max-width: none;
+    width: fit-content;
+    max-width: 100%;
     flex: 0 0 auto;
-    justify-content: space-between;
+    justify-content: flex-start;
     text-align: left;
     white-space: nowrap;
     font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    padding-top: var(--spacing_6);
+    padding-bottom: var(--spacing_6);
     padding-right: var(--spacing_12);
     padding-left: var(--spacing_12);
   }
@@ -600,8 +607,9 @@
       overflow-x: auto;
     }
     .webui-plugin-category-filter > .webui-mavis-button {
-      width: 100%;
+      width: fit-content;
       min-width: 0;
+      max-width: 100%;
       /* The spacing scale has no 10px step, so this padding was being dropped
        * by the browser and the buttons kept their default padding. */
       padding-right: var(--spacing_8);
@@ -616,7 +624,7 @@
       padding: 0 var(--spacing_8);
     }
     .webui-plugin-page-layout.has-categories > .webui-plugin-page-categories {
-      padding-top: var(--spacing_8);
+      padding-top: 0;
     }
     .webui-plugin-page-controls { padding-right: 0; padding-left: 0; }
     .webui-plugin-page-search { max-width: 100%; }

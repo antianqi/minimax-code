@@ -45,6 +45,20 @@ describe("the plugin listing has one owner", () => {
     expect(workflows.getSnapshot().listing.rows.map((row) => row.name)).toEqual(["second"]);
   });
 
+  it("does not show a blocking loading state when switching catalogue selections", async () => {
+    let resolveSkills: (value: unknown) => void = () => undefined;
+    const skills = createWebuiPluginWorkflows({
+      port: { pluginManagement: (request) => request.action === "listSkillHub"
+        ? new Promise((resolve) => { resolveSkills = resolve; })
+        : Promise.resolve({ plugins: [] }) },
+    });
+    await skills.loadListing(initialWebuiPluginSelection);
+    const pending = skills.loadListing({ ...initialWebuiPluginSelection, area: "skills" });
+    expect(skills.getSnapshot().listing.loading).toBe(false);
+    resolveSkills({ skills: [] });
+    await pending;
+  });
+
   it("records a missing capability as one error, not a silent empty", async () => {
     const workflows = createWebuiPluginWorkflows({ port: {} });
     await workflows.loadListing(initialWebuiPluginSelection);
@@ -149,6 +163,33 @@ describe("a plugin mutation invalidates exactly what it affects", () => {
     expect(workflows.getSnapshot().revision).toBe(before + 1);
     expect(workflows.getSnapshot().listing.rows).toHaveLength(1);
     expect(reloads.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps the current rows visible while a post-mutation refresh runs", async () => {
+    let resolveRefresh: (value: unknown) => void = () => undefined;
+    let listCalls = 0;
+    const workflows = createWebuiPluginWorkflows({
+      port: {
+        pluginManagement: (request) => {
+          if (request.action === "listInstalledPlugins") {
+            listCalls += 1;
+            if (listCalls === 1) return Promise.resolve({ plugins: [{ name: "existing" }] });
+            return new Promise((resolve) => { resolveRefresh = resolve; });
+          }
+          if (request.action === "listMarketplacePlugins") return Promise.resolve({ plugins: [] });
+          return Promise.resolve({ ok: true });
+        },
+      },
+    });
+
+    await workflows.loadListing({ ...initialWebuiPluginSelection, view: "personal" });
+    const mutation = workflows.installPlugin({ pluginName: "new" });
+    await flush();
+    expect(workflows.getSnapshot().listing.loading).toBe(false);
+    expect(workflows.getSnapshot().listing.rows.map((row) => row.name)).toEqual(["existing"]);
+    resolveRefresh({ plugins: [{ name: "existing" }, { name: "new" }] });
+    await mutation;
+    expect(workflows.getSnapshot().listing.rows.map((row) => row.name)).toEqual(["existing", "new"]);
   });
 
   it("says what the cloud refused when it refuses the declared client version", async () => {

@@ -142,7 +142,22 @@ test("the skills marketplace renders rows from the skill hub listing", async ({ 
   await openApp(page, "#session=A");
   await page.getByRole("button", { name: "插件" }).first().click();
   const surface = page.getByTestId("plugin-management");
+  await page.evaluate(() => window.__fixture.delayNext("pluginManagement", { action: "listSkillHub" }));
   await surface.getByRole("button", { name: "技能", exact: true }).click();
+  const skeleton = page.getByTestId("plugin-market-skeleton");
+  await expect(skeleton).toBeVisible();
+  await expect(surface.locator(".webui-plugin-page-search .webui-skeleton")).toHaveCount(0);
+  await expect(surface.locator(".webui-plugin-page-search input")).toBeVisible();
+  await expect(surface.locator(".webui-plugin-page-categories")).toHaveCount(0);
+  await expect(surface.locator(".webui-plugin-header .webui-skeleton")).toHaveCount(0);
+  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(12);
+  const skillSkeletonBody = await skeleton.locator(".webui-feedback-skeleton-body").boundingBox();
+  expect(skillSkeletonBody.width).toBeLessThanOrEqual(266);
+  await page.evaluate(() => window.__fixture.resolveAllPending(
+    "pluginManagement",
+    { action: "listSkillHub" },
+    { skills: [{ name: "release-notes", displayName: "Release notes", description: "Prepare a release summary", url: "https://example.invalid/release-notes" }] },
+  ));
   await expect(surface.locator(".webui-plugin-grid .webui-plugin-row")).toHaveCount(1);
   await expect(surface.getByText("Release notes")).toBeVisible();
   const skillSearch = await surface.locator(".webui-plugin-page-search").boundingBox();
@@ -170,13 +185,14 @@ test("plugin loading uses the shared single-layer skeleton", async ({ page }) =>
   const skeleton = page.getByTestId("plugin-market-skeleton");
   await expect(skeleton).toBeVisible();
   const searchSkeletons = page.locator(".webui-plugin-page-search .webui-skeleton");
-  await expect(searchSkeletons).toHaveCount(1);
-  await expect(searchSkeletons.locator(".webui-skeleton")).toHaveCount(0);
+  await expect(searchSkeletons).toHaveCount(0);
+  await expect(page.locator(".webui-plugin-page-search input")).toBeVisible();
+  await expect(page.locator(".webui-plugin-header .webui-skeleton")).toHaveCount(0);
+  await expect(page.locator(".webui-plugin-page-categories .webui-skeleton")).toHaveCount(0);
   const searchBox = await page.locator(".webui-plugin-page-search .webui-search-field").boundingBox();
-  const searchShape = await searchSkeletons.boundingBox();
-  expect(Math.abs(searchShape.width - searchBox.width)).toBeLessThan(1);
-  expect(Math.abs(searchShape.height - searchBox.height)).toBeLessThan(1);
-  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(6);
+  expect(searchBox.width).toBeGreaterThan(0);
+  expect(searchBox.height).toBeGreaterThan(0);
+  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(12);
   await expect(skeleton.locator(".webui-plugin-market-skeleton-row")).toHaveCount(0);
   const shapes = await skeleton.locator(".webui-skeleton").evaluateAll((elements) => elements.map((element) => {
     const style = getComputedStyle(element);
@@ -187,16 +203,9 @@ test("plugin loading uses the shared single-layer skeleton", async ({ page }) =>
       nestedSkeletons: element.querySelectorAll(".webui-skeleton").length,
     };
   }));
-  expect(shapes).toHaveLength(6);
+  expect(shapes).toHaveLength(12);
   expect(shapes.every((shape) => shape.boxShadow === "none" && shape.backgroundImage === "none" && shape.nestedSkeletons === 0), JSON.stringify(shapes)).toBe(true);
   expect(shapes.every((shape) => shape.animationName === "webui-skeleton-pulse")).toBe(true);
-  const projectedControls = await page.locator(".webui-plugin-management .webui-page-skeleton-node[data-webui-page-skeleton-control='true']")
-    .evaluateAll((elements) => elements.map((element) => {
-      const style = getComputedStyle(element);
-      return { backgroundColor: style.backgroundColor, boxShadow: style.boxShadow, animationName: style.animationName };
-    }));
-  expect(projectedControls.length).toBeGreaterThan(0);
-  expect(projectedControls.every((control) => control.backgroundColor === "rgba(0, 0, 0, 0)" && control.boxShadow === "none" && control.animationName === "none"), JSON.stringify(projectedControls)).toBe(true);
   const rows = await skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton").evaluateAll((elements) =>
     elements.map((element) => {
       const rect = element.getBoundingClientRect();
@@ -204,7 +213,8 @@ test("plugin loading uses the shared single-layer skeleton", async ({ page }) =>
       return { top: rect.top, left: rect.left, width: rect.width, height: rect.height, background: style.backgroundColor, opacity: style.opacity };
     }),
   );
-  expect(rows.every((row, index) => row.width > 0 && row.height === 12 && row.background !== "rgba(0, 0, 0, 0)" && (index === 0 || row.top > rows[index - 1].top)), JSON.stringify(rows)).toBe(true);
+  expect(rows.every((row, index) => row.width > 0 && row.width <= 266 && row.height === 28 && row.background !== "rgba(0, 0, 0, 0)" && (index === 0 || row.top > rows[index - 1].top)), JSON.stringify(rows)).toBe(true);
+  expect(new Set(rows.map((row) => row.width)).size).toBeGreaterThan(4);
   if (process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR) {
     mkdirSync(process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({

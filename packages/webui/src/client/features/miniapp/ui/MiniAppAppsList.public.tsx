@@ -239,7 +239,7 @@ export function MiniAppAppsList({
                             ? `另一个客户端${row.ownerClient ? `（${row.ownerClient}）` : ""}正在运行此 Mini App`
                             : undefined
                         }
-                        onClick={() => void workflows?.open(row.pluginId)}
+                        onClick={() => workflows?.open(row.pluginId)}
                       >
                         {row.ownedElsewhere
                           ? `其他客户端运行中${row.ownerClient ? `（${row.ownerClient}）` : ""}`
@@ -268,7 +268,7 @@ export function MiniAppAppsList({
                         size="compact"
                         type="button"
                         disabled={!row.running && row.status !== "starting"}
-                        onClick={() => void workflows?.stop(row.pluginId)}
+                        onClick={() => workflows?.stop(row.pluginId)}
                       >
                         停止
                       </WebuiButton>

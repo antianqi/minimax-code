@@ -21,6 +21,7 @@
 // What belongs to the business: the words, the retry command, the amount.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import lottie from "lottie-web";
 import { useWebuiPageLoading, WebuiSkeleton, WebuiSkeletonProjection } from "./page.js";
 
@@ -304,6 +305,26 @@ export function WebuiSpinner({
   return <span aria-hidden="true" className={`webui-feedback-spinner${size === "compact" ? " webui-feedback-spinner--compact" : ""}${className ? ` ${className}` : ""}`} />;
 }
 
+/** Track promise-returning control actions and combine them with explicit loading. */
+export function useFeedbackActionLoading(controlledLoading = false): {
+  readonly loading: boolean;
+  readonly track: <T>(action: () => T) => T;
+} {
+  const [actionPending, setActionPending] = useState(false);
+  const track = <T,>(action: () => T): T => {
+    const result = action();
+    if (result && typeof (result as unknown as Promise<unknown>).then === "function") {
+      setActionPending(true);
+      void Promise.resolve(result).then(
+        () => setActionPending(false),
+        () => setActionPending(false),
+      );
+    }
+    return result;
+  };
+  return { loading: controlledLoading || actionPending, track };
+}
+
 /**
  * Work is happening and the amount is unknown.
  *
@@ -329,6 +350,28 @@ export function FeedbackBusy({
       </WebuiSkeletonProjection>
       <WebuiSkeletonProjection><span className="webui-feedback-busy-label">{label}</span></WebuiSkeletonProjection>
     </div>
+  );
+}
+
+/** A shared blocking overlay for actions whose completion must be awaited. */
+export function FeedbackLoadingOverlay({
+  open,
+  label = "正在处理…",
+  testId,
+}: {
+  readonly open: boolean;
+  readonly label?: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="webui-feedback-loading-overlay" data-testid={testId}>
+      <div className="webui-feedback-loading-dialog" role="dialog" aria-modal="true" aria-label={label}>
+        <WebuiSpinner />
+        <span className="webui-feedback-busy-label">{label}</span>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

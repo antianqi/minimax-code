@@ -67,12 +67,12 @@ export function PluginManagementList({
   readonly area: Area;
   readonly rows: readonly WebuiPluginCatalogueRow[];
   readonly loading?: boolean;
-  readonly onMutate: (intent: WebuiPluginIntent) => void;
+  readonly onMutate: (intent: WebuiPluginIntent) => void | Promise<unknown>;
   readonly onConfirmMutation: (
     label: string,
     intent: WebuiPluginIntent,
-  ) => void;
-  readonly onPrepareMcp: (row: WebuiPluginCatalogueRow["source"]) => void;
+  ) => void | Promise<unknown>;
+  readonly onPrepareMcp: (row: WebuiPluginCatalogueRow["source"]) => void | Promise<unknown>;
 }): ReactElement {
   return loading ? (
     <FeedbackSkeleton

@@ -68,7 +68,7 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
         <WebuiButton variant="secondary" size="dialog" onClick={onClose}>
           取消
         </WebuiButton>
-        <WebuiButton variant="primary" size="dialog" onClick={() => void save()}>
+        <WebuiButton variant="primary" size="dialog" onClick={save}>
           保存
         </WebuiButton>
       </WebuiDialogActions>

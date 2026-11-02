@@ -17,11 +17,13 @@ import {
   forwardRef,
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
 import type { WebuiLayoutGap } from "./layout-primitives.js";
 import { useWebuiPageLoading, WebuiSkeletonProjection } from "./page.js";
+import { FeedbackLoadingOverlay, useFeedbackActionLoading } from "./feedback.js";
 
 /**
  * The variants the client's callers need today.
@@ -171,7 +173,7 @@ function buttonClasses(variant: WebuiButtonVariant, size: WebuiButtonSize, class
     .join(" ");
 }
 
-export interface WebuiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> {
+export interface WebuiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "onClick"> {
   readonly variant: WebuiButtonVariant;
   readonly size?: WebuiButtonSize;
   /** Gap between button content such as an icon and its label. */
@@ -179,6 +181,10 @@ export interface WebuiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
   /** The caller's layout only — never the control's states or appearance. */
   readonly className?: string;
   readonly children?: ReactNode;
+  /** Show shared blocking loading feedback while this action is pending. */
+  readonly loading?: boolean;
+  readonly loadingLabel?: string;
+  readonly onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<unknown>;
 }
 
 /**
@@ -191,17 +197,32 @@ export interface WebuiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
 // Forwarded refs are part of the contract, not an extra: a button that opens a
 // dropdown is a trigger, and a trigger has to hand its element to the popup.
 export const WebuiButton = forwardRef<HTMLButtonElement, WebuiButtonProps>(function WebuiButton(
-  { variant, size = "regular", contentGap, className, children, type = "button", ...rest },
+  { variant, size = "regular", contentGap, className, children, type = "button", loading = false, loadingLabel, onClick, disabled = false, ...rest },
   ref,
 ): ReactElement {
   const classes = buttonClasses(variant, size, className, contentGap);
+  const actionLoading = useFeedbackActionLoading(loading);
+  const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
+    actionLoading.track(() => onClick?.(event));
+  };
   if (useWebuiPageLoading()) {
     return <WebuiSkeletonProjection><button type={type} className={classes} style={rest.style}>{children}</button></WebuiSkeletonProjection>;
   }
   return (
-    <button ref={ref} type={type} className={classes} {...rest}>
-      {children}
-    </button>
+    <>
+      <button
+        ref={ref}
+        type={type}
+        className={classes}
+        {...rest}
+        disabled={disabled || actionLoading.loading}
+        aria-busy={actionLoading.loading || undefined}
+        onClick={handleClick}
+      >
+        {children}
+      </button>
+      <FeedbackLoadingOverlay open={actionLoading.loading} label={loadingLabel} />
+    </>
   );
 });
 
@@ -238,7 +259,7 @@ export const WebuiButtonLink = forwardRef<HTMLAnchorElement, WebuiButtonLinkProp
 );
 
 export interface WebuiIconButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "children"> {
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "children" | "onClick"> {
   /** The accessible name. An icon-only control has no text of its own. */
   readonly label: string;
   /**
@@ -249,6 +270,9 @@ export interface WebuiIconButtonProps
   readonly size?: "regular" | "compact" | "micro" | "panel" | "rail";
   readonly className?: string;
   readonly children?: ReactNode;
+  readonly loading?: boolean;
+  readonly loadingLabel?: string;
+  readonly onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<unknown>;
 }
 
 /**
@@ -260,9 +284,13 @@ export interface WebuiIconButtonProps
  */
 export const WebuiIconButton = forwardRef<HTMLButtonElement, WebuiIconButtonProps>(
   function WebuiIconButton(
-    { label, tone = "surface", size = "regular", className, children, type = "button", ...rest },
+    { label, tone = "surface", size = "regular", className, children, type = "button", loading = false, loadingLabel, onClick, disabled = false, ...rest },
     ref,
   ): ReactElement {
+    const actionLoading = useFeedbackActionLoading(loading);
+    const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
+      actionLoading.track(() => onClick?.(event));
+    };
     const classes = [
       "webui-icon-button",
       "webui-motion-feedback",
@@ -280,9 +308,21 @@ export const WebuiIconButton = forwardRef<HTMLButtonElement, WebuiIconButtonProp
       return <WebuiSkeletonProjection><button type={type} className={classes} style={rest.style}>{children}</button></WebuiSkeletonProjection>;
     }
     return (
-      <button ref={ref} type={type} className={classes} aria-label={label} {...rest}>
-        {children}
-      </button>
+      <>
+        <button
+          ref={ref}
+          type={type}
+          className={classes}
+          aria-label={label}
+          {...rest}
+          disabled={disabled || actionLoading.loading}
+          aria-busy={actionLoading.loading || undefined}
+          onClick={handleClick}
+        >
+          {children}
+        </button>
+        <FeedbackLoadingOverlay open={actionLoading.loading} label={loadingLabel} />
+      </>
     );
   },
 );

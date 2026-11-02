@@ -90,6 +90,25 @@
     font-size: 12px;
     line-height: 16px;
   }
+  .webui-feedback-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 18%);
+  }
+  .webui-feedback-loading-dialog {
+    display: flex;
+    min-width: 160px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing_12);
+    border-radius: var(--radius_12);
+    padding: var(--spacing_16) var(--spacing_20);
+    background: var(--bg_default_primary);
+    box-shadow: var(--elevation_lg);
+  }
   .webui-feedback-progress-track {
     display: block;
     height: 4px;

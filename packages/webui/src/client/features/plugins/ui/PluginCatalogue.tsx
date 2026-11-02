@@ -31,7 +31,10 @@ import type {
 } from "../contracts/plugin-actions.js";
 import { MiniAppAppsList } from "../../miniapp/ui/MiniAppAppsList.public.js";
 import { useWebuiMiniAppCatalogueSummary } from "../../miniapp/bindings/use-miniapp-catalogue.public.js";
-import { FeedbackBusy, FeedbackError } from "../../../ui/feedback.js";
+import {
+  FeedbackBusy,
+  FeedbackError,
+} from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiPage } from "../../../ui/page.js";
 
@@ -131,7 +134,10 @@ export function PluginCatalogue({
    * this response" and the label falls back to a bare 「查看全部技能」. */
   const marketSkillTotal = listing.skillTotal ?? null;
   const tagDefinitions = listing.tagDefinitions ?? [];
-  const busy = listing.loading || (area !== "apps" && snapshot.mutating);
+  // A mutation must not lock unrelated controls while the runtime command and
+  // its follow-up listing are in flight. Keep only selection reads as a form
+  // busy state; mutation progress is reported independently below.
+  const busy = listing.loading;
   const error = localError || snapshot.mutationError || listing.error || "";
   const reload = async (): Promise<void> => {
     if (area === "apps") {
@@ -261,7 +267,8 @@ export function PluginCatalogue({
   };
   const confirmMutation = (label: string, intent: WebuiPluginIntent) => {
     if (window.confirm(`确定${label}？此操作会立即影响本地配置。`))
-      void mutate(intent);
+      return mutate(intent);
+    return undefined;
   };
   const nameOf = (item: Row) =>
     read(
@@ -489,7 +496,7 @@ export function PluginCatalogue({
                 <WebuiIconButton
                   label="刷新插件市场"
                   tone="surface"
-                  onClick={() => void reload()}
+                  onClick={reload}
                 >
                   ⟳
                 </WebuiIconButton>
@@ -674,7 +681,7 @@ export function PluginCatalogue({
                     variant="surface-quiet"
                     size="compact"
                     disabled={busy}
-                    onClick={() => void chatWithAgent(selectedAgent)}
+                    onClick={() => chatWithAgent(selectedAgent)}
                   >
                     和他对话
                   </WebuiButton>
@@ -694,7 +701,7 @@ export function PluginCatalogue({
             sections={area === "plugins" ? marketplaceSections : undefined}
             showAll={showAllCatalogue}
             onToggleAll={() => setShowAllCatalogue((value) => !value)}
-            onIntent={(intent) => void mutate(intent)}
+            onIntent={(intent) => mutate(intent)}
           />
         </>
       ) : area === "apps" ? (
@@ -710,9 +717,9 @@ export function PluginCatalogue({
           area={area}
           rows={catalogueView.rows}
           loading={listing.loading}
-          onMutate={(intent) => void mutate(intent)}
+          onMutate={(intent) => mutate(intent)}
           onConfirmMutation={confirmMutation}
-          onPrepareMcp={(item) => void prepareMcp(item)}
+          onPrepareMcp={prepareMcp}
         />
       )}
       <PluginItemDialog
@@ -734,8 +741,8 @@ export function PluginCatalogue({
           preview={pluginPreview}
           error={error}
           busy={busy}
-          onPreview={() => void previewPlugin()}
-          onImport={() => void importPlugin()}
+          onPreview={previewPlugin}
+          onImport={importPlugin}
           onClose={detachPluginImportDialog}
         />
       </PluginPageLayout>

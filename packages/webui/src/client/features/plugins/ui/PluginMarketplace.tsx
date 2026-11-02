@@ -73,7 +73,7 @@ function PluginMarketCard({
   readonly area: "plugins" | "skills";
   readonly row: WebuiPluginCatalogueRow;
   readonly index: number;
-  readonly onIntent: (intent: WebuiPluginIntent) => void;
+  readonly onIntent: (intent: WebuiPluginIntent) => void | Promise<unknown>;
 }): ReactElement {
   const item = row.source;
   const name = row.name || `item-${index}`;
@@ -201,7 +201,7 @@ export function PluginMarketplace({
   readonly visibleMarketTotal: number;
   readonly showAll: boolean;
   readonly onToggleAll: () => void;
-  readonly onIntent: (intent: WebuiPluginIntent) => void;
+  readonly onIntent: (intent: WebuiPluginIntent) => void | Promise<unknown>;
   readonly hideToggle?: boolean;
   readonly loading?: boolean;
   readonly sections?: readonly PluginMarketplaceSection[];

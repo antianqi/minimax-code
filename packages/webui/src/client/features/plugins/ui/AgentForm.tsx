@@ -103,14 +103,14 @@ export function AgentForm({
       )}
       <WebuiDialogActions>
         {editing && onChatWithAgent ? (
-          <WebuiButton variant="secondary" size="dialog" onClick={() => void onChatWithAgent(name)}>
+          <WebuiButton variant="secondary" size="dialog" onClick={() => onChatWithAgent(name)}>
             对话
           </WebuiButton>
         ) : null}
         <WebuiButton variant="secondary" size="dialog" onClick={onClose}>
           取消
         </WebuiButton>
-        <WebuiButton variant="primary" size="dialog" onClick={() => void save()}>
+        <WebuiButton variant="primary" size="dialog" onClick={save}>
           保存
         </WebuiButton>
       </WebuiDialogActions>

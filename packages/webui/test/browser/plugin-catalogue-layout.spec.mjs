@@ -246,7 +246,7 @@ test("plugin management loading uses the shared skeleton group", async ({ page }
 
   const skeleton = page.getByTestId("plugin-management-skeleton");
   await expect(skeleton).toBeVisible();
-  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(6);
+  await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(12);
   await expect(skeleton.locator(".webui-plugin-management-skeleton-row")).toHaveCount(0);
   const released = await page.evaluate(() => window.__fixture.resolveAllPending(
     "pluginManagement",

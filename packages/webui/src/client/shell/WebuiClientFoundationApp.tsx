@@ -526,12 +526,6 @@ export function WebuiClientFoundationApp(
     usageNoticeKey && usageNoticeKey === dismissedUsageNoticeKey
       ? null
       : usageNotice;
-  // First-paint of the home page: the rail reads from the sessions list,
-  // but the welcome hero appears regardless. Show the greeting skeleton
-  // while the initial session page is still being fetched so the layout
-  // doesn't flash an empty hero before the rail populates.
-  const homeGreetingPending =
-    homeMode && sessionWorkflows.canLoadFlat && page.sessions.length === 0 && loading;
   const selectedSession = flatSessionsWithChildren.find(
     (session) => session.sessionId === selectedSessionId,
   );
@@ -1144,7 +1138,7 @@ export function WebuiClientFoundationApp(
               // that started the creation is still current.
               if (outcome.selected) application.select(outcome.sessionId);
               handleSessionCreatedViewEffect(outcome.sessionId, outcome.selected, teamModeOff);
-            }} /></WebuiZoneBoundary> : <WebuiPage as="div" kind="content" loading={homeGreetingPending} className="contents">
+              }} /></WebuiZoneBoundary> : <WebuiPage as="div" kind="content" className="contents">
             <ConversationSurface
               home={homeMode}
               title={selectedSession?.title}
@@ -1257,7 +1251,7 @@ export function WebuiClientFoundationApp(
                 onManageMiniApps={() => openPluginManagement("plugins")}
               /></WebuiZoneBoundary> : undefined}
             />
-            </WebuiPage>}
+          </WebuiPage>}
           </main>
         </div>
       </div>

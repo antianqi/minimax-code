@@ -25,6 +25,8 @@ import { WebuiWorkspaceQueriesProvider } from "../../src/client/bindings/use-que
 import {
   WebuiContextMenu,
 } from "../../src/client/ui/ContextMenu.js";
+import { WebuiStack } from "../../src/client/ui/layout-primitives.js";
+import { WebuiPage } from "../../src/client/ui/page.js";
 import { placeWebuiContextMenu } from "../../src/client/projection/common/context-menu.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
 import { WebuiProjectList } from "../../src/client/features/sessions/ui/SessionRail.js";
@@ -222,6 +224,16 @@ function renderSessionShell(): string {
 const INERT_NAV_LABELS = ["网站"];
 
 describe("WebUI shell", () => {
+  it("gives compact vertical stacks clear spacing while a page is loading", () => {
+    const markup = renderToStaticMarkup(createElement(
+      WebuiPage,
+      { loading: true },
+      createElement(WebuiStack, { gap: "hairline" }, createElement("div", null, "first"), createElement("div", null, "second")),
+    ));
+    expect(markup).toContain("webui-stack--gap-small");
+    expect(markup).not.toContain("webui-stack--gap-hairline");
+  });
+
   it("projects desktop workspace state and exposes only the supported add-menu tabs", () => {
     expect(projectWebuiTodos([{ toolCalls: [{ name: "todowrite", input: { todos: [{ content: "完成面板", status: "in_progress" }] } }] }])).toEqual([{ content: "完成面板", status: "in_progress" }]);
     expect(projectWebuiTodos([{ msgContent: JSON.stringify({ eventType: "todo_updated", todos: [{ content: "事件进度", status: "completed", priority: "high" }] }) }])).toEqual([{ content: "事件进度", status: "completed", priority: "high" }]);
@@ -303,7 +315,15 @@ describe("WebUI shell", () => {
     const overview = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, { open: true, workspaceDir: "/tmp/project", workspaceEnvironment: environment, todos: [] }));
     expect(overview).toContain('data-testid="progress-overview-panel"');
     expect(overview).toContain('data-testid="progress-overview-card"');
-    expect(overview).toContain('aria-hidden="false"');
+    // The panel is exposed while it is open. The shared page boundary hides a
+    // hidden panel with `aria-hidden` and `inert`; an open one carries
+    // neither, and `aria-hidden="false"` would say nothing a reader could
+    // act on.
+    expect(overview).toContain('data-webui-page="panel"');
+    // The panel root itself is exposed. The decorative parts inside it carry
+    // their own `aria-hidden`, so the check is about the root's tag.
+    const panelTag = overview.slice(0, overview.indexOf(">") + 1);
+    expect(panelTag).not.toContain('aria-hidden="true"');
     expect(overview).toContain("环境信息");
     expect(overview).toContain(">webui<");
     // 158a301 起行数拆成两个着色 span，"+4 -1" 不再是连续文本。
@@ -354,14 +374,25 @@ describe("WebUI shell", () => {
     expect(markup).toContain('data-testid="progress-overview-panel"');
     expect(markup).toContain('data-webui-environment-panel="true"');
     expect(markup).toContain('aria-busy="true"');
-    expect(markup).toContain('aria-label="正在加载环境信息"');
-    expect(markup).toContain("webui-environment-skeleton--action");
+    // The loading state is announced by the shared live region, which carries
+    // the words themselves — an `aria-label` would only repeat what the
+    // region already says.
+    expect(markup).toContain("正在加载环境信息");
+    expect(markup).toContain('role="status"');
+    // The reserved loading slot is the shared skeleton's now: the placeholder
+    // is a skeleton node, and the controls inside it are marked as controls
+    // so the projection knows what to replace.
+    expect(markup).toContain("webui-page-skeleton-node");
+    expect(markup).toContain('data-webui-page-skeleton-control="true"');
     expect(markup).toContain("Existing progress");
     expect(markup).toContain("worker");
   });
 
   it("does not render Desktop's environment section for a non-git session", () => {
     const overview = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, {
+      // The panel is opened to be inspected: a closed one is not mounted, and
+      // a closed panel says nothing about what a non-git session shows.
+      open: true,
       workspaceDir: "/tmp/non-git-workspace",
       workspaceEnvironment: { isGitRepo: false, changedFiles: 0, insertions: 0, deletions: 0, lineStatsStatus: "skipped" },
       todos: [],
@@ -394,7 +425,10 @@ describe("WebUI shell", () => {
       collapsed: true,
     }));
     expect(collapsed).toContain("webui-progress-section webui-progress-panel is-collapsed");
-    expect(collapsed).toContain('class="webui-expandable-motion" aria-hidden="true"');
+    // The collapsed body is the shared disclosure's: it stays mounted and
+    // hidden, so the rows keep their widths for the next open.
+    expect(collapsed).toContain('data-webui-motion-state="collapse"');
+    expect(collapsed).toContain('aria-hidden="true"');
     expect(collapsed).toContain('aria-expanded="false"');
     expect(collapsed).toContain('aria-hidden="true"');
   });
@@ -948,8 +982,10 @@ describe("WebUI shell", () => {
       /\.webui-session-leading-marker\s*\{([^}]*)\}/u,
     );
     expect(leadingMarkerRule, "session leading marker rule is missing").not.toBeNull();
-    expect(leadingMarkerRule![1]).toMatch(/width:\s*18px/u);
-    expect(leadingMarkerRule![1]).toMatch(/flex:\s*0\s+0\s+18px/u);
+    // The marker column matches the disclosure target inside it: an 18px
+    // column clipped the one place a session row is opened from.
+    expect(leadingMarkerRule![1]).toMatch(/width:\s*24px/u);
+    expect(leadingMarkerRule![1]).toMatch(/flex:\s*0\s+0\s+24px/u);
   });
 
   it("keeps subagent sessions visibly nested under their parent session", () => {

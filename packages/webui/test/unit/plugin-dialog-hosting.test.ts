@@ -3,9 +3,10 @@
 // The dialogs were cut out of this file, so what must hold is that the *hosting* and the two
 // failure behaviours did not move with them:
 //
-//   - each dialog still renders in the conditional it occupied (`dialog ?` / `pluginImportDialog ?`),
-//     which is also what makes both own no state — they are unmounted on close, and the fields they
-//     show are the catalogue's, so reopening one shows what the user last typed;
+//   - each dialog is hosted by the catalogue and told which one is open (`open={dialog !== null}` /
+//     `open={pluginImportDialog}`): the shared dialog owns the mount, so it renders nothing until it
+//     is open and plays its own exit. Both own no state — the fields they show are the catalogue's,
+//     so reopening one shows what the user last typed;
 //   - the three save paths are dispatched from the form's submit, by `dialog`, as before;
 //   - **install failure preserves prior state**: `importPlugin` closes the dialog and clears the
 //     preview only inside the branch that ran after the mutation reported success;
@@ -34,9 +35,14 @@ const slice = (text: string, from: string, to: string): string =>
   text.slice(text.indexOf(from), text.indexOf(to));
 
 describe("the catalogue hosts both dialogs as it did", () => {
-  it("renders each in the conditional it occupied", () => {
-    expect(catalogue).toContain("{dialog ? (\n        <PluginItemDialog");
-    expect(catalogue).toContain("{pluginImportDialog ? (\n        <PluginImportDialog");
+  it("renders each under the catalogue's own open state", () => {
+    // The shared dialog owns the mount: it renders nothing until it is open
+    // and plays its own exit. So the catalogue says which dialog is open
+    // instead of deciding whether to render one.
+    expect(catalogue).toContain("open={dialog !== null}");
+    expect(catalogue).toContain("open={pluginImportDialog}");
+    expect(catalogue).toContain("<PluginItemDialog");
+    expect(catalogue).toContain("<PluginImportDialog");
   });
 
   it("keeps both dialogs stateless, so the catalogue's fields outlive a close", () => {

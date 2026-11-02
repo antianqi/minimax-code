@@ -25,7 +25,9 @@ describe("the menu keeps the two open flags and the mutual exclusion (LC-7)", ()
 
   it("opens one panel only by closing the other", () => {
     expect(shell).toContain("const loadUsage = (forceRefresh = false) => {\n    setUsageOpen(true);\n    setSigninOpen(false);");
-    expect(shell).toContain("const loadSignin = () => {\n    setSigninOpen(true);\n    setUsageOpen(false);");
+    // The sign-in panel opens by closing the usage panel. The guard in front
+    // of it only skips a second read, so the assertion reads past it.
+    expect(shell).toMatch(/const loadSignin = \(\) => \{[\s\S]*?setSigninOpen\(true\);\n\s*setUsageOpen\(false\);/u);
   });
 
   it("keeps both flags out of the panels", () => {
@@ -43,7 +45,7 @@ describe("dismissal stays with the menu (LC-8)", () => {
     expect(shell).toContain("    setUsageOpen(false);\n    setSigninOpen(false);\n  };");
     // The rail's own trigger closes them too, and the two cross-panel jumps do: check-in -> usage is
     // the one that used to be easy to lose, since it starts inside the panel that is going away.
-    expect(shell).toContain("setSigninOpen(false);\n                    loadUsage();");
+    expect(shell).toMatch(/setSigninOpen\(false\);\n\s*loadUsage\(\);/u);
   });
 
   it("routes the outside pointer and Escape through the shared rule", () => {
@@ -60,8 +62,13 @@ describe("dismissal stays with the menu (LC-8)", () => {
 
 describe("the panels load on demand, never on mount (LC-9)", () => {
   it("opens each panel from a hover, focus or click on the menu", () => {
-    expect(shell).toContain("onMouseEnter={() => { cancelPanelClose(); loadSignin(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadSignin(); }}");
-    expect(shell).toContain("onMouseEnter={() => { cancelPanelClose(); loadUsage(); }} onMouseLeave={schedulePanelClose} onFocus={() => { cancelPanelClose(); loadUsage(); }}");
+    // Each panel opens on a hover or a focus, and the menu owns the
+    // dismissal timer for both.
+    expect(shell).toMatch(/onMouseEnter=\{\(\) => \{\s*cancelPanelClose\(\);\s*loadSignin\(\);\s*\}/u);
+    expect(shell).toMatch(/onFocus=\{\(\) => \{\s*cancelPanelClose\(\);\s*loadSignin\(\);\s*\}/u);
+    expect(shell).toMatch(/onMouseEnter=\{\(\) => \{\s*cancelPanelClose\(\);\s*loadUsage\(\);\s*\}/u);
+    expect(shell).toMatch(/onFocus=\{\(\) => \{\s*cancelPanelClose\(\);\s*loadUsage\(\);\s*\}/u);
+    expect(shell).toContain("onMouseLeave={schedulePanelClose}");
   });
 
   it("gives neither panel a mount-time load", () => {
@@ -92,14 +99,14 @@ describe("the account answers come from the one owner", () => {
 describe("the two cross-surface jumps stay in the menu", () => {
   it("sends the check-in panel's 查看用量 on to the quota popover", () => {
     // The one that starts inside the panel that is going away, so it has to close check-in first.
-    expect(shell).toContain("setSigninOpen(false);\n                    loadUsage();");
+    expect(shell).toMatch(/setSigninOpen\(false\);\n\s*loadUsage\(\);/u);
   });
 
   it("sends the quota popover's login action on to the login dialog", () => {
     // As a sign-in, not as a switch: this entry offers the account its login,
     // and a switch would sign the current account out again. Switching is
     // what the menu's own 切换账号 row is for.
-    expect(shell).toContain('onLogin={() => { setOpen(false); setLoginMode("sign-in"); setLoginOpen(true); }}');
+    expect(shell).toMatch(/onLogin=\{\(\) => \{\s*setOpen\(false\);\s*setLoginMode\("sign-in"\);\s*setLoginOpen\(true\);\s*\}/u);
   });
 });
 
@@ -109,11 +116,11 @@ describe("the menu offers the switch-account row", () => {
     // bottom-left menu offers the same entry point.
     expect(shell).toContain('data-testid="user-menu-switch-account"');
     expect(shell).toContain("切换账号");
-    expect(shell).toContain('setLoginMode("switch"); setLoginOpen(true);');
+    expect(shell).toMatch(/setLoginMode\("switch"\);\s*setLoginOpen\(true\);/u);
   });
 
   it("keeps the sign-in row on the page's other mode", () => {
-    expect(shell).toContain('setLoginMode("sign-in"); setLoginOpen(true);');
+    expect(shell).toMatch(/setLoginMode\("sign-in"\);\s*setLoginOpen\(true\);/u);
   });
 });
 

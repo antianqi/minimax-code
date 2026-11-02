@@ -336,7 +336,7 @@ export function SigninCard({
         aria-label={SIGNIN.title}
         className="signin-card-container"
       >
-        <div className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
+        <div data-webui-page-skeleton-surface="true" className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
           <div className="signin-corner-clip" aria-hidden="true">
             <SigninArtwork
               lightUrl="/assets/img/corner-light.svg"

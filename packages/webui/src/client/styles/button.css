@@ -395,7 +395,7 @@
   .webui-mavis-button-selectable-row[aria-current="page"],
   .webui-mavis-button-selectable-row[aria-current="true"],
   .webui-mavis-button-selectable-row[aria-selected="true"] {
-    background: var(--bg_grouped_secondary);
+    background: var(--bg_interaction_tertiary_selected);
   }
   /* The filled call to action: one per surface, and the accent fill the whole
    * client answers to. It used to be the interactions business's

@@ -148,7 +148,10 @@ describe("W0 · SSR · WebuiTurnProcess", () => {
     expect(html).toContain(">100 token/s<");
     expect(html).not.toContain("共执行 3 秒 · 100 token/s");
     expect(html).toContain('aria-expanded="false"');
-    expect(html).toMatch(/data-testid="turn-process-detail" hidden=""/u);
+    // The folded body stays mounted and hidden: the shared disclosure owns
+    // the folding, so the body says which way it is folded.
+    expect(html).toMatch(/data-testid="turn-process-detail"[^>]*aria-hidden="true"/u);
+    expect(html).toContain('data-webui-motion-state="collapse"');
   });
 
   it("falls back to the wall-clock span and then to zero seconds", () => {

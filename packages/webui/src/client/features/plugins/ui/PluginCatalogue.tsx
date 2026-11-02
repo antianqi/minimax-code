@@ -18,11 +18,13 @@ import { projectWebuiPluginCatalogue } from "../projection/catalogue-view.js";
 import {
   PluginMarketplace,
   PluginMarketplaceFilters,
+  marketplaceCategoryLabel,
 } from "./PluginMarketplace.js";
 import {
   PluginManagementFilters,
   PluginManagementList,
 } from "./PluginManagementList.js";
+import { PluginPageLayout } from "./PluginPageLayout.js";
 import type {
   WebuiPluginGithubSource,
   WebuiPluginIntent,
@@ -183,6 +185,21 @@ export function PluginCatalogue({
   // page itself overflows the preview, so the control is never gated on a
   // number this response could not supply.
   const visibleMarketTotal = catalogueView.visibleMarketTotal;
+  const searchLabel = managementOpen
+    ? area === "mcp"
+      ? "搜索MCP"
+      : area === "skills"
+        ? "搜索技能"
+        : area === "agents"
+          ? "搜索Agent"
+          : area === "apps"
+            ? "搜索应用"
+            : "搜索插件"
+    : isMarketCatalogue
+      ? area === "skills"
+        ? "搜索技能"
+        : "搜索插件"
+      : undefined;
   const mutate = async (intent: WebuiPluginIntent): Promise<boolean> => {
     try {
       if (!workflows)
@@ -449,32 +466,32 @@ export function PluginCatalogue({
             </>
           )}
         </div>
-        {isMarketCatalogue && (area === "plugins" || area === "skills") ? (
+      </header>
+      <PluginPageLayout
+        sidebar={isMarketCatalogue && area === "plugins" ? (
           <PluginMarketplaceFilters
-            area={area}
-            query={query}
             category={category}
-            tagDefinitions={tagDefinitions}
-            onQueryChange={setQuery}
             onCategoryChange={setCategory}
           />
-        ) : null}
-        {managementOpen ? (
+        ) : managementOpen ? (
           <PluginManagementFilters
             area={area}
-            query={query}
             rowCount={area === "apps" ? installedMiniApps.length : data.length}
             onAreaChange={(nextArea) => {
               setLocalError("");
               setArea(nextArea);
               setView("personal");
             }}
-            onQueryChange={setQuery}
           />
         ) : null}
-      </header>
+        searchLabel={searchLabel}
+        query={query}
+        onQueryChange={setQuery}
+      >
       {isMarketCatalogue ? (
-        <h2 className="webui-plugin-market-heading">{selectedTag?.displayName ?? marketNoun}</h2>
+        <h2 className="webui-plugin-market-heading">
+          {selectedTag?.displayName ?? (category ? marketplaceCategoryLabel(category) : undefined) ?? marketNoun}
+        </h2>
       ) : null}
       {area === "plugins" && view === "personal" && !managementOpen ? (
         <h2 className="webui-plugin-market-heading">插件</h2>
@@ -628,6 +645,7 @@ export function PluginCatalogue({
             rows={catalogueView.rows}
             marketTotal={marketTotal}
             visibleMarketTotal={visibleMarketTotal}
+            loading={listing.loading}
             showAll={showAllCatalogue}
             onToggleAll={() => setShowAllCatalogue((value) => !value)}
             onIntent={(intent) => void mutate(intent)}
@@ -665,6 +683,7 @@ export function PluginCatalogue({
         <PluginManagementList
           area={area}
           rows={catalogueView.rows}
+          loading={listing.loading}
           onMutate={(intent) => void mutate(intent)}
           onConfirmMutation={confirmMutation}
           onPrepareMcp={(item) => void prepareMcp(item)}
@@ -693,6 +712,7 @@ export function PluginCatalogue({
           onImport={() => void importPlugin()}
           onClose={detachPluginImportDialog}
         />
+      </PluginPageLayout>
     </WebuiPage>
   );
 }

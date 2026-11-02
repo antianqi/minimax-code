@@ -25,6 +25,11 @@ const repoFile = (relative: string): string =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
 
 const BUTTON_CSS = repoFile("../../src/client/styles/button.css");
+// The button draws from two shared layers: its own contract, and the motion
+// vocabulary every interactive control shares — the feedback motion is one of
+// the classes it renders. A class declared in neither is an unstyled control,
+// so both layers count.
+const DECLARED_CLASSES = `${BUTTON_CSS}\n${repoFile("../../src/client/styles/motion.css")}`;
 
 /** Every stylesheet the client ships, so a retired class cannot hide in one. */
 const CLIENT_STYLES = (() => {
@@ -83,7 +88,7 @@ describe("the button contract", () => {
         const classes = /class="([^"]*)"/.exec(markup)?.[1].split(" ") ?? [];
         expect(classes.length).toBeGreaterThan(0);
         for (const className of classes) {
-          expect(BUTTON_CSS, `${className} is rendered but not declared`).toContain(`.${className}`);
+          expect(DECLARED_CLASSES, `${className} is rendered but not declared`).toContain(`.${className}`);
         }
       }
     }

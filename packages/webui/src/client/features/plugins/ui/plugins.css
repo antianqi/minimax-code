@@ -171,39 +171,65 @@
     color: var(--text_default_secondary);
   }
   .webui-plugin-category-filter {
-    max-width: 960px;
-    overflow-x: auto;
-    margin: 0 auto 12px;
-    justify-content: center;
-    gap: 3px;
-  }
-  .webui-plugin-management.is-marketplace .webui-plugin-market-discovery {
-    box-sizing: border-box;
-    max-width: 832px;
-    margin: 14px auto 0;
-    padding: 40px 32px 4px;
-  }
-  .webui-plugin-management.is-marketplace .webui-plugin-category-filter {
     max-width: none;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
     gap: var(--spacing_4);
-    margin-bottom: 10px;
   }
-  .webui-plugin-management.is-managing .webui-plugin-management-discovery {
-    box-sizing: border-box;
-    max-width: 832px;
+  .webui-plugin-page-layout {
+    display: grid;
+    width: min(1200px, 100%);
+    grid-template-columns: 208px minmax(0, 1fr);
+    align-items: start;
+    gap: var(--spacing_24);
     margin: 16px auto 0;
-    padding: 0 32px 4px;
   }
-  .webui-plugin-management.is-managing .webui-plugin-management-discovery .webui-plugin-category-filter {
-    max-width: none;
-    justify-content: flex-start;
-    gap: var(--spacing_4);
-    margin: 0 0 10px;
+  .webui-plugin-page-layout:not(.has-sidebar) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .webui-plugin-management.is-marketplace .webui-plugin-page-layout {
+    box-sizing: border-box;
+    padding: 0 var(--spacing_16);
+  }
+  .webui-plugin-page-sidebar,
+  .webui-plugin-page-main {
+    min-width: 0;
+  }
+  .webui-plugin-page-sidebar {
+    padding-top: var(--spacing_4);
+    position: sticky;
+    top: 52px;
+    align-self: start;
+  }
+  .webui-plugin-category-filter > .webui-mavis-button {
+    width: auto;
+    max-width: 100%;
+    justify-content: space-between;
+    text-align: left;
+    white-space: normal;
+    font-size: var(--size_14);
+    padding-right: var(--spacing_12);
+    padding-left: var(--spacing_12);
+  }
+  .webui-plugin-page-search {
+    max-width: 832px;
+    margin: 0 auto var(--spacing_20);
+  }
+  .webui-plugin-page-content {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .webui-plugin-page-content > .webui-feedback--empty {
+    align-items: center;
+    text-align: center;
   }
   .webui-plugin-management.is-marketplace .webui-plugin-grid {
     max-width: 768px;
     row-gap: var(--spacing_12);
+  }
+  .webui-plugin-management.is-managing .webui-plugin-page-sidebar {
+    top: 88px;
   }
   .webui-plugin-market-heading {
     max-width: 768px;
@@ -212,9 +238,36 @@
     font-weight: 600;
     line-height: var(--line_height_26);
   }
-  .webui-plugin-show-all {
-    display: block;
+  .webui-mavis-button.webui-plugin-show-all {
+    display: flex;
+    width: fit-content;
     margin: 8px auto 34px;
+  }
+  .webui-plugin-market-skeleton-row {
+    display: flex;
+    min-width: 0;
+    min-height: 60px;
+    align-items: center;
+    gap: var(--spacing_12);
+    border-radius: var(--radius_12);
+    padding: var(--spacing_8) var(--spacing_12);
+  }
+  .webui-plugin-market-skeleton-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--spacing_8);
+  }
+  .webui-plugin-market-skeleton-copy > .webui-skeleton:first-child {
+    max-width: 160px;
+  }
+  .webui-plugin-market-skeleton-copy > .webui-skeleton:last-child {
+    max-width: 220px;
+  }
+  .webui-plugin-market-skeleton-row > .webui-skeleton:last-child {
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   /* Marketplace rows stay open at rest and reveal a rounded surface only
@@ -225,6 +278,10 @@
     border-radius: var(--radius_12);
     background: transparent;
     padding: var(--spacing_8) var(--spacing_12);
+  }
+  .webui-plugin-management.is-marketplace .webui-plugin-grid .webui-plugin-row > .webui-mavis-button {
+    flex: 0 0 auto;
+    margin-left: auto;
   }
   .webui-plugin-management.is-marketplace
     .webui-plugin-grid
@@ -256,6 +313,29 @@
   .webui-plugin-management.is-managing .webui-plugin-error {
     width: min(768px, calc(100% - 64px));
     max-width: 768px;
+  }
+  .webui-plugin-management-skeleton {
+    width: min(768px, calc(100% - 64px));
+    margin: 0 auto;
+  }
+  .webui-plugin-management-skeleton-row {
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    gap: var(--spacing_12);
+    border-bottom: 1px solid var(--border_default);
+    padding: var(--spacing_8) 0;
+  }
+  .webui-plugin-management-skeleton-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--spacing_8);
+  }
+  .webui-plugin-management-skeleton-row > .webui-skeleton:last-child {
+    flex: 0 0 auto;
+    margin-left: auto;
   }
   .webui-plugin-row {
     min-height: 84px;
@@ -386,16 +466,6 @@
   }
   .webui-plugin-management.is-managing .webui-agent-editor {
     width: min(768px, calc(100% - 64px));
-  }
-  .webui-plugin-management.is-managing > .webui-plugin-list,
-  .webui-plugin-management.is-managing > .webui-plugin-toolbar {
-    margin-top: var(--spacing_24);
-  }
-  .webui-plugin-management.is-managing > .webui-agent-editor {
-    margin-top: var(--spacing_24);
-  }
-  .webui-plugin-management.is-managing > .webui-plugin-error {
-    margin-top: var(--spacing_24);
   }
   .webui-agent-list {
     display: flex;
@@ -546,6 +616,19 @@
     }
     .webui-plugin-categories {
       overflow-x: auto;
+    }
+    .webui-plugin-page-layout {
+      grid-template-columns: 148px minmax(0, 1fr);
+      gap: var(--spacing_12);
+    }
+    .webui-plugin-page-sidebar,
+    .webui-plugin-management.is-managing .webui-plugin-page-sidebar {
+      top: 52px;
+    }
+    .webui-plugin-category-filter > .webui-mavis-button {
+      min-width: 0;
+      padding-right: var(--spacing_10);
+      padding-left: var(--spacing_10);
     }
     .webui-plugin-grid {
       grid-template-columns: 1fr;

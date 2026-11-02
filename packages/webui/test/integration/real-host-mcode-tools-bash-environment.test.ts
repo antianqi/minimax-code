@@ -147,6 +147,7 @@ const booted: Booted[] = [];
 const stubs: Stub[] = [];
 const previousDataDir = process.env.MINIMAX_DATA_DIR;
 const previousBuildEnv = process.env.MAVIS_BUILD_ENV;
+const previousRegion = process.env.MAVIS_REGION;
 const hostKeySnapshot = new Map<string, string | undefined>();
 
 /** The host keys the integration installs, remembered so they can be restored. */
@@ -164,6 +165,8 @@ afterEach(async () => {
   else process.env.MINIMAX_DATA_DIR = previousDataDir;
   if (previousBuildEnv === undefined) delete process.env.MAVIS_BUILD_ENV;
   else process.env.MAVIS_BUILD_ENV = previousBuildEnv;
+  if (previousRegion === undefined) delete process.env.MAVIS_REGION;
+  else process.env.MAVIS_REGION = previousRegion;
   // The integration installs the host keys on the process environment, and
   // the host close restores them. Restore defensively as well, so a failed
   // boot cannot leak them into the next case.
@@ -183,7 +186,12 @@ describe("the real host, what the Agent's Bash inherits", () => {
     async () => {
       const stub = await startStubServer();
       stubs.push(stub);
+      // The scope the runtime resolves is a COMPLETE pair, so both halves are
+      // named here: a lone build env is not a scope, and the resolver would
+      // replace it with the default — whose content-review endpoint is the
+      // production one, which this test's stub cannot answer.
       process.env.MAVIS_BUILD_ENV = "test";
+      process.env.MAVIS_REGION = "cn";
       const reviewBaseUrl = stub.url.replace(/\/v1$/u, "");
 
       const dataDir = await mkdtemp(join(tmpdir(), "webui-real-host-mcode-tools-"));

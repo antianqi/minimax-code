@@ -62,6 +62,24 @@ function storedTheme(page) {
   return page.evaluate(() => localStorage.getItem("webui-theme"));
 }
 
+test("the active settings navigation row uses the shared selected interaction fill", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await openSettings(page);
+
+  const activeRow = page.locator('.webui-settings-nav [data-menu-key="desktop"]');
+  await expect(activeRow).toHaveAttribute("aria-current", "page");
+  const actual = await activeRow.evaluate((element) => getComputedStyle(element).backgroundColor);
+  const expected = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--bg_interaction_tertiary_selected)";
+    document.body.append(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  });
+  expect(actual).toBe(expected);
+});
+
 test("跟随系统 follows the OS color scheme while it is the selected preference", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);

@@ -136,12 +136,21 @@ function isContentReviewRequest(url: string | undefined): boolean {
 
 // A test build honours a loopback content-review base URL, so the turn can reach a
 // real review endpoint instead of the placeholder host.
+//
+// The scope the runtime resolves is a COMPLETE pair: a lone build env is not
+// a scope, so the resolver would replace it with the default — and the
+// default's content-review endpoint is the production one, which this test's
+// stub cannot answer. Both halves are named here.
 const previousBuildEnv = process.env.MAVIS_BUILD_ENV;
+const previousRegion = process.env.MAVIS_REGION;
 process.env.MAVIS_BUILD_ENV = "test";
+process.env.MAVIS_REGION = "cn";
 
 afterAll(() => {
   if (previousBuildEnv === undefined) delete process.env.MAVIS_BUILD_ENV;
   else process.env.MAVIS_BUILD_ENV = previousBuildEnv;
+  if (previousRegion === undefined) delete process.env.MAVIS_REGION;
+  else process.env.MAVIS_REGION = previousRegion;
 });
 
 it("a real agent turn resumes after refresh and drains a queued message in order", async () => {
@@ -580,15 +589,25 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     const rewindGeometry = await persistedSourceRewindDialog.evaluate((node) => {
       const viewportWidth = document.body.clientWidth;
       const viewportHeight = document.body.clientHeight;
-      const dialog = node.getBoundingClientRect();
-      const surface = node.querySelector(".webui-message-dialog-surface")!.getBoundingClientRect();
-      const buttons = [...node.querySelectorAll<HTMLButtonElement>(".webui-message-dialog-actions button")];
+      // The shared dialog carries the test id on its surface, and the mask
+      // that covers the viewport is the surface's parent.
+      const mask = node.parentElement!;
+      const dialog = mask.getBoundingClientRect();
+      const surface = node.getBoundingClientRect();
+      const buttons = [...node.querySelectorAll<HTMLButtonElement>(".webui-dialog-actions button")];
       return {
-        fixedBackdrop: getComputedStyle(node).position === "fixed",
+        fixedBackdrop: getComputedStyle(mask).position === "fixed",
         backdropCoversViewport: dialog.left <= 0 && dialog.top <= 0 &&
           dialog.right >= viewportWidth && dialog.bottom >= viewportHeight,
-        centered: Math.abs(surface.left + surface.width / 2 - viewportWidth / 2) < 3 &&
-          Math.abs(surface.top + surface.height / 2 - viewportHeight / 2) < 3,
+        // The mask is the frame the dialog is centred in, and it covers the
+        // window rather than the body's client box — the scrollbar makes
+        // those two differ, and the dialog is centred on the window.
+        //
+        // The layout box is what centring is about: the surface is measured
+        // while its enter animation is still running, and the rect carries
+        // that movement.
+        centered: Math.abs(node.offsetLeft + node.offsetWidth / 2 - mask.clientWidth / 2) < 3 &&
+          Math.abs(node.offsetTop + node.offsetHeight / 2 - mask.clientHeight / 2) < 3,
         surfaceWithinViewport: surface.left >= 0 && surface.top >= 0 &&
           surface.right <= viewportWidth && surface.bottom <= viewportHeight,
         actionsReachable: buttons.length >= 2 && buttons.every((button) => {
@@ -599,7 +618,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
         portalClientBox: { width: viewportWidth, height: viewportHeight },
         backdropRect: { left: dialog.left, top: dialog.top, right: dialog.right, bottom: dialog.bottom },
         surfaceRect: { left: surface.left, top: surface.top, right: surface.right, bottom: surface.bottom },
-        grid: { display: getComputedStyle(node).display, placeItems: getComputedStyle(node).placeItems },
+        grid: { display: getComputedStyle(mask).display, placeItems: getComputedStyle(mask).placeItems },
       };
     });
     expect(rewindGeometry, JSON.stringify(rewindGeometry)).toMatchObject({
@@ -837,8 +856,10 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await browserExpect(forkedSessionLink).toBeVisible();
     await browserExpect.poll(() => requests.filter((request) => request.operation === "getSessionTree").length)
       .toBeGreaterThan(1);
+    // The rail row's hover actions sit over the tail of the title, so the
+    // click lands on the visible text the way a person would.
     await page.locator(`[data-webui-session-link="${sessionId}"]`)
-      .getByText("Message actions before refresh.").click();
+      .getByText("Message actions before refresh.").click({ position: { x: 4, y: 8 } });
     await browserExpect(page).toHaveURL(new RegExp(`#session=${sessionId}$`));
 
     await waitForSignal(queuedTurnGate, "queued follow-up model request");
@@ -954,8 +975,12 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     );
     await page.keyboard.type("browser-while-todo-active");
     await expect.poll(() => browserReportedValues).toContain("browser-while-todo-active");
-    await browserExpect(page.getByTestId("progress-overview-card").getByText("Visible task from runtime tool"))
-      .toBeVisible();
+    // The two right-side panels share one surface, and the browser panel
+    // holds it now — so the progress card is not on the screen. The todo
+    // itself is still reported: the runtime still carries it, and the
+    // transcript shows it.
+    await browserExpect(page.getByTestId("progress-overview-card")).toHaveCount(0);
+    await browserExpect(page.getByText("Visible task from runtime tool").first()).toBeVisible();
     const browserInputRequests = requests.filter((request) => request.operation === "sendBrowserInput");
     expect(browserInputRequests.length, JSON.stringify(browserInputRequests)).toBeGreaterThan(0);
     await expect.poll(async () => (await port.getActiveTurn({ id: sessionId })) !== undefined).toBe(true);
@@ -1028,7 +1053,8 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     expect(modelRequests.some((request) => request.body.includes("Create a task checklist.") &&
       request.body.includes("todowrite"))).toBe(true);
 
-    const attachmentInput = page.locator('input.webui-composer-hidden-file-input[aria-label="添加文件或图片"]');
+    // The composer uses the shared file input now.
+    const attachmentInput = page.locator('input.webui-file-input[aria-label="添加文件或图片"]');
     await attachmentInput.setInputFiles({
       name: "runtime-note.txt",
       mimeType: "text/plain",
@@ -1203,8 +1229,11 @@ it("a real agent turn resumes after refresh and drains a queued message in order
         backdropFixed: getComputedStyle(backdrop!).position === "fixed",
         backdropCoversViewport: backdropRect.left <= 0 && backdropRect.top <= 0 &&
           backdropRect.right >= innerWidth && backdropRect.bottom >= innerHeight,
-        centered: Math.abs(rect.left + rect.width / 2 - innerWidth / 2) < 3 &&
-          Math.abs(rect.top + rect.height / 2 - innerHeight / 2) < 3,
+        // The layout box is what centring is about: the surface is measured
+        // while its enter animation is still running, and the rect carries
+        // that movement. The mask is the frame it is centred in.
+        centered: Math.abs(node.offsetLeft + node.offsetWidth / 2 - (backdropRect.left + backdropRect.width / 2)) < 3 &&
+          Math.abs(node.offsetTop + node.offsetHeight / 2 - (backdropRect.top + backdropRect.height / 2)) < 3,
         insideViewport: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
         fieldsGrid: getComputedStyle(fields).display === "grid",
         controlsAligned: controls.length >= 3 && controls.every((control) => {
@@ -1243,7 +1272,9 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       },
     });
 
-    await forkedSessionLink.getByText("synthetic-message-fork").click();
+    // The rail row's hover actions sit over the tail of the title, so the
+    // click lands on the visible text the way a person would.
+    await forkedSessionLink.getByText("synthetic-message-fork").click({ position: { x: 4, y: 8 } });
     await browserExpect(page).toHaveURL(new RegExp(`#session=${String(messageForkSessionId)}$`));
     await browserExpect(forkedSessionLink).toHaveAttribute("data-webui-session-active", "true");
     await browserExpect(page.locator(`[data-webui-transcript="${String(messageForkSessionId)}"]`))
@@ -1428,11 +1459,11 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       "Synthetic model refusal for retry journey.",
     );
     await page.locator(`[data-webui-session-link="${sessionId}"]`)
-      .getByText("Message actions before refresh.").click();
+      .getByText("Message actions before refresh.").click({ position: { x: 4, y: 8 } });
     await browserExpect(page).toHaveURL(new RegExp(`#session=${sessionId}$`));
     await browserExpect(page.getByTestId("output-error-surface")).toHaveCount(0);
     await page.locator(`[data-webui-session-link="${String(messageForkSessionId)}"]`)
-      .getByText("synthetic-message-fork", { exact: true }).click();
+      .getByText("synthetic-message-fork", { exact: true }).click({ position: { x: 4, y: 8 } });
     await browserExpect(page).toHaveURL(new RegExp(`#session=${String(messageForkSessionId)}$`));
     await browserExpect(retryError).toBeVisible();
     await browserExpect(retryError).toContainText("Synthetic model refusal for retry journey.");

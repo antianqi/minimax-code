@@ -443,6 +443,15 @@ export const WebuiDisclosure = forwardRef<HTMLElement, WebuiDisclosureProps>(
 export type WebuiSkeletonVariant =
   "circle" | "control" | "pulse" | "rect" | "shape" | "text";
 
+const SKELETON_VARIANT_CLASS: Record<WebuiSkeletonVariant, string> = {
+  circle: "webui-skeleton--circle",
+  control: "webui-skeleton--control",
+  pulse: "webui-skeleton--pulse",
+  rect: "webui-skeleton--rect",
+  shape: "webui-skeleton--shape",
+  text: "webui-skeleton--text",
+};
+
 export interface WebuiSkeletonProps {
   readonly animated?: boolean;
   readonly variant?: WebuiSkeletonVariant;
@@ -500,7 +509,7 @@ function cssLength(value: string | number): string {
   return typeof value === "number" ? `${value}px` : value;
 }
 
-/** Shared skeleton shape and shimmer. Callers supply geometry, never animation rules. */
+/** Shared skeleton shape and pulse. Callers supply geometry, never animation rules. */
 export function WebuiSkeleton({
   animated = true,
   variant = "text",
@@ -521,7 +530,7 @@ export function WebuiSkeleton({
       className={[
         "webui-skeleton",
         animated ? "webui-motion-loading" : "",
-        `webui-skeleton--${variant}`,
+        SKELETON_VARIANT_CLASS[variant],
         className,
       ]
         .filter(Boolean)

@@ -288,10 +288,24 @@ describe("context panel — the six-category split is folded until asked for", (
   });
 
   it("hides the rows rather than unmounting them", () => {
-    // `hidden` keeps the six rows out of the tab order and out of the
-    // accessibility tree while folded, and keeps the bar's segment widths from
-    // being recomputed on the first open.
-    expect(indicator).toContain("hidden={!breakdownOpen}");
+    // The six rows stay out of the tab order and out of the accessibility
+    // tree while folded, and the bar's segment widths are not recomputed on
+    // the first open. The shared disclosure owns that now: it keeps its
+    // children mounted while folded and hides them with `inert` and
+    // `aria-hidden`, so the indicator states the state and the shared
+    // component states the mechanism.
+    expect(indicator).toContain("open={breakdownOpen}");
+    expect(indicator).toContain("webui-context-usage-components");
+    const disclosure = readFileSync(
+      path.resolve(here, "../../src/client/ui/page.tsx"),
+      "utf8",
+    );
+    // The children are not mounted on open — they stay mounted while folded.
+    expect(disclosure).toContain("mountOnOpen = false");
+    // And a folded disclosure is inert: out of the tab order, out of the
+    // accessibility tree.
+    expect(disclosure).toContain("aria-hidden={hidden || undefined}");
+    expect(disclosure).toContain("inert={hidden || undefined}");
   });
 
   it("tells the cascade about the folded state, because `hidden` alone does not", () => {
@@ -301,11 +315,18 @@ describe("context panel — the six-category split is folded until asked for", (
     // `display: flex` on the same class outranks it and the rows stayed both
     // visible and in the accessibility tree. A DOM assertion passes on this;
     // only the stylesheet says otherwise.
+    //
+    // The collapse is the shared disclosure's now: the folded row is
+    // `0fr` with the content clipped, so the rows take no space and no
+    // opacity while they stay mounted.
     const css = readFileSync(
-      path.resolve(here, "../../src/client/features/transcript/ui/transcript.css"),
+      path.resolve(here, "../../src/client/styles/motion.css"),
       "utf8",
     );
-    expect(css).toContain(".webui-context-usage-components[hidden] { display: none; }");
+    expect(css).toContain("grid-template-rows: 0fr;");
+    expect(css).toContain(
+      ".webui-disclosure-content { min-width: 0; min-height: 0; overflow: hidden; }",
+    );
   });
 
   it("keeps the bar's segments outside the disclosure", () => {

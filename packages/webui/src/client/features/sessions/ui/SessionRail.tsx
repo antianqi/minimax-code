@@ -474,7 +474,7 @@ export function WebuiProjectList({
       : expandedSessions;
 
   return (
-    <section data-webui-project-list="true">
+    <section data-webui-project-list="true" aria-busy={loading || undefined}>
       <ProjectList
         projects={regularProjectGroups}
         pinnedProjectGroups={pinnedProjectGroups}
@@ -500,6 +500,7 @@ export function WebuiProjectList({
         projectNames={projectNames}
         pinnedSessionState={pinnedSessions}
         pinnedProjects={pinnedProjects}
+        catalogLoading={loading}
         activity={activity}
         now={now}
         expandedProjects={expandedProjectsForRender}

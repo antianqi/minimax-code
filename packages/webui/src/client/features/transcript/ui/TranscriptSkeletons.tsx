@@ -3,7 +3,7 @@
 // `greeting-skeleton` for fresh / no-history cases.
 //
 // The line widths (8 primary + 4 secondary) are fixed. The shared skeleton
-// class owns the shimmer cadence and reduced-motion behavior.
+// class owns the pulse cadence and reduced-motion behavior.
 //
 // The 736px content column below MUST track `.webui-session-layout
 // .message-list`'s `max-width` in `shell.css`. These skeletons stand in for
@@ -37,12 +37,12 @@ const LINE_WIDTHS: readonly string[] = [
 
 const SECONDARY_WIDTHS: readonly string[] = ["76%", "53%", "63%", "35%"];
 
-const gradientMask: CSSProperties = {
+const fadeMask: CSSProperties = {
   maskImage: "linear-gradient(180deg, black 0%, transparent 100%)",
   WebkitMaskImage: "linear-gradient(180deg, black 0%, transparent 100%)",
 };
 
-function ShimmerBar(props: { width: string | number; height: number; rounded?: string }): React.JSX.Element {
+function SkeletonBar(props: { width: string | number; height: number; rounded?: string }): React.JSX.Element {
   const { width, height, rounded = "0.5rem" } = props;
   return <WebuiSkeleton variant="shape" style={{ width, height, borderRadius: rounded }} />;
 }
@@ -55,17 +55,17 @@ export function ChatSkeleton(): React.JSX.Element {
         style={{ maxWidth: `${SKELETON_CONTENT_MAX_WIDTH_PX}px` }}
       >
         <WebuiInline justify="end">
-          <ShimmerBar width={280} height={48} rounded="1rem" />
+          <SkeletonBar width={280} height={48} rounded="1rem" />
         </WebuiInline>
         <WebuiStack className="mt-5">
           <WebuiStack className="webui-transcript-skeleton-lines">
             {LINE_WIDTHS.map((width, index) => (
-              <ShimmerBar key={`a${index}`} width={width} height={22} />
+              <SkeletonBar key={`a${index}`} width={width} height={22} />
             ))}
           </WebuiStack>
-          <WebuiStack gap="small" className="mt-2" style={gradientMask}>
+          <WebuiStack gap="small" className="mt-2" style={fadeMask}>
             {SECONDARY_WIDTHS.map((width, index) => (
-              <ShimmerBar key={`b${index}`} width={width} height={24} />
+              <SkeletonBar key={`b${index}`} width={width} height={24} />
             ))}
           </WebuiStack>
         </WebuiStack>
@@ -81,16 +81,16 @@ export function GreetingSkeleton(): React.JSX.Element {
         className="mx-auto"
         style={{ maxWidth: `${SKELETON_CONTENT_MAX_WIDTH_PX}px` }}
       >
-        <ShimmerBar width={40} height={40} rounded="9999px" />
+        <SkeletonBar width={40} height={40} rounded="9999px" />
         <WebuiStack className="mt-4">
           <WebuiStack className="webui-transcript-skeleton-lines">
             {LINE_WIDTHS.map((width, index) => (
-              <ShimmerBar key={`a${index}`} width={width} height={22} />
+              <SkeletonBar key={`a${index}`} width={width} height={22} />
             ))}
           </WebuiStack>
-          <WebuiStack gap="small" className="mt-2" style={gradientMask}>
+          <WebuiStack gap="small" className="mt-2" style={fadeMask}>
             {SECONDARY_WIDTHS.map((width, index) => (
-              <ShimmerBar key={`b${index}`} width={width} height={24} />
+              <SkeletonBar key={`b${index}`} width={width} height={24} />
             ))}
           </WebuiStack>
         </WebuiStack>

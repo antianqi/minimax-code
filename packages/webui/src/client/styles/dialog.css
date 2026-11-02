@@ -14,6 +14,14 @@
     background: var(--webui-modal-scrim);
   }
 
+  /* A closing dialog must not swallow the press that was meant for the page
+     behind it. The mask is still on the screen while it fades out, and it is
+     inert by then, so a press on it goes nowhere at all. The dialog is closed
+     and accepts nothing, so the page behind it should. */
+  .webui-dialog-mask[aria-hidden="true"] {
+    pointer-events: none;
+  }
+
   .webui-dialog-surface {
     position: relative;
     display: flex;

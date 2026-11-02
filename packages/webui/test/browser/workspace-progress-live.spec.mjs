@@ -63,6 +63,24 @@ const panelText = (page) =>
     return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : null;
   });
 
+test("environment loading skeleton geometry", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.delayEvery("getWorkspaceEnvironment", {}));
+  await openApp(page, "#session=A");
+  await attachLiveTurn(page);
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
+    (item) => item.operation === "getWorkspaceEnvironment",
+  ))).toBe(true);
+  const environment = page.locator(".webui-environment-panel.is-loading");
+  await expect(environment).toBeVisible();
+  const rowGeometry = await environment.locator(".webui-environment-actions > .webui-environment-action").evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: rect.height };
+  }));
+  expect(rowGeometry).toHaveLength(3);
+  expect(rowGeometry.every((rect) => rect.height === 36)).toBe(true);
+  expect(rowGeometry.slice(1).every((rect, index) => rect.top - rowGeometry[index].bottom >= 8)).toBe(true);
+});
+
 test("the workspace commit dialog completes the shared exit motion before unmounting", async ({ page }) => {
   await configureFixture(page, () => window.__fixture.setResponse("getWorkspaceEnvironment", {
     isGitRepo: true,

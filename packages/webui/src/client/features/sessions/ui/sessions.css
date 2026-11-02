@@ -181,6 +181,15 @@
     border-top: 1px solid var(--border_light);
     padding-top: var(--spacing_8);
   }
+  .webui-project-list-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing_8);
+    padding: var(--spacing_8) 0;
+  }
+  .webui-project-list-skeleton-row {
+    border-radius: var(--radius_8);
+  }
   .webui-pinned-session-card:focus-visible {
     outline: 2px solid var(--border_accent);
     outline-offset: 1px;

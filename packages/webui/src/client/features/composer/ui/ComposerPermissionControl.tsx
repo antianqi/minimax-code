@@ -145,7 +145,7 @@ export function WebuiComposerPermissionControl({
           return (
             <WebuiButton
               variant="selectable-row"
-              size="regular"
+              size="row"
               key={option}
               role="menuitemradio"
               aria-checked={active}

@@ -3561,6 +3561,16 @@ describe("WebUI runtime host assembly", () => {
       path.join(os.tmpdir(), "webui-assembly-auth-"),
     );
     let lastOptions: Record<string, unknown> | undefined;
+    // The resolver prefers a complete MAVIS_REGION / MAVIS_BUILD_ENV pair,
+    // and every assembly writes its own pair into this process's environment
+    // — so an earlier test in this file would decide the scope for this one,
+    // and the namespace this test wrote would never be read. The scope under
+    // test is the namespace's, so the ambient pair goes away for the duration
+    // of the call.
+    const previousRegion = process.env.MAVIS_REGION;
+    const previousBuildEnv = process.env.MAVIS_BUILD_ENV;
+    delete process.env.MAVIS_REGION;
+    delete process.env.MAVIS_BUILD_ENV;
     try {
       const namespace = createAuthNamespace({
         dataDir,
@@ -3634,6 +3644,12 @@ describe("WebUI runtime host assembly", () => {
       expect(getter?.()).toBeUndefined();
       await assembled.harnessPort.close();
     } finally {
+      // The scope the assembly settled on stays in this process's
+      // environment unless it is put back the way it was.
+      if (previousRegion === undefined) delete process.env.MAVIS_REGION;
+      else process.env.MAVIS_REGION = previousRegion;
+      if (previousBuildEnv === undefined) delete process.env.MAVIS_BUILD_ENV;
+      else process.env.MAVIS_BUILD_ENV = previousBuildEnv;
       await removeDataDir(dataDir);
     }
   });

@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PluginCatalogue } from "../../src/client/features/plugins/ui/PluginCatalogue.js";
-import { PluginMarketplaceFilters } from "../../src/client/features/plugins/ui/PluginMarketplace.js";
+import { marketplaceCategoryLabel, PluginMarketplaceFilters } from "../../src/client/features/plugins/ui/PluginMarketplace.js";
 import { projectWebuiPluginCatalogue } from "../../src/client/features/plugins/projection/catalogue-view.js";
 import type { WebuiPluginRow } from "../../src/client/features/plugins/contracts/plugin-rows.js";
 const marketplace = (initialArea: "plugins" | "skills"): string =>
@@ -56,11 +56,15 @@ const owner = squashWhitespace(
 describe("plugin marketplace catalogue", () => {
   it("renders the server-provided Mini App category as a selectable market filter", () => {
     const html = renderToStaticMarkup(createElement(PluginMarketplaceFilters, {
-      area: "plugins", query: "", category: "tag:miniapp",
-      tagDefinitions: [{ key: "miniapp", displayName: "Mini App" }],
-      onQueryChange: () => {}, onCategoryChange: () => {},
+      category: "tag:miniapp",
+      onCategoryChange: () => {},
     }));
     expect(html).toContain('aria-pressed="true">Mini App</button>');
+  });
+  it("uses Desktop marketplace taxonomy keys and labels", () => {
+    expect(marketplaceCategoryLabel("studio")).toBe("创作");
+    expect(marketplaceCategoryLabel("tools")).toBe("工具");
+    expect(marketplaceCategoryLabel("creative")).toBeUndefined();
   });
   it("renders Mini App with the fixed categories before market metadata loads", () => {
     const html = marketplace("plugins");

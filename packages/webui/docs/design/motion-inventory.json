@@ -69,7 +69,6 @@
         { "value": "0s", "family": "distinct", "reason": "an empty range has no value transition to animate" }
       ],
       "keyframes": [
-        { "name": "webui-skeleton-shimmer", "family": "loading" },
         { "name": "webui-skeleton-pulse", "family": "loading" },
         { "name": "webui-motion-surface-enter", "family": "surface" },
         { "name": "webui-motion-surface-exit", "family": "surface" },

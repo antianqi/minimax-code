@@ -660,8 +660,9 @@ describe("W0 · structural declarations W5 must preserve", () => {
     const environmentLoading = winning(".webui-environment-loading");
     expect(declaration(environmentLoading.body, "min-height")).toBe("132px");
     expect(declaration(environmentLoading.body, "box-sizing")).toBe("border-box");
+    // The progress scroll sits inside the shared disclosure's body now.
     const progressScroll = winning(
-      ".webui-expandable-motion > .webui-progress-scroll",
+      ".webui-progress-section-body .webui-progress-scroll",
     );
     expect(declaration(progressScroll.body, "overflow-y")).toBe("auto");
     expect(declaration(progressScroll.body, "overflow-x")).toBe("hidden");
@@ -882,12 +883,17 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       rule.context.some((entry) => entry.includes("prefers-reduced-motion")),
     );
 
-    // Nineteen rules across the stylesheets the shell imports. Deleting one of
+    // Six rules across the stylesheets the shell imports. Deleting one of
     // these is the failure mode this assertion exists for: the base rule would
     // keep animating for a user who asked for reduced motion. The exact list
     // is the point -- adding an animated rule without registering its override
     // here is the same defect, in the other direction.
-    expect(reducedMotion).toHaveLength(19);
+    //
+    // The list is short because the policy is shared: the motion foundations
+    // collapse their own duration tokens, so every surface that reads a
+    // duration token stops moving at once. The rules below are the ones that
+    // do not read a token.
+    expect(reducedMotion).toHaveLength(6);
     for (const rule of reducedMotion) {
       // Three ways to stop a motion, and all of them are the point. A rule
       // that names the property disables it outright; the motion foundations
@@ -905,59 +911,25 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
 
     const selectors = reducedMotion.map((rule) => rule.selector).sort();
     expect(selectors).toEqual([
+      // The transcript's own message entrance: it fades and lifts, so a reader
+      // who asked for reduced motion would otherwise watch every message
+      // arrive.
       ".message-animate-in",
+      // The account menu's daily check-in fly-out: it collapses and the
+      // claimed day pulses, so both are named as one group.
       ".signin-card-collapsing, .signin-day-claimed-animation",
-      // Added with the context-usage indicator: the chevron, the hover label,
-      // the bar fill and the quota bar fill all transition in their base rules.
-      // The popover is NOT among them any more: its motion is the shared
-      // dropdown surface's, and that surface disables its own.
-      ".webui-context-usage-chevron, .webui-context-usage-label, .webui-context-usage-bar span, .webui-context-usage-quota-bar span",
       // The shared dropdown surface: it enters and leaves with an animation, so
       // a reader who asked for reduced motion would otherwise watch every
       // popup in the client slide. The fly-out surface is the same sheet: it
       // carries the same motion, so it carries the same override.
-      ".webui-dropdown-popup, .webui-dropdown-popup.is-leaving, .webui-dropdown-surface",
-      ".webui-environment-skeleton::after",
-      ".webui-message-actions",
-      // The thinking slider animates its fill, stops and thumb while the user
-      // drags it; reduced motion must disable those transitions as a group.
-      ".webui-model-effort-fill, .webui-model-effort-dot, .webui-model-effort-thumb",
-      // The model menu's list and panel slide in during the transition, so a
-      // reader who asked for reduced motion would otherwise watch both move.
-      ".webui-model-menu[data-webui-model-transitioning=\"true\"] .webui-model-list, .webui-model-menu[data-webui-model-transitioning=\"true\"] .webui-model-panel",
-      // The shared motion foundations collapse their own duration tokens, so
-      // every surface that reads them stops moving. The loading bar states
-      // itself as well: it is the one animation that runs on a timer.
-      ".webui-motion-loading",
-      // Added with the project-first rail: the section that holds a project's
-      // sessions opens and closes by transitioning its height, so a reader who
-      // asked for reduced motion would otherwise watch the section slide.
-      ".webui-progress-content-enter",
-      // Added with the progress section: it and its chevron transition their
-      // own state, so a reader who asked for reduced motion would otherwise
-      // watch both move.
-      ".webui-progress-section, .webui-progress-section-chevron",
-      ".webui-project-section-content",
-      // Added with the rail activity spinner. It spins forever by design, so a
-      // reader who asked for reduced motion would otherwise get an animation
-      // that never stops -- stopped but still drawn, so the row still reads as
-      // busy.
-      ".webui-rail-spinner",
-      ".webui-settings-content",
-      // Added with the brain trigger's hover bubble, which fades and slides in
-      // its base rule.
-      ".webui-thinking-label",
-      // Renamed from `.webui-settings-toggle span` when the toggle became the
-      // shared `.webui-toggle-switch` control.
-      ".webui-toggle-switch, .webui-toggle-switch > span",
-      // Added with the TurnNavigator jump: the destination message flashes
-      // once, so reduced motion replaces the flash with a steady highlight.
+      ".webui-dropdown-popup, .webui-dropdown-popup.is-leaving, .webui-flyout-surface",
+      // The shared motion foundations: the loading bar states itself, and the
+      // pulse that says "working" stops its iteration — it is the one
+      // animation that must keep being drawn.
+      ".webui-motion-loading, .webui-motion-loading-pulse",
+      // The TurnNavigator jump: the destination message flashes once, so
+      // reduced motion replaces the flash with a steady highlight.
       ".webui-turn-jump-flash",
-      // Added with the account menu's daily check-in fly-out, which now enters
-      // with the shared surface's motion. It is rendered through a portal, so
-      // the shell-wide override in `index.css` — which is scoped to
-      // `[data-webui-shell] *` — does not reach it.
-      ".webui-user-menu-signin-panel",
       // The motion foundations' own tokens: a reader who asked for less motion
       // gets durations near zero, which every surface that reads a duration
       // token inherits.
@@ -1023,7 +995,6 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
     // belongs in its own change.
     expect(names.sort()).toEqual([
       "message-appear",
-      "signin-card-collapse",
       "signin-day-claimed",
       "webui-dropdown-in",
       // The shared surface's slide, and the slide for a popup that opened on
@@ -1035,36 +1006,32 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // The shared feedback family's spinner: the busy state turns while it
       // waits, so it is a declared animation of its own.
       "webui-feedback-spin",
-      "webui-menu-enter",
-      "webui-modal-enter",
-      // The model menu's list and panel each slide in from their own side.
-      "webui-model-list-enter",
-      "webui-model-panel-enter",
-      "webui-overlay-enter",
-      "webui-panel-enter-right",
-      "webui-popover-enter",
-      "webui-progress-content-enter",
-      "webui-progress-skeleton",
-      "webui-settings-content-in",
-      "webui-signin-claim-spin",
+      // The shared motion foundations' own four: the panel enters, expands and
+      // collapses, and the surface enters and leaves.
+      "webui-motion-panel-collapse",
+      "webui-motion-panel-exit",
+      "webui-motion-panel-expand",
+      "webui-motion-surface-enter",
+      "webui-motion-surface-exit",
+      // The shared skeleton's pulse: the placeholder says "loading" by
+      // breathing.
+      "webui-skeleton-pulse",
       // The TurnNavigator jump flash: the message a tick jumped to flashes
       // once so the destination is findable without following the scroll.
       "webui-turn-jump-flash",
-      "webui-user-menu-usage-pulse",
-      // The workspace panel's own reveal: it grows from the right edge, and
-      // the panel that covers it slides the other way.
-      "webui-workspace-panel-collapse",
-      "webui-workspace-panel-exit",
-      "webui-workspace-panel-expand",
     ]);
-    expect(transcriptNames).toEqual(["transcript-shimmer"]);
+    // The widgets sheet declares no animation of its own any more: the
+    // shimmer it used to carry is the shared skeleton's pulse.
+    expect(transcriptNames).toEqual([]);
   });
 
-  it("keeps the three !important declarations in place", () => {
+  it("keeps the !important declarations in place", () => {
     const important = shellRules.filter((rule) =>
       rule.body.includes("!important"),
     );
-    expect(important).toHaveLength(3);
+    // Seven: the shared skeleton's own surface (it has to beat the surface it
+    // stands in for), the button's dark hover, and the xterm viewport.
+    expect(important).toHaveLength(7);
     expect(
       important.some((rule) =>
         rule.selector.includes(".webui-xterm-host .xterm-viewport"),

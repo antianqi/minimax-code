@@ -168,7 +168,13 @@ test("A history is never rendered during B's delayed first page", async ({ page 
   await expect.poll(() => page.evaluate(() => window.__fixture.pending.some((item) => item.operation === "getMessages" && item.body.id === "B"))).toBe(true);
   const skeleton = page.locator(".webui-skeleton.webui-motion-loading").first();
   await expect(skeleton).toBeVisible();
-  await expect.poll(() => skeleton.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-skeleton-shimmer");
+  await expect.poll(() => skeleton.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-skeleton-pulse");
+  const skeletonLines = await page.locator(".webui-transcript-skeleton-lines .webui-skeleton").evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom };
+  }));
+  expect(skeletonLines).toHaveLength(8);
+  expect(skeletonLines.slice(1).every((line, index) => line.top - skeletonLines[index].bottom >= 8)).toBe(true);
   await expect(page.getByText("History A synthetic")).toHaveCount(0);
   await expect(page.getByText("History B synthetic")).toHaveCount(0);
 

@@ -3937,6 +3937,15 @@
       "home": "target"
     },
     {
+      "path": "client/ui/page.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
       "path": "client/ui/settings-glyphs.tsx",
       "layers": [
         "bindings"
@@ -5843,6 +5852,51 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "client/features/plugins/ui/PluginRow.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "plugins",
+      "home": "target"
+    },
+    {
+      "path": "client/styles/card.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "client/styles/markdown.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "client/styles/tooltip.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "client/ui/card.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
     }
   ],
   "directions": [

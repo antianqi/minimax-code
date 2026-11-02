@@ -26,7 +26,12 @@ import { SessionActivityMeta } from "./session-activity-meta.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiSkeletonProjection } from "../../../ui/page.js";
+import {
+  WebuiDisclosure,
+  WebuiMotion,
+  WebuiMotionSlot,
+  WebuiSkeleton,
+} from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 /** Project rows consume rail-owned display state and return named view actions. */
@@ -36,6 +41,7 @@ export function ProjectList({
   pinnedSessions,
   pinnedSessionState,
   pinnedProjects,
+  catalogLoading,
   pinnedSectionExpanded,
   projectSectionExpanded,
   projectLoading,
@@ -74,6 +80,7 @@ export function ProjectList({
   readonly pinnedSessions: readonly WebuiClientSession[];
   readonly pinnedSessionState?: Readonly<Record<string, boolean>>;
   readonly pinnedProjects?: Readonly<Record<string, boolean>>;
+  readonly catalogLoading: boolean;
   readonly pinnedSectionExpanded: boolean;
   readonly projectSectionExpanded: boolean;
   readonly projectLoading: boolean;
@@ -117,6 +124,25 @@ export function ProjectList({
   readonly error?: string;
   readonly projectLoadError?: string;
 }): ReactElement {
+  if (catalogLoading) {
+    return (
+      <>
+        <span className="sr-only" role="status">正在加载项目和会话</span>
+        <div className="webui-project-list-skeleton" aria-hidden="true">
+          {[92, 100, 84, 100, 72, 94, 80, 100, 88, 96, 76].map((width, index) => (
+            <WebuiSkeleton
+              key={index}
+              variant="shape"
+              width={`${width}%`}
+              height={36}
+              className="webui-project-list-skeleton-row"
+            />
+          ))}
+        </div>
+      </>
+    );
+  }
+
   const renderProjects = (items: readonly WebuiProjectGroup[]) => (
     <WebuiStack as="ul" gap="hairline" data-webui-project-list-items="true">
       {items.map((project) => {
@@ -214,7 +240,7 @@ export function ProjectList({
   );
 
   return (
-    <WebuiSkeletonProjection>
+    <>
       <div className="webui-project-sections">
         <RailSectionHeader
           label="置顶"
@@ -390,7 +416,7 @@ export function ProjectList({
           </div>
         </WebuiDisclosure>
       </div>
-    </WebuiSkeletonProjection>
+    </>
   );
 }
 

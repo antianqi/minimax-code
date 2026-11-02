@@ -23,6 +23,7 @@
   .webui-environment-loading { display: flex; min-height: 132px; box-sizing: border-box; flex-direction: column; justify-content: center; gap: var(--spacing_8); overflow: hidden; padding: 0 6px 6px; color: var(--text_default_tertiary); font-size: var(--size_12); }
   .webui-environment-workspace { overflow: hidden; padding: 0 0 4px; color: var(--text_default_tertiary); font-size: var(--size_12); line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
   .webui-environment-actions { display: flex; flex-direction: column; gap: 1px; }
+  .webui-environment-panel.is-loading .webui-environment-actions { gap: var(--spacing_8); }
   .webui-environment-action { display: flex; min-height: 34px; width: 100%; align-items: center; gap: var(--spacing_8); padding: 0 2px; }
   .webui-environment-action small { display: inline-flex; flex-shrink: 0; gap: var(--spacing_8); margin-left: auto; font-size: var(--size_12); }
   .webui-environment-action small .webui-diff-additions { color: var(--text_label_positive_secondary_default); }

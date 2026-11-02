@@ -224,13 +224,13 @@
     max-width: 100%;
     overflow: hidden;
     background-color: var(--border_default);
-    background-image: linear-gradient(90deg, transparent 0%, var(--bg_grouped_secondary) 48%, transparent 100%);
-    background-size: 200% 100%;
+    background-image: none;
   }
   .webui-skeleton--text { height: 12px; border-radius: var(--radius_4); }
   .webui-skeleton--control { height: 36px; border-radius: var(--radius_8); }
-  .webui-skeleton.webui-motion-loading:not(.webui-skeleton--pulse) {
-    animation-name: webui-skeleton-shimmer;
+  .webui-skeleton.webui-motion-loading {
+    animation-name: webui-skeleton-pulse;
+    animation-timing-function: ease-in-out;
   }
   .webui-skeleton--pulse.webui-motion-loading {
     background-image: none;
@@ -243,9 +243,10 @@
   .webui-skeleton--short { width: 60%; }
   .webui-skeleton-group { display: flex; min-width: 0; flex-direction: column; gap: var(--spacing_8); }
   .webui-page { min-width: 0; min-height: 0; color: var(--text_default_primary); }
-  .webui-page-skeleton-node { pointer-events: none !important; color: transparent !important; background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
-  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: var(--border_default) !important; background-image: linear-gradient(90deg, transparent 0%, var(--bg_grouped_secondary) 48%, transparent 100%) !important; background-size: 200% 100% !important; animation-name: webui-skeleton-shimmer; }
-  .webui-page-skeleton-shape { display: block !important; pointer-events: none !important; color: transparent !important; background-color: var(--border_default) !important; background-image: linear-gradient(90deg, transparent 0%, var(--bg_grouped_secondary) 48%, transparent 100%) !important; background-size: 200% 100% !important; border-color: transparent !important; box-shadow: none !important; }
+  .webui-page-skeleton-node { pointer-events: none !important; color: transparent !important; }
+  .webui-page-skeleton-node:not([data-webui-page-skeleton-surface="true"]) { background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
+  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: var(--border_default) !important; background-image: none !important; animation-name: webui-skeleton-pulse; animation-timing-function: ease-in-out; }
+  .webui-page-skeleton-shape { display: block !important; pointer-events: none !important; color: transparent !important; background-color: var(--border_default) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; }
   .webui-page-loading-status {
     position: absolute;
     width: 1px;
@@ -255,13 +256,9 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  @keyframes webui-skeleton-shimmer {
-    from { background-position: 100% 0; }
-    to { background-position: -100% 0; }
-  }
   @keyframes webui-skeleton-pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    50% { opacity: 0.78; }
   }
   @keyframes webui-motion-surface-enter {
     from { opacity: 0; translate: var(--webui-motion-offset-x) var(--webui-motion-offset-y); }

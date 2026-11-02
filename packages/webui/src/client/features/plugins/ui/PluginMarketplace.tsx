@@ -1,12 +1,11 @@
 import { useId, type ReactElement } from "react";
-import { IconFileCode, IconSearch } from "@tabler/icons-react";
+import { IconFileCode } from "@tabler/icons-react";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
-import { WebuiSearchField } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiDisclosure, WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
+import { WebuiDisclosure, WebuiMotion, WebuiSkeleton, WebuiSkeletonProjection } from "../../../ui/page.js";
 import {
   PluginRow,
   PluginRowActions,
@@ -20,16 +19,21 @@ const MINIAPP_CATEGORY = { id: "tag:miniapp", label: "Mini App" } as const;
 const categories: readonly { id: string; label: string }[] = [
   { id: "", label: "全部" },
   { id: "office", label: "办公" },
-  { id: "creative", label: "创作" },
+  { id: "studio", label: "创作" },
   { id: "design_and_sites", label: "设计与网站" },
   { id: "code", label: "代码" },
   { id: "business", label: "商业" },
   { id: "sales", label: "销售" },
   { id: "productivity", label: "效率" },
+  { id: "tools", label: "工具" },
   { id: "science_and_healthcare", label: "科学与医疗" },
   { id: "education", label: "教育" },
   { id: "other", label: "其他" },
 ];
+
+export function marketplaceCategoryLabel(category: string): string | undefined {
+  return categories.find((item) => item.id === category)?.label;
+}
 
 function PluginMarketCard({
   area,
@@ -125,54 +129,31 @@ function PluginMarketCard({
 }
 
 export function PluginMarketplaceFilters({
-  area,
-  query,
   category,
-  tagDefinitions,
-  onQueryChange,
   onCategoryChange,
 }: {
-  readonly area: "plugins" | "skills";
-  readonly query: string;
   readonly category: string;
-  readonly tagDefinitions: readonly { key: string; displayName: string }[];
-  readonly onQueryChange: (query: string) => void;
   readonly onCategoryChange: (category: string) => void;
 }): ReactElement {
-  const noun = area === "skills" ? "技能" : "插件";
   return (
-    <div className="webui-plugin-market-discovery">
-      {area === "plugins" ? (
-        <nav className="webui-plugin-category-filter" aria-label="市场分类">
-          {[
-            categories[0],
-            MINIAPP_CATEGORY,
-            ...tagDefinitions
-              .filter((tag) => tag.key !== "miniapp")
-              .map((tag) => ({ id: `tag:${tag.key}`, label: tag.displayName })),
-            ...categories.slice(1),
-          ].map((item) => (
-            <WebuiButton
-              variant="segmented"
-              size="inline-dense"
-              type="button"
-              key={item.id}
-              aria-pressed={category === item.id}
-              onClick={() => onCategoryChange(item.id)}
-            >
-              {item.label}
-            </WebuiButton>
-          ))}
-        </nav>
-      ) : null}
-      <WebuiSearchField
-        icon={<IconSearch size={18} stroke={1.5} />}
-        label={`搜索${noun}`}
-        placeholder={`搜索${noun}...`}
-        value={query}
-        onChange={(event) => onQueryChange(event.currentTarget.value)}
-      />
-    </div>
+    <nav className="webui-plugin-category-filter" aria-label="市场分类">
+      {[
+        categories[0],
+        MINIAPP_CATEGORY,
+        ...categories.slice(1),
+      ].map((item) => (
+        <WebuiButton
+          variant="segmented"
+          size="inline-dense"
+          type="button"
+          key={item.id}
+          aria-pressed={category === item.id}
+          onClick={() => onCategoryChange(item.id)}
+        >
+          {item.label}
+        </WebuiButton>
+      ))}
+    </nav>
   );
 }
 export function PluginMarketplace({
@@ -184,6 +165,7 @@ export function PluginMarketplace({
   onToggleAll,
   onIntent,
   hideToggle = false,
+  loading = false,
 }: {
   readonly area: "plugins" | "skills";
   readonly rows: readonly WebuiPluginCatalogueRow[];
@@ -193,13 +175,16 @@ export function PluginMarketplace({
   readonly onToggleAll: () => void;
   readonly onIntent: (intent: WebuiPluginIntent) => void;
   readonly hideToggle?: boolean;
+  readonly loading?: boolean;
 }): ReactElement {
   const noun = area === "skills" ? "技能" : "插件";
   const expandedListId = useId();
   return (
-    <WebuiSkeletonProjection>
+    <WebuiSkeletonProjection loading={false}>
       <>
-        {rows.length === 0 ? (
+        {loading ? (
+          <PluginMarketSkeleton />
+        ) : rows.length === 0 ? (
           <FeedbackEmpty title="暂无内容" />
         ) : (
           <PluginRowList className="webui-plugin-grid">
@@ -239,5 +224,22 @@ export function PluginMarketplace({
         ) : null}
       </>
     </WebuiSkeletonProjection>
+  );
+}
+
+function PluginMarketSkeleton(): ReactElement {
+  return (
+    <div className="webui-plugin-grid" aria-hidden="true" data-testid="plugin-market-skeleton">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div className="webui-plugin-market-skeleton-row" key={index}>
+          <WebuiSkeleton variant="shape" width={40} height={40} />
+          <span className="webui-plugin-market-skeleton-copy">
+            <WebuiSkeleton variant="text" width="72%" height={12} />
+            <WebuiSkeleton variant="text" width="88%" height={12} />
+          </span>
+          <WebuiSkeleton variant="control" width={56} height={36} />
+        </div>
+      ))}
+    </div>
   );
 }

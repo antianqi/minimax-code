@@ -501,7 +501,10 @@ export function WebuiTurnProcess({
       {hasExpandableContent ? (
         <WebuiDisclosure id={disclosureId} open={contentExpanded} className="mt-2" data-testid="turn-process-detail">
           <WebuiStack gap="roomy">
-            {typeof children === "function" ? children(true) : children}
+            {/* The children are told whether the process is open, so the part
+                the collapsed content shows outside the disclosure is not
+                rendered inside it as well. */}
+            {typeof children === "function" ? children(contentExpanded) : children}
           </WebuiStack>
         </WebuiDisclosure>
       ) : null}

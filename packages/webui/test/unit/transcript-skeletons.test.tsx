@@ -68,20 +68,36 @@ describe("Agent activity disclosure", () => {
     const completed = renderToStaticMarkup(createElement(WebuiThinkingBlock, { text: "Completed reasoning" }));
     const live = renderToStaticMarkup(createElement(WebuiThinkingBlock, { text: "Current reasoning", streaming: true }));
     expect(completed).toContain("Completed reasoning");
-    expect(completed).not.toContain('<details class="webui-thinking-block" data-webui-thinking-block="true" open=""');
-    expect(live).toContain('<details class="webui-thinking-block" data-webui-thinking-block="true" open=""');
+    // The shared disclosure states the state twice: the trigger says whether
+    // it is open, and the body says which way it is folded.
+    expect(completed).not.toContain('aria-expanded="true"');
+    expect(completed).toContain('data-webui-motion-state="collapse"');
+    expect(live).toContain('aria-expanded="true"');
+    expect(live).toContain('data-webui-motion-state="expand"');
   });
 
   it("keeps the final answer visible when the process disclosure is collapsed", () => {
     const html = renderToStaticMarkup(createElement(WebuiTurnProcess, {
       active: false,
       initiallyExpanded: false,
-      children: (expanded) => <>{expanded ? <span>Tool activity</span> : null}<p data-testid="persistent-final-answer">Final answer</p></>,
+      children: () => <span>Tool activity</span>,
+      // The final answer is the content that stays on the surface while the
+      // process is folded — that is what `collapsedContent` is for.
+      collapsedContent: (expanded) => !expanded
+        ? <p data-testid="persistent-final-answer">Final answer</p>
+        : null,
     }));
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('data-testid="turn-process-detail"');
+    // The answer is outside the folded disclosure, so it is still on the
+    // surface while the activity is away.
     expect(html).toContain("Final answer");
-    expect(html).not.toContain("Tool activity");
+    expect(html.indexOf("Final answer")).toBeGreaterThan(
+      html.indexOf('data-testid="turn-process-detail"'),
+    );
+    // The activity is inside the disclosure, which the shared layer folds.
+    expect(html).toContain("Tool activity");
+    expect(html).toContain('data-webui-motion-state="collapse"');
   });
 
   it("preserves source order for interleaved answer text and tools while activity is expanded", () => {
@@ -118,7 +134,10 @@ describe("Agent activity disclosure", () => {
     }));
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("final answer");
-    expect(html).toContain('data-testid="turn-process-detail" hidden=""');
+    // The folded body stays mounted and hidden: the shared disclosure owns
+    // both the folding and the accessibility state.
+    expect(html).toContain('data-webui-motion-state="collapse"');
+    expect(html).toContain('aria-hidden="true"');
     expect((html.match(/final answer/g) ?? []).length).toBe(1);
   });
 
@@ -190,7 +209,8 @@ describe("Agent activity disclosure", () => {
       activityItems,
       initiallyExpanded: true,
     }));
-    expect(expanded).toContain('class="activity-group" data-testid="activity-group" open=""');
+    expect(expanded).toContain('class="activity-group" data-testid="activity-group"');
+    expect(expanded).toContain('aria-expanded="true"');
     expect(expanded).toContain("思考 1 次，查看 5 个文件");
     expect((expanded.match(/data-webui-tool-call="read_file"/gu) ?? []).length).toBe(5);
     for (let index = 0; index < 5; index += 1) {
@@ -215,7 +235,8 @@ describe("Agent activity disclosure", () => {
     expect(html).not.toContain("已完成推理");
     expect(html).toContain("Reasoning without tools");
     expect(html).not.toContain('data-testid="activity-group"');
-    expect(html).toContain('class="webui-thinking-block" data-webui-thinking-block="true" open=""');
+    expect(html).toContain('class="webui-thinking-block" data-webui-thinking-block="true"');
+    expect(html).toContain('aria-expanded="true"');
   });
 
   it("renders workspace paths in list items as linked file references", () => {
@@ -256,7 +277,7 @@ describe("Agent activity disclosure", () => {
       tools: [{ id: "tc-running", name: "bash", tool_call_status: 1, input: "pwd" }],
     }));
     expect(html).toContain('data-testid="activity-group"');
-    expect(html).toContain("open=\"\"");
+    expect(html).toContain('aria-expanded="true"');
     expect(html).toContain('data-webui-tool-status="running"');
     expect(html).toContain("运行中");
   });
@@ -268,7 +289,7 @@ describe("Agent activity disclosure", () => {
       }));
       expect(html).toContain('data-active="true"');
       expect(html).toContain('data-webui-tool-status="pending"');
-      expect(html).toContain('open=""');
+      expect(html).toContain('aria-expanded="true"');
     }
   });
 

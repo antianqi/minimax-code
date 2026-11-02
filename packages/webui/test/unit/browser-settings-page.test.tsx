@@ -98,7 +98,9 @@ describe("the 浏览器 page carries the settings", () => {
     // second style of their own.
     const markup = renderToStaticMarkup(<BrowserSettingsPage />);
 
-    expect(markup).toContain('class="webui-settings-page"');
+    // The settings page is the shared page boundary with the page's own
+    // class beside its vocabulary.
+    expect(markup).toContain("webui-settings-page");
     expect(markup).toContain('class="webui-settings-section"');
     expect(markup).toContain('class="webui-settings-card"');
     expect(markup).toContain("webui-settings-row");

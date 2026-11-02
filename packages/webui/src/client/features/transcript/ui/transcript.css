@@ -1,8 +1,8 @@
 /* transcript — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
-  /* The 5px rhythm belongs to the transcript's placeholder lines. */
-  .webui-transcript-skeleton-lines { gap: 5px; }
+  /* Keep transcript placeholder lines on the shared skeleton clearance rhythm. */
+  .webui-transcript-skeleton-lines { gap: var(--spacing_8); }
 
   .webui-context-usage-anchor { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; }
   .webui-context-usage-trigger { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: var(--icon_default_tertiary); }

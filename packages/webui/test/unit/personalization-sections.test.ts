@@ -71,8 +71,10 @@ describe("each editor keeps its own load/save lifecycle", () => {
 
 describe("the manager dialog keeps its own mount and dismissal", () => {
   it("is mounted by the memory card under the same conditional", () => {
+    // The shared dialog owns the mount, so the card says whether the manager
+    // is open instead of deciding whether to render one.
     expect(sections.MemorySection).toContain("const [managing, setManaging] = useState(false);");
-    expect(sections.MemorySection).toContain("{managing ? (");
+    expect(sections.MemorySection).toContain("open={managing}");
     expect(sections.MemorySection).toContain("<MemoryManagerDialog");
   });
 

@@ -4,6 +4,140 @@ import { expect } from "@playwright/test";
 
 import { openApp, screenshotOptions, test } from "./harness.mjs";
 
+test("marketplace and management share a left category rail and centered content layout", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "插件" }).first().click();
+
+  const layout = page.locator(".webui-plugin-page-layout");
+  const marketSidebar = layout.locator(".webui-plugin-page-sidebar");
+  const marketSearch = layout.locator(".webui-plugin-page-search");
+  const marketContent = layout.locator(".webui-plugin-page-content");
+  await expect(layout).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "市场分类" })).toBeVisible();
+  await expect(marketSearch.getByLabel("搜索插件")).toBeVisible();
+  const marketGeometry = await layout.evaluate((element) => {
+    const sidebar = element.querySelector(".webui-plugin-page-sidebar").getBoundingClientRect();
+    const main = element.querySelector(".webui-plugin-page-main").getBoundingClientRect();
+    const search = element.querySelector(".webui-plugin-page-search").getBoundingClientRect();
+    const content = element.querySelector(".webui-plugin-page-content").getBoundingClientRect();
+    const grid = getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean);
+    return {
+      columns: grid.length,
+      sidebarBeforeMain: sidebar.right <= main.left,
+      searchInsideMain: search.left >= main.left && search.right <= main.right,
+      contentAfterSearch: content.top >= search.bottom,
+      contentCentered: Math.abs(content.left + content.width / 2 - (main.left + main.width / 2)) < 2,
+      categoryTextSize: Number.parseFloat(getComputedStyle(element.querySelector(".webui-plugin-category-filter .webui-mavis-button")).fontSize),
+      selectedCategoryWidth: element.querySelector(".webui-plugin-category-filter .webui-mavis-button[aria-pressed=true]").getBoundingClientRect().width,
+      sidebarTop: Math.round(sidebar.top),
+      sidebarPosition: getComputedStyle(element.querySelector(".webui-plugin-page-sidebar")).position,
+    };
+  });
+  expect(marketGeometry).toEqual({
+    columns: 2,
+    sidebarBeforeMain: true,
+    searchInsideMain: true,
+    contentAfterSearch: true,
+    contentCentered: true,
+    categoryTextSize: 14,
+    selectedCategoryWidth: expect.any(Number),
+    sidebarTop: expect.any(Number),
+    sidebarPosition: "sticky",
+  });
+  expect(marketGeometry.selectedCategoryWidth).toBeLessThan(120);
+  const captureDir = process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR;
+  if (captureDir) {
+    mkdirSync(captureDir, { recursive: true });
+    await page.screenshot({ path: join(captureDir, "plugin-marketplace.png"), fullPage: true });
+  }
+
+  await page.getByTestId("plugin-manage-trigger").click();
+  await expect(page.getByRole("navigation", { name: "插件管理分类" })).toBeVisible();
+  await expect(layout.locator(".webui-plugin-page-search").getByLabel("搜索插件")).toBeVisible();
+  const managementGeometry = await layout.evaluate((element) => {
+    const sidebar = element.querySelector(".webui-plugin-page-sidebar").getBoundingClientRect();
+    const main = element.querySelector(".webui-plugin-page-main").getBoundingClientRect();
+    const search = element.querySelector(".webui-plugin-page-search").getBoundingClientRect();
+    const content = element.querySelector(".webui-plugin-page-content").getBoundingClientRect();
+    return {
+      sidebarBeforeMain: sidebar.right <= main.left,
+      searchInsideMain: search.left >= main.left && search.right <= main.right,
+      contentAfterSearch: content.top >= search.bottom,
+      contentCentered: Math.abs(content.left + content.width / 2 - (main.left + main.width / 2)) < 2,
+      sidebarPosition: getComputedStyle(element.querySelector(".webui-plugin-page-sidebar")).position,
+    };
+  });
+  expect(managementGeometry).toEqual({
+    sidebarBeforeMain: true,
+    searchInsideMain: true,
+    contentAfterSearch: true,
+    contentCentered: true,
+    sidebarPosition: "sticky",
+  });
+  if (captureDir) {
+    await page.screenshot({ path: join(captureDir, "plugin-management.png"), fullPage: true });
+  }
+
+  await page.setViewportSize({ width: 480, height: 900 });
+  const narrowGeometry = await layout.evaluate((element) => {
+    const sidebar = element.querySelector(".webui-plugin-page-sidebar");
+    const main = element.querySelector(".webui-plugin-page-main");
+    return {
+      direction: getComputedStyle(element.querySelector(".webui-plugin-category-filter")).flexDirection,
+      noHorizontalOverflow: element.scrollWidth <= element.clientWidth,
+      sidebarBeforeMain: sidebar.getBoundingClientRect().right <= main.getBoundingClientRect().left,
+    };
+  });
+  expect(narrowGeometry).toEqual({ direction: "column", noHorizontalOverflow: true, sidebarBeforeMain: true });
+  if (captureDir) {
+    await page.screenshot({ path: join(captureDir, "plugin-management-narrow.png"), fullPage: true });
+  }
+});
+
+test("plugin loading skeleton follows the card and action geometry", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.delayNext("pluginManagement", { action: "listMarketplacePlugins" });
+      window.__fixture.setPluginManagementResult("listInstalledPlugins", { plugins: [] });
+    });
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "插件" }).first().click();
+  const skeleton = page.getByTestId("plugin-market-skeleton");
+  await expect(skeleton).toBeVisible();
+  const geometry = await skeleton.locator(".webui-plugin-market-skeleton-row").first().evaluate((row) => {
+    const icon = row.querySelector(":scope > .webui-skeleton").getBoundingClientRect();
+    const lines = [...row.querySelectorAll(".webui-plugin-market-skeleton-copy > .webui-skeleton")]
+      .map((line) => line.getBoundingClientRect());
+    const action = row.querySelector(":scope > .webui-skeleton:last-child").getBoundingClientRect();
+    return {
+      icon: { width: icon.width, height: icon.height },
+      lines: lines.map(({ width, height }) => ({ width, height })),
+      action: { width: action.width, height: action.height },
+      actionInset: row.getBoundingClientRect().right - action.right,
+    };
+  });
+  expect(geometry.icon).toEqual({ width: 40, height: 40 });
+  expect(geometry.lines.every((line) => line.height === 12 && line.width < 240), JSON.stringify(geometry)).toBe(true);
+  expect(geometry.action.height).toBe(36);
+  expect(Math.abs(geometry.actionInset - 12)).toBeLessThan(2);
+  if (process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR) {
+    mkdirSync(process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: join(process.env.WEBUI_PLUGIN_LAYOUT_SCREENSHOT_DIR, "plugin-loading-skeleton.png"),
+      fullPage: true,
+    });
+  }
+  const released = await page.evaluate(() => window.__fixture.resolveAllPending(
+    "pluginManagement",
+    { action: "listMarketplacePlugins" },
+    { plugins: [], pluginTotal: 0 },
+  ));
+  expect(released).toBe(1);
+  await expect(skeleton).toHaveCount(0);
+});
+
 test("marketplace groups and filters Mini Apps from the returned tags", async ({ page }) => {
   await page.addInitScript(() => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
@@ -27,7 +161,9 @@ test("marketplace groups and filters Mini Apps from the returned tags", async ({
   await page.getByRole("navigation", { name: "市场分类" }).getByRole("button", { name: "Mini App" }).click();
   await expect(page.locator(".webui-plugin-grid")).toContainText("Board");
   await expect(page.locator(".webui-plugin-grid")).not.toContainText("Other");
-  await page.locator(".webui-plugin-grid").getByRole("button", { name: "安装" }).click();
+  await page.getByRole("navigation", { name: "市场分类" }).getByRole("button", { name: "效率" }).click();
+  await expect(page.getByRole("heading", { name: "效率" })).toBeVisible();
+  await page.locator(".webui-plugin-grid").getByRole("button", { name: "安装" }).first().click();
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((entry) =>
     entry.operation === "pluginManagement" && entry.body.action === "installPlugin" && entry.body.input?.pluginName === "board"))).toBe(true);
 });
@@ -108,6 +244,7 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
           name: `market-plugin-${index + 1}`,
           displayName: `Market plugin ${index + 1}`,
           description: "Marketplace card",
+          ...(index === 0 ? { installed: true } : {}),
         })),
       });
       window.__fixture.setPluginManagementResult("listInstalledPlugins", {
@@ -123,6 +260,11 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   await expect(cards).toHaveCount(10);
   await expect(cards.nth(9)).toBeVisible();
   await expect(page.getByRole("heading", { name: "插件" }).last()).toBeVisible();
+  const installedActionInset = await cards.first().getByRole("button", { name: "已安装" }).evaluate((button) => {
+    const row = button.closest(".webui-plugin-row");
+    return row.getBoundingClientRect().right - button.getBoundingClientRect().right;
+  });
+  expect(Math.abs(installedActionInset - 12)).toBeLessThan(2);
 
   const captureDir = process.env.WEBUI_DECOMPOSITION_SCREENSHOT_DIR;
   if (captureDir) {
@@ -138,6 +280,17 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   await expect(expandedList).toHaveAttribute("aria-hidden", "true");
   await expect.poll(() => expandedList.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
   await expect(page.getByRole("button", { name: "查看全部 10 个" })).toBeVisible();
+  const showAllGeometry = await page.getByRole("button", { name: "查看全部 10 个" }).evaluate((button) => {
+    const container = button.closest(".webui-plugin-page-content");
+    const buttonRect = button.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return {
+      offset: Math.abs(buttonRect.left + buttonRect.width / 2 - (containerRect.left + containerRect.width / 2)),
+      button: { left: buttonRect.left, right: buttonRect.right, width: buttonRect.width, display: getComputedStyle(button).display, marginLeft: getComputedStyle(button).marginLeft, marginRight: getComputedStyle(button).marginRight },
+      container: { left: containerRect.left, right: containerRect.right, width: containerRect.width },
+    };
+  });
+  expect(showAllGeometry.offset, JSON.stringify(showAllGeometry)).toBeLessThan(2);
   if (captureDir) {
     await page.screenshot({
       path: join(captureDir, "d06-plugin-market-collapsed.png"),

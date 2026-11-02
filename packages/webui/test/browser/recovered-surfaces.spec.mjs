@@ -22,9 +22,51 @@
 
 import { expect } from "@playwright/test";
 
-import { openApp, test } from "./harness.mjs";
+import { configureFixture, openApp, test } from "./harness.mjs";
 
 const boundary = (page) => page.locator('[data-testid="webui-error-boundary"]');
+
+test("session rail loading uses solid shared pulse skeletons", async ({ page }) => {
+  await page.setViewportSize({ width: 338, height: 829 });
+  await configureFixture(page, () => window.__fixture.delayEvery("listSessions", {}));
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openApp(page, "#session=A");
+  await expect.poll(() =>
+    page.evaluate(() => window.__fixture.pending.some((item) => item.operation === "listSessions")),
+  ).toBe(true);
+  await page.getByRole("button", { name: "展开导航栏" }).click();
+
+  const rail = page.locator('[data-webui-shell-region="rail"]');
+  await expect(rail).toBeVisible();
+  const shapes = rail.locator(".webui-project-list-skeleton .webui-skeleton");
+  await expect(shapes.first()).toBeVisible();
+  const styles = await shapes.evaluateAll((elements) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    return { animationName: style.animationName, animationTimingFunction: style.animationTimingFunction, backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage };
+  }));
+  const geometry = await shapes.evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: rect.height };
+  }));
+  const skeletonColor = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--border_default)";
+    document.body.append(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  });
+  expect(styles.length).toBeGreaterThan(0);
+  expect(styles.every((style) => style.animationName === "webui-skeleton-pulse")).toBe(true);
+  expect(styles.every((style) => style.animationTimingFunction === "ease-in-out")).toBe(true);
+  expect(styles.every((style) => style.backgroundColor === skeletonColor)).toBe(true);
+  expect(styles.every((style) => style.backgroundImage === "none")).toBe(true);
+  expect(geometry).toHaveLength(11);
+  expect(geometry.every((rect) => rect.height === 36)).toBe(true);
+  expect(geometry.slice(1).every((rect, index) => rect.top - geometry[index].bottom >= 8)).toBe(true);
+  await expect(rail.locator(".webui-page-skeleton-node, .webui-page-skeleton-shape")).toHaveCount(0);
+  await expect(rail.locator('[data-webui-rail-brand] button')).toBeVisible();
+});
 
 async function openUserMenu(page) {
   await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
@@ -72,6 +114,9 @@ test("the sign-in loading skeleton stays visible while its panel request is pend
 
   const skeleton = page.locator('[data-testid="signin-card-skeleton"]');
   await expect(skeleton).toBeVisible();
+  const surface = skeleton.locator(".signin-card-surface");
+  const surfaceBackground = await surface.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(surfaceBackground).not.toBe("rgba(0, 0, 0, 0)");
   const placeholder = skeleton.locator(".webui-page-skeleton-shape, .webui-skeleton").first();
   const background = await placeholder.evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(background).not.toBe("rgba(0, 0, 0, 0)");
@@ -215,6 +260,20 @@ test("choosing a permission mode survives the write-then-read-back check", async
   await expect(trigger).toContainText("帮我批准");
   await expect(boundary(page)).toHaveCount(0);
   expect(pageErrors).toEqual([]);
+});
+
+test("permission mode options give both text lines room inside each row", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await page.getByTestId("composer-permission-mode").click();
+  await expect(page.locator(".webui-composer-permission-option").first()).toBeVisible();
+  const optionRows = await page.locator(".webui-composer-permission-option").evaluateAll((elements) => elements.map((element) => {
+    const row = element.getBoundingClientRect();
+    const copy = element.querySelector(".webui-composer-permission-copy").getBoundingClientRect();
+    return { rowHeight: row.height, copyHeight: copy.height, copyTop: copy.top, rowTop: row.top, rowBottom: row.bottom };
+  }));
+  expect(optionRows).toHaveLength(3);
+  expect(optionRows.every((row) => row.copyTop >= row.rowTop && row.copyTop + row.copyHeight <= row.rowBottom)).toBe(true);
+  expect(optionRows.every((row) => row.rowHeight > row.copyHeight)).toBe(true);
 });
 
 test("full-access permission trigger colors its label and icon as warning", async ({ page }) => {

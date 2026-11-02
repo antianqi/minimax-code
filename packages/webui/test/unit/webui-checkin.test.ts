@@ -295,7 +295,9 @@ describe("SigninCard desktop parity", () => {
   it("marks the claim-loading state with 签到中…", () => {
     const html = renderCard({ panel: PANEL, claiming: true });
     expect(html).toContain("签到中…");
-    expect(html).toContain("webui-signin-claim-spinner");
+    // The spinner is the shared feedback one — the claim button is a shared
+    // button, and the loading state is the shared feedback's.
+    expect(html).toContain("webui-feedback-spinner");
   });
 
   it("renders the unavailable state when nothing is claimable", () => {

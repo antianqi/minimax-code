@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { MARKETPLACE_VISIBILITY_DESKTOP_VERSION } from "@mavis/shared/marketplace-visibility";
+import { MarketplaceCategory } from "@mavis/protocol/local";
 
 import {
   createWebuiPluginWorkflows,
@@ -74,6 +75,21 @@ describe("the plugin listing has one owner", () => {
     expect(workflows.getSnapshot().listing.tagDefinitions).toEqual([{ key: "miniapp", displayName: "Mini App" }]);
     expect(workflows.getSnapshot().listing.rows.map((row) => row.name)).toEqual(["board"]);
     expect(requests.find((request) => request.action === "listMarketplacePlugins")?.input?.category).toBeUndefined();
+  });
+
+  it("maps Desktop marketplace categories to their protocol enum values", async () => {
+    const requests: { action: string; input?: Record<string, unknown> }[] = [];
+    const workflows = createWebuiPluginWorkflows({ port: { pluginManagement: async (request) => {
+      requests.push(request);
+      return request.action === "listMarketplacePlugins" ? { plugins: [] } : { plugins: [] };
+    } } });
+    await workflows.loadListing({ ...initialWebuiPluginSelection, category: "studio" });
+    expect(requests.find((request) => request.action === "listMarketplacePlugins")?.input?.category)
+      .toBe(MarketplaceCategory.STUDIO);
+    requests.length = 0;
+    await workflows.loadListing({ ...initialWebuiPluginSelection, category: "tools" });
+    expect(requests.find((request) => request.action === "listMarketplacePlugins")?.input?.category)
+      .toBe(MarketplaceCategory.TOOLS);
   });
 
   it("loads later marketplace pages before filtering by tag", async () => {

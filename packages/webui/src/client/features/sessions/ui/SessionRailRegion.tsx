@@ -41,7 +41,6 @@ export function SessionRailRegion(props: {
     <WebuiPage
       as="aside"
       kind={props.drawer ? "drawer" : "panel"}
-      loading={props.projectList.loading}
       visible={props.drawer ? props.drawerOpen ?? false : true}
       motion={{ kind: props.drawer ? "surface" : "disclosure" }}
       aria-label="Primary navigation"

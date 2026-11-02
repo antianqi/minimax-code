@@ -4,7 +4,7 @@
 // the existing WebUI goal contract while the visual surface keeps a compact
 // status/actions layout.
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -51,7 +51,7 @@ export function WebuiGoalClearDialog({
   readonly portalTarget: HTMLElement | null;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
-  readonly onExitComplete: () => void;
+  readonly onExitComplete?: () => void;
 }): ReactElement {
   /**
    * The confirmation is a layer, so the coordinator answers Escape and the
@@ -118,7 +118,6 @@ export function WebuiGoalBanner({
   const [dismissedGoalKey, setDismissedGoalKey] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const clearSucceeded = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   useEffect(() => {
     setObjectiveExpanded(false);
@@ -161,7 +160,10 @@ export function WebuiGoalBanner({
     setError(undefined);
     void clearGoal({ sessionId: goal.sessionId })
       .then(() => {
-        clearSucceeded.current = true;
+        // The banner goes away with the goal, so the dialog's exit animation
+        // may never end — and the composer must hear that the goal is gone
+        // even then, or it stays in goal mode with no goal left to write.
+        onCleared?.();
         setConfirmClear(false);
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)))
@@ -174,11 +176,6 @@ export function WebuiGoalBanner({
       portalTarget={dom.portalTarget()}
       onCancel={() => { setConfirmClear(false); setError(undefined); }}
       onConfirm={clear}
-      onExitComplete={() => {
-        if (!clearSucceeded.current) return;
-        clearSucceeded.current = false;
-        onCleared?.();
-      }}
     />;
   return (
     <section className="webui-goal-banner" data-testid="thread-goal-banner" data-goal-status={status}>

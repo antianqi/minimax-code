@@ -105,12 +105,13 @@ const LISTING_ROW_KEY: Readonly<Record<WebuiPluginArea, string>> = {
 const MARKETPLACE_CATEGORY: Readonly<Record<string, number>> = {
   other: MarketplaceCategory.OTHER,
   office: MarketplaceCategory.OFFICE,
-  creative: MarketplaceCategory.STUDIO,
+  studio: MarketplaceCategory.STUDIO,
   design_and_sites: MarketplaceCategory.DESIGN_AND_SITES,
   code: MarketplaceCategory.CODE,
   business: MarketplaceCategory.BUSINESS,
   sales: MarketplaceCategory.SALES,
   productivity: MarketplaceCategory.PRODUCTIVITY,
+  tools: MarketplaceCategory.TOOLS,
   science_and_healthcare: MarketplaceCategory.SCIENCE_AND_HEALTHCARE,
   education: MarketplaceCategory.EDUCATION,
 };

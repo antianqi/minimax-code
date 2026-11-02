@@ -1,13 +1,12 @@
 import type { ReactElement } from "react";
-import { IconFileCode, IconSearch } from "@tabler/icons-react";
+import { IconFileCode } from "@tabler/icons-react";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
-import { WebuiSearchField } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
+import { WebuiMotion, WebuiSkeleton, WebuiSkeletonProjection } from "../../../ui/page.js";
 import {
   PluginRow,
   PluginRowActions,
@@ -29,65 +28,44 @@ const categories: readonly { id: PluginManagementArea; label: string }[] = [
 
 export function PluginManagementFilters({
   area,
-  query,
   rowCount,
   onAreaChange,
-  onQueryChange,
 }: {
   readonly area: PluginManagementArea;
-  readonly query: string;
   readonly rowCount: number;
   readonly onAreaChange: (area: PluginManagementArea) => void;
-  readonly onQueryChange: (query: string) => void;
 }): ReactElement {
-  const noun =
-    area === "mcp"
-      ? "MCP"
-      : area === "skills"
-        ? "技能"
-        : area === "agents"
-          ? "Agent"
-          : area === "apps"
-            ? "应用"
-            : "插件";
   return (
-    <div className="webui-plugin-market-discovery webui-plugin-management-discovery">
-      <nav className="webui-plugin-category-filter" aria-label="插件管理分类">
-        {categories.map((item) => (
-          <WebuiButton
-            variant="segmented"
-            size="compact"
-            key={item.id}
-            aria-pressed={area === item.id}
-            onClick={() => onAreaChange(item.id)}
-          >
-            <span>{item.label}</span>
-            {area === item.id ? (
-              <span className="webui-plugin-count">{rowCount}</span>
-            ) : null}
-          </WebuiButton>
-        ))}
-      </nav>
-      <WebuiSearchField
-        icon={<IconSearch size={18} stroke={1.5} />}
-        label={`搜索${noun}`}
-        placeholder={`搜索${noun}...`}
-        value={query}
-        onChange={(event) => onQueryChange(event.currentTarget.value)}
-      />
-    </div>
+    <nav className="webui-plugin-category-filter" aria-label="插件管理分类">
+      {categories.map((item) => (
+        <WebuiButton
+          variant="segmented"
+          size="compact"
+          key={item.id}
+          aria-pressed={area === item.id}
+          onClick={() => onAreaChange(item.id)}
+        >
+          <span>{item.label}</span>
+          {area === item.id ? (
+            <span className="webui-plugin-count">{rowCount}</span>
+          ) : null}
+        </WebuiButton>
+      ))}
+    </nav>
   );
 }
 
 export function PluginManagementList({
   area,
   rows,
+  loading = false,
   onMutate,
   onConfirmMutation,
   onPrepareMcp,
 }: {
   readonly area: Area;
   readonly rows: readonly WebuiPluginCatalogueRow[];
+  readonly loading?: boolean;
   readonly onMutate: (intent: WebuiPluginIntent) => void;
   readonly onConfirmMutation: (
     label: string,
@@ -95,7 +73,20 @@ export function PluginManagementList({
   ) => void;
   readonly onPrepareMcp: (row: WebuiPluginCatalogueRow["source"]) => void;
 }): ReactElement {
-  return rows.length === 0 ? (
+  return loading ? (
+    <div className="webui-plugin-management-skeleton" aria-hidden="true" data-testid="plugin-management-skeleton">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div className="webui-plugin-management-skeleton-row" key={index}>
+          <WebuiSkeleton variant="shape" width={40} height={40} />
+          <div className="webui-plugin-management-skeleton-copy">
+          <WebuiSkeleton variant="text" width="42%" height={12} />
+          <WebuiSkeleton variant="text" width="65%" height={12} />
+          </div>
+          <WebuiSkeleton variant="control" width={64} height={36} />
+        </div>
+      ))}
+    </div>
+  ) : rows.length === 0 ? (
     <FeedbackEmpty title="暂无内容" />
   ) : (
     <WebuiSkeletonProjection>

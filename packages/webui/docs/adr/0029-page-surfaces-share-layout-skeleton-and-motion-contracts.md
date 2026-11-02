@@ -23,7 +23,7 @@ Programmatic smooth scrolling also follows one shared reduced-motion policy in `
 
 `WebuiLottie` owns Lottie playback lifecycle and reduced-motion policy. A feature may supply a genuinely feature-specific animation asset, but it must not import or drive the animation engine itself. The Transcript thinking indicator keeps its rose-loader asset and phrase behavior; playback remains in the shared feedback component.
 
-The approved exceptions are the account usage skeleton's shared pulse variant, the sign-in success effect, and Transcript-specific message entrance, turn-jump highlight and rose-loader art. The shared motion gate permits only those named feature-owned effects; repeated disclosure, button, card, panel, progress and loading motion belongs to shared contracts. Shared motion continues to honor the package reduced-motion policy.
+All loading skeletons use the shared solid-color pulse treatment and reduced-motion policy. The account usage skeleton is an example of this shared treatment, not a feature-specific exception. Other approved exceptions are the sign-in success effect and Transcript-specific message entrance, turn-jump highlight and rose-loader art. The shared motion gate permits only those named feature-owned effects; repeated disclosure, button, card, panel, progress and loading motion belongs to shared contracts.
 
 ## Adoption
 

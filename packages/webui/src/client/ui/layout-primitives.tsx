@@ -5,9 +5,12 @@
 // content that makes that layout unique rather than re-declaring the layout.
 
 import { createElement, type HTMLAttributes, type ReactElement, type ReactNode } from "react";
-import { WebuiSkeletonProjection } from "./page.js";
+import { useWebuiPageLoading, WebuiSkeletonProjection } from "./page.js";
 
 export type WebuiLayoutGap = "none" | "hairline" | "micro" | "tight" | "compact" | "small" | "medium" | "roomy" | "large";
+// A loading projection can turn normal content into bars, so compact layout
+// gaps need the same clear separation as the shared skeleton groups.
+const SKELETON_GAPS_BELOW_CLEARANCE: readonly WebuiLayoutGap[] = ["none", "hairline", "micro", "tight", "compact"];
 export type WebuiLayoutAlignment = "start" | "center" | "end" | "stretch" | "baseline";
 export type WebuiLayoutJustification = "start" | "center" | "end" | "between";
 export type WebuiInlineElement = "div" | "label" | "main" | "span" | "ul";
@@ -73,12 +76,15 @@ export function WebuiStack({
   children,
   ...rest
 }: WebuiStackProps): ReactElement {
+  const pageLoading = useWebuiPageLoading();
+  const layoutGap =
+    pageLoading && SKELETON_GAPS_BELOW_CLEARANCE.includes(gap) ? "small" : gap;
   return createElement(
     as,
     {
       className: [
         "webui-stack",
-        `webui-stack--gap-${gap}`,
+        `webui-stack--gap-${layoutGap}`,
         `webui-stack--align-${align}`,
         `webui-stack--justify-${justify}`,
         className,

@@ -45,7 +45,7 @@ describe("the plugin listing has one owner", () => {
     expect(workflows.getSnapshot().listing.rows.map((row) => row.name)).toEqual(["second"]);
   });
 
-  it("does not show a blocking loading state when switching catalogue selections", async () => {
+  it("shows the first selection skeleton and reuses loaded catalogue selections", async () => {
     let resolveSkills: (value: unknown) => void = () => undefined;
     const skills = createWebuiPluginWorkflows({
       port: { pluginManagement: (request) => request.action === "listSkillHub"
@@ -54,9 +54,13 @@ describe("the plugin listing has one owner", () => {
     });
     await skills.loadListing(initialWebuiPluginSelection);
     const pending = skills.loadListing({ ...initialWebuiPluginSelection, area: "skills" });
-    expect(skills.getSnapshot().listing.loading).toBe(false);
+    expect(skills.getSnapshot().listing.loading).toBe(true);
     resolveSkills({ skills: [] });
     await pending;
+
+    const cachedSelection = skills.loadListing(initialWebuiPluginSelection);
+    expect(skills.getSnapshot().listing.loading).toBe(false);
+    await cachedSelection;
   });
 
   it("records a missing capability as one error, not a silent empty", async () => {

@@ -37,6 +37,7 @@ export type WebuiButtonVariant =
   | "primary"
   | "muted"
   | "danger"
+  | "danger-soft"
   | "plain"
   // The inline appearances: a hairline ring, or no ring at all.
   | "outline"
@@ -99,6 +100,7 @@ const VARIANT_CLASS: Record<WebuiButtonVariant, string> = {
   // rather than a class string each of them writes.
   muted: "webui-mavis-button-muted",
   danger: "webui-mavis-button-danger",
+  "danger-soft": "webui-mavis-button-danger-soft",
   // `plain` is the button a surface already styles as "a button, no fill" — the
   // contract owns its states (focus, disabled) and the caller owns the rest.
   plain: "webui-mavis-button-plain",

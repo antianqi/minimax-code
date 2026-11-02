@@ -209,7 +209,7 @@ export function PluginMarketplace({
   const noun = area === "skills" ? "技能" : "插件";
   const expandedListId = useId();
   if (sections) {
-    return loading ? <FeedbackSkeleton rows={12} widths={MARKET_SKELETON_WIDTHS} maxWidth={266} rowHeight={28} rowRadius={12} testId="plugin-market-skeleton" /> : sections.length === 0 ? <FeedbackEmpty title="暂无内容" /> : (
+    return loading ? <FeedbackSkeleton rows={12} widths={MARKET_SKELETON_WIDTHS} maxWidth={266} rowHeight={28} rowRadius={12} testId="plugin-market-skeleton" /> : sections.length === 0 || sections.every((section) => section.rows.length === 0) ? <FeedbackEmpty title="暂无内容" /> : (
       <>
         {sections.map((section) => (
           <section

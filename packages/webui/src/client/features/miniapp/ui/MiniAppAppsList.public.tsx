@@ -3,6 +3,7 @@
 // own lifecycle state and actions, the same runtime rows the launcher reads.
 
 import { useEffect, type ReactElement } from "react";
+import { IconTrash } from "@tabler/icons-react";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -272,14 +273,15 @@ export function MiniAppAppsList({
                         停止
                       </WebuiButton>
                       <WebuiButton
-                        variant="danger"
-                        size="compact"
+                        variant="danger-soft"
+                        size="action"
                         type="button"
                         onClick={() => {
                           if (window.confirm(`确定卸载 ${item.name}？`))
                             void workflows?.uninstall(row.pluginId);
                         }}
                       >
+                        <IconTrash aria-hidden="true" size={18} stroke={1.7} />
                         卸载
                       </WebuiButton>
                       <WebuiButton

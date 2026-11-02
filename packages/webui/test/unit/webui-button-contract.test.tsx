@@ -52,6 +52,7 @@ const VARIANTS: readonly WebuiButtonVariant[] = [
   "primary",
   "muted",
   "danger",
+  "danger-soft",
   "plain",
   "outline",
   "outline-secondary",

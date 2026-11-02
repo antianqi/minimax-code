@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { IconFileCode } from "@tabler/icons-react";
+import { IconFileCode, IconTrash } from "@tabler/icons-react";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { readWebuiPluginRow as read } from "../contracts/plugin-rows.js";
 import type { WebuiPluginCatalogueRow } from "../projection/catalogue-view.js";
@@ -25,6 +25,7 @@ const categories: readonly { id: PluginManagementArea; label: string }[] = [
   { id: "mcp", label: "MCP" },
   { id: "agents", label: "Agents" },
 ];
+const MANAGEMENT_SKELETON_WIDTHS = [100, 70, 82, 46, 70, 46] as const;
 
 export function PluginManagementFilters({
   area,
@@ -74,7 +75,14 @@ export function PluginManagementList({
   readonly onPrepareMcp: (row: WebuiPluginCatalogueRow["source"]) => void;
 }): ReactElement {
   return loading ? (
-    <FeedbackSkeleton rows={6} testId="plugin-management-skeleton" />
+    <FeedbackSkeleton
+      rows={12}
+      widths={MANAGEMENT_SKELETON_WIDTHS}
+      maxWidth={334}
+      rowHeight={35}
+      rowRadius={18}
+      testId="plugin-management-skeleton"
+    />
   ) : rows.length === 0 ? (
     <FeedbackEmpty title="暂无内容" />
   ) : (
@@ -210,8 +218,8 @@ export function PluginManagementList({
                   />
                   {area === "plugins" ? (
                     <WebuiButton
-                      variant="danger"
-                      size="compact"
+                      variant="danger-soft"
+                      size="action"
                       onClick={() =>
                         onConfirmMutation("卸载插件", {
                           kind: "uninstallPlugin",
@@ -222,6 +230,7 @@ export function PluginManagementList({
                         })
                       }
                     >
+                      <IconTrash aria-hidden="true" size={18} stroke={1.7} />
                       卸载
                     </WebuiButton>
                   ) : area === "skills" ? (

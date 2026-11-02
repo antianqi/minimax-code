@@ -83,7 +83,7 @@ export const initialWebuiPluginSelection: WebuiPluginSelection = {
 export const initialWebuiPluginListingState: WebuiPluginListingState = {
   selection: initialWebuiPluginSelection,
   rows: [],
-  loading: false,
+  loading: true,
 };
 
 export const initialWebuiPluginWorkflowsState: WebuiPluginWorkflowsState = {
@@ -329,7 +329,6 @@ export function createWebuiPluginWorkflows(deps: {
 
   const actions: WebuiPluginActions = createWebuiPluginActions(port);
   const listingCache = new Map<string, WebuiPluginListingState>();
-  let hasStartedListing = false;
 
   /**
    * One typed dispatch.
@@ -359,8 +358,6 @@ export function createWebuiPluginWorkflows(deps: {
   const loadListing = async (selection: WebuiPluginSelection): Promise<void> => {
     const version = bump("listing");
     const cached = listingCache.get(selectionKey(selection));
-    const showInitialSkeleton = !cached && !hasStartedListing;
-    hasStartedListing = true;
     if (!port.pluginManagement) {
       set((current) => ({
         ...current,
@@ -391,7 +388,7 @@ export function createWebuiPluginWorkflows(deps: {
           ...((cached?.skillTotal ?? retained?.skillTotal) !== undefined
             ? { skillTotal: cached?.skillTotal ?? retained?.skillTotal }
             : {}),
-          loading: showInitialSkeleton,
+          loading: cached ? false : retained?.loading ?? true,
         },
       };
     });

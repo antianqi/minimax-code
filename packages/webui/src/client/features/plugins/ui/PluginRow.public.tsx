@@ -34,13 +34,7 @@ export function PluginRowList({ className, children }: PluginRowListProps): Reac
 }
 
 export interface PluginRowProps {
-  /**
-   * The row lifts on hover.
-   *
-   * The marketplace and the management list are hoverable cards; the miniapp's
-   * rows are not. The lift is the shared card motion's, and a row that does
-   * not lift simply does not publish the hoverable state.
-   */
+  /** Opt in to the shared card hover treatment. */
   readonly hoverable?: boolean;
   /** The caller's layout only — the row's own slots stay here. */
   readonly className?: string;

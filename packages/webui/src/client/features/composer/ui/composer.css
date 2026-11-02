@@ -85,7 +85,7 @@
   .webui-composer-mention-menu {
     min-width: 220px;
     max-width: min(360px, calc(100vw - 32px));
-    padding: 6px;
+    padding: var(--spacing_6);
   }
 
   /* The `+` trigger's wrap: the button plus the panel it opens. It is the
@@ -171,7 +171,7 @@
   .webui-composer-menu-item {
     min-height: 38px;
     gap: 10px;
-    padding: 8px 10px;
+    padding: var(--spacing_8) 10px;
     border-radius: 9px;
   }
 
@@ -190,7 +190,7 @@
 
   .webui-composer-menu-empty {
     padding: 10px;
-    color: var(--webui-color-text-tertiary, #999);
+    color: var(--text_default_tertiary);
     font-size: var(--size_12);
   }
 
@@ -350,7 +350,7 @@
 
   .webui-composer-mention-section {
     padding: 8px 10px 4px;
-    color: var(--webui-color-text-tertiary, #999);
+    color: var(--text_default_tertiary);
     font-size: 11px;
   }
 
@@ -363,7 +363,7 @@
   .webui-composer-mention-option small {
     overflow: hidden;
     max-width: 100%;
-    color: var(--webui-color-text-tertiary, #999);
+    color: var(--text_default_tertiary);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -384,10 +384,10 @@
     flex-direction: column;
     gap: 5px;
     overflow: hidden;
-    padding: 8px;
+    padding: var(--spacing_8);
     border-radius: 14px;
-    background: var(--webui-color-bg-secondary, #f5f5f5);
-    color: var(--webui-color-text-secondary, #666);
+    background: var(--bg_grouped_tertiary);
+    color: var(--text_default_secondary);
     font-size: var(--size_12);
   }
 
@@ -405,14 +405,14 @@
     display: grid;
     height: 46px;
     place-items: center;
-    border-radius: 8px;
-    background: var(--webui-color-bg-primary, #fff);
-    color: var(--webui-color-text-accent, #6a78e8);
+    border-radius: var(--radius_8);
+    background: var(--bg_default_primary);
+    color: var(--text_default_accent);
   }
 
   .webui-composer-attachment-name {
     overflow: hidden;
-    padding: 0 8px;
+    padding: 0 var(--spacing_8);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -425,7 +425,7 @@
 
   .webui-composer-attachment-loading {
     align-self: center;
-    color: var(--webui-color-text-tertiary, #999);
+    color: var(--text_default_tertiary);
     font-size: var(--size_12);
   }
 
@@ -437,8 +437,8 @@
     gap: var(--spacing_6);
     padding: 0 6px 0 10px;
     border-radius: 10px;
-    background: var(--webui-color-bg-secondary, #f5f5f5);
-    color: var(--webui-color-text-secondary, #666);
+    background: var(--bg_grouped_tertiary);
+    color: var(--text_default_secondary);
   }
 
   .webui-composer-url-reference .webui-control {
@@ -460,32 +460,6 @@
     max-width: min(244px, 36vw);
     min-width: 0;
     flex: 0 1 auto;
-  }
-  /* The thinking trigger. Three tones, and the third is the one that matters:
-   * `unstated` is NOT `off`. The wire says an empty effort means "no override,
-   * the engine picks", and the engine never reports back which level it chose,
-   * so a blue brain beside the word "Default" would assert a state nothing in
-   * this process can verify. The neutral tone is the honest one, and the label
-   * beside it carries the truth. */
-  .webui-thinking-anchor { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; }
-  /* The brain's hover bubble: the same dark shape with an arrow as
-   * `.webui-context-usage-label` two controls away, so a tooltip here and a
-   * tooltip there are one object rather than two. A native `title` was the
-   * alternative and it never appeared — it is drawn by the window chrome, not
-   * by this page, and in this shell it stayed invisible. */
-  .webui-thinking-label { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 60; width: max-content; max-width: 220px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%); transform-origin: bottom center; background: rgb(0 0 0 / 85%); color: #fff; font-size: var(--size_12); line-height: 16px; white-space: nowrap; pointer-events: none; }
-  .webui-thinking-label::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
-  .webui-thinking-brain {
-    display: block;
-    width: 18px;
-    height: 18px;
-  }
-  .webui-thinking-brain--on {
-    color: var(--text_default_accent);
-  }
-  .webui-thinking-brain--off,
-  .webui-thinking-brain--unstated {
-    color: var(--icon_default_tertiary);
   }
   /* Slash palette rows reproduce the icon, bold title, dim
      description pattern. The leading icon is the command glyph; the trailing

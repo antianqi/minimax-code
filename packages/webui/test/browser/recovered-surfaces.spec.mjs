@@ -64,6 +64,66 @@ test("the sign-in row renders seven days instead of tripping the error boundary"
   expect(pageErrors).toEqual([]);
 });
 
+test("the sign-in loading skeleton stays visible while its panel request is pending", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await openUserMenu(page);
+  await page.evaluate(() => window.__fixture.delayNext("getSigninPanel", {}));
+  await page.locator(".webui-user-menu-signin-anchor").hover();
+
+  const skeleton = page.locator('[data-testid="signin-card-skeleton"]');
+  await expect(skeleton).toBeVisible();
+  const placeholder = skeleton.locator(".webui-page-skeleton-shape, .webui-skeleton").first();
+  const background = await placeholder.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(background).not.toBe("rgba(0, 0, 0, 0)");
+
+  const response = {
+    scene: 2,
+    days: Array.from({ length: 7 }, (_, index) => ({
+      day_no: index + 1,
+      points: 10,
+      bonus_points: index === 2 ? 400 : 0,
+      is_today: index === 2,
+      status: index < 2 ? 3 : index === 2 ? 2 : 1,
+    })),
+  };
+  await page.evaluate((panel) => window.__fixture.resolve("getSigninPanel", {}, panel), response);
+  await expect(page.locator('[data-testid="signin-card"]')).toBeVisible();
+});
+
+test("a successful sign-in claim reconciles the panel without a page refresh", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openApp(page, "#session=A");
+  await openUserMenu(page);
+  await page.locator(".webui-user-menu-signin-anchor").hover();
+  await expect(page.locator('[data-testid="signin-card"]')).toBeVisible();
+
+  const stalePanel = {
+    scene: 2,
+    days: Array.from({ length: 7 }, (_, index) => ({
+      day_no: index + 1,
+      points: 10,
+      bonus_points: index === 2 ? 400 : 0,
+      is_today: index === 2,
+      status: index < 2 ? 3 : index === 2 ? 2 : 1,
+    })),
+  };
+  const claimedPanel = {
+    ...stalePanel,
+    days: stalePanel.days.map((day) => day.is_today ? { ...day, status: 3 } : day),
+  };
+  const claimResult = { claim_id: "synthetic-claim", claim_result: 1, day_no: 3, points: 10, expire_at_ms: 1, panel: stalePanel };
+  await page.evaluate(() => window.__fixture.delayNext("claimSignin", {}));
+
+  const claimButton = page.getByRole("button", { name: /签到得/ });
+  await expect(claimButton).toBeVisible();
+  await claimButton.click();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "claimSignin"))).toBe(true);
+  await page.evaluate((panel) => window.__fixture.setResponse("getSigninPanel", panel), claimedPanel);
+  await page.evaluate((result) => window.__fixture.resolve("claimSignin", {}, result), claimResult);
+  await expect(page.getByRole("button", { name: "今日已签到" })).toBeVisible();
+  await expect(page.locator('[data-testid="signin-day-3"]')).toHaveAttribute("aria-label", /已签到/);
+});
+
 test("the sign-in flyout completes its shared surface exit when another account panel opens", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openApp(page, "#session=A");

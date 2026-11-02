@@ -368,7 +368,9 @@ export const WebuiTooltip = forwardRef<HTMLElement, WebuiTooltipProps>(
         data-webui-tooltip-visible={visible ? "true" : "false"}
         aria-hidden={ariaHidden ?? !visible}
         inert={inert ?? !visible}
-        className={className}
+        className={["webui-tooltip-bubble", className]
+          .filter((entry) => Boolean(entry && entry.length > 0))
+          .join(" ")}
       />
     );
   },

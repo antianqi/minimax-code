@@ -1171,6 +1171,22 @@ export function createWebuiAccountWorkflows(deps: {
     set((current) => ({ ...current, signin: { ...current.signin, claiming: true, error: undefined } }));
     try {
       const result = await claim();
+      // Re-read the account's authoritative panel after the write. Some claim
+      // responses can confirm the reward while still carrying the pre-claim
+      // day status; relying on that snapshot leaves the button claimable until
+      // the next page load. Keep the validated claim panel as a fallback if the
+      // follow-up read is unavailable.
+      let panel = normalizeSigninPanel(result.panel);
+      let refreshError: string | undefined;
+      if (port.getSigninPanel) {
+        try {
+          panel = normalizeSigninPanel(await port.getSigninPanel());
+        } catch (reason) {
+          // The claim itself succeeded and its response already contains a
+          // usable panel, so a failed reconciliation must not undo that result.
+          refreshError = message(reason);
+        }
+      }
       // A claim changes the account's credential facts, so it retires the
       // answers computed under the previous generation.
       afterCredentialChange();
@@ -1179,7 +1195,8 @@ export function createWebuiAccountWorkflows(deps: {
         signin: {
           ...current.signin,
           claiming: false,
-          panel: normalizeSigninPanel(result.panel),
+          panel,
+          error: refreshError,
           claim: result,
         },
       }));

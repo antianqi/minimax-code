@@ -201,36 +201,28 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 120;
-    width: max-content;
     /* 250, not the 340 this used to carry. The value follows antd's
      * `Tooltip`, whose documented `maxWidth` default is 250, and it is never
      * overridden — only `.ant-tooltip-inner` typography is touched. The 6px
-     * radius and the 8/12 padding on
-     * the next two rules are antd's `borderRadius` / `paddingSM`+`paddingXS`
-     * defaults for the same reason, so 340 was the one number on this bubble
-     * that came from nowhere. Unlike its two siblings below, this one wraps
-     * (`white-space: normal`), so the width is live and the old value was
-     * showing. */
+     * radius and the 8/12 padding here are antd's `borderRadius` /
+     * `paddingSM`+`paddingXS` defaults for the same reason, so 340 was the
+     * one number on this bubble that came from nowhere. Unlike its two
+     * siblings below, this one wraps (`white-space: normal`), so the width is
+     * live and the old value was showing.
+     *
+     * The shape itself — the fill, the radius, the type and the arrow — is
+     * the shared tooltip contract's (`styles/tooltip.css`), which this
+     * renders through `WebuiTooltip`. */
     max-width: 250px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.85);
-    color: #fff;
-    font-size: 12px;
-    line-height: 18px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    padding: var(--spacing_8) var(--spacing_12);
+    line-height: var(--line_height_18);
+    box-shadow: var(--elevation_lg);
     white-space: normal;
     text-align: left;
+    /* The credits note carries a link, so the pointer has to reach it; the
+     * shared bubble turns the pointer off for the bubbles that carry text
+     * only. */
     pointer-events: auto;
-  }
-  .webui-signin-credits-tooltip::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 5px solid transparent;
-    border-top-color: rgba(0, 0, 0, 0.85);
   }
   .webui-plugin-categories {
     max-width: 960px;
@@ -450,36 +442,18 @@
   .webui-settings-info-hint { display: inline-flex; width: 14px; height: 14px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--border_light); border-radius: 50%; background: transparent; padding: 0; color: var(--text_default_tertiary); font-size: 9px; font-style: normal; font-weight: var(--weight_medium); line-height: 1; cursor: help; }
   .webui-settings-info-hint:hover { border-color: var(--border_accent); color: var(--text_default_secondary); }
   .webui-settings-info-hint:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 1px; }
-  /* The dark bubble with an arrow is the shell's existing tooltip shape (see
-   * `.webui-signin-credits-tooltip`); its 6px
-   * radius, 8/12 padding and 18px line height are the same three numbers, so
-   * this is a third call site on one shape rather than a third shape.
+  /* The bubble's own box: where it sits and how wide it may grow. The shape
+   * — the fill, the radius, the type and the arrow — is the shared tooltip
+   * contract's (`styles/tooltip.css`), which this renders through
+   * `WebuiTooltip`.
    *
-   * The hardcoded `rgb(0 0 0 / 85%)` / `#fff` is DELIBERATE and must not be
-   * rebound to a token. These values are antd's `Tooltip` colours, sourced
-   * from the `colorBgSpotlight` and `colorTextLightSolid`
-   * global tokens — documented defaults `rgba(0,0,0,0.85)` and `#fff` — and
-   * they are theme-independent: the bubble is black under BOTH
-   * `.light` and `.dark`. The same source
-   * explains the 6px radius and the 250px max width, which are antd's
-   * `borderRadius` and Tooltip `maxWidth` defaults rather than measurements.
-   * Everything else on this surface is token-driven because it *should* follow
-   * the theme; this bubble should not, so a token binding here would be a
-   * fidelity regression dressed up as a fix.
-   *
-   * The 250 is antd's `Tooltip` `maxWidth` default, which is not
-   * overridden — so all three of these bubbles now share one width, and the 340
-   * that used to sit on `.webui-signin-credits-tooltip` is gone. Two more
-   * labels still read 220, but both are under `white-space: nowrap` where the
-   * ceiling cannot shape anything; see the note on `.webui-context-usage-label`.
-   *
+   * The 250 is antd's `Tooltip` `maxWidth` default, which is not overridden.
    * `position: absolute` against the anchor, NOT `fixed`: absolute travels
    * with the section when the panel scrolls, which is what a tooltip attached
-   * to a heading has to do. `pointer-events: none` for the same reason the
-   * context-usage label is — otherwise the pointer leaving the glyph toward
-   * the bubble drops the hover that is showing it. */
-  .webui-settings-info-hint-bubble { position: absolute; bottom: calc(100% + var(--spacing_8)); left: 50%; z-index: 60; width: max-content; max-width: 250px; padding: var(--spacing_8) var(--spacing_12); border-radius: 6px; transform: translateX(-50%); transform-origin: bottom center; background: rgb(0 0 0 / 85%); box-shadow: 0 6px 16px rgb(0 0 0 / 18%); color: #fff; font-size: var(--size_12); line-height: var(--line_height_18); white-space: normal; text-align: left; pointer-events: none; }
-  .webui-settings-info-hint-bubble::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
+   * to a heading has to do. The shared bubble turns the pointer off for the
+   * same reason the context-usage label does — otherwise the pointer leaving
+   * the glyph toward the bubble drops the hover that is showing it. */
+  .webui-settings-info-hint-bubble { position: absolute; bottom: calc(100% + var(--spacing_8)); left: 50%; z-index: 60; max-width: 250px; padding: var(--spacing_8) var(--spacing_12); transform: translateX(-50%); box-shadow: var(--elevation_lg); line-height: var(--line_height_18); white-space: normal; text-align: left; }
 
   /* The Mini App view (ADR 0020).
    *

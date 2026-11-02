@@ -7,6 +7,13 @@ import { FeedbackEmpty } from "../../../ui/feedback.js";
 import { WebuiSearchField } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDisclosure, WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
+import {
+  PluginRow,
+  PluginRowActions,
+  PluginRowCopy,
+  PluginRowIcon,
+  PluginRowList,
+} from "../../plugins/ui/PluginRow.public.js";
 
 const MARKET_PREVIEW_COUNT = 8;
 const MINIAPP_CATEGORY = { id: "tag:miniapp", label: "Mini App" } as const;
@@ -45,17 +52,13 @@ function PluginMarketCard({
     ...(row.pluginSource === undefined ? {} : { source: row.pluginSource }),
   });
   return (
-    <WebuiMotion
-      as="article"
-      kind="card"
+    <PluginRow
       hoverable
-      className="webui-plugin-row"
       key={`${area}-${name}`}
     >
-      <div
-        className={`webui-plugin-icon${area === "skills" ? " webui-plugin-icon--skill" : ""}`}
-        aria-hidden="true"
-      >
+    <PluginRowIcon
+      className={area === "skills" ? "webui-plugin-icon--skill" : undefined}
+    >
         {area === "skills" ? (
           <span className="webui-plugin-skill-icon-tile">
             <IconFileCode aria-hidden="true" size={22} stroke={1.5} />
@@ -76,11 +79,11 @@ function PluginMarketCard({
         ) : (
           "▦"
         )}
-      </div>
-      <div className="webui-plugin-copy">
+      </PluginRowIcon>
+      <PluginRowCopy>
         <h2>{read(item, "displayName", "display_name") || name}</h2>
         <p>{row.description || read(item, "transport")}</p>
-      </div>
+      </PluginRowCopy>
       {area === "plugins" ? (
         <WebuiButton
           variant="secondary"
@@ -117,7 +120,7 @@ function PluginMarketCard({
           {item.added === true ? "已添加" : "添加"}
         </WebuiButton>
       )}
-    </WebuiMotion>
+    </PluginRow>
   );
 }
 
@@ -199,7 +202,7 @@ export function PluginMarketplace({
         {rows.length === 0 ? (
           <FeedbackEmpty title="暂无内容" />
         ) : (
-          <div className="webui-plugin-list webui-plugin-grid">
+          <PluginRowList className="webui-plugin-grid">
             {rows.slice(0, MARKET_PREVIEW_COUNT).map((row, index) => (
               <PluginMarketCard area={area} row={row} index={index} onIntent={onIntent} key={`${area}-preview-${row.name || index}`} />
             ))}
@@ -216,7 +219,7 @@ export function PluginMarketplace({
                 ))}
               </WebuiDisclosure>
             ) : null}
-          </div>
+          </PluginRowList>
         )}
         {!hideToggle && visibleMarketTotal > MARKET_PREVIEW_COUNT ? (
           <WebuiButton

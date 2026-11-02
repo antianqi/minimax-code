@@ -187,7 +187,7 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
   return <>
     <WorkspaceProgressSection kind="environment" className={`webui-environment-panel${pending ? " is-loading" : ""}`} title={PROGRESS_COPY.environment} collapsed={collapsed} onToggle={onToggle} busy={pending}>
         <>
-          {pending ? <FeedbackLiveRegion className="webui-feedback-sr">正在加载环境信息</FeedbackLiveRegion> : null}
+          {pending ? <FeedbackLiveRegion screenReaderOnly>正在加载环境信息</FeedbackLiveRegion> : null}
           {environmentError ? <FeedbackError message=<>环境信息加载失败：{environmentError}</> className="webui-environment-loading" /> : environment || pending ? <WebuiSkeletonProjection loading={pending}>{environmentBody}</WebuiSkeletonProjection> : null}
         </>
     </WorkspaceProgressSection>

@@ -18,6 +18,13 @@ import {
 import { readWebuiPluginRow } from "../../plugins/contracts/plugin-rows.js";
 import { FeedbackBusy, FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
+import {
+  PluginRow,
+  PluginRowActions,
+  PluginRowCopy,
+  PluginRowIcon,
+  PluginRowList,
+} from "../../plugins/ui/PluginRow.public.js";
 import { WebuiSkeletonProjection } from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -146,7 +153,7 @@ export function MiniAppAppsList({
             title={"暂无已安装的 Mini App"}
           />
         ) : null}
-        <div className="webui-plugin-list">
+        <PluginRowList>
           {listingRows.map((item) => {
             const row = item.runtime;
             const refusal = row ? state.refusals[row.pluginId] : undefined;
@@ -159,12 +166,11 @@ export function MiniAppAppsList({
                   })
                 : undefined;
             return (
-              <article
-                className="webui-plugin-row"
+              <PluginRow
                 key={`apps-${item.pluginId}`}
-                data-testid={`miniapp-app-${item.pluginId}`}
+                testId={`miniapp-app-${item.pluginId}`}
               >
-                <div className="webui-plugin-icon" aria-hidden="true">
+                <PluginRowIcon>
                   {item.iconUrl ? (
                     <>
                       <img
@@ -183,8 +189,8 @@ export function MiniAppAppsList({
                   ) : (
                     "◇"
                   )}
-                </div>
-                <div className="webui-plugin-copy">
+                </PluginRowIcon>
+                <PluginRowCopy>
                   <h2>{item.name}</h2>
                   <p>{item.description || item.pluginId}</p>
                   {refusal ? (
@@ -198,7 +204,7 @@ export function MiniAppAppsList({
                       })}
                     />
                   ) : null}
-                </div>
+                </PluginRowCopy>
                 <span
                   className="text-text_default_tertiary"
                   data-testid={`miniapp-app-status-${item.pluginId}`}
@@ -216,7 +222,7 @@ export function MiniAppAppsList({
                     ? `（${webuiMiniAppFailureCodeText(row.errorCode)}）`
                     : ""}
                 </span>
-                <div className="webui-plugin-actions">
+                <PluginRowActions>
                   {row?.enabled ? (
                     <>
                       <WebuiButton
@@ -312,11 +318,11 @@ export function MiniAppAppsList({
                       启用
                     </WebuiButton>
                   ) : null}
-                </div>
-              </article>
+                </PluginRowActions>
+              </PluginRow>
             );
           })}
-        </div>
+        </PluginRowList>
       </div>
     </WebuiSkeletonProjection>
   );

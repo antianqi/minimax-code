@@ -401,7 +401,7 @@
     display: inline-flex;
     align-items: center;
     height: 30px;
-    padding: 2px;
+    padding: var(--spacing_2);
     border-radius: var(--radius_full);
     background-color: var(--bg_grouped_tertiary);
   }

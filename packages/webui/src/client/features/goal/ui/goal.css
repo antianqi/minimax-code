@@ -118,7 +118,7 @@
     flex: none;
     color: var(--text_status_blue);
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
 
   .webui-goal-usage,
@@ -126,7 +126,7 @@
     flex: none;
     color: var(--text_default_tertiary);
     font-size: var(--size_12);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
 
   .webui-goal-usage {
@@ -175,7 +175,7 @@
   .webui-goal-objective-expanded {
     max-height: 240px;
     overflow: auto;
-    padding: 8px 12px;
+    padding: var(--spacing_8) var(--spacing_12);
     color: var(--text_default_secondary);
     font-size: var(--size_14);
     overflow-wrap: anywhere;

@@ -4,6 +4,7 @@ import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiCard } from "../../../ui/card.js";
 
 /**
  * The messages waiting behind a running turn, and whether the queue is held.
@@ -53,10 +54,11 @@ export function WebuiQueuePanel({
           </strong>
           <WebuiStack as="ul" gap="small" className="w-full" role="list">
             {items.map((item) => (
-              <li
+              <WebuiCard
+                as="li"
                 key={item.itemId}
                 data-webui-queue-item={item.itemId}
-                className="webui-card flex items-center gap-2 p-spacing_12"
+                className="flex items-center gap-2 p-spacing_12"
               >
                 <span className="min-w-0 flex-1 truncate text-size_14">
                   {item.content || item.itemId}
@@ -72,7 +74,7 @@ export function WebuiQueuePanel({
                     移除
                   </WebuiButton>
                 ) : null}
-              </li>
+              </WebuiCard>
             ))}
           </WebuiStack>
         </WebuiStack>

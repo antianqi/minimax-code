@@ -351,12 +351,22 @@ export function FeedbackAnnouncement({
 export function FeedbackLiveRegion({
   children,
   politeness = "polite",
+  screenReaderOnly = false,
   className,
   testId,
   dataAttributes,
 }: {
   readonly children: ReactNode;
   readonly politeness?: "polite" | "assertive";
+  /**
+   * A live region that is announced and not seen.
+   *
+   * Some regions exist only to be heard: the loading state of a panel whose
+   * own text says nothing. The screen-reader-only appearance is part of that
+   * contract, so the shared component owns it — a caller that spelled the
+   * class itself would be re-deriving the recipe this module owns.
+   */
+  readonly screenReaderOnly?: boolean;
   /** The surface's own classes. */
   readonly className?: string;
   readonly testId?: string;
@@ -364,7 +374,9 @@ export function FeedbackLiveRegion({
 }): ReactElement {
   return (
     <div
-      className={className}
+      className={[screenReaderOnly ? "webui-feedback-sr" : "", className]
+        .filter(Boolean)
+        .join(" ")}
       role="status"
       aria-live={politeness}
       aria-atomic="true"

@@ -514,6 +514,10 @@ describe("W0 · stylesheet composition", () => {
       // animates with, the field's own arrangement, the feedback family's
       // states, and the shell's own rules.
       "./motion.css",
+      // The shared tooltip bubble: the one dark shape with an arrow that every
+      // floating label draws. It comes before the surfaces that call it, so a
+      // caller's own box wins over the shared shape.
+      "./tooltip.css",
       "./field.css",
       "./feedback.css",
       "./shell.css",
@@ -531,6 +535,11 @@ describe("W0 · stylesheet composition", () => {
       // The shared modal shell: the scrim, the surface, its header, body and
       // footer, and the action slot's geometry.
       "./dialog.css",
+      // The shared block surface: the hairline border over the soft layer that
+      // a card in the main column is made of.
+      "./card.css",
+      // The published markdown renderer's appearance and the code palette.
+      "./markdown.css",
       "../features/plugins/ui/plugins.css",
       // The shared button contract: the base, the sizes and the variants.
       "./button.css",

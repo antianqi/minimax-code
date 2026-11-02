@@ -19,6 +19,7 @@ import type {
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiCheckbox, WebuiRadio, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiCard } from "../../../ui/card.js";
 
 export function WebuiInteractionPanel({
   sessionId,
@@ -121,9 +122,10 @@ export function WebuiInteractionPanel({
       }
     >
       {visiblePermissions.map((permission) => (
-        <article
+        <WebuiCard
+          as="article"
           key={permission.requestId}
-          className="webui-card flex flex-col gap-2 p-spacing_16"
+          className="flex flex-col gap-2 p-spacing_16"
           data-webui-permission-request={permission.requestId}
           aria-label="Permission request"
         >
@@ -155,7 +157,7 @@ export function WebuiInteractionPanel({
               Deny
             </WebuiButton>
           </WebuiInline>
-        </article>
+        </WebuiCard>
       ))}
       {/* Plan mode arrives on the same questionnaire channel. Only the DECISION
           belongs here — the plan file card is a message in the transcript,
@@ -182,8 +184,9 @@ export function WebuiInteractionPanel({
         </div>
       ) : null}
       {questionnaire && questionnaire.mode !== "plan" ? (
-        <article
-          className="webui-card flex max-h-[60vh] flex-col gap-3 overflow-hidden rounded-[20px] border-[0.5px] border-border_default bg-bg_grouped_secondary_elevated p-spacing_16"
+        <WebuiCard
+          as="article"
+          className="flex max-h-[60vh] flex-col gap-3 overflow-hidden rounded-[20px] border-[0.5px] border-border_default bg-bg_grouped_secondary_elevated p-spacing_16"
           data-testid="questionnaire-composer"
           data-webui-questionnaire-request={questionnaire.id}
           aria-label={questionnaire.title ?? "Questionnaire"}
@@ -462,7 +465,7 @@ export function WebuiInteractionPanel({
               跳过
             </WebuiButton>
           </WebuiInline>
-        </article>
+        </WebuiCard>
       ) : null}
           {interactionError ? (
         <FeedbackError message="Unable to answer interaction: {interactionError}" className="text-text_default_secondary text-size_12" testId="questionnaire-error" />

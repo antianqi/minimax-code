@@ -25,6 +25,13 @@ import {
 import { WebuiIconChevronRight, WebuiIconSites } from "../../../shell/icons.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
+import {
+  PluginRow,
+  PluginRowActions,
+  PluginRowCopy,
+  PluginRowIcon,
+  PluginRowList,
+} from "../../plugins/ui/PluginRow.public.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 export interface MiniAppPickerProps {
@@ -91,12 +98,12 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
       {capacityRefused ? (
         <FeedbackError message={webuiMiniAppCapacityText(rows)} className="webui-plugin-error" testId="miniapp-picker-capacity" />
       ) : null}
-      <div className="webui-plugin-list">
+      <PluginRowList>
         {rows.map((row) => {
           const refusal = state.refusals[row.pluginId];
           return (
-            <article className="webui-plugin-row webui-miniapp-picker-row" key={`picker-${row.pluginId}`} data-testid={`miniapp-picker-row-${row.pluginId}`}>
-              <div className="webui-plugin-icon webui-miniapp-picker-icon" aria-hidden="true">
+            <PluginRow className="webui-miniapp-picker-row" key={`picker-${row.pluginId}`} testId={`miniapp-picker-row-${row.pluginId}`}>
+              <PluginRowIcon className="webui-miniapp-picker-icon">
                 {row.iconUrl ? (
                   <>
                     <img
@@ -115,8 +122,8 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
                 ) : (
                   <WebuiIconSites />
                 )}
-              </div>
-              <div className="webui-plugin-copy">
+              </PluginRowIcon>
+              <PluginRowCopy>
                 <h2>{row.name}</h2>
                 <p>{row.description || row.pluginId}</p>
                 <span className="webui-miniapp-picker-status" data-status={row.status}>
@@ -133,8 +140,8 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
                     })}
                   />
                 ) : null}
-              </div>
-              <div className="webui-plugin-actions">
+              </PluginRowCopy>
+              <PluginRowActions>
                 <WebuiButton
                   variant="secondary"
                   size="compact"
@@ -161,11 +168,11 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
                     停止
                   </WebuiButton>
                 ) : null}
-              </div>
-            </article>
+              </PluginRowActions>
+            </PluginRow>
           );
         })}
-      </div>
+      </PluginRowList>
       <WebuiButton variant="primary" size="panel" className="webui-miniapp-picker-create" type="button" onClick={onManage} disabled={!onManage}>
         创建 Mini App
       </WebuiButton>

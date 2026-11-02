@@ -12,7 +12,7 @@
   .webui-user-menu-anchor-collapsed {
     display: flex;
     justify-content: center;
-    padding: 6px 0;
+    padding: var(--spacing_6) 0;
   }
   .webui-user-menu-trigger-rail {
     border-radius: var(--radius_full);
@@ -59,7 +59,7 @@
     flex: 1 1 auto;
     flex-direction: column;
     gap: var(--spacing_2);
-    margin-left: 8px;
+    margin-left: var(--spacing_8);
     overflow: hidden;
   }
   .webui-user-menu-identity > span,
@@ -70,12 +70,12 @@
   }
   .webui-user-menu-identity > span {
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
   .webui-user-menu-identity > small {
     color: var(--text_default_tertiary);
     font-size: var(--size_12);
-    line-height: 16px;
+    line-height: var(--line_height_16);
   }
   .webui-user-menu-bell {
     display: flex;
@@ -94,7 +94,7 @@
    * measures the trigger and places the panel in viewport coordinates. */
   .webui-user-menu-popover {
     width: 244px;
-    padding: 4px;
+    padding: var(--spacing_4);
   }
   .webui-user-menu-uid {
     display: flex;
@@ -102,10 +102,10 @@
     align-items: center;
     overflow: hidden;
     border-radius: 6px;
-    padding: 0 6px;
+    padding: 0 var(--spacing_6);
     color: var(--text_default_tertiary);
     font-size: var(--size_12);
-    line-height: 16px;
+    line-height: var(--line_height_16);
     white-space: nowrap;
   }
   .webui-user-menu-list {
@@ -120,7 +120,7 @@
   .webui-user-menu-item {
     position: relative;
     height: 32px;
-    padding: 0 6px;
+    padding: 0 var(--spacing_6);
     white-space: nowrap;
   }
   .webui-user-menu-shortcut {
@@ -150,15 +150,15 @@
     z-index: 111;
     width: 222px;
     min-height: 154px;
-    padding: 12px;
+    padding: var(--spacing_12);
     color: var(--text_default_primary);
     font-size: var(--size_12);
-    line-height: 16px;
+    line-height: var(--line_height_16);
   }
 
   .webui-user-menu-usage-hairline {
     height: 1px;
-    margin: 8px 0;
+    margin: var(--spacing_8) 0;
     background-color: var(--border_default);
   }
 
@@ -170,7 +170,7 @@
     margin: 0;
     color: var(--text_default_secondary);
     font-size: 13px;
-    line-height: 18px;
+    line-height: var(--line_height_18);
   }
   .webui-user-menu-usage-content {
     min-width: 0;
@@ -179,7 +179,7 @@
     min-width: 0;
   }
   .webui-user-menu-quota-row {
-    border-radius: 8px;
+    border-radius: var(--radius_8);
     overflow: hidden;
   }
   .webui-user-menu-quota-line {
@@ -191,14 +191,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     font-weight: 400;
     color: var(--text_default_primary);
   }
   .webui-user-menu-quota-value {
     flex: 0 0 auto;
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     font-weight: 400;
     color: var(--text_default_primary);
   }
@@ -208,7 +208,7 @@
   .webui-user-menu-quota-meta {
     color: var(--text_default_secondary);
     font-size: var(--size_12);
-    line-height: 16px;
+    line-height: var(--line_height_16);
   }
   .webui-user-menu-credits-row {
     display: flex;
@@ -218,7 +218,7 @@
     gap: var(--spacing_8);
     overflow: hidden;
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     color: var(--text_default_primary);
   }
   .webui-user-menu-usage-error {
@@ -226,21 +226,21 @@
   }
   .webui-user-menu-usage-error-title {
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     font-weight: 500;
     color: var(--text_default_primary);
   }
   .webui-user-menu-usage-retry {
     align-self: flex-start;
-    margin-top: 4px;
+    margin-top: var(--spacing_4);
   }
   .webui-user-menu-usage-skeleton {
     min-height: 72px;
-    padding: 8px 0;
+    padding: var(--spacing_8) 0;
   }
   .webui-user-menu-usage-skeleton-row {
-    padding: 4px 0;
-    border-radius: 8px;
+    padding: var(--spacing_4) 0;
+    border-radius: var(--radius_8);
   }
   .webui-user-menu-usage-skeleton-line {
     min-width: 0;
@@ -289,7 +289,7 @@
   .signin-card-surface {
     container-type: inline-size;
     min-height: 201px;
-    box-shadow: 0 0 20px 0 var(--shadow_default, #0a0a0a14);
+    box-shadow: 0 0 20px 0 var(--shadow_default);
   }
   .signin-corner-clip {
     pointer-events: none;
@@ -317,7 +317,7 @@
     align-items: flex-start;
     gap: var(--spacing_4);
     min-width: 214px;
-    padding: 0 8px;
+    padding: 0 var(--spacing_8);
   }
   .signin-day,
   .signin-day-dot {
@@ -395,7 +395,7 @@
   @container (max-width: 265px) {
     .signin-progress {
       gap: 3px;
-      padding: 0 4px;
+      padding: 0 var(--spacing_4);
     }
     .signin-day-points {
       font-size: 10px;

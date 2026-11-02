@@ -272,6 +272,11 @@ export function UserMenu({
   };
 
   const loadSignin = () => {
+    // The trigger's mouseenter/focus events can fire again while the pointer
+    // moves between the menu row and its flyout. Keep the already-open panel
+    // interactive instead of putting its entire subtree back into skeleton
+    // projection during an unnecessary second read.
+    if (signinOpen) return;
     setSigninOpen(true);
     setUsageOpen(false);
     void accountWorkflows?.loadSigninPanel();

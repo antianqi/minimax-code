@@ -40,7 +40,7 @@
     color: var(--text_default_primary);
     font-size: 14px;
     line-height: 20px;
-    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+    box-shadow: var(--elevation_md);
     animation: webui-dropdown-in var(--webui-motion-duration-surface) var(--webui-motion-ease-enter);
   }
 
@@ -58,7 +58,7 @@
     border-radius: 12px;
     background: var(--bg_default_primary);
     color: var(--text_default_primary);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+    box-shadow: var(--elevation_md);
   }
 
   /*

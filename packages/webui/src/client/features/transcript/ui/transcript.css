@@ -21,12 +21,11 @@
    * text never wraps, `width: max-content` sizes the box to the unwrapped run,
    * and there is no `overflow: hidden` to clip it, so this label can only
    * overflow its own max-width rather than being shaped by it. It is left at
-   * 220 — and `.webui-thinking-label` with it — because changing an inert
-   * number would only hide where it came from. The live width on this shape is
-   * the 250 on `.webui-settings-info-hint-bubble` and
-   * `.webui-signin-credits-tooltip`, which is antd's `Tooltip` `maxWidth`. */
-  .webui-context-usage-label { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 60; width: max-content; max-width: 220px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%); transform-origin: bottom center; background: rgb(0 0 0 / 85%); color: #fff; font-size: var(--size_12); line-height: 16px; white-space: nowrap; pointer-events: none; }
-  .webui-context-usage-label::after { position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: rgb(0 0 0 / 85%); content: ""; transform: translateX(-50%); }
+   * 220 because changing an inert number would only hide where it came from.
+   * The live width on this shape is the 250 on
+   * `.webui-settings-info-hint-bubble` and `.webui-signin-credits-tooltip`,
+   * which is antd's `Tooltip` `maxWidth`. */
+  .webui-context-usage-label { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 60; max-width: 220px; padding: 4px 8px; transform: translateX(-50%); line-height: var(--line_height_16); white-space: nowrap; }
   .webui-context-usage-track, .webui-context-usage-value { fill: none; stroke-width: 2; }
   .webui-context-usage-track { stroke: var(--border_light); }
   .webui-context-usage-value { stroke: var(--text_default_accent); stroke-linecap: round; }
@@ -135,20 +134,9 @@
     }
   }
 
-  /* A session is a two-zone surface: one message viewport owns the scroll
-   * position, while the composer stays in the bottom zone. The DOM keeps the
-   * composer close to the home surface markup, so the explicit order here is
-   * the seam that prevents it from reappearing above the conversation. */
-  .webui-session-layout {
-    position: relative;
-    min-height: 0;
-    min-width: 0;
-    width: 100%;
-  }
-  .webui-session-layout .webui-session-scroll-viewport {
-    min-width: 0;
-    align-items: stretch;
-  }
+  /* The transcript's own region inside the session skeleton: the scroll it
+   * owns and the message list inside it. The skeleton's own three rules live
+   * in `styles/layout.css`, with the shell that renders them. */
   .webui-session-layout .webui-session-transcript-scroll {
     order: 1;
     min-height: 0;
@@ -198,11 +186,6 @@
     margin: 0;
     text-align: center;
   }
-  .webui-session-layout .webui-session-bottom-padding {
-    order: 3;
-    height: var(--webui-composer-bottom-padding, 168px);
-  }
-
   /* The user's turn: a 16px-radius pale blue bubble, right-aligned and capped
    * at 80% of the reading column; the user body reads 15px/24px. */
   .webui-user-bubble {
@@ -232,7 +215,7 @@
     align-items: center;
     vertical-align: middle;
     gap: var(--spacing_4);
-    margin-right: 6px;
+    margin-right: var(--spacing_6);
     color: var(--icon_default_accent);
     font-weight: 500;
   }
@@ -268,7 +251,7 @@
     gap: var(--spacing_16);
     color: var(--text_default_primary);
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
   .webui-assistant-answer {
     min-width: 0;
@@ -287,7 +270,7 @@
     color: var(--text_default_tertiary);
     font-size: var(--size_14);
     font-weight: 400;
-    line-height: 22px;
+    line-height: var(--line_height_22);
     padding: 0;
     border: 0;
     background: transparent;
@@ -312,7 +295,7 @@
     cursor: pointer;
     color: var(--text_default_secondary);
     font-size: var(--size_14);
-    line-height: 22px;
+    line-height: var(--line_height_22);
     font-weight: 400;
     padding: 0;
     border: 0;
@@ -364,7 +347,7 @@
     bottom: 2px;
     left: 7.5px;
     width: 1px;
-    border-radius: 8px;
+    border-radius: var(--radius_8);
     background: var(--border_light);
   }
   .timeline-connector { margin-left: 7.5px; height: 8px; width: 1px; background: var(--border_light); }
@@ -379,12 +362,12 @@
   }
   .webui-thinking-detail {
     position: relative;
-    margin-left: 8px;
+    margin-left: var(--spacing_8);
     border-left: 0.5px solid var(--border_default);
     padding: var(--spacing_12) 0 var(--spacing_4) var(--spacing_16);
     color: var(--text_default_tertiary);
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
   /* The live "推理中…" row trails the streamed thinking detail (or the tool
    * row above it, when the detail is still empty). It carried no margin at
@@ -399,7 +382,7 @@
     gap: var(--spacing_8);
     color: var(--text_default_tertiary);
     font-size: var(--size_14);
-    line-height: 22px;
+    line-height: var(--line_height_22);
   }
   .webui-thinking-detail-heading {
     display: flex;
@@ -409,7 +392,7 @@
     margin: 0 0 var(--spacing_8) -24px;
     color: var(--text_default_tertiary);
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
   .webui-thinking-detail-content {
     position: relative;
@@ -435,7 +418,7 @@
   }
   .webui-thinking-detail .webui-markdown {
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     color: var(--text_default_tertiary);
   }
   .webui-turn-process-segments {
@@ -455,7 +438,7 @@
     min-width: 0;
     color: var(--text_default_tertiary);
     font-size: var(--size_14);
-    line-height: 22px;
+    line-height: var(--line_height_22);
   }
   .webui-tool-row-summary {
     display: flex;
@@ -481,7 +464,7 @@
     justify-content: center;
     color: var(--text_default_tertiary);
     font-size: var(--size_16);
-    line-height: 16px;
+    line-height: var(--line_height_16);
   }
   .webui-tool-icon > svg { width: 16px; height: 16px; }
   .webui-tool-icon--command { color: var(--text_default_secondary); }
@@ -532,7 +515,7 @@
     min-width: 0;
     border-radius: var(--radius_12);
     background-color: var(--bg_grouped_tertiary);
-    padding: 4px;
+    padding: var(--spacing_4);
   }
   .webui-tool-detail-body {
     min-width: 0;
@@ -543,7 +526,7 @@
     font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
       Liberation Mono, monospace;
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
   }
   .webui-tool-detail-title {
     overflow-wrap: anywhere;
@@ -565,7 +548,7 @@
     color: var(--text_default_secondary);
     font-family: inherit;
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     white-space: pre-wrap;
     word-break: break-all;
   }
@@ -577,261 +560,16 @@
 
   /* --------------------------------------------------------- markdown */
 
-  /* Assistant and thinking content renders through
-   * `.matrix-markdown`. In the chat reading column the body resolves to
-   * 15px/24px. */
-  .webui-markdown {
-    font-size: 15px;
-    line-height: 24px;
-    color: var(--text_default_primary);
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-  .webui-message-file-link { display: inline-flex; align-items: baseline; gap: 5px; color: var(--text_default_accent); text-decoration: none; }
-  .webui-message-file-link:hover { text-decoration: underline; }
+  /* The delivered-assets list is the assistant's own attachments, not the
+   * renderer's output. The renderer itself — its body, its fenced block, its
+   * diagram panel and its table shell — is the shared layer's
+   * (`styles/markdown.css`), because three businesses render it. */
   .webui-delivered-assets { margin: var(--spacing_8) 0; padding-left: var(--spacing_24); list-style: disc; }
   .webui-delivered-asset { color: var(--text_default_secondary); }
   .webui-delivered-asset-icon { margin-right: 5px; }
   .webui-delivered-asset-caption { color: var(--text_default_secondary); }
   .webui-delivered-asset-deleted { margin-left: var(--spacing_8); color: var(--text_default_tertiary); font-size: var(--size_12); }
-  .webui-markdown > * {
-    min-width: 0;
-    margin-block-start: 0;
-    margin-block-end: 0;
-  }
-  .webui-markdown > * + * {
-    margin-block-start: var(--spacing_12);
-  }
-  .webui-markdown > p + :is(ul, ol) {
-    margin-block-start: 10px;
-  }
-  .webui-markdown > p + .webui-code-block {
-    margin-block-start: 14px;
-  }
-  .webui-markdown p {
-    margin: 0;
-  }
-  /* The `--thinking` variant: a step down from the chat body, and
-   * never bolded. */
 
-  .webui-markdown :is(h1, h2, h3, h4, h5, h6):first-child {
-    margin-block-start: 0;
-  }
-  .webui-markdown h1,
-  .webui-markdown h2 {
-    font-size: var(--size_20);
-    font-weight: 600;
-    line-height: 26px;
-    margin-block-start: var(--spacing_12);
-  }
-  .webui-markdown h3 {
-    font-size: 18px;
-    font-weight: 600;
-    line-height: 24px;
-    margin-block-start: var(--spacing_12);
-  }
-  .webui-markdown h4,
-  .webui-markdown h5 {
-    font-size: var(--size_16);
-    font-weight: 500;
-    line-height: 22px;
-    margin-block-start: var(--spacing_8);
-  }
-  .webui-markdown h6 {
-    font-size: var(--size_14);
-    font-weight: 500;
-    line-height: 22px;
-    margin-block-start: var(--spacing_8);
-  }
-  .webui-markdown strong,
-  .webui-markdown b {
-    font-weight: var(--weight_medium);
-  }
-  .webui-markdown a {
-    color: var(--text_default_primary);
-    text-decoration: none;
-  }
-  .webui-markdown a.webui-message-file-link {
-    color: var(--text_default_accent);
-  }
-  .webui-markdown a:hover {
-    color: var(--text_default_accent);
-    text-decoration: underline;
-  }
-  .webui-markdown ul {
-    margin: 0 0 0 1.8em;
-    padding: 0;
-    list-style-type: disc;
-  }
-  .webui-markdown ol {
-    margin: 0 0 0 1.8em;
-    padding: 0;
-    list-style-type: decimal;
-  }
-  .webui-markdown ul ul {
-    list-style-type: circle;
-  }
-  .webui-markdown ul ul ul {
-    list-style-type: square;
-  }
-  .webui-markdown li {
-    line-height: 24px;
-    padding-bottom: var(--spacing_4);
-  }
-  .webui-markdown li:last-of-type {
-    padding-bottom: 0;
-  }
-  .webui-markdown li > p {
-    margin: 0;
-  }
-  .webui-markdown li :is(ul, ol) {
-    margin: 0 0 0 1.2em;
-  }
-  .webui-markdown hr {
-    border: none;
-    border-top: 0.5px solid var(--border_default);
-    margin: var(--spacing_16) 0;
-  }
-  .webui-markdown blockquote {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing_12);
-    margin: 0;
-    padding: var(--spacing_8) 0 var(--spacing_8) var(--spacing_16);
-  }
-  .webui-markdown blockquote::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: var(--spacing_8);
-    bottom: var(--spacing_8);
-    width: 4px;
-    border-radius: var(--radius_full);
-    background-color: var(--border_tertiary_inactive);
-  }
-  .webui-markdown blockquote * {
-    color: var(--text_default_primary);
-  }
-  .webui-markdown blockquote :is(p, ul, ol) {
-    margin: 0;
-  }
-  /* Inline code carries its own surface; the fenced block gets the wrapper. */
-  .webui-markdown code {
-    font-size: 13px;
-    line-height: 20px;
-  }
-  .webui-markdown :not(pre) > code {
-    padding: 0.18em 0.5em;
-    border-radius: 6px;
-    background-color: var(--bg_grouped_tertiary);
-  }
-  .webui-code-block {
-    background-color: var(--bg_grouped_tertiary);
-    border-radius: var(--radius_16);
-    overflow: hidden;
-  }
-  .webui-code-block pre {
-    margin: 0;
-    max-height: 400px;
-    overflow: auto;
-    padding: var(--spacing_12) var(--spacing_16);
-    background-color: transparent;
-  }
-  /* C-2: the gutter is a sibling of the `pre` so that selecting and copying the
-     code carries no line numbers, which also means the `pre` owns the scroll
-     and the gutter holds its place beside it. The selectors carry
-     `.webui-markdown` because the gutter is an `<ol>` rendered inside the
-     transcript, and `.webui-markdown ol` above sets `list-style-type: decimal`
-     and a 1.8em indent. Both rules sit in the same layer, so the tie is broken
-     by specificity, not by order: at `.webui-code-gutter` (0,1,0) the markdown
-     rule (0,1,1) won and every fence rendered as `1. 1` / `2. 2`. */
-  .webui-code-block--numbered {
-    display: flex;
-    align-items: stretch;
-  }
-  .webui-code-block--numbered pre {
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-  .webui-markdown .webui-code-gutter {
-    flex: 0 0 auto;
-    margin: 0;
-    padding: var(--spacing_12) 0 var(--spacing_12) var(--spacing_16);
-    border-right: 1px solid var(--border_light);
-    color: var(--text_default_tertiary);
-    font-variant-numeric: tabular-nums;
-    list-style: none;
-    text-align: right;
-    user-select: none;
-  }
-  .webui-markdown .webui-code-gutter li {
-    padding: 0 var(--spacing_8);
-  }
-  /* C-1: the transcript's own tokens, mirroring `.webui-file-code` so a fence
-     and the file viewer read as one surface. */
-  .webui-code-block .hljs-comment, .webui-code-block .hljs-quote { color: var(--text_default_tertiary); font-style: italic; }
-  .webui-code-block .hljs-keyword, .webui-code-block .hljs-meta .hljs-keyword { color: var(--text_label_accent_default); }
-  .webui-code-block .hljs-string, .webui-code-block .hljs-doctag { color: var(--text_label_positive_secondary_default); }
-  .webui-code-block .hljs-number, .webui-code-block .hljs-literal { color: var(--text_label_warning_secondary_default); }
-  .webui-code-block .hljs-title, .webui-code-block .hljs-title.function_, .webui-code-block .hljs-function, .webui-code-block .hljs-section { color: var(--text_label_accent_default); }
-  .webui-code-block .hljs-type, .webui-code-block .hljs-built_in, .webui-code-block .hljs-title.class_ { color: var(--text_label_danger_secondary_default); }
-  .webui-code-block .hljs-attr, .webui-code-block .hljs-variable, .webui-code-block .hljs-property { color: var(--text_default_secondary); }
-  /* Mermaid diagrams: the container the rendered SVG lands in, and the raw
-     diagram text before the render settles. The surface tokens mirror
-     `.webui-code-block` so a diagram and a fence read as one panel. The SVG
-     itself carries Mermaid's own inline styles — drawn with the app's
-     current theme, so a diagram on a dark page is a dark diagram — and only
-     its scaling is pinned here. The `pre` covers the pending state, which
-     shows the diagram source while the library chunk loads. */
-  .webui-mermaid {
-    background-color: var(--bg_grouped_tertiary);
-    border-radius: var(--radius_16);
-    overflow: hidden;
-    padding: var(--spacing_12) var(--spacing_16);
-  }
-  .webui-mermaid pre {
-    margin: 0;
-    max-height: 400px;
-    overflow: auto;
-    font-size: 13px;
-    line-height: 20px;
-  }
-  .webui-mermaid svg {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
-
-  .webui-table-shell {
-    max-width: 100%;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    padding: var(--spacing_4) 0;
-  }
-  .webui-markdown table {
-    width: max-content;
-    min-width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-    line-height: 20px;
-  }
-  .webui-markdown table tr {
-    border-bottom: 1px solid var(--border_light);
-  }
-  .webui-markdown table thead tr {
-    border-bottom: 1px solid var(--border_tertiary_press);
-  }
-  .webui-markdown table th,
-  .webui-markdown table td {
-    padding: 10px var(--spacing_16) 10px 0;
-    text-align: left;
-    vertical-align: top;
-  }
-  .webui-markdown table th {
-    min-width: 60px;
-    font-weight: var(--weight_medium);
-  }
 
   /* ===== message-render parity: thinking pulse, turn clock, stop
      button, questionnaire card, edited-files card ===== */
@@ -844,7 +582,7 @@
     margin: 0;
     color: var(--text_default_secondary);
     font-size: var(--size_12);
-    line-height: 16px;
+    line-height: var(--line_height_16);
     font-variant-numeric: tabular-nums;
   }
 
@@ -853,7 +591,7 @@
     flex-direction: column;
     overflow: hidden;
     border: 0.5px solid var(--border_default);
-    border-radius: 12px;
+    border-radius: var(--radius_12);
     /* The diff card sits inside the reading column and inherits the
      * grouped surface tint through `transparent`. */
     background: transparent;
@@ -863,7 +601,7 @@
     min-height: 48px;
     justify-content: center;
     gap: var(--spacing_4);
-    padding: 8px 12px;
+    padding: var(--spacing_8) var(--spacing_12);
   }
 
   .webui-diff-neutral-copy {
@@ -878,7 +616,7 @@
     align-items: center;
     justify-content: center;
     flex: none;
-    border-radius: 8px;
+    border-radius: var(--radius_8);
     background: var(--bg_grouped_tertiary);
     color: var(--text_default_secondary);
   }
@@ -893,7 +631,7 @@
     align-items: center;
     gap: var(--spacing_12);
     min-height: 70px;
-    padding: 12px 16px;
+    padding: var(--spacing_12) var(--spacing_16);
   }
 
   .webui-diff-header:hover {
@@ -906,7 +644,7 @@
     flex: 1;
     align-items: center;
     gap: var(--spacing_12);
-    padding-right: 12px;
+    padding-right: var(--spacing_12);
     text-align: left;
   }
 
@@ -969,7 +707,7 @@
     align-items: center;
     gap: var(--spacing_8);
     min-height: 36px;
-    padding: 0 12px;
+    padding: 0 var(--spacing_12);
     border-bottom: 0.5px solid var(--border_default);
     font-size: 13px;
   }
@@ -1015,12 +753,12 @@
     min-height: 36px;
     align-items: center;
     justify-content: flex-start;
-    padding: 0 12px;
+    padding: 0 var(--spacing_12);
     text-align: left;
   }
 
   .webui-diff-card .webui-tool-list {
-    padding: 4px 8px;
+    padding: var(--spacing_4) var(--spacing_8);
   }
 
   .webui-diff-actions {
@@ -1036,16 +774,16 @@
     display: inline-flex;
     height: 32px;
     align-items: center;
-    padding: 0 8px;
+    padding: 0 var(--spacing_8);
     white-space: nowrap;
   }
 
   .webui-diff-review {
-    padding: 0 12px;
+    padding: 0 var(--spacing_12);
   }
 
   .webui-diff-review-panel {
-    padding: 8px 12px;
+    padding: var(--spacing_8) var(--spacing_12);
     border-top: 0.5px solid var(--border_default);
     color: var(--text_default_secondary);
     font-size: var(--size_12);
@@ -1070,7 +808,7 @@
   .webui-diff-revert,
   .webui-diff-reapply {
     min-width: 0;
-    padding: 4px 8px;
+    padding: var(--spacing_4) var(--spacing_8);
   }
 
   /* A revert/reapply that did not apply. Deliberately a footnote on the live
@@ -1080,7 +818,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--spacing_12);
-    padding: 8px 12px;
+    padding: var(--spacing_8) var(--spacing_12);
     border-top: 0.5px solid var(--border_default);
     background: var(--bg_interaction_secondary_default);
     font-size: var(--size_12);
@@ -1115,7 +853,7 @@
     align-items: center;
     gap: var(--spacing_6);
     min-height: 28px;
-    margin-top: 4px;
+    margin-top: var(--spacing_4);
     color: var(--text_default_tertiary);
     font-size: 13px;
     line-height: 19.5px;
@@ -1153,7 +891,7 @@
     min-height: 26px;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: var(--radius_8);
     padding: 0;
     border: 0;
     background: transparent;
@@ -1170,15 +908,15 @@
   .webui-message-feedback {
     display: inline-flex;
     gap: var(--spacing_2);
-    margin-left: 2px;
-    padding-left: 4px;
+    margin-left: var(--spacing_2);
+    padding-left: var(--spacing_4);
     border-left: 1px solid var(--border_default);
   }
 
   .webui-user-inline-editor {
-    padding: 16px;
+    padding: var(--spacing_16);
     border: 1px solid var(--border_default);
-    border-radius: 16px;
+    border-radius: var(--radius_16);
     background: var(--bg_default_secondary);
     color: var(--text_default_primary);
   }
@@ -1196,7 +934,7 @@
     display: flex;
     justify-content: space-between;
     gap: var(--spacing_12);
-    padding: 6px 0;
+    padding: var(--spacing_6) 0;
     border-top: 1px solid var(--border_default);
     color: var(--text_default_secondary);
     font-size: var(--size_12);

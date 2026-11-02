@@ -202,6 +202,18 @@
   --spacing_8: 8px;
   --spacing_90: 90px;
   --weight_medium: 500;
+  /* elevation tokens: the shadow recipes the surfaces share.
+   *
+   * They sit in the scale layer rather than beside the semantic
+   * `--shadow_default` because they are theme-independent: a shadow is a
+   * shadow under both themes, so there is nothing to rebind per theme. The
+   * semantic token is the opposite case — it follows the surface it sits on,
+   * so it is bound in `.light` and `.dark` like every other semantic
+   * token. */
+  --elevation_sm: 0 2px 8px rgb(0 0 0 / 12%);
+  --elevation_md: 0 8px 24px rgb(0 0 0 / 12%);
+  --elevation_lg: 0 6px 16px rgb(0 0 0 / 18%);
+  --elevation_glow: 0 0 20px rgba(10, 10, 10, 0.08);
   --weight_regular: 400;
 
   /* semantic tokens — light values (the default; .light reaffirms them) */

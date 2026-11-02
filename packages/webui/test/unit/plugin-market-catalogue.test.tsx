@@ -123,9 +123,17 @@ describe("marketplace page layout parity", () => {
     expect(catalogueView).toMatch(
       /const isMarketCatalogue\s*=\s*\(area === "plugins" \|\| area === "skills"\) && view === "market";/,
     );
+    // The grid's two classes are split between the caller's own layout and
+    // the published list's own: the caller says `webui-plugin-grid`, and the
+    // published component supplies `webui-plugin-list`.
     expect(marketplaceSource).toContain(
-      'className="webui-plugin-list webui-plugin-grid"',
+      '<PluginRowList className="webui-plugin-grid">',
     );
+    expect(
+      squashWhitespace(
+        readWebuiSource("features/plugins/ui/PluginRow.public.tsx"),
+      ),
+    ).toContain('"webui-plugin-list"');
   });
 
   it("previews the same number of cards on both pages", () => {

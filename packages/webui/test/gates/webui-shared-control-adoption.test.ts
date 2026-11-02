@@ -44,6 +44,10 @@ export const SHARED_CONTROL_CLASSES = [
   // The menu-row contract.
   "webui-menu-item",
   "webui-menu-separator",
+  // The tooltip bubble: the shared shape every floating label draws.
+  "webui-tooltip-bubble",
+  // The block surface: the hairline border over the soft layer a card is.
+  "webui-card",
 ];
 
 /**
@@ -54,9 +58,11 @@ export const SHARED_CONTROL_CLASSES = [
  */
 export const SHARED_HOME = [
   "packages/webui/src/client/ui/button.tsx",
+  "packages/webui/src/client/ui/card.tsx",
   "packages/webui/src/client/ui/feedback.tsx",
   "packages/webui/src/client/ui/field.tsx",
   "packages/webui/src/client/ui/menu-item.tsx",
+  "packages/webui/src/client/ui/page.tsx",
 ];
 
 function listTsx(directory: string): string[] {
@@ -124,6 +130,8 @@ describe("the adoption gate", () => {
     ["form", "webui-form webui-form-actions"],
     ["menu item", "webui-menu-item webui-menu-item-label"],
     ["menu separator", "webui-menu-separator"],
+    ["tooltip bubble", "webui-tooltip-bubble"],
+    ["block surface", "webui-card"],
   ];
 
   for (const [family, className] of fixtures) {

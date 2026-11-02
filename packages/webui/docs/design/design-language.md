@@ -22,6 +22,14 @@ Three layers, all plain custom properties.
 | Type size | `--size_12` `_14` `_16` `_20` `_24` `_32` `_40` `_48` `_64` |
 | Line height | `--line_height_16` `_18` `_20` `_22` `_26` `_28` `_36` `_40` |
 | Weight | `--weight_regular` `--weight_medium` |
+| Elevation | `--elevation_sm` `_md` `_lg` `_glow` |
+
+The elevation tokens are the shadow recipes the surfaces share. They sit in the
+scale layer rather than beside the semantic `--shadow_default` because they
+are theme-independent: a shadow is a shadow under both themes, so there is
+nothing to rebind per theme. The semantic token is the opposite case — it
+follows the surface it sits on, so it is bound in `.light` and `.dark` like
+every other semantic token.
 
 **3. Semantic tokens.** 211 of them, named `<role>_<group>_<component>_<state>`:
 

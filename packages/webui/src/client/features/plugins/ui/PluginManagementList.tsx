@@ -8,6 +8,13 @@ import { FeedbackEmpty } from "../../../ui/feedback.js";
 import { WebuiSearchField } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiMotion, WebuiSkeletonProjection } from "../../../ui/page.js";
+import {
+  PluginRow,
+  PluginRowActions,
+  PluginRowCopy,
+  PluginRowIcon,
+  PluginRowList,
+} from "../../plugins/ui/PluginRow.public.js";
 
 export type PluginManagementArea =
   "plugins" | "skills" | "apps" | "mcp" | "agents";
@@ -92,7 +99,7 @@ export function PluginManagementList({
     <FeedbackEmpty title="暂无内容" />
   ) : (
     <WebuiSkeletonProjection>
-      <div className="webui-plugin-list">
+      <PluginRowList>
         {rows.map((row, index) => {
           const item = row.source;
           const name = row.name || `item-${index}`;
@@ -107,17 +114,13 @@ export function PluginManagementList({
               : { source: row.pluginSource }),
           });
           return (
-            <WebuiMotion
-              as="article"
-              kind="card"
+            <PluginRow
               hoverable
-              className="webui-plugin-row"
               key={`${area}-${name}`}
             >
-              <div
-                className={`webui-plugin-icon${area === "skills" ? " webui-plugin-icon--skill" : ""}`}
-                aria-hidden="true"
-              >
+            <PluginRowIcon
+              className={area === "skills" ? "webui-plugin-icon--skill" : undefined}
+            >
                 {area === "skills" ? (
                   <span className="webui-plugin-skill-icon-tile">
                     <IconFileCode aria-hidden="true" size={22} stroke={1.5} />
@@ -142,11 +145,11 @@ export function PluginManagementList({
                 ) : (
                   "◇"
                 )}
-              </div>
-              <div className="webui-plugin-copy">
+              </PluginRowIcon>
+              <PluginRowCopy>
                 <h2>{read(item, "displayName", "display_name") || name}</h2>
                 <p>{row.description || read(item, "transport")}</p>
-              </div>
+              </PluginRowCopy>
               {area === "apps" ? (
                 <span className="text-text_default_tertiary">
                   {row.appStatus}
@@ -170,7 +173,7 @@ export function PluginManagementList({
                       </small>
                     ) : null}
                   </div>
-                  <div className="webui-plugin-actions">
+                  <PluginRowActions>
                     <WebuiButton
                       variant="secondary"
                       size="compact"
@@ -201,10 +204,10 @@ export function PluginManagementList({
                         })
                       }
                     />
-                  </div>
+                  </PluginRowActions>
                 </>
               ) : (
-                <div className="webui-plugin-actions">
+                <PluginRowActions>
                   <ToggleSwitch
                     checked={isOn}
                     label={`启用 ${name}`}
@@ -258,12 +261,12 @@ export function PluginManagementList({
                       删除
                     </WebuiButton>
                   ) : null}
-                </div>
+                </PluginRowActions>
               )}
-            </WebuiMotion>
+            </PluginRow>
           );
         })}
-      </div>
+      </PluginRowList>
     </WebuiSkeletonProjection>
   );
 }

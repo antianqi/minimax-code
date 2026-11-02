@@ -1,0 +1,24 @@
+/*
+ * The shared block surface (ADR 0028 § Shared contracts).
+ *
+ * A block in the main column: a hairline border over a soft layer. The border
+ * alone reads as nothing on a light surface — the shadow is what makes the
+ * layer visible at all.
+ *
+ * Two businesses used this surface: the interaction panel and the composer's
+ * queue panel. Each of them spelled the shape out of the other one's
+ * stylesheet, so the block's appearance belonged to nobody in particular.
+ *
+ * The shape is here. A caller owns its layout, and a caller that needs
+ * another radius or fill says so with its own utilities — the utilities layer
+ * wins over this rule, which is how the interaction panel's raised variant
+ * already reads.
+ */
+@layer components {
+  .webui-card {
+    background-color: var(--bg_default_primary);
+    border: 1px solid var(--border_default);
+    border-radius: var(--radius_16);
+    box-shadow: 0 0 10px 0 var(--shadow_default);
+  }
+}

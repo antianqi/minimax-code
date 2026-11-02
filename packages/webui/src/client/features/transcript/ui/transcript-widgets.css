@@ -41,7 +41,7 @@
  * variable references.
  */
 .transcript-shadow-banner-soft {
-  box-shadow: 0 0 20px rgba(10, 10, 10, 0.08);
+  box-shadow: var(--elevation_glow);
 }
 
 /*

@@ -37,7 +37,7 @@
     align-items: center;
     gap: var(--spacing_2);
     min-width: 0;
-    padding: 6px 10px;
+    padding: var(--spacing_6) 10px;
     background: var(--bg_grouped_secondary);
     border-bottom: 1px solid var(--border_default);
   }
@@ -75,7 +75,7 @@
     align-items: center;
     gap: var(--spacing_8);
     height: 28px;
-    margin: 0 6px;
+    margin: 0 var(--spacing_6);
     padding: 0 10px;
     border-radius: 14px;
     background: var(--bg_default_primary);
@@ -100,7 +100,7 @@
     flex: 0 1 auto;
     align-items: center;
     gap: var(--spacing_6);
-    padding: 0 8px;
+    padding: 0 var(--spacing_8);
     color: var(--text_default_tertiary);
     font-size: var(--font-size_11, 11px);
   }
@@ -144,7 +144,7 @@
   }
 
   .webui-browser-surface {
-    padding: 4px 10px;
+    padding: var(--spacing_4) 10px;
     border: 1px solid var(--border_light);
     border-radius: var(--border-radius_8, 8px);
     background: var(--bg_grouped_secondary);
@@ -184,12 +184,12 @@
     left: 8px;
     max-width: calc(100% - 16px);
     margin: 0;
-    padding: 6px 10px;
+    padding: var(--spacing_6) 10px;
     border-radius: var(--border-radius_8, 8px);
     background: var(--bg_interaction_secondary_default);
     color: var(--text_default_secondary);
     font-size: var(--font-size_12, 12px);
-    box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+    box-shadow: var(--elevation_sm);
   }
 
   .webui-browser-notice.is-error {
@@ -242,7 +242,7 @@
 
   .webui-browser-empty {
     margin: 0;
-    padding: 12px;
+    padding: var(--spacing_12);
     color: var(--text_default_secondary);
     font-size: var(--font-size_12, 12px);
     text-align: center;

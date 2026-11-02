@@ -223,6 +223,35 @@
     box-shadow: 12px 0 32px rgb(10 10 10 / 12%);
   }
 
+  /*
+   * The session skeleton.
+   *
+   * A session is a two-zone surface: one message viewport owns the scroll
+   * position, while the composer stays in the bottom zone. The DOM keeps the
+   * composer close to the home surface markup, so the explicit order here is
+   * the seam that prevents it from reappearing above the conversation.
+   *
+   * These three rules are the skeleton's, and they were the transcript's
+   * stylesheet's: the shell renders both of the elements they describe, and
+   * the shell is what owns their box. The transcript's own region — the scroll
+   * it owns and the message list inside it — stays with the transcript, as the
+   * composer's own overlay stays with the composer.
+   */
+  .webui-session-layout {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+  }
+  .webui-session-layout .webui-session-scroll-viewport {
+    min-width: 0;
+    align-items: stretch;
+  }
+  .webui-session-layout .webui-session-bottom-padding {
+    order: 3;
+    height: var(--webui-composer-bottom-padding, 168px);
+  }
+
   /* The scrim behind an open drawer. It takes the surface's clicks, so the
    * content behind a drawer is not reachable by tapping it. It dims the whole
    * shell, so it sits above every shell surface — the composer's own overlay

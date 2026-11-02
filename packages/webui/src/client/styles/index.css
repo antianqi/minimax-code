@@ -19,6 +19,10 @@
  * the reduced-motion policy. It comes right after the tokens, because every
  * surface below it moves by reading one of these values. */
 @import "./motion.css";
+/* The shared tooltip bubble: the one dark shape with an arrow that every
+ * floating label in the client draws. It comes before the surfaces that call
+ * it, so a caller's own box wins over the shared shape. */
+@import "./tooltip.css";
 /* The field contract's arrangement (ADR 0028 § Shared contracts): a label, a
  * description, an error and a control, stacked or in a row. */
 @import "./field.css";
@@ -41,6 +45,13 @@
  * feature that needs something specific about its own popup can still say so. */
 @import "./dropdown.css";
 @import "./dialog.css";
+/* The shared block surface: the hairline border over the soft layer that a
+ * card in the main column is made of. */
+@import "./card.css";
+/* The published markdown renderer's appearance: the body, the fenced block,
+ * the diagram panel and the table shell, plus the code palette the file
+ * viewer shares with the fence. */
+@import "./markdown.css";
 /* Feature rules follow their business. Each file holds that business's rules
  * out of the old monolith, in their original relative order, and every one of
  * them is still inside `@layer components` — Tailwind collects that layer and

@@ -1,0 +1,304 @@
+/*
+ * The published markdown renderer's appearance (ADR 0028 § Shared contracts).
+ *
+ * `WebuiMarkdown` is a published module: the transcript renders it, and so do
+ * the interactions panel and the workspace's file preview. Its appearance was
+ * the transcript's stylesheet's, so two of its three callers were drawing a
+ * surface another business owned.
+ *
+ * The body, the fenced block, the diagram panel and the table shell are one
+ * surface, and they are stated once here.
+ *
+ * The code palette is the other half of it. The workspace's file viewer shows
+ * highlighted source too, and it carried its own copy of the same seven
+ * rules, so a fence and a file read as one surface only by coincidence. Both
+ * surfaces name the palette below; a surface that shows highlighted source
+ * and is not in that list has to be added, which is the point of writing it
+ * down once.
+ */
+
+@layer components {
+  /* Assistant and thinking content renders through
+   * `.matrix-markdown`. In the chat reading column the body resolves to
+   * 15px/24px. */
+  .webui-markdown {
+    font-size: 15px;
+    line-height: 24px;
+    color: var(--text_default_primary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .webui-message-file-link { display: inline-flex; align-items: baseline; gap: 5px; color: var(--text_default_accent); text-decoration: none; }
+  .webui-message-file-link:hover { text-decoration: underline; }
+  .webui-markdown > * {
+    min-width: 0;
+    margin-block-start: 0;
+    margin-block-end: 0;
+  }
+  .webui-markdown > * + * {
+    margin-block-start: var(--spacing_12);
+  }
+  .webui-markdown > p + :is(ul, ol) {
+    margin-block-start: 10px;
+  }
+  .webui-markdown > p + .webui-code-block {
+    margin-block-start: 14px;
+  }
+  .webui-markdown p {
+    margin: 0;
+  }
+  /* The `--thinking` variant: a step down from the chat body, and
+   * never bolded. */
+
+  .webui-markdown :is(h1, h2, h3, h4, h5, h6):first-child {
+    margin-block-start: 0;
+  }
+  .webui-markdown h1,
+  .webui-markdown h2 {
+    font-size: var(--size_20);
+    font-weight: 600;
+    line-height: 26px;
+    margin-block-start: var(--spacing_12);
+  }
+  .webui-markdown h3 {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 24px;
+    margin-block-start: var(--spacing_12);
+  }
+  .webui-markdown h4,
+  .webui-markdown h5 {
+    font-size: var(--size_16);
+    font-weight: 500;
+    line-height: 22px;
+    margin-block-start: var(--spacing_8);
+  }
+  .webui-markdown h6 {
+    font-size: var(--size_14);
+    font-weight: 500;
+    line-height: 22px;
+    margin-block-start: var(--spacing_8);
+  }
+  .webui-markdown strong,
+  .webui-markdown b {
+    font-weight: var(--weight_medium);
+  }
+  .webui-markdown a {
+    color: var(--text_default_primary);
+    text-decoration: none;
+  }
+  .webui-markdown a.webui-message-file-link {
+    color: var(--text_default_accent);
+  }
+  .webui-markdown a:hover {
+    color: var(--text_default_accent);
+    text-decoration: underline;
+  }
+  .webui-markdown ul {
+    margin: 0 0 0 1.8em;
+    padding: 0;
+    list-style-type: disc;
+  }
+  .webui-markdown ol {
+    margin: 0 0 0 1.8em;
+    padding: 0;
+    list-style-type: decimal;
+  }
+  .webui-markdown ul ul {
+    list-style-type: circle;
+  }
+  .webui-markdown ul ul ul {
+    list-style-type: square;
+  }
+  .webui-markdown li {
+    line-height: 24px;
+    padding-bottom: var(--spacing_4);
+  }
+  .webui-markdown li:last-of-type {
+    padding-bottom: 0;
+  }
+  .webui-markdown li > p {
+    margin: 0;
+  }
+  .webui-markdown li :is(ul, ol) {
+    margin: 0 0 0 1.2em;
+  }
+  .webui-markdown hr {
+    border: none;
+    border-top: 0.5px solid var(--border_default);
+    margin: var(--spacing_16) 0;
+  }
+  .webui-markdown blockquote {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing_12);
+    margin: 0;
+    padding: var(--spacing_8) 0 var(--spacing_8) var(--spacing_16);
+  }
+  .webui-markdown blockquote::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: var(--spacing_8);
+    bottom: var(--spacing_8);
+    width: 4px;
+    border-radius: var(--radius_full);
+    background-color: var(--border_tertiary_inactive);
+  }
+  .webui-markdown blockquote * {
+    color: var(--text_default_primary);
+  }
+  .webui-markdown blockquote :is(p, ul, ol) {
+    margin: 0;
+  }
+  /* Inline code carries its own surface; the fenced block gets the wrapper. */
+  .webui-markdown code {
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .webui-markdown :not(pre) > code {
+    padding: 0.18em 0.5em;
+    border-radius: 6px;
+    background-color: var(--bg_grouped_tertiary);
+  }
+  .webui-code-block {
+    background-color: var(--bg_grouped_tertiary);
+    border-radius: var(--radius_16);
+    overflow: hidden;
+  }
+  .webui-code-block pre {
+    margin: 0;
+    max-height: 400px;
+    overflow: auto;
+    padding: var(--spacing_12) var(--spacing_16);
+    background-color: transparent;
+  }
+  /* C-2: the gutter is a sibling of the `pre` so that selecting and copying the
+     code carries no line numbers, which also means the `pre` owns the scroll
+     and the gutter holds its place beside it. The selectors carry
+     `.webui-markdown` because the gutter is an `<ol>` rendered inside the
+     transcript, and `.webui-markdown ol` above sets `list-style-type: decimal`
+     and a 1.8em indent. Both rules sit in the same layer, so the tie is broken
+     by specificity, not by order: at `.webui-code-gutter` (0,1,0) the markdown
+     rule (0,1,1) won and every fence rendered as `1. 1` / `2. 2`. */
+  .webui-code-block--numbered {
+    display: flex;
+    align-items: stretch;
+  }
+  .webui-code-block--numbered pre {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .webui-markdown .webui-code-gutter {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: var(--spacing_12) 0 var(--spacing_12) var(--spacing_16);
+    border-right: 1px solid var(--border_light);
+    color: var(--text_default_tertiary);
+    font-variant-numeric: tabular-nums;
+    list-style: none;
+    text-align: right;
+    user-select: none;
+  }
+  .webui-markdown .webui-code-gutter li {
+    padding: 0 var(--spacing_8);
+  }
+  /* The code palette: the syntax colours, declared once for every surface
+   * that shows highlighted source. The fence and the workspace's file viewer
+   * each carried their own copy of these seven rules, so the two read as one
+   * surface only by coincidence. */
+  .webui-code-block .hljs-comment,
+  .webui-code-block .hljs-quote,
+  .webui-file-code .hljs-comment,
+  .webui-file-code .hljs-quote { color: var(--text_default_tertiary); font-style: italic; }
+  .webui-code-block .hljs-keyword,
+  .webui-code-block .hljs-meta .hljs-keyword,
+  .webui-file-code .hljs-keyword,
+  .webui-file-code .hljs-meta .hljs-keyword { color: var(--text_label_accent_default); }
+  .webui-code-block .hljs-string,
+  .webui-code-block .hljs-doctag,
+  .webui-file-code .hljs-string,
+  .webui-file-code .hljs-doctag { color: var(--text_label_positive_secondary_default); }
+  .webui-code-block .hljs-number,
+  .webui-code-block .hljs-literal,
+  .webui-file-code .hljs-number,
+  .webui-file-code .hljs-literal { color: var(--text_label_warning_secondary_default); }
+  .webui-code-block .hljs-title,
+  .webui-code-block .hljs-title.function_,
+  .webui-code-block .hljs-function,
+  .webui-code-block .hljs-section,
+  .webui-file-code .hljs-title,
+  .webui-file-code .hljs-title.function_,
+  .webui-file-code .hljs-function,
+  .webui-file-code .hljs-section { color: var(--text_label_accent_default); }
+  .webui-code-block .hljs-type,
+  .webui-code-block .hljs-built_in,
+  .webui-code-block .hljs-title.class_,
+  .webui-file-code .hljs-type,
+  .webui-file-code .hljs-built_in,
+  .webui-file-code .hljs-title.class_ { color: var(--text_label_danger_secondary_default); }
+  .webui-code-block .hljs-attr,
+  .webui-code-block .hljs-variable,
+  .webui-code-block .hljs-property,
+  .webui-file-code .hljs-attr,
+  .webui-file-code .hljs-variable,
+  .webui-file-code .hljs-property { color: var(--text_default_secondary); }
+  /* Mermaid diagrams: the container the rendered SVG lands in, and the raw
+     diagram text before the render settles. The surface tokens mirror
+     `.webui-code-block` so a diagram and a fence read as one panel. The SVG
+     itself carries Mermaid's own inline styles — drawn with the app's
+     current theme, so a diagram on a dark page is a dark diagram — and only
+     its scaling is pinned here. The `pre` covers the pending state, which
+     shows the diagram source while the library chunk loads. */
+  .webui-mermaid {
+    background-color: var(--bg_grouped_tertiary);
+    border-radius: var(--radius_16);
+    overflow: hidden;
+    padding: var(--spacing_12) var(--spacing_16);
+  }
+  .webui-mermaid pre {
+    margin: 0;
+    max-height: 400px;
+    overflow: auto;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .webui-mermaid svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  /* The table shell scrolls sideways only, so it does not reserve the base
+   * layer's stable vertical gutter. */
+  .webui-table-shell {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: var(--spacing_4) 0;
+    scrollbar-gutter: auto;
+  }
+  .webui-markdown table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .webui-markdown table tr {
+    border-bottom: 1px solid var(--border_light);
+  }
+  .webui-markdown table thead tr {
+    border-bottom: 1px solid var(--border_tertiary_press);
+  }
+  .webui-markdown table th,
+  .webui-markdown table td {
+    padding: 10px var(--spacing_16) 10px 0;
+    text-align: left;
+    vertical-align: top;
+  }
+  .webui-markdown table th {
+    min-width: 60px;
+    font-weight: var(--weight_medium);
+  }
+}

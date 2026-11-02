@@ -2,17 +2,6 @@
 @layer components {
 
 
-  /* A block surface in the main column. The composer card is this
-   * shape: a hairline border with a soft layer underneath it. The border alone
-   * reads as nothing on a light surface; the shadow is what makes the layer
-   * visible at all. */
-  .webui-card {
-    background-color: var(--bg_default_primary);
-    border: 1px solid var(--border_default);
-    border-radius: var(--radius_16);
-    box-shadow: 0 0 10px 0 var(--shadow_default);
-  }
-
   /* A quick-action chip: 32px, 8px radius, a hairline ring. */
 
   /* The accent action and the grouped pill used to be declared here, as
@@ -40,24 +29,24 @@
     margin: 0;
     color: var(--text_default_secondary);
     font-size: var(--size_12);
-    line-height: 16px;
+    line-height: var(--line_height_16);
   }
 
   .webui-questionnaire-options {
     display: flex;
     flex-direction: column;
-    margin-top: 4px;
+    margin-top: var(--spacing_4);
   }
 
   .webui-questionnaire-option {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    padding: 10px 8px;
+    padding: 10px var(--spacing_8);
     border-radius: 10px;
     color: var(--text_default_primary);
     font-size: var(--size_14);
-    line-height: 20px;
+    line-height: var(--line_height_20);
     cursor: pointer;
   }
 
@@ -95,8 +84,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing_8);
-    margin-top: 4px;
-    padding: 8px;
+    margin-top: var(--spacing_4);
+    padding: var(--spacing_8);
     border-radius: 10px;
     font-size: var(--size_14);
     cursor: pointer;
@@ -151,6 +140,6 @@
   }
 
   .webui-questionnaire-multi-hint {
-    margin: 4px 8px;
+    margin: var(--spacing_4) var(--spacing_8);
   }
 }

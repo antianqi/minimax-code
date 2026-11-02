@@ -1,0 +1,46 @@
+/*
+ * The shared tooltip bubble (ADR 0028 § Shared contracts).
+ *
+ * One dark shape with an arrow, and until this file it was three copies of it
+ * plus a fourth that no longer had a caller: the shell's section hint, the
+ * account menu's credits note and the composer's context label each carried
+ * their own background, radius, type and arrow, and the copies had already
+ * drifted — one of them wrapped its text and the others did not, and the arrow
+ * was on two of the three.
+ *
+ * What is here is the shape. Where a bubble sits, how wide it may grow and
+ * whether it wraps are the caller's own, and so is the pointer: a bubble that
+ * carries only text turns the pointer off, so the pointer leaving the glyph
+ * towards the bubble does not drop the hover that is showing it, and a bubble
+ * that carries a link turns it back on.
+ *
+ * The colours are antd's `Tooltip` defaults — `colorBgSpotlight` and
+ * `colorTextLightSolid` — and they are DELIBERATELY not tokens: the bubble
+ * is black under BOTH `.light` and `.dark`, so a theme binding here would
+ * be a fidelity regression dressed up as a fix. The 6px radius is antd's
+ * `borderRadius` default for the same reason.
+ *
+ * The account page's calendar tip (`.webui-account-usage-cell-tip`) is NOT
+ * one of these: it is a two-line card with its own radius and its own colour,
+ * so it stays outside this primitive and keeps its own rule.
+ */
+@layer components {
+  .webui-tooltip-bubble {
+    width: max-content;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 85%);
+    color: #fff;
+    font-size: var(--size_12);
+    transform-origin: bottom center;
+    pointer-events: none;
+  }
+  .webui-tooltip-bubble::after {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    border: 5px solid transparent;
+    border-top-color: rgb(0 0 0 / 85%);
+    content: "";
+    transform: translateX(-50%);
+  }
+}

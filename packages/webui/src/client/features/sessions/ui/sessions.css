@@ -279,7 +279,7 @@
     flex: 0 0 24px;
     /* The row it opens sits directly beside it; the margin is the space the
        target rule asks for when two targets touch. */
-    margin-right: 2px;
+    margin-right: var(--spacing_2);
     align-items: center;
     justify-content: center;
   }

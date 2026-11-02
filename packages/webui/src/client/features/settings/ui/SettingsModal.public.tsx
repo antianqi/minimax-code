@@ -13,7 +13,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconChevronDown, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconMicrophone, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
-import { WebuiSearchBox, WebuiSelect, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiSearchField, WebuiSelect, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
@@ -235,7 +235,7 @@ export function SettingsModal({ open, onClose, dataDir, version, sessionId, work
               <Icon name="back" />
               <span>返回应用</span>
             </WebuiButton>
-            <WebuiSearchBox
+            <WebuiSearchField
               icon={<SearchIcon />}
               label="搜索设置"
               placeholder="搜索设置..."
@@ -482,7 +482,7 @@ function ArchivedSessionsPage({ sessions, canDelete, canUnarchive, onDelete, onU
     <SettingsPage testId="settings-archived-page">
       {actionError ? <FeedbackError message={actionError} className="webui-archived-error" /> : null}
       <div className="webui-archived-filters">
-        <WebuiSearchBox icon={<SearchIcon />} label="搜索已归档聊天" placeholder="搜索已归档聊天" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <WebuiSearchField icon={<SearchIcon />} label="搜索已归档聊天" placeholder="搜索已归档聊天" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
       {filtered.length ? (
         [...grouped].map(([path, rows]) => (

@@ -9,7 +9,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { WebuiField, WebuiFormActions, WebuiFormLayout, type FieldControlProps } from "../../src/client/ui/field.js";
+import { WebuiField, WebuiFormActions, WebuiFormLayout, WebuiSearchField, type FieldControlProps } from "../../src/client/ui/field.js";
 
 const input = (props: FieldControlProps) => createElement("input", { ...props });
 
@@ -65,6 +65,25 @@ describe("the field contract", () => {
     const html = render({ label: "API Key", control: input });
     expect(html).not.toContain("readonly");
     expect(html).toContain("<input");
+  });
+});
+
+describe("the shared search field", () => {
+  it("renders one labelled searchbox with the shared field class", () => {
+    const html = renderToStaticMarkup(createElement(WebuiSearchField, {
+      label: "搜索变更",
+      placeholder: "搜索变更",
+      value: "src/client",
+      onChange: () => undefined,
+      testId: "review-search-input",
+    }));
+
+    expect(html).toContain('class="webui-search-field"');
+    expect(html).toContain('role="searchbox"');
+    expect(html).toContain('aria-label="搜索变更"');
+    expect(html).toContain('data-testid="review-search-input"');
+    expect(html).toContain('placeholder="搜索变更"');
+    expect(html).toContain('value="src/client"');
   });
 });
 

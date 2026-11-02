@@ -14,7 +14,7 @@ import {
   type ReactElement,
 } from "react";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiSearchBox } from "../../../ui/field.js";
+import { WebuiSearchField } from "../../../ui/field.js";
 import { WebuiDisclosure } from "../../../ui/page.js";
 
 import {
@@ -270,7 +270,7 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
       <span className="webui-diff-add">{`+${state.totals.additions}`}</span>
       <span className="webui-diff-del">{`-${state.totals.deletions}`}</span>
     </div> : null}
-    {state.status === "ready" ? <WebuiSearchBox
+    {state.status === "ready" ? <WebuiSearchField
       icon={<SearchIcon />}
       label="在变更里搜索"
       placeholder="在变更里搜索"

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
-import { WebuiSearchBox, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiSearchField, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
 import { Terminal } from "@xterm/xterm";
 import { IconEdit } from "@tabler/icons-react";
@@ -782,7 +782,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <FeedbackLiveRegion className="webui-turn-review-empty">正在收集变更…</FeedbackLiveRegion> : reviewSummary.error && !reviewSummary.summary ? <FeedbackError message={reviewSummary.error} className="webui-turn-review-empty" /> : reviewSummary.summary ? <>
         <WebuiInline gap="medium" justify="between" className="webui-turn-review-summary"><span>{reviewSummary.summary.totals.files} 个文件</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{reviewSummary.summary.totals.additions}</span>{reviewSummary.summary.totals.deletions ? <span className="webui-diff-del">-{reviewSummary.summary.totals.deletions}</span> : null}</span></WebuiInline>
         {reviewSummary.summary.files.length ? <>
-          <WebuiSearchBox className="webui-workspace-review-search" icon={<WebuiIconSearch className="size-4" />} label="搜索变更" value={reviewSearchQuery} onChange={(event) => setReviewSearchQuery(event.currentTarget.value)} placeholder="搜索变更" onSubmit={(event) => { event.preventDefault(); runReviewSearch(); }} submitLabel="搜索" submitDisabled={!queries?.canSearchReviewDiffs || reviewSearch?.loading} />
+          <form className="webui-workspace-review-search" onSubmit={(event) => { event.preventDefault(); runReviewSearch(); }}>
+            <WebuiSearchField className="webui-workspace-review-search-field" icon={<WebuiIconSearch className="size-4" />} label="搜索变更" value={reviewSearchQuery} onChange={(event) => setReviewSearchQuery(event.currentTarget.value)} placeholder="搜索变更" />
+            <WebuiButton variant="secondary" size="compact" type="submit" className="webui-workspace-review-search-submit" disabled={!queries?.canSearchReviewDiffs || reviewSearch?.loading}>搜索</WebuiButton>
+          </form>
           {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.loading ? <FeedbackLiveRegion className="webui-workspace-review-status">正在搜索变更…</FeedbackLiveRegion> : null}
           {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.error ? <FeedbackError message={currentWorkspaceReviewSearch.error} className="webui-workspace-review-status" /> : null}
           {reviewDiffs?.error && reviewDiffs.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? <FeedbackError message={reviewDiffs.error} className="webui-workspace-review-status" /> : null}
@@ -902,7 +905,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     </div> : null}
       </div>
       {hasFileWorkspace ? <WebuiDisclosure as="aside" open={fileTreeOpen} axis="horizontal" className="webui-workspace-file-tree-panel" data-webui-page="panel" aria-label="工作区文件树">
-        <WebuiSearchBox className="webui-workspace-file-search" icon={<WebuiIconSearch className="size-4" />} label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} />
+        <WebuiSearchField className="webui-workspace-file-search" icon={<WebuiIconSearch className="size-4" />} label="搜索文件" placeholder="搜索" value={fileSearch} onChange={(event) => setFileSearch(event.currentTarget.value)} />
         <div className="webui-workspace-file-tree-scroll" ref={fileTreeScrollRef}>
           {/* 加载中是一条播报；播报通道交给共享契约。契约本身带 role="status"，
               仍是这个滚动容器的直接子元素，`.webui-workspace-file-tree-scroll > [role="status"]` 继续命中。 */}

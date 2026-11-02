@@ -3,7 +3,7 @@ import { WebuiProjectList } from "./SessionRail.js";
 import { RailRow } from "./RailRow.js";
 import { WebuiIconBrand, WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSchedule, WebuiIconSessionImport, WebuiIconSites } from "../../../shell/icons.js";
 import { IconSearch } from "@tabler/icons-react";
-import { WebuiFileInput, WebuiSearchBox } from "../../../ui/field.js";
+import { WebuiFileInput, WebuiSearchField } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiPage } from "../../../ui/page.js";
@@ -82,7 +82,7 @@ export function SessionRailRegion(props: {
           </div>
         </div>
         {props.searchOpen ? <div className="flex-shrink-0 px-4 pb-px pt-1" data-webui-rail-fixed-row="true">
-          <WebuiSearchBox
+          <WebuiSearchField
             icon={<IconSearch />}
             id="webui-rail-search"
             inputRef={props.searchInputRef}

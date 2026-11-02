@@ -128,19 +128,12 @@
     align-items: center;
     gap: var(--spacing_8);
     border: 1px solid var(--border_default);
-    border-radius: var(--radius_8);
+    border-radius: var(--radius_full);
     background: var(--bg_default_primary);
     color: var(--text_default_secondary);
-    min-height: 40px;
+    min-height: 36px;
     padding: 0 var(--spacing_12);
   }
-  .webui-search-box {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: var(--spacing_8);
-  }
-  .webui-search-box > .webui-search-field { flex: 1 1 auto; }
   .webui-search-field:focus-within { border-color: var(--border_accent); }
   .webui-search-field-icon { display: flex; flex: none; align-items: center; }
   .webui-search-field-icon > svg {

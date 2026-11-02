@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { IconSearch } from "@tabler/icons-react";
-import { WebuiSearchBox } from "../../../ui/field.js";
+import { WebuiSearchField } from "../../../ui/field.js";
 
 export interface PluginPageLayoutProps {
   readonly categories?: ReactNode;
@@ -23,7 +23,7 @@ export function PluginPageLayout({
       <div className="webui-plugin-page-controls">
         {searchLabel && onQueryChange ? (
           <div className="webui-plugin-page-search">
-            <WebuiSearchBox
+            <WebuiSearchField
               icon={<IconSearch size={18} stroke={1.5} />}
               label={searchLabel}
               placeholder={`${searchLabel}...`}

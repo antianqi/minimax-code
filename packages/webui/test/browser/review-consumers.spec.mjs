@@ -7,6 +7,8 @@
 // the owner's decisions; these cases pin that the surfaces are actually wired to
 // it.
 
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { expect } from "@playwright/test";
 
 import { configureFixture, openApp, switchSession, test } from "./harness.mjs";
@@ -76,6 +78,22 @@ test("a settled revert refreshes the workspace review family", async ({ page }) 
   await page.getByTestId("workspace-launcher-tile-review").click();
   await expect(page.getByTestId("workspace-review")).toBeVisible();
   await expect.poll(() => requests(page, "getWorkspaceReviewSummary")).toBeGreaterThan(0);
+  const changeSearch = page.getByRole("searchbox", { name: "搜索变更" });
+  await expect(changeSearch).toBeVisible();
+  const searchGeometry = await changeSearch.locator("xpath=ancestor::div[contains(@class, 'webui-search-field')]").evaluate((element) => {
+    const style = getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    return { borderRadius: Number.parseFloat(style.borderTopLeftRadius), height: bounds.height };
+  });
+  expect(searchGeometry.borderRadius).toBeGreaterThanOrEqual(searchGeometry.height / 2);
+  const captureDir = process.env.WEBUI_REVIEW_SEARCH_SCREENSHOT_DIR;
+  if (captureDir) {
+    mkdirSync(captureDir, { recursive: true });
+    await page.screenshot({ path: join(captureDir, "workspace-review-search.png"), fullPage: true });
+  }
+  await changeSearch.fill("a.ts");
+  await page.getByTestId("workspace-review").getByRole("button", { name: "搜索", exact: true }).click();
+  await expect.poll(() => requests(page, "searchWorkspaceReviewDiffs")).toBeGreaterThan(0);
   const before = await requests(page, "getWorkspaceReviewSummary");
 
   // The revert settles in the turn family and announces it; the review family is

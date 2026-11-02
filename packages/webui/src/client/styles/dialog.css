@@ -146,11 +146,19 @@
    * editor: a 36px control with an 8px radius and a 14px label on a 21px line in
    * the secondary text colour. The field contract's own scale stays as it is for
    * page-level forms; inside a modal the density is the reference's. */
-  .webui-dialog-surface .webui-control:not(.webui-control--bare) {
+  .webui-dialog-surface .webui-control {
+    font-size: var(--size_14);
+  }
+  .webui-dialog-surface .webui-control:not(.webui-control--bare):not(.webui-control--multiline) {
+    height: 36px;
     min-height: 36px;
     border-radius: var(--radius_8);
-    font-size: var(--size_14);
+    padding: 0 11px;
     line-height: 21px;
+  }
+  .webui-dialog-surface .webui-field-control button {
+    height: 36px;
+    min-height: 36px;
   }
   .webui-dialog-surface .webui-field-label {
     color: var(--text_default_secondary);

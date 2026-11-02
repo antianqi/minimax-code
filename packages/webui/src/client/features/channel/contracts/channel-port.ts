@@ -16,6 +16,10 @@ import type {
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
   WebuiChannelStatus,
+  WebuiChannelWechatBindStartRequest,
+  WebuiChannelWechatBindStartResult,
+  WebuiChannelWechatBindStatusRequest,
+  WebuiChannelWechatBindStatusResult,
 } from "../../../../shared/contracts/channel.js";
 
 export interface ChannelPort {
@@ -35,4 +39,17 @@ export interface ChannelPort {
   readonly updateChannelMessageFilter?: (
     request: WebuiChannelMessageFilterRequest,
   ) => Promise<WebuiChannelMessageFilter>;
+  /**
+   * Starts the WeChat authorization the create flow shows a QR for.
+   *
+   * The runtime's own route (`wechat/bind/start`) already answers it; this member is how the
+   * browser reaches it.
+   */
+  readonly startChannelWechatBind?: (
+    request: WebuiChannelWechatBindStartRequest,
+  ) => Promise<WebuiChannelWechatBindStartResult>;
+  /** Reads one WeChat authorization's state. */
+  readonly getChannelWechatBindStatus?: (
+    request: WebuiChannelWechatBindStatusRequest,
+  ) => Promise<WebuiChannelWechatBindStatusResult>;
 }

@@ -208,8 +208,9 @@ export const LIST_CRON_TASK_RUNS_OPERATION_NAME = "listCronTaskRuns" as const;
  * unbind them.
  *
  * Desktop's IM client talks to the runtime's channel-bridge routes; the WebUI projects the same
- * five routes (`status`, `connect`, `disconnect`, `config-check`, `message-filter`) as named
- * operations, so the browser never learns a route path.
+ * routes (`status`, `connect`, `disconnect`, `config-check`, `message-filter`, and the WeChat
+ * authorization pair `wechat/bind/start` + `wechat/bind/status`) as named operations, so the
+ * browser never learns a route path.
  */
 export const LIST_CHANNEL_STATUS_OPERATION_NAME = "listChannelStatus" as const;
 export const CONNECT_CHANNEL_OPERATION_NAME = "connectChannel" as const;
@@ -217,6 +218,8 @@ export const DISCONNECT_CHANNEL_OPERATION_NAME = "disconnectChannel" as const;
 export const CHECK_CHANNEL_CONFIG_OPERATION_NAME = "checkChannelConfig" as const;
 export const GET_CHANNEL_MESSAGE_FILTER_OPERATION_NAME = "getChannelMessageFilter" as const;
 export const UPDATE_CHANNEL_MESSAGE_FILTER_OPERATION_NAME = "updateChannelMessageFilter" as const;
+export const START_CHANNEL_WECHAT_BIND_OPERATION_NAME = "startChannelWechatBind" as const;
+export const GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME = "getChannelWechatBindStatus" as const;
 /**
  * The 远程控制 surface: the phone link's status, the mutations that open and close it, and the
  * credentials the browser signs and pushes down.
@@ -370,6 +373,10 @@ import type {
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
   WebuiChannelStatus,
+  WebuiChannelWechatBindStartRequest,
+  WebuiChannelWechatBindStartResult,
+  WebuiChannelWechatBindStatusRequest,
+  WebuiChannelWechatBindStatusResult,
 } from "./contracts/channel.js";
 import type {
   WebuiRemoteControlComposerMode,
@@ -1038,6 +1045,20 @@ export interface OperationSpec {
   updateChannelMessageFilter: {
     request: WebuiChannelMessageFilterRequest;
     response: WebuiChannelMessageFilter;
+  };
+  /**
+   * The WeChat authorization the 接入 IM create flow shows a QR for, and the read of its state.
+   *
+   * The runtime owns both routes; the browser asks for the authorization and then reads whether
+   * the scan finished.
+   */
+  startChannelWechatBind: {
+    request: WebuiChannelWechatBindStartRequest;
+    response: WebuiChannelWechatBindStartResult;
+  };
+  getChannelWechatBindStatus: {
+    request: WebuiChannelWechatBindStatusRequest;
+    response: WebuiChannelWechatBindStatusResult;
   };
   /**
    * The 远程控制 surface.

@@ -48,6 +48,8 @@ import {
   SAVE_SSH_PROJECT_OPERATION_NAME,
   SET_SSH_CONNECTION_ENABLED_OPERATION_NAME,
   UPDATE_CHANNEL_MESSAGE_FILTER_OPERATION_NAME,
+  START_CHANNEL_WECHAT_BIND_OPERATION_NAME,
+  GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME,
   WATCH_REMOTE_CONTROL_STATUS_OPERATION_NAME,
   WATCH_SSH_TERMINAL_OPERATION_NAME,
   WRITE_SSH_TERMINAL_OPERATION_NAME,
@@ -351,6 +353,8 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     checkChannelConfig: (body) => request(CHECK_CHANNEL_CONFIG_OPERATION_NAME, body),
     getChannelMessageFilter: (body) => request(GET_CHANNEL_MESSAGE_FILTER_OPERATION_NAME, body),
     updateChannelMessageFilter: (body) => request(UPDATE_CHANNEL_MESSAGE_FILTER_OPERATION_NAME, body),
+    startChannelWechatBind: (body) => request(START_CHANNEL_WECHAT_BIND_OPERATION_NAME, body),
+    getChannelWechatBindStatus: (body) => request(GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME, body),
     getRemoteControlStatus: () => request(GET_REMOTE_CONTROL_STATUS_OPERATION_NAME, undefined),
     watchRemoteControlStatus: (onFrame) =>
       watchFrames(WATCH_REMOTE_CONTROL_STATUS_OPERATION_NAME, undefined, onFrame),

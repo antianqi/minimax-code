@@ -19,7 +19,9 @@ import {
   CONNECT_CHANNEL_OPERATION_NAME,
   DISCONNECT_CHANNEL_OPERATION_NAME,
   GET_CHANNEL_MESSAGE_FILTER_OPERATION_NAME,
+  GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME,
   LIST_CHANNEL_STATUS_OPERATION_NAME,
+  START_CHANNEL_WECHAT_BIND_OPERATION_NAME,
   UPDATE_CHANNEL_MESSAGE_FILTER_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import type {
@@ -32,6 +34,10 @@ import type {
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
   WebuiChannelStatus,
+  WebuiChannelWechatBindStartRequest,
+  WebuiChannelWechatBindStartResult,
+  WebuiChannelWechatBindStatusRequest,
+  WebuiChannelWechatBindStatusResult,
 } from "../../shared/contracts/channel.js";
 import type { WebuiOperation, WebuiOperationValidation } from "./operation-contract.js";
 
@@ -173,6 +179,69 @@ export const getChannelMessageFilterOperation: WebuiOperation<
     const agent = readAgent((body as Record<string, unknown>).agent);
     if (typeof agent !== "string") return invalid(agent.error);
     return { ok: true, body: { agent } };
+  },
+};
+
+/**
+ * Starting the WeChat authorization the 接入 IM create flow shows a QR for.
+ *
+ * The runtime owns the route; this validator only checks the shape a browser may send — the bot's
+ * name and, optionally, the agent it is bound to.
+ */
+export const startChannelWechatBindOperation: WebuiOperation<
+  WebuiChannelWechatBindStartRequest,
+  WebuiChannelWechatBindStartResult
+> = {
+  name: START_CHANNEL_WECHAT_BIND_OPERATION_NAME,
+  validate: (body) => {
+    if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) {
+      return invalid(`${START_CHANNEL_WECHAT_BIND_OPERATION_NAME} body must be an object`);
+    }
+    const value = body as Record<string, unknown>;
+    const name = readName(value.name);
+    if (typeof name !== "string") return invalid(name.error);
+    const agent = readOptionalText(value.agent, "agent");
+    if (agent !== undefined && typeof agent !== "string") return invalid(agent.error);
+    return {
+      ok: true,
+      body: {
+        name,
+        ...(agent === undefined ? {} : { agent }),
+      },
+    };
+  },
+};
+
+/**
+ * Reading one WeChat authorization's state.
+ *
+ * The runtime files the authorization under a session, and under a connection once the scan has
+ * confirmed it, so either names it.
+ */
+export const getChannelWechatBindStatusOperation: WebuiOperation<
+  WebuiChannelWechatBindStatusRequest,
+  WebuiChannelWechatBindStatusResult
+> = {
+  name: GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME,
+  validate: (body) => {
+    if (body === undefined || body === null || typeof body !== "object" || Array.isArray(body)) {
+      return invalid(`${GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME} body must be an object`);
+    }
+    const value = body as Record<string, unknown>;
+    const sessionId = readOptionalText(value.sessionId, "sessionId");
+    if (sessionId !== undefined && typeof sessionId !== "string") return invalid(sessionId.error);
+    const connectionId = readOptionalText(value.connectionId, "connectionId");
+    if (connectionId !== undefined && typeof connectionId !== "string") return invalid(connectionId.error);
+    if (sessionId === undefined && connectionId === undefined) {
+      return invalid(`${GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME} body must name an authorization`);
+    }
+    return {
+      ok: true,
+      body: {
+        ...(sessionId === undefined ? {} : { sessionId }),
+        ...(connectionId === undefined ? {} : { connectionId }),
+      },
+    };
   },
 };
 

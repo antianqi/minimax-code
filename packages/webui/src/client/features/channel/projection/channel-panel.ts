@@ -57,9 +57,49 @@ export const WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_DESCRIPTION =
 /**
  * The button that starts a new IM bot.
  *
- * The Desktop's `im_connect.create_im_bot`: the list's own action, under the rows.
+ * The Desktop's `im_connect.create_im_bot`: the list's own action, under the rows. It opens the
+ * platform menu (Desktop's `im_connect` dropdown), one entry per platform.
  */
 export const WEBUI_CHANNEL_CREATE_BOT_LABEL = "创建 IM Bot";
+
+/**
+ * The platforms the create menu offers.
+ *
+ * Desktop 3.1.6 builds the menu from its platform catalogue: one entry per platform, each with the
+ * platform's own icon and label (`channel-<id>`). The live Desktop offers 微信 and 飞书, which is
+ * the pair this repository's runtime binds.
+ */
+export interface WebuiChannelAddOption {
+  readonly key: "wechat" | "feishu";
+  /** The menu row's label. */
+  readonly label: string;
+  /** The card's association title for this platform. */
+  readonly title: string;
+  /** The line under the QR, when the platform shows one. */
+  readonly qrDescription: string;
+}
+
+export const WEBUI_CHANNEL_ADD_OPTIONS: readonly WebuiChannelAddOption[] = [
+  {
+    key: "wechat",
+    label: "微信",
+    title: "扫码绑定微信",
+    qrDescription: "微信扫码授权以绑定MiniMax Code",
+  },
+  {
+    key: "feishu",
+    label: "飞书",
+    title: "扫码绑定飞书",
+    qrDescription: "通过扫码或链接完成飞书授权",
+  },
+];
+
+/** The Desktop's copy while the authorization is being created. */
+export const WEBUI_CHANNEL_AUTHORIZATION_STARTING = "正在创建授权…";
+/** The Desktop's copy for the pairing code the QR carries. */
+export const WEBUI_CHANNEL_AUTHORIZATION_ACTIVE = "请完成授权，完成后将自动绑定。";
+/** The Desktop's action that starts the authorization over. */
+export const WEBUI_CHANNEL_RENEW_AUTHORIZATION = "刷新";
 /** The name the Desktop gives the WeChat bot. */
 export const WEBUI_CHANNEL_WECHAT_BOT_NAME = "ClawBot";
 /** The name a bot that carries no binding name gets. */
@@ -82,6 +122,16 @@ export interface WebuiChannelRow {
   readonly platformLabel: string;
   readonly agentLabel: string;
   readonly selected: boolean;
+  /**
+   * Whether the bot is already bound to its platform.
+   *
+   * Desktop draws two card shapes from this: a bound bot carries the association's bound copy and
+   * the 解除连接 action and shows no QR; a bot that is still waiting for its authorization carries
+   * the unbound copy, the 刷新二维码 action and the QR itself.
+   */
+  readonly bound: boolean;
+  /** The state the card's header shows. */
+  readonly stateLabel: string;
   /**
    * The name the list and the detail header show.
    *
@@ -108,7 +158,33 @@ export function webuiChannelRows(
     agentLabel: client.agentName ?? WEBUI_CHANNEL_DEFAULT_AGENT_LABEL,
     selected: client.name === selectedName,
     botName: webuiChannelBotName(client.platform, client.name),
+    bound: true,
+    stateLabel: WEBUI_CHANNEL_STATE_BOUND,
   }));
+}
+
+/**
+ * The bot the create flow is adding, as a row.
+ *
+ * Desktop adds a bot by preparing it: the new bot is not bound yet, so its card carries the
+ * unbound copy, the QR and the 未绑定 state. The row is built here so the card has one shape for
+ * both cases.
+ */
+export function webuiChannelPendingRow(
+  platform: "wechat" | "feishu",
+  name: string,
+): WebuiChannelRow {
+  const option = WEBUI_CHANNEL_ADD_OPTIONS.find((entry) => entry.key === platform);
+  return {
+    name,
+    platform,
+    platformLabel: option?.label ?? platform,
+    agentLabel: WEBUI_CHANNEL_DEFAULT_AGENT_LABEL,
+    selected: true,
+    botName: webuiChannelBotName(platform, name),
+    bound: false,
+    stateLabel: WEBUI_CHANNEL_STATE_UNBOUND,
+  };
 }
 
 /**

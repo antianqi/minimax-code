@@ -31,6 +31,10 @@ import type {
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
   WebuiChannelStatus,
+  WebuiChannelWechatBindStartRequest,
+  WebuiChannelWechatBindStartResult,
+  WebuiChannelWechatBindStatusRequest,
+  WebuiChannelWechatBindStatusResult,
 } from "../shared/contracts/channel.js";
 import type {
   WebuiRemoteControlComposerMode,
@@ -784,6 +788,17 @@ export interface WebuiHarnessPort {
   updateChannelMessageFilter(
     request: WebuiChannelMessageFilterRequest,
   ): Promise<WebuiChannelMessageFilter>;
+  /**
+   * The WeChat authorization the 接入 IM create flow shows a QR for, and the read of its state.
+   *
+   * The runtime owns both routes; these two members are how the browser reaches them.
+   */
+  startChannelWechatBind(
+    request: WebuiChannelWechatBindStartRequest,
+  ): Promise<WebuiChannelWechatBindStartResult>;
+  getChannelWechatBindStatus(
+    request: WebuiChannelWechatBindStatusRequest,
+  ): Promise<WebuiChannelWechatBindStatusResult>;
   /**
    * The 远程控制 surface.
    *

@@ -69,6 +69,36 @@ export interface LocalChannelBridgeMessageFilterRequest extends LocalChannelBrid
   readonly filter: LocalChannelBridgeMessageFilterView;
 }
 
+/** Starting the WeChat authorization the IM create flow shows a QR for. */
+export interface LocalChannelBridgeWechatBindStartRequest {
+  readonly name: string;
+  readonly agent?: string;
+}
+
+export interface LocalChannelBridgeWechatBindStartView {
+  readonly ok: boolean;
+  readonly sessionId?: string;
+  /** The QR as an image, when the runtime produced one. */
+  readonly qrImageUrl?: string;
+  /** The text the QR carries, when the runtime produced text rather than an image. */
+  readonly qrContent?: string;
+  readonly error?: string;
+  readonly code?: string;
+}
+
+/** Which WeChat authorization to read. */
+export interface LocalChannelBridgeWechatBindStatusRequest {
+  readonly sessionId?: string;
+  readonly connectionId?: string;
+}
+
+export interface LocalChannelBridgeWechatBindStatusView {
+  readonly status: "pending" | "confirmed" | "expired" | "error";
+  readonly connectionId?: string;
+  readonly error?: string;
+  readonly code?: string;
+}
+
 export interface LocalChannelBridgeSurface {
   /** The bound IM clients, in the runtime's own order. */
   listStatus(): Promise<LocalChannelBridgeStatusView>;
@@ -79,6 +109,17 @@ export interface LocalChannelBridgeSurface {
   updateMessageFilter(
     request: LocalChannelBridgeMessageFilterRequest,
   ): Promise<LocalChannelBridgeMessageFilterView>;
+  /**
+   * The WeChat authorization the IM create flow shows a QR for, and the read of its state.
+   *
+   * The routes already exist in the runtime's dispatcher; this surface only narrows them.
+   */
+  startWechatBind(
+    request: LocalChannelBridgeWechatBindStartRequest,
+  ): Promise<LocalChannelBridgeWechatBindStartView>;
+  getWechatBindStatus(
+    request: LocalChannelBridgeWechatBindStatusRequest,
+  ): Promise<LocalChannelBridgeWechatBindStatusView>;
 }
 
 export interface LocalChannelBridgeDependencies {
@@ -276,6 +317,59 @@ export function createLocalChannelBridgeSurface(
         { body: { mode: request.filter.mode, includeToolSummary: request.filter.includeToolSummary } },
       );
       return messageFilterView(body);
+    },
+
+    startWechatBind: async (request) => {
+      requireEnabled(deps);
+      const { body } = await forwardRoute(deps, "POST", "wechat/bind/start", {
+        body: {
+          name: request.name,
+          ...(request.agent === undefined ? {} : { agentName: request.agent }),
+        },
+      });
+      const sessionId = readString(body.sessionId);
+      const qrcodeUrl = readString(body.qrcodeUrl);
+      const qrcode = readString(body.qrcode);
+      // The runtime sends the QR as an image when it produced one, and as the text to encode
+      // otherwise; the caller is told which one it got.
+      const isImageData = body.isImageData === true;
+      const error = readString(body.error);
+      const code = readString(body.code);
+      return {
+        ok: body.ok === true,
+        ...(sessionId === undefined ? {} : { sessionId }),
+        ...(isImageData && qrcodeUrl !== undefined ? { qrImageUrl: qrcodeUrl } : {}),
+        ...(!isImageData && qrcodeUrl !== undefined ? { qrContent: qrcodeUrl } : {}),
+        ...(!isImageData && qrcodeUrl === undefined && qrcode !== undefined
+          ? { qrContent: qrcode }
+          : {}),
+        ...(error === undefined ? {} : { error }),
+        ...(code === undefined ? {} : { code }),
+      };
+    },
+
+    getWechatBindStatus: async (request) => {
+      requireEnabled(deps);
+      const { body } = await forwardRoute(deps, "GET", "wechat/bind/status", {
+        query: { sessionId: request.sessionId, connectionId: request.connectionId },
+      });
+      const status = readString(body.status)?.toLowerCase();
+      const connectionId = readString(body.connectionId);
+      const error = readString(body.error);
+      const code = readString(body.code);
+      return {
+        status:
+          status === "confirmed"
+            ? "confirmed"
+            : status === "expired"
+              ? "expired"
+              : status === "error" || body.ok === false
+                ? "error"
+                : "pending",
+        ...(connectionId === undefined ? {} : { connectionId }),
+        ...(error === undefined ? {} : { error }),
+        ...(code === undefined ? {} : { code }),
+      };
     },
   };
 }

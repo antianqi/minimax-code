@@ -23,7 +23,9 @@ export {
   connectChannelOperation,
   disconnectChannelOperation,
   getChannelMessageFilterOperation,
+  getChannelWechatBindStatusOperation,
   listChannelStatusOperation,
+  startChannelWechatBindOperation,
   updateChannelMessageFilterOperation,
 } from "./channel.js";
 export {
@@ -391,6 +393,8 @@ export function createOperationRegistry(
   registerOperation(registry, entry("checkChannelConfig"));
   registerOperation(registry, entry("getChannelMessageFilter"));
   registerOperation(registry, entry("updateChannelMessageFilter"));
+  registerOperation(registry, entry("startChannelWechatBind"));
+  registerOperation(registry, entry("getChannelWechatBindStatus"));
   registerOperation(registry, entry("getRemoteControlStatus"));
   registerOperation(registry, entry("connectRemoteControl"));
   registerOperation(registry, entry("disconnectRemoteControl"));

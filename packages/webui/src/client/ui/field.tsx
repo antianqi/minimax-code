@@ -442,6 +442,17 @@ export function WebuiFormLayout({
   return <div className={`webui-form${className ? ` ${className}` : ""}`}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>;
 }
 
+/** A two-column form group whose fields share the same available width. */
+export function WebuiFormGrid({
+  children,
+  className,
+}: {
+  readonly children: ReactNode;
+  readonly className?: string;
+}): ReactElement {
+  return <div className={`webui-form-grid webui-form-grid--two${className ? ` ${className}` : ""}`}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>;
+}
+
 /** The actions a form ends with. The commands stay with the caller. */
 export function WebuiFormActions({
   children,

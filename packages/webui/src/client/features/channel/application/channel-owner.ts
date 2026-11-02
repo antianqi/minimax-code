@@ -23,11 +23,45 @@ import type {
   WebuiChannelMessageFilterRequest,
 } from "../../../../shared/contracts/channel.js";
 import type { ChannelPort } from "../contracts/channel-port.js";
+import { WEBUI_CHANNEL_WECHAT_BOT_NAME } from "../projection/channel-panel.js";
 
 export type WebuiChannelLoadStatus = "idle" | "loading" | "ready" | "error";
 
+/**
+ * The platform the create flow is adding.
+ *
+ * Desktop's create menu offers one entry per platform, and the platform decides what the card
+ * shows: a QR for WeChat, and — where the runtime has no onboarding route — the platform's own
+ * credential form for Feishu.
+ */
+export type WebuiChannelAddPlatform = "wechat" | "feishu";
+
+/**
+ * The authorization the create flow is running.
+ *
+ * The QR is the authorization: the user scans it on their phone, the runtime confirms the
+ * authorization, and the bot is bound. `userCode` is the code the user types when the QR does
+ * not carry it.
+ */
+export interface WebuiChannelAuthorization {
+  readonly platform: WebuiChannelAddPlatform;
+  /** Where the authorization is: being created, waiting, done, expired or refused. */
+  readonly status: "starting" | "pending" | "confirmed" | "expired" | "error";
+  /** The QR image the runtime produced, when it produced one. */
+  readonly qrImageUrl?: string;
+  /** The text the QR carries, when the runtime produced text rather than an image. */
+  readonly qrContent?: string;
+  readonly connectionId?: string;
+  readonly sessionId?: string;
+  readonly error?: string;
+}
+
 export interface WebuiChannelSnapshot {
   readonly status: WebuiChannelLoadStatus;
+  /** The platform the create flow is adding, when the create flow is open. */
+  readonly addPlatform?: WebuiChannelAddPlatform;
+  /** The authorization the create flow is running. */
+  readonly authorization?: WebuiChannelAuthorization;
   /** The bound IM clients, in the runtime's own order. */
   readonly clients: readonly WebuiChannelClient[];
   /** The client whose detail the pane shows. */
@@ -70,6 +104,19 @@ export interface WebuiChannelOwner {
   readonly updateMessageFilter: (
     request: WebuiChannelMessageFilterRequest,
   ) => Promise<WebuiChannelMutation>;
+  /**
+   * Opens the create flow for one platform.
+   *
+   * WeChat starts an authorization and answers with its QR; Feishu opens the platform's own
+   * credential form, which the runtime's connect route serves.
+   */
+  readonly startAdding: (platform: WebuiChannelAddPlatform) => Promise<WebuiChannelMutation>;
+  /** Reads the authorization the create flow is running. */
+  readonly readAuthorization: () => Promise<WebuiChannelAuthorization | undefined>;
+  /** Starts the authorization over — the Desktop's 刷新二维码. */
+  readonly renewAuthorization: () => Promise<WebuiChannelMutation>;
+  /** Leaves the create flow. */
+  readonly cancelAdding: () => void;
 }
 
 export const WEBUI_CHANNEL_UNAVAILABLE =
@@ -77,6 +124,8 @@ export const WEBUI_CHANNEL_UNAVAILABLE =
 export const WEBUI_CHANNEL_READ_FAILED = "读取 IM 接入列表失败。";
 export const WEBUI_CHANNEL_FAILED = "操作 IM 接入失败。";
 export const WEBUI_CHANNEL_FILTER_FAILED = "读取消息过滤设置失败。";
+/** The refusal a host without the WeChat authorization route answers the create flow with. */
+export const WEBUI_CHANNEL_WECHAT_UNAVAILABLE = "宿主没有微信授权通道，无法生成绑定二维码。";
 
 export interface CreateWebuiChannelOwnerOptions {
   readonly port: ChannelPort;
@@ -212,6 +261,119 @@ export function createWebuiChannelOwner(
     }
   };
 
+  /**
+   * Opens the create flow.
+   *
+   * WeChat's authorization is the runtime's own route: it answers with the QR to show and with the
+   * connection to poll. Feishu has no onboarding route on this runtime, so its flow is the
+   * platform's credential form, which the connect route serves.
+   */
+  const startAdding = async (platform: WebuiChannelAddPlatform): Promise<WebuiChannelMutation> => {
+    if (platform === "feishu") {
+      publish({ ...snapshot, addPlatform: platform, authorization: undefined });
+      return { ok: true };
+    }
+    const start = options.port.startChannelWechatBind;
+    if (!start) {
+      // A create flow that cannot produce a QR says so next to the entry that started it.
+      publish({ ...snapshot, actionError: WEBUI_CHANNEL_WECHAT_UNAVAILABLE });
+      return { ok: false, message: WEBUI_CHANNEL_WECHAT_UNAVAILABLE };
+    }
+    publish({
+      ...snapshot,
+      addPlatform: platform,
+      authorization: { platform, status: "starting" },
+    });
+    try {
+      const result = await start({ name: WEBUI_CHANNEL_WECHAT_BOT_NAME });
+      if (!result.ok) {
+        const message = result.error ?? WEBUI_CHANNEL_FAILED;
+        publish({
+          ...snapshot,
+          addPlatform: platform,
+          authorization: { platform, status: "error", error: message },
+        });
+        return { ok: false, message };
+      }
+      publish({
+        ...snapshot,
+        addPlatform: platform,
+        authorization: {
+          platform,
+          status: "pending",
+          ...(result.qrImageUrl === undefined ? {} : { qrImageUrl: result.qrImageUrl }),
+          ...(result.qrContent === undefined ? {} : { qrContent: result.qrContent }),
+          ...(result.sessionId === undefined ? {} : { sessionId: result.sessionId }),
+        },
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = failureMessage(error);
+      publish({
+        ...snapshot,
+        addPlatform: platform,
+        authorization: { platform, status: "error", error: message },
+      });
+      return { ok: false, message };
+    }
+  };
+
+  /**
+   * Reads the authorization the create flow is running.
+   *
+   * A confirmed authorization binds the bot, so the list is read again and the create flow closes:
+   * the bot then appears in the list, where it belongs.
+   */
+  const readAuthorization = async (): Promise<WebuiChannelAuthorization | undefined> => {
+    const current = snapshot.authorization;
+    const read = options.port.getChannelWechatBindStatus;
+    // The runtime files the authorization under a session, and under a connection once the scan
+    // has confirmed it, so either one names it.
+    if (
+      !current ||
+      current.status !== "pending" ||
+      (current.sessionId === undefined && current.connectionId === undefined) ||
+      !read
+    ) {
+      return current;
+    }
+    try {
+      const result = await read({
+        ...(current.sessionId === undefined ? {} : { sessionId: current.sessionId }),
+        ...(current.connectionId === undefined ? {} : { connectionId: current.connectionId }),
+      });
+      const status =
+        result.status === "confirmed"
+          ? "confirmed"
+          : result.status === "expired"
+            ? "expired"
+            : result.status === "error"
+              ? "error"
+              : "pending";
+      const next: WebuiChannelAuthorization = {
+        ...current,
+        status,
+        ...(result.connectionId === undefined ? {} : { connectionId: result.connectionId }),
+        ...(result.error === undefined ? {} : { error: result.error }),
+      };
+      publish({ ...snapshot, authorization: next });
+      if (status === "confirmed") {
+        await load();
+        publish({ ...snapshot, addPlatform: undefined, authorization: undefined });
+        return undefined;
+      }
+      return next;
+    } catch (error) {
+      const next: WebuiChannelAuthorization = {
+        ...current,
+        status: "error",
+        error: failureMessage(error),
+      };
+      publish({ ...snapshot, authorization: next });
+      return next;
+    }
+  };
+
   return {
     subscribe: (listener) => {
       listeners.add(listener);
@@ -250,6 +412,12 @@ export function createWebuiChannelOwner(
         publish({ ...snapshot, actionError: message });
         return { ok: false, message };
       }
+    },
+    startAdding,
+    readAuthorization,
+    renewAuthorization: () => startAdding("wechat"),
+    cancelAdding: () => {
+      publish({ ...snapshot, addPlatform: undefined, authorization: undefined });
     },
   };
 }

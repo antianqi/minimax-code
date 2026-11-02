@@ -30,6 +30,10 @@ import type {
   WebuiChannelMessageFilterRequest,
   WebuiChannelOperationResult,
   WebuiChannelStatus,
+  WebuiChannelWechatBindStartRequest,
+  WebuiChannelWechatBindStartResult,
+  WebuiChannelWechatBindStatusRequest,
+  WebuiChannelWechatBindStatusResult,
 } from "../../shared/contracts/channel.js";
 
 /**
@@ -69,6 +73,32 @@ export interface WebuiRuntimeChannelBridge {
     readonly agent: string;
     readonly filter: { readonly mode: string; readonly includeToolSummary: boolean };
   }) => Promise<{ readonly mode: string; readonly includeToolSummary: boolean }>;
+  /**
+   * The WeChat authorization the 接入 IM create flow shows a QR for, and the read of its state.
+   *
+   * Both are optional: a host that carries no WeChat adapter refuses them by name instead of
+   * answering a QR it never produced.
+   */
+  readonly startWechatBind?: (request: {
+    readonly name: string;
+    readonly agent?: string;
+  }) => Promise<{
+    readonly ok: boolean;
+    readonly sessionId?: string;
+    readonly qrImageUrl?: string;
+    readonly qrContent?: string;
+    readonly error?: string;
+    readonly code?: string;
+  }>;
+  readonly getWechatBindStatus?: (request: {
+    readonly sessionId?: string;
+    readonly connectionId?: string;
+  }) => Promise<{
+    readonly status: "pending" | "confirmed" | "expired" | "error";
+    readonly connectionId?: string;
+    readonly error?: string;
+    readonly code?: string;
+  }>;
 }
 
 /**
@@ -106,6 +136,12 @@ interface WebuiChannelMembers {
   readonly updateChannelMessageFilter: (
     request: WebuiChannelMessageFilterRequest,
   ) => Promise<WebuiChannelMessageFilter>;
+  readonly startChannelWechatBind: (
+    request: WebuiChannelWechatBindStartRequest,
+  ) => Promise<WebuiChannelWechatBindStartResult>;
+  readonly getChannelWechatBindStatus: (
+    request: WebuiChannelWechatBindStatusRequest,
+  ) => Promise<WebuiChannelWechatBindStatusResult>;
 }
 
 const CHANNEL_MEMBER_NAMES = [
@@ -170,6 +206,36 @@ function membersFromRuntimeBridge(bridge: WebuiRuntimeChannelBridge): WebuiChann
           },
         }),
       ),
+    startChannelWechatBind: async (request) => {
+      const start = bridge.startWechatBind;
+      if (!start) throw new WebuiResultShapeError("the host carries no WeChat authorization route");
+      const outcome = await start({
+        name: request.name,
+        ...(request.agent === undefined ? {} : { agent: request.agent }),
+      });
+      return {
+        ok: outcome.ok === true,
+        ...(outcome.sessionId === undefined ? {} : { sessionId: outcome.sessionId }),
+        ...(outcome.qrImageUrl === undefined ? {} : { qrImageUrl: outcome.qrImageUrl }),
+        ...(outcome.qrContent === undefined ? {} : { qrContent: outcome.qrContent }),
+        ...(outcome.error === undefined ? {} : { error: outcome.error }),
+        ...(outcome.code === undefined ? {} : { code: outcome.code }),
+      };
+    },
+    getChannelWechatBindStatus: async (request) => {
+      const read = bridge.getWechatBindStatus;
+      if (!read) throw new WebuiResultShapeError("the host carries no WeChat authorization route");
+      const outcome = await read({
+        ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
+        ...(request.connectionId === undefined ? {} : { connectionId: request.connectionId }),
+      });
+      return {
+        status: outcome.status,
+        ...(outcome.connectionId === undefined ? {} : { connectionId: outcome.connectionId }),
+        ...(outcome.error === undefined ? {} : { error: outcome.error }),
+        ...(outcome.code === undefined ? {} : { code: outcome.code }),
+      };
+    },
   };
 }
 
@@ -180,9 +246,29 @@ function membersFromRuntimeBridge(bridge: WebuiRuntimeChannelBridge): WebuiChann
  * gets them converted here; a host that carries neither refuses with one stated error, so the
  * browser never reads an absent bridge as "no IM client is bound".
  */
+/**
+ * The refusal a host without a WeChat adapter answers the authorization with.
+ *
+ * It is named rather than swallowed: a create flow that cannot produce a QR says so, instead of
+ * showing an empty square as if the authorization had started.
+ */
+async function refuseWechatAuthorization(): Promise<never> {
+  throw new WebuiResultShapeError("the host carries no WeChat authorization route");
+}
+
 function requireChannelMembers(host: WebuiRuntimeHostHandle): WebuiChannelMembers {
   const own = host as unknown as Partial<WebuiChannelMembers>;
-  if (hasAllChannelMembers(own)) return own as WebuiChannelMembers;
+  // The two authorization members are newer than the six the host may carry itself, so a host that
+  // carries the six without them still serves the six and refuses only the authorization.
+  if (hasAllChannelMembers(own)) {
+    return {
+      ...(own as WebuiChannelMembers),
+      startChannelWechatBind:
+        own.startChannelWechatBind ?? refuseWechatAuthorization,
+      getChannelWechatBindStatus:
+        own.getChannelWechatBindStatus ?? refuseWechatAuthorization,
+    };
+  }
   const slot = host as unknown as WebuiChannelBridgeSlot;
   const bridge = requireHostSlot(
     slot.channelBridge ??
@@ -273,6 +359,8 @@ export function createChannelAdapter(host: WebuiRuntimeHostHandle): Pick<
   | "checkChannelConfig"
   | "getChannelMessageFilter"
   | "updateChannelMessageFilter"
+  | "startChannelWechatBind"
+  | "getChannelWechatBindStatus"
 > {
   return {
     async listChannelStatus(): Promise<WebuiChannelStatus> {
@@ -297,6 +385,16 @@ export function createChannelAdapter(host: WebuiRuntimeHostHandle): Pick<
 
     async updateChannelMessageFilter(request): Promise<WebuiChannelMessageFilter> {
       return requireChannelMembers(host).updateChannelMessageFilter(request);
+    },
+    async startChannelWechatBind(
+      request: WebuiChannelWechatBindStartRequest,
+    ): Promise<WebuiChannelWechatBindStartResult> {
+      return requireChannelMembers(host).startChannelWechatBind(request);
+    },
+    async getChannelWechatBindStatus(
+      request: WebuiChannelWechatBindStatusRequest,
+    ): Promise<WebuiChannelWechatBindStatusResult> {
+      return requireChannelMembers(host).getChannelWechatBindStatus(request);
     },
   };
 }

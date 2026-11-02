@@ -4494,6 +4494,14 @@
       "homepage": "https://mths.be/punycode"
     },
     {
+      "name": "qrcode.react",
+      "versions": [
+        "4.2.0"
+      ],
+      "license": "ISC",
+      "homepage": "http://zpao.github.io/qrcode.react"
+    },
+    {
       "name": "qs",
       "versions": [
         "6.16.0"

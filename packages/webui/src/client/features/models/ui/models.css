@@ -3,7 +3,7 @@
 
   .webui-provider-form { display: contents; }
   .webui-provider-form-body { min-height: 0; }
-  .webui-provider-form-provider-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--spacing_12); }
+  .webui-provider-form-provider-grid { gap: var(--spacing_12); }
   .webui-provider-picker { position: relative; min-width: 0; }
   /* The field is both the selection and the search: it shows the chosen
      provider, and typing in it filters the list. */

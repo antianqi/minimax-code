@@ -161,6 +161,8 @@ export type WebuiOperationPort = Pick<
   | "checkChannelConfig"
   | "getChannelMessageFilter"
   | "updateChannelMessageFilter"
+  | "startChannelWechatBind"
+  | "getChannelWechatBindStatus"
   | "getRemoteControlStatus"
   | "watchRemoteControlStatus"
   | "connectRemoteControl"
@@ -285,6 +287,8 @@ export interface RuntimeGroups {
     | "checkChannelConfig"
     | "getChannelMessageFilter"
     | "updateChannelMessageFilter"
+    | "startChannelWechatBind"
+    | "getChannelWechatBindStatus"
   >;
   /**
    * The 远程控制 surface.

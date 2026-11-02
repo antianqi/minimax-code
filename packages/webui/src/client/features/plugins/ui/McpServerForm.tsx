@@ -22,7 +22,7 @@ import {
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiField, WebuiSelectMenu, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiFormGrid, WebuiSelectMenu, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
 import { FeedbackError } from "../../../ui/feedback.js";
@@ -335,7 +335,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
           onChange={(event) => setJson(event.currentTarget.value)}
         />
       ) : (
-        <div className="webui-mcp-form-fields">
+        <WebuiFormGrid className="webui-mcp-form-fields">
           <WebuiField
             label="名称"
             required
@@ -436,7 +436,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
               />
             </div>
           </WebuiDisclosure>
-        </div>
+        </WebuiFormGrid>
       )}
       {localError ? <FeedbackError message={localError} /> : null}
       <WebuiDialogActions>

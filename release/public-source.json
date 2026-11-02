@@ -4070,6 +4070,7 @@
     "packages/webui/src/client/features/remote-control/projection/remote-control-panel.ts",
     "packages/webui/src/client/features/remote-control/ui/RemoteControlDevices.public.tsx",
     "packages/webui/src/client/features/remote-control/ui/RemoteControlPanel.public.tsx",
+    "packages/webui/src/client/features/remote-control/ui/remote-control.css",
     "packages/webui/src/client/features/remote/application/remote-owner.ts",
     "packages/webui/src/client/features/remote/contracts/remote-page.ts",
     "packages/webui/src/client/features/remote/ui/RemotePage.public.tsx",

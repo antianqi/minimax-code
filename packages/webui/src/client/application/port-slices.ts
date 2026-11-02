@@ -269,6 +269,8 @@ const CHANNEL_KEYS = [
   "checkChannelConfig",
   "getChannelMessageFilter",
   "updateChannelMessageFilter",
+  "startChannelWechatBind",
+  "getChannelWechatBindStatus",
 ] as const satisfies readonly (keyof ChannelPort)[];
 
 /**

@@ -112,33 +112,39 @@ remote terminal shipped with the 远程 page, and the tab now carries them — t
 them (`设置 > 连接 > SSH`). `shortcuts` left the group earlier, when the rebindable composer bindings
 shipped.
 
-## 4a. The 接入 IM surface has four sections without a route behind them
+## 4a. The 接入 IM surface: what the runtime serves, and what it does not
 
-The 接入 IM tab is a bot list plus a detail card. The list is wired to the runtime's channel
-bridge. Four of the detail card's sections are not, because this repository's runtime exposes no
-route for them.
+The 接入 IM tab is Desktop 3.1.6's tab, transcribed: the bot list, the platform menu under it, and
+the selected bot's card. The runtime's channel bridge serves more of it than this document used to
+claim, because the bridge routes are the same ones Desktop 3.1.6 calls — under the
+`/channel-bridge/*` prefix instead of Desktop's `/minimax-desktop/api/v1/*`.
 
-Desktop 3.1.6 drives the card through the v2 channel-connection service, over the runtime
-transport, at these paths:
-
-| Desktop action | Desktop 3.1.6 path | What is missing here |
+| Desktop action | The route this runtime serves | Where the WebUI reaches it |
 | --- | --- | --- |
-| list bots | `GET /minimax-desktop/api/v1/channel/connections` | the connection list route — the store exists (`LocalImConnectionStore.listViews`), the route does not |
-| the QR binding (WeChat) | `POST /minimax-desktop/api/v1/channel/wechat/bind`, `GET .../wechat/bind/status` | both calls; the Feishu pair is `POST /minimax-desktop/api/v1/lark/onboard/start`, `GET .../lark/onboard/status` |
-| the Agent and working-directory choice | `POST /minimax-desktop/api/v1/channel/connections/prepare` | the binding write (`LocalChannelBindingWrite`: agentName, sessionId, strategy, pinned, routeRuleId, exactOwnerName, ownerInstanceId, projectKey, routingMode) |
-| 删除Bot | `DELETE /minimax-desktop/api/v1/channel/connections/:connection_id` | `store.deleteConnection` |
+| list bots | `GET /channel-bridge/status` (the bound clients) | `listChannelStatus` |
+| bind a Feishu bot | `POST /channel-bridge/connect` (name + app id + secret) | `connectChannel` |
+| 解除连接 | `POST /channel-bridge/disconnect` | `disconnectChannel` |
+| the WeChat QR authorization | `POST /channel-bridge/wechat/bind/start`, `GET /channel-bridge/wechat/bind/status` | `startChannelWechatBind`, `getChannelWechatBindStatus` |
+| the per-agent configuration | `GET /channel-bridge/config-check` | `checkChannelConfig` |
+| the message filter | `GET`/`PUT /channel-bridge/message-filter/<agent>` | `getChannelMessageFilter`, `updateChannelMessageFilter` |
 
-The Desktop's 解除连接 — `DELETE /minimax-desktop/api/v1/channel/connections/:connection_id/binding`
-— is the one of these the WebUI can serve, through the v1 channel bridge's own unbind call.
+Three things are still missing, and each renders as Desktop's own copy with an
+`aria-disabled` state and no handler, never as a faked success:
 
-Each unwired section renders as `Disabled (not yet wired)`: the Desktop's own markup and copy, an
-`aria-disabled` state, a neutral colour, and no handler. None of them fakes a success state. The
-seams are listed here rather than left implied, because the tab is otherwise indistinguishable from
-the Desktop's.
+| Desktop action | What is missing here |
+| --- | --- |
+| list the bots that are still waiting for their authorization | the connection list route — the store exists (`LocalImConnectionStore.listViews`), the route does not. The list therefore shows the bound clients only, and a bot that is being added appears in the detail column instead of in the list. |
+| the Agent and working-directory choice | the binding write (`LocalChannelBindingWrite`: agentName, sessionId, strategy, pinned, routeRuleId, exactOwnerName, ownerInstanceId, projectKey, routingMode) |
+| 删除Bot | `store.deleteConnection` — the runtime has the store method but no route, so the WebUI's 删除 button unbinds the client instead of removing the bot |
 
-The Desktop 3.1.6 tab also lists bots that are still waiting for their authorization, and it names
-a WeChat bot `ClawBot`. This repository's channel bridge only reports clients it has bound, so
-the list shows those and the pane names a WeChat client `ClawBot` the way the Desktop does.
+One substitution: Desktop binds Feishu by a QR code and a link (`lark/onboard/start`), and this
+runtime has no onboarding route for it. The WebUI's Feishu add surface therefore asks for the app
+id and the secret — the path the runtime does serve (`connect`) — where Desktop shows a QR.
+
+The WeChat authorization's QR is drawn in the client, the way Desktop draws it: the bind route
+answers with the link the phone opens rather than with a picture, and the pane encodes that text
+as a QR with the same library Desktop bundles (`qrcode.react`). A runtime that answers with an
+image instead is drawn as that image.
 
 ## 5. Upstream open results need runtime conversion
 

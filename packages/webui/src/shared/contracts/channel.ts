@@ -86,3 +86,41 @@ export interface WebuiChannelMessageFilterRequest {
   readonly agent: string;
   readonly filter: WebuiChannelMessageFilter;
 }
+
+/**
+ * Starting the WeChat authorization the 接入 IM create flow shows a QR for.
+ *
+ * The runtime's own route answers with the QR it produced and the session the authorization is
+ * filed under; the status route reads that session back.
+ */
+export interface WebuiChannelWechatBindStartRequest {
+  /** The bot's name. The runtime keys a WeChat bot by the agent behind it. */
+  readonly name: string;
+  /** The agent the bot is bound to, when the caller names one. */
+  readonly agent?: string;
+}
+
+export interface WebuiChannelWechatBindStartResult {
+  readonly ok: boolean;
+  /** The session the authorization is filed under. */
+  readonly sessionId?: string;
+  /** The QR image, when the runtime produced one. */
+  readonly qrImageUrl?: string;
+  /** The text the QR carries, when the runtime produced text rather than an image. */
+  readonly qrContent?: string;
+  readonly error?: string;
+  readonly code?: string;
+}
+
+/** Which authorization to read. The runtime files it under a session, and a connection once bound. */
+export interface WebuiChannelWechatBindStatusRequest {
+  readonly sessionId?: string;
+  readonly connectionId?: string;
+}
+
+export interface WebuiChannelWechatBindStatusResult {
+  readonly status: "pending" | "confirmed" | "expired" | "error";
+  readonly connectionId?: string;
+  readonly error?: string;
+  readonly code?: string;
+}

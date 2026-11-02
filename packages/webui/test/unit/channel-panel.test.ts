@@ -2,9 +2,9 @@
  * The 接入 IM pane: projection, owner transitions, and the rendered branches.
  *
  * The claims are asserted where they are made rather than through a browser: the rows' wording,
- * the empty state, the refusal a host without an IM channel service gets, and the sections the
- * runtime has no route behind. Rendering goes through `renderToStaticMarkup` — this package has
- * no jsdom.
+ * the empty state, the refusal a host without an IM channel service gets, the create flow's
+ * authorization, and the sections the runtime has no route behind. Rendering goes through
+ * `renderToStaticMarkup` — this package has no jsdom.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -22,6 +22,7 @@ import {
   WEBUI_CHANNEL_SECTION_WORKSPACE,
   webuiChannelAssociationLabel,
   webuiChannelConfigLabel,
+  webuiChannelPendingRow,
   webuiChannelPlatformLabel,
   webuiChannelRows,
 } from "../../src/client/features/channel/projection/channel-panel.js";
@@ -38,7 +39,7 @@ function snapshot(overrides: Partial<WebuiChannelSnapshot> = {}): WebuiChannelSn
 
 const noop = (): void => {};
 
-function view(snap: WebuiChannelSnapshot): string {
+function view(snap: WebuiChannelSnapshot, menuOpen = false): string {
   // The pure view carries no hooks, so it is called the way the house style calls it: this file
   // is a `.ts` and the package has no JSX transform for one.
   return renderToStaticMarkup(
@@ -48,12 +49,17 @@ function view(snap: WebuiChannelSnapshot): string {
       onBind: noop,
       onUnbind: noop,
       onUpdateFilter: noop,
+      menuOpen: menuOpen,
+      onMenuOpenChange: noop,
       binding: false,
       onOpenBinding: noop,
       onCloseBinding: noop,
       deleting: false,
       onOpenDelete: noop,
       onCloseDelete: noop,
+      onStartAdding: noop,
+      onCancelAdding: noop,
+      onRenewAuthorization: noop,
     }),
   );
 }
@@ -86,6 +92,8 @@ describe("the 接入 IM projection", () => {
         agentLabel: "mavis",
         selected: false,
         botName: "mavis",
+        bound: true,
+        stateLabel: "已绑定",
       },
       {
         name: "wechat:mavis",
@@ -94,8 +102,26 @@ describe("the 接入 IM projection", () => {
         agentLabel: "默认",
         selected: true,
         botName: "ClawBot",
+        bound: true,
+        stateLabel: "已绑定",
       },
     ]);
+  });
+
+  it("builds the bot the create flow adds as an unbound row", () => {
+    // Desktop adds a bot by preparing it: the new bot is not bound yet, so its card carries the
+    // unbound state.
+    expect(webuiChannelPendingRow("wechat", "ClawBot")).toEqual({
+      name: "ClawBot",
+      platform: "wechat",
+      platformLabel: "微信",
+      agentLabel: "默认",
+      selected: true,
+      botName: "ClawBot",
+      bound: false,
+      stateLabel: "未绑定",
+    });
+    expect(webuiChannelPendingRow("feishu", "新 Bot").botName).toBe("新 Bot");
   });
 });
 
@@ -199,6 +225,70 @@ describe("the 接入 IM owner", () => {
     expect(result).toEqual({ ok: true });
     expect(owner.getSnapshot().filter).toEqual({ mode: "full", includeToolSummary: true });
   });
+
+  it("starts the WeChat authorization and publishes the QR it produced", async () => {
+    const owner = createWebuiChannelOwner({
+      port: {
+        listChannelStatus: async () => ({ clients: [] }),
+        startChannelWechatBind: async () => ({
+          ok: true,
+          sessionId: "sess-1",
+          qrImageUrl: "data:image/png;base64,AAAA",
+        }),
+      },
+    });
+
+    const result = await owner.startAdding("wechat");
+
+    expect(result).toEqual({ ok: true });
+    expect(owner.getSnapshot().addPlatform).toBe("wechat");
+    expect(owner.getSnapshot().authorization).toEqual({
+      platform: "wechat",
+      status: "pending",
+      qrImageUrl: "data:image/png;base64,AAAA",
+      sessionId: "sess-1",
+    });
+  });
+
+  it("reports a refused authorization as a value, not a pending QR", async () => {
+    const owner = createWebuiChannelOwner({
+      port: {
+        listChannelStatus: async () => ({ clients: [] }),
+        startChannelWechatBind: async () => ({
+          ok: false,
+          error: "LOCAL_CHANNEL_RUNNER_UNAVAILABLE: no platform runner",
+        }),
+      },
+    });
+
+    const result = await owner.startAdding("wechat");
+
+    expect(result.ok).toBe(false);
+    expect(owner.getSnapshot().authorization?.status).toBe("error");
+    expect(owner.getSnapshot().authorization?.error).toBe(
+      "LOCAL_CHANNEL_RUNNER_UNAVAILABLE: no platform runner",
+    );
+  });
+
+  it("closes the create flow and re-reads the list once the authorization is confirmed", async () => {
+    let bound = false;
+    const owner = createWebuiChannelOwner({
+      port: {
+        listChannelStatus: async () => ({ clients: bound ? [client({ name: "wechat:mavis", platform: "wechat" })] : [] }),
+        startChannelWechatBind: async () => ({ ok: true, sessionId: "sess-1" }),
+        getChannelWechatBindStatus: async () => ({ status: "confirmed" }),
+      },
+    });
+
+    await owner.startAdding("wechat");
+    bound = true;
+    await owner.readAuthorization();
+
+    // The bot is bound, so it belongs in the list and the create flow is over.
+    expect(owner.getSnapshot().clients.map((entry) => entry.name)).toEqual(["wechat:mavis"]);
+    expect(owner.getSnapshot().addPlatform).toBeUndefined();
+    expect(owner.getSnapshot().authorization).toBeUndefined();
+  });
 });
 
 describe("the rendered 接入 IM pane", () => {
@@ -216,6 +306,14 @@ describe("the rendered 接入 IM pane", () => {
     // The Desktop names a WeChat bot ClawBot and every other bot after its binding.
     expect(markup).toContain("ClawBot");
     expect(markup).toContain("创建 IM Bot");
+  });
+
+  it("offers the platform menu the Desktop's create action opens", () => {
+    // The menu is a popup: it renders its entries only while it is open.
+    const markup = view(snapshot({ clients: [], status: "ready" }), true);
+
+    expect(markup).toContain('data-webui-channel-add="wechat"');
+    expect(markup).toContain('data-webui-channel-add="feishu"');
   });
 
   it("shows the empty state only for a successful empty read", () => {
@@ -245,8 +343,55 @@ describe("the rendered 接入 IM pane", () => {
     expect(markup).toContain('data-webui-channel-section="delete"');
     expect(markup).toContain("绑定机器人");
     expect(markup).toContain("已关联飞书，可解除或新建 bot");
+    expect(markup).toContain("解除连接");
+  });
+
+  it("shows the bot the create flow adds as an unbound card with its QR", () => {
+    const markup = view(
+      snapshot({
+        clients: [],
+        status: "ready",
+        addPlatform: "wechat",
+        authorization: {
+          platform: "wechat",
+          status: "pending",
+          qrImageUrl: "data:image/png;base64,AAAA",
+          sessionId: "sess-1",
+        },
+      }),
+    );
+
+    // The unbound card is the Desktop's other shape: the QR, the copy and the pairing code.
+    expect(markup).toContain('data-testid="authorization-qr-container"');
+    expect(markup).toContain('data-testid="authorization-qr-image"');
     expect(markup).toContain("微信扫码授权以绑定MiniMax Code");
     expect(markup).toContain("机器人将自动绑定");
+    expect(markup).toContain("未绑定");
+    // A bot that is being added is not in the list yet.
+    expect(markup).not.toContain(WEBUI_CHANNEL_EMPTY_TEXT);
+  });
+
+  it("encodes the text the runtime produced as a QR, the way Desktop does", () => {
+    const markup = view(
+      snapshot({
+        clients: [],
+        status: "ready",
+        addPlatform: "wechat",
+        authorization: {
+          platform: "wechat",
+          status: "pending",
+          qrContent: "https://liteapp.weixin.qq.com/q/7GiQu1?qrcode=5552f5c5",
+          sessionId: "sess-1",
+        },
+      }),
+    );
+
+    // The WeChat bind route answers with the link the phone opens rather than with a picture, so
+    // the pane encodes it inline — the branch Desktop takes when the runtime answers with text.
+    expect(markup).toContain('data-testid="authorization-qr-container"');
+    expect(markup).toContain('data-testid="authorization-qr-code"');
+    expect(markup).toContain("<svg");
+    expect(markup).not.toContain('data-testid="authorization-qr-image"');
   });
 
   it("shows the selected client's message filter", () => {

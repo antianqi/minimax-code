@@ -115,7 +115,9 @@ import {
   connectChannelOperation,
   disconnectChannelOperation,
   getChannelMessageFilterOperation,
+  getChannelWechatBindStatusOperation,
   listChannelStatusOperation,
+  startChannelWechatBindOperation,
   updateChannelMessageFilterOperation,
 } from "./channel.js";
 import { pluginManagementOperation } from "./plugin-management.js";
@@ -611,6 +613,16 @@ export const WEBUI_OPERATION_BINDINGS = {
   }),
   getChannelMessageFilter: bind("channels")("getChannelMessageFilter")("getChannelMessageFilter")({
     operation: getChannelMessageFilterOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  startChannelWechatBind: bind("channels")("startChannelWechatBind")("startChannelWechatBind")({
+    operation: startChannelWechatBindOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  getChannelWechatBindStatus: bind("channels")("getChannelWechatBindStatus")("getChannelWechatBindStatus")({
+    operation: getChannelWechatBindStatusOperation,
     args: (body) => [body],
     result: identity,
   }),

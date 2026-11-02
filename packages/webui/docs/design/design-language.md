@@ -389,9 +389,13 @@ contract owns; if no published size fits, the size is the contract's to add.
   between them: the control is named by `for`, described by `aria-describedby` and marked invalid by
   `aria-invalid`. `WebuiTextInput`, `WebuiTextarea`, `WebuiSelect`, `WebuiCheckbox`, `WebuiRadio` and
   `WebuiFileInput` own the common native control markup, appearance, focus, hidden-picker geometry
-  and disabled states. `WebuiSearchField` owns the labelled icon/input composition and focus-within
-  treatment shared by search surfaces. Form controls use the same blue border on focus, without an
-  outer ring. `WebuiFormLayout` and `WebuiFormActions` own the arrangement of a form.
+  and disabled states; `WebuiSelectMenu` uses the shared dropdown surface for a WebUI-rendered option
+  list. Form layout owns field placement and column spans; fields and their controls fill the space
+  allocated to them, including custom dropdown wrappers. Control text and placeholder text use the
+  shared 14px size by default. Rich text keeps its own sizing contract.
+  `WebuiSearchField` owns the labelled icon/input composition and focus-within treatment shared by
+  search surfaces. Form controls use the same blue border on focus, without an outer ring.
+  `WebuiFormLayout` and `WebuiFormActions` own the arrangement of a form.
   Feature code keeps submission, validation rules and business state.
 - **Multi-line text sizes** — `WebuiTextarea` defaults to a 280px minimum height; `compact` is 120px,
   `large` is 360px, and `document` grows with its content between 220px and 360px. Use these shared

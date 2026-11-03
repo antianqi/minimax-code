@@ -251,6 +251,15 @@ describe("WebUI shell", () => {
     // web tab is opened by typing a URL rather than from a launcher tile.
     expect(markup).not.toContain("浏览器");
     expect(markup).not.toContain("Mini App");
+
+    const reviewState = reduceWorkspacePanelState(state, { type: "open-workspace-review", sessionId: "session-1", workspaceDir: "/tmp" });
+    const reviewMarkup = renderToStaticMarkup(createElement(WebuiWorkspacePanel, { state: reviewState, dispatch: () => undefined, workspaceDir: "/tmp" }));
+    for (const toolbarButton of ["expand", "layout", "context", "tree"]) {
+      expect(reviewMarkup).toContain(`data-testid="workspace-review-toolbar-${toolbarButton}"`);
+    }
+    const toolbarMarkup = reviewMarkup.match(/<div class="webui-workspace-review-toolbar"[^>]*>(.*?)<\/div>/u)?.[1] ?? "";
+    expect([...toolbarMarkup.matchAll(/<button\b/gu)]).toHaveLength(4);
+    expect([...toolbarMarkup.matchAll(/<svg\b/gu)]).toHaveLength(4);
   });
 
   it("renders Desktop-compatible Subagents and exposes child selection", () => {

@@ -300,12 +300,72 @@ export interface FieldControlProps {
   readonly "aria-describedby"?: string;
   /** Present only while the field carries an error. */
   readonly "aria-invalid"?: true;
+  /** Present when the field is required, including for custom controls. */
+  readonly "aria-required"?: true;
 }
 
 /** What the field knows that a control may need but must not spread. */
 export interface FieldContext {
   /** The id of the label, for a control that points at it with `aria-labelledby`. */
   readonly labelId: string;
+}
+
+export interface WebuiRequiredField {
+  /** Stable field key used by `WebuiField.error`. */
+  readonly name: string;
+  readonly label: string;
+  readonly value: string | undefined | null;
+  readonly required?: boolean;
+  readonly message?: string;
+}
+
+export type WebuiFieldErrors = Readonly<Record<string, string>>;
+
+export function WebuiRequiredMark(): ReactElement {
+  return <span aria-hidden="true" className="webui-field-required">{" *"}</span>;
+}
+
+/** The shared inline error for a grouped control that is not one native input. */
+export function WebuiFieldError({ id, message }: { readonly id?: string; readonly message: string }): ReactElement {
+  return <span className="webui-field-error" id={id} role="alert">{message}</span>;
+}
+
+/** Build the same field-level empty-value errors for every WebUI form. */
+export function validateWebuiRequiredFields(
+  fields: readonly WebuiRequiredField[],
+): WebuiFieldErrors {
+  return Object.fromEntries(fields
+    .filter((field) => field.required !== false && (field.value ?? "").trim() === "")
+    .map((field) => [field.name, field.message ?? `${field.label}不能为空。`]));
+}
+
+/** Shared required-field validation state; domain-specific validation stays with the form. */
+export function useWebuiFormValidation(): {
+  readonly errors: WebuiFieldErrors;
+  readonly validateRequired: (fields: readonly WebuiRequiredField[]) => boolean;
+  readonly setFieldError: (name: string, message: string) => void;
+  readonly clearFieldError: (name: string) => void;
+  readonly clearErrors: () => void;
+} {
+  const [errors, setErrors] = useState<WebuiFieldErrors>({});
+  const validateRequired = useCallback((fields: readonly WebuiRequiredField[]) => {
+    const next = validateWebuiRequiredFields(fields);
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }, []);
+  const setFieldError = useCallback((name: string, error: string) => {
+    setErrors((current) => ({ ...current, [name]: error }));
+  }, []);
+  const clearFieldError = useCallback((name: string) => {
+    setErrors((current) => {
+      if (!(name in current)) return current;
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
+  }, []);
+  const clearErrors = useCallback(() => setErrors({}), []);
+  return { errors, validateRequired, setFieldError, clearFieldError, clearErrors };
 }
 
 export interface WebuiFieldProps {
@@ -371,11 +431,7 @@ export function WebuiField({
   const labelText = (
     <label className="webui-field-label" id={labelId} htmlFor={controlId} data-overlay-layer={regionLayerId ?? undefined}>
       {label}
-      {required ? (
-        <span aria-hidden="true" className="webui-field-required">
-          {" *"}
-        </span>
-      ) : null}
+      {required ? <WebuiRequiredMark /> : null}
     </label>
   );
 
@@ -385,18 +441,15 @@ export function WebuiField({
     </span>
   ) : null;
 
-  const errorText = error ? (
-    // `role="alert"` announces the message when it appears; the control's
-    // `aria-describedby` makes it reachable again afterwards.
-    <span className="webui-field-error" id={errorId} role="alert">
-      {error}
-    </span>
-  ) : null;
+  // `role="alert"` announces the message when it appears; the control's
+  // `aria-describedby` makes it reachable again afterwards.
+  const errorText = error ? <WebuiFieldError id={errorId} message={error} /> : null;
 
   const props: FieldControlProps = {
     id: controlId,
     ...(describedBy ? { "aria-describedby": describedBy } : {}),
     ...(error ? { "aria-invalid": true as const } : {}),
+    ...(required ? { "aria-required": true as const } : {}),
   };
   const field: FieldContext = { labelId };
 

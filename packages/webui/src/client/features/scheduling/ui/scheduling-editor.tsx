@@ -30,7 +30,7 @@ import {
   type WebuiCronSchedulePreset,
 } from "../projection/scheduling-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiField, WebuiFormLayout, WebuiSelectMenu, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiFormLayout, WebuiSelectMenu, WebuiTextarea, WebuiTextInput, useWebuiFormValidation, type WebuiFieldErrors } from "../../../ui/field.js";
 
 export interface SchedulingEditorViewProps {
   readonly mode: "create" | "edit";
@@ -38,6 +38,7 @@ export interface SchedulingEditorViewProps {
   readonly busy: boolean;
   /** A rejection from the validator or the runtime, shown above the buttons. */
   readonly error?: string;
+  readonly fieldErrors?: WebuiFieldErrors;
   readonly onChange: (patch: Partial<WebuiCronDraft>) => void;
   readonly onCancel: () => void;
   readonly onSubmit: () => void;
@@ -59,6 +60,8 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
       <WebuiFormLayout>
         <WebuiField
           label="名称"
+          required
+          error={props.fieldErrors?.name}
           control={(props) => (
             <WebuiTextInput
               {...props}
@@ -74,6 +77,8 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
         {props.mode === "create"
           ? <WebuiField
             label="执行 agent"
+            required
+            error={props.fieldErrors?.agentName}
             control={(props) => (
               <WebuiTextInput
                 {...props}
@@ -89,6 +94,8 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
           : null}
         <WebuiField
           label="请求"
+          required
+          error={props.fieldErrors?.prompt}
           control={(props) => (
             <WebuiTextarea
               {...props}
@@ -272,14 +279,16 @@ export function SchedulingEditor(props: {
   const [draft, setDraft] = useState<WebuiCronDraft>(initialDraft);
   const [error, setError] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
 
   const submit = async (): Promise<void> => {
-    if (draft.name.trim() === "") return setError("名称不能为空。");
-    if (draft.prompt.trim() === "") return setError("请求不能为空。");
     const agentName = draft.agentName.trim();
-    if (editingTask === undefined && agentName === "") {
-      return setError("执行任务的 agent 不能为空。");
-    }
+    setError(undefined);
+    if (!validateRequired([
+      { name: "name", label: "名称", value: draft.name },
+      { name: "prompt", label: "请求", value: draft.prompt },
+      { name: "agentName", label: "执行 agent", value: draft.agentName, required: editingTask === undefined },
+    ])) return;
     // A create always carries a schedule; an edit carries one only when the schedule changed — see
     // `webuiCronUpdateRequest`, which owns that rule for the same reason it owns the conversion.
     const converted = webuiCronScheduleFromDraft(draft, props.nowMs());
@@ -345,8 +354,12 @@ export function SchedulingEditor(props: {
         mode={mode}
         draft={draft}
         busy={busy}
+        fieldErrors={fieldErrors}
         {...(error === undefined ? {} : { error })}
-        onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+        onChange={(patch) => {
+          setDraft((current) => ({ ...current, ...patch }));
+          for (const field of Object.keys(patch)) clearFieldError(field);
+        }}
         onCancel={props.onDone}
         onSubmit={() => void submit()}
       />

@@ -276,9 +276,12 @@ export class OfficialPluginReconciler {
         expectedContentDigest: packageVersion.contentDigest,
         signal,
       });
-      if (!(await isUsableCachedPackage(materialized.packageRoot, packageVersion))) {
-        throw new Error('materialized Plugin package identity does not match full-state');
-      }
+      // The reader is what decides whether a package is the one the full state
+      // named: a manifest this build cannot read (an unsupported field, a broken
+      // Mini App declaration) has to surface as itself. Folding it into a boolean
+      // made every rejection read as a digest/identity mismatch, which sent the
+      // first investigation after the download instead of the manifest.
+      await assertUsableCachedPackage(materialized.packageRoot, packageVersion);
       return { package: cachedPackage(packageVersion, materialized.cacheKey), repaired: true };
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
@@ -575,11 +578,32 @@ async function isUsableCachedPackage(
   expected: PluginPackageVersion,
 ): Promise<boolean> {
   try {
-    await access(packageRoot);
-    const plugin = await readMiniMaxPlugin(packageRoot, { source: 'OFFICIAL' });
-    return plugin.name === expected.name && plugin.version === expected.version;
+    await assertUsableCachedPackage(packageRoot, expected);
+    return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * The reader's verdict, kept as a throw.
+ *
+ * `isUsableCachedPackage` answers a boolean for the cache checks, which are about
+ * repairing a slot. After a materialization the question is different: the package
+ * has to be the one the full state named, and a manifest this build cannot read is
+ * a reason to say why — an unsupported manifest field, a broken Mini App
+ * declaration — not to report a digest mismatch.
+ */
+async function assertUsableCachedPackage(
+  packageRoot: string,
+  expected: PluginPackageVersion,
+): Promise<void> {
+  await access(packageRoot);
+  const plugin = await readMiniMaxPlugin(packageRoot, { source: 'OFFICIAL' });
+  if (plugin.name !== expected.name || plugin.version !== expected.version) {
+    throw new Error(
+      `materialized Plugin package identity does not match full-state: expected ${expected.name}@${expected.version}, read ${plugin.name}@${String(plugin.version)}`,
+    );
   }
 }
 

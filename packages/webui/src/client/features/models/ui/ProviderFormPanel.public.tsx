@@ -16,7 +16,7 @@
 // write will actually send. The editor and its commands arrive as props — the provider CRUD
 // is `models`' duty, not `settings`'.
 
-import { useEffect, useRef, useState, type Dispatch, type ReactElement, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type FormEvent, type ReactElement, type SetStateAction } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -48,7 +48,7 @@ import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiCheckbox, WebuiField, WebuiFormGrid, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiCheckbox, WebuiField, WebuiFieldError, WebuiFormGrid, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 
@@ -248,6 +248,7 @@ export function ProviderFormPanel({
   const [apiFormatOpen, setApiFormatOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+  const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   // The API formats the runtime accepts, plus whatever a saved provider carries
   // if this build does not know it: an edit must not silently rewrite it.
   // A field error the view can decide on its own: the endpoint is a URL, and a
@@ -257,7 +258,18 @@ export function ProviderFormPanel({
   const baseUrlError =
     draftBaseUrl.trim() && !/^https?:\/\/[^\s]+$/u.test(draftBaseUrl.trim())
       ? "请输入以 http:// 或 https:// 开头的地址"
-      : undefined;
+      : fieldErrors.baseUrl;
+  const submitProviderForm = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (!validateRequired([
+      { name: "name", label: "提供商名称", value: draftName, required: editingProvider !== undefined || selectedPresetId === "__other__" },
+      { name: "baseUrl", label: "接口地址", value: draftBaseUrl },
+      { name: "apiKey", label: "API Key", value: draftApiKey, required: editingProvider === undefined },
+      { name: "models", label: "模型", value: draftModels.some((model) => model.modelId.trim()) ? "configured" : "" , message: "请至少填写一个模型名称。" },
+    ])) return;
+    if (baseUrlError && baseUrlError !== fieldErrors.baseUrl) return;
+    void editor.save();
+  };
   const apiFormatOptions = WEBUI_MODEL_PROVIDER_APIS.includes(
     draftApiFormat as (typeof WEBUI_MODEL_PROVIDER_APIS)[number],
   )
@@ -350,20 +362,21 @@ export function ProviderFormPanel({
           <WebuiButton variant="primary" type="submit" form="provider-form-content" disabled={formBusy || (!draftTested && !skipTest)}>{formBusy ? "加载中…" : "保存"}</WebuiButton>
         </WebuiDialogActions>
       </>}>
-        <form id="provider-form-content" className="webui-provider-form" onSubmit={(event) => { event.preventDefault(); void editor.save(); }}>
+        <form id="provider-form-content" className="webui-provider-form" onSubmit={submitProviderForm}>
         <WebuiStack gap="roomy" className="webui-provider-form-body">
-          {!editingProvider ? <WebuiFormGrid className="webui-provider-form-provider-grid"><WebuiField gap="small" label="提供商" control={(props) => <ProviderPresetPicker controlId={props.id} presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); editor.changeField("name", ""); editor.changeField("baseUrl", ""); editor.changeField("apiFormat", "openai-completions"); editor.clearModels(); return; } setSelectedPresetId(textOf(preset.providerId)); editor.changeField("name", textOf(preset.name)); editor.changeField("baseUrl", textOf(preset.baseUrl)); editor.changeField("apiFormat", textOf(preset.apiFormat)); editor.clearModels(); }} />} />{selectedPresetId === "__other__" ? <WebuiField gap="small" label="提供商名称" required control={(props) => <WebuiTextInput {...props} controlSize="compact" value={draftName} placeholder="输入提供商名称" onChange={(event) => editor.changeField("name", event.target.value)} required />} /> : null}</WebuiFormGrid> : null}
-          <WebuiFormGrid className="webui-provider-form-provider-grid">{editingProvider ? <WebuiField gap="small" label="提供商名称" required control={(props) => <WebuiTextInput {...props} controlSize="compact" value={draftName} placeholder="输入提供商名称" onChange={(event) => editor.changeField("name", event.target.value)} required />} /> : null}<WebuiField gap="small" label="API 格式" control={(props, field) => <WebuiDropdown
+          {!editingProvider ? <WebuiFormGrid className="webui-provider-form-provider-grid"><WebuiField gap="small" label="提供商" control={(props) => <ProviderPresetPicker controlId={props.id} presets={presets} selected={selectedPresetId ?? ""} selectedName={selectedPresetId && selectedPresetId !== "__other__" ? draftName : ""} onSelect={(preset) => { if (!preset) { setSelectedPresetId("__other__"); editor.changeField("name", ""); editor.changeField("baseUrl", ""); editor.changeField("apiFormat", "openai-completions"); editor.clearModels(); return; } setSelectedPresetId(textOf(preset.providerId)); editor.changeField("name", textOf(preset.name)); editor.changeField("baseUrl", textOf(preset.baseUrl)); editor.changeField("apiFormat", textOf(preset.apiFormat)); editor.clearModels(); }} />} />{selectedPresetId === "__other__" ? <WebuiField gap="small" label="提供商名称" required error={fieldErrors.name} control={(props) => <WebuiTextInput {...props} controlSize="compact" value={draftName} placeholder="输入提供商名称" onChange={(event) => { editor.changeField("name", event.target.value); clearFieldError("name"); }} />} /> : null}</WebuiFormGrid> : null}
+          <WebuiFormGrid className="webui-provider-form-provider-grid">{editingProvider ? <WebuiField gap="small" label="提供商名称" required error={fieldErrors.name} control={(props) => <WebuiTextInput {...props} controlSize="compact" value={draftName} placeholder="输入提供商名称" onChange={(event) => { editor.changeField("name", event.target.value); clearFieldError("name"); }} />} /> : null}<WebuiField gap="small" label="API 格式" control={(props, field) => <WebuiDropdown
           managed
           managedLayerId="provider-form-format" open={apiFormatOpen} onOpen={() => setApiFormatOpen(true)} onClose={() => setApiFormatOpen(false)} role="listbox" ariaLabel="API 格式" width="match" wrapperClassName="webui-provider-format" className="webui-provider-format-menu" trigger={(triggerProps) => {
             // Named by the field's label and by the value it shows: a name that
             // restates the value alone would not match the visible text.
             const valueId = `${props.id}-value`;
             return <WebuiButton variant="secondary" size="compact" type="button" {...triggerProps} id={props.id} aria-labelledby={`${field.labelId} ${valueId}`} className="webui-provider-format-trigger"><span id={valueId}>{draftApiFormat}</span><IconChevronDown aria-hidden="true" size={16} stroke={1.7} /></WebuiButton>;
-          }}>{apiFormatOptions.map((option) => <WebuiButton key={option} variant="selectable-row" size="regular" type="button" role="option" aria-selected={draftApiFormat === option} className="webui-provider-format-option" onClick={() => { editor.changeField("apiFormat", option); setApiFormatOpen(false); }}>{option}</WebuiButton>)}</WebuiDropdown>} /><WebuiField gap="small" label="接口地址" required error={baseUrlError} control={(props) => <WebuiTextInput {...props} controlSize="compact" placeholder="https://api.example.com/v1" value={draftBaseUrl} onChange={(event) => editor.changeField("baseUrl", event.target.value)} required />} /><WebuiField gap="small" label="API Key" required={!editingProvider} description={editingProvider ? "留空则保留原值" : undefined} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" placeholder={editingProvider ? "留空保留原值" : "请输入API Key"} value={draftApiKey} onChange={(event) => editor.changeField("apiKey", event.target.value)} required={!editingProvider} />} /></WebuiFormGrid>
+          }}>{apiFormatOptions.map((option) => <WebuiButton key={option} variant="selectable-row" size="regular" type="button" role="option" aria-selected={draftApiFormat === option} className="webui-provider-format-option" onClick={() => { editor.changeField("apiFormat", option); setApiFormatOpen(false); }}>{option}</WebuiButton>)}</WebuiDropdown>} /><WebuiField gap="small" label="接口地址" required error={baseUrlError} control={(props) => <WebuiTextInput {...props} controlSize="compact" placeholder="https://api.example.com/v1" value={draftBaseUrl} onChange={(event) => { editor.changeField("baseUrl", event.target.value); clearFieldError("baseUrl"); }} />} /><WebuiField gap="small" label="API Key" required={!editingProvider} error={fieldErrors.apiKey} description={editingProvider ? "留空则保留原值" : undefined} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" placeholder={editingProvider ? "留空保留原值" : "请输入API Key"} value={draftApiKey} onChange={(event) => { editor.changeField("apiKey", event.target.value); clearFieldError("apiKey"); }} />} /></WebuiFormGrid>
           <WebuiStack gap="medium" className="webui-provider-form-models">
-            <WebuiInline justify="between" gap="medium" className="webui-provider-form-models-header"><span className="text-[14px] font-medium leading-5 text-text_default_primary">模型</span><WebuiInline gap="small"><WebuiButton variant="outline-secondary" size="compact" onClick={() => editor.addModel()}>添加模型</WebuiButton><WebuiButton variant="quiet-highlight" size="compact" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</WebuiButton></WebuiInline></WebuiInline>
-            {draftModels.length ? draftModels.map((model, index) => <ProviderModelCard key={model.id} model={model} index={index} busy={formBusy} onChange={(patch) => editor.changeModel(model.id, patch)} onTest={() => void editor.testModel(model.id)} onRemove={() => editor.removeModel(model.id)} />) : <FeedbackEmpty className="webui-provider-form-models-empty" title={"请至少添加一个模型"} />}
+            <WebuiInline justify="between" gap="medium" className="webui-provider-form-models-header"><span className="text-[14px] font-medium leading-5 text-text_default_primary">模型</span><WebuiInline gap="small"><WebuiButton variant="outline-secondary" size="compact" onClick={() => { editor.addModel(); clearFieldError("models"); }}>添加模型</WebuiButton><WebuiButton variant="quiet-highlight" size="compact" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</WebuiButton></WebuiInline></WebuiInline>
+            {draftModels.length ? draftModels.map((model, index) => <ProviderModelCard key={model.id} model={model} index={index} busy={formBusy} onChange={(patch) => { editor.changeModel(model.id, patch); clearFieldError("models"); }} onTest={() => void editor.testModel(model.id)} onRemove={() => { editor.removeModel(model.id); clearFieldError("models"); }} />) : <FeedbackEmpty className="webui-provider-form-models-empty" title={"请至少添加一个模型"} />}
+            {fieldErrors.models ? <WebuiFieldError message={fieldErrors.models} /> : null}
           </WebuiStack>
           <WebuiStack gap="small" className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <WebuiInline key={header.id} gap="small" className="webui-provider-form-header-row"><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton></WebuiInline>)}<WebuiButton variant="outline-secondary" size="compact" className="w-fit self-start" onClick={() => editor.addHeader()}><IconPlus aria-hidden="true" size={16} stroke={1.7} /> 添加 Header</WebuiButton></WebuiStack>
           {formError ? <FeedbackError message={formError} className="webui-provider-form-error" /> : null}

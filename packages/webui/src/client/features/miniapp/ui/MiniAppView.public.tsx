@@ -34,6 +34,13 @@ import {
   useState,
   type ReactElement,
 } from "react";
+import { createPortal } from "react-dom";
+import {
+  IconExternalLink,
+  IconPlayerPlay,
+  IconPlayerStop,
+  IconRefresh,
+} from "@tabler/icons-react";
 
 import {
   WEBUI_MINIAPP_BRIDGE_APPEND_REPLY,
@@ -53,7 +60,7 @@ import {
 import { createWebuiMiniAppAgentBridge } from "../application/miniapp-agent-bridge.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
-import { WebuiButton } from "../../../ui/button.js";
+import { WebuiIconButton } from "../../../ui/button.js";
 import { WebuiSkeletonProjection } from "../../../ui/page.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import {
@@ -88,6 +95,8 @@ export interface MiniAppViewProps {
    * standalone one and to switch to it, while the standalone view offers neither.
    */
   readonly surface?: WebuiMiniAppSurface;
+  /** Workspace toolbar target for the inline app actions; omitted by standalone views. */
+  readonly toolbarTarget?: HTMLDivElement | null;
 }
 
 export function MiniAppView({
@@ -95,6 +104,7 @@ export function MiniAppView({
   sessionId,
   title,
   surface = "inline",
+  toolbarTarget,
 }: MiniAppViewProps): ReactElement {
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
@@ -420,6 +430,31 @@ export function MiniAppView({
    * — because another document holds the presentation — offers none of them.
    */
   const running = presentation?.kind === "open" && !detached;
+  const stopped = presentation?.kind === "stopped" && !detached;
+  const viewActions = running || stopped || canMove || detached ? (
+    <div className="webui-miniapp-view-move" data-testid="miniapp-view-actions">
+      {running ? <>
+        <span className="webui-miniapp-view-badge" data-testid="miniapp-view-status">
+          {row?.statusLabel ?? "运行中"}
+        </span>
+        <WebuiIconButton tone="bare" size="panel" label="刷新应用" title="刷新" data-testid="miniapp-refresh" onClick={reload}>
+          <IconRefresh aria-hidden="true" size={20} stroke={1.7} />
+        </WebuiIconButton>
+        <WebuiIconButton tone="bare" size="panel" label="停止应用" title="停止" data-testid="miniapp-stop" onClick={() => void workflows?.stop(pluginId)}>
+          <IconPlayerStop aria-hidden="true" size={20} stroke={1.7} />
+        </WebuiIconButton>
+      </> : null}
+      {stopped ? <WebuiIconButton tone="bare" size="panel" label="重新打开应用" title="重新打开" data-testid="miniapp-reopen" onClick={() => void workflows?.open(pluginId)}>
+        <IconPlayerPlay aria-hidden="true" size={20} stroke={1.7} />
+      </WebuiIconButton> : null}
+      {detached ? <WebuiIconButton tone="bare" size="panel" label="切换到该标签页" title="切换到该标签页" data-testid="miniapp-switch-standalone" onClick={moveToStandalone}>
+        <IconExternalLink aria-hidden="true" size={20} stroke={1.7} />
+      </WebuiIconButton> : null}
+      {canMove ? <WebuiIconButton tone="bare" size="panel" label="在新标签页中打开" title="在新标签页中打开" data-testid="miniapp-open-standalone" onClick={moveToStandalone}>
+        <IconExternalLink aria-hidden="true" size={20} stroke={1.7} />
+      </WebuiIconButton> : null}
+    </div>
+  ) : null;
 
   return (
     <WebuiSkeletonProjection>
@@ -433,27 +468,21 @@ export function MiniAppView({
       >
         {presentation?.kind === "opening" && !detached ? (
           // 启动中是一个要被听到的状态，播报通道交给共享契约。
-          <FeedbackLiveRegion className="webui-miniapp-view-status">
-            正在启动 {name}…
-          </FeedbackLiveRegion>
+          <div className="webui-miniapp-view-state" data-testid="miniapp-view-opening">
+            <FeedbackLiveRegion className="webui-miniapp-view-status">
+              正在启动 {name}…
+            </FeedbackLiveRegion>
+          </div>
         ) : null}
         {detached ? (
           <div
-            className="webui-miniapp-view-detached"
+            className="webui-miniapp-view-state webui-miniapp-view-detached"
             data-testid="miniapp-view-detached"
           >
             {/* 切换到独立标签页的事实要被听到，播报通道交给共享契约。 */}
             <FeedbackLiveRegion>
               已在独立的浏览器标签页中打开。
             </FeedbackLiveRegion>
-            <WebuiButton
-              variant="secondary"
-              size="compact"
-              data-testid="miniapp-switch-standalone"
-              onClick={moveToStandalone}
-            >
-              切换到该标签页
-            </WebuiButton>
           </div>
         ) : null}
         {presentation?.kind === "open" && !detached ? (
@@ -490,80 +519,33 @@ export function MiniAppView({
             }}
           />
         ) : null}
-        {running || canMove ? (
-          <div
-            className="webui-miniapp-view-move"
-            data-testid="miniapp-view-actions"
-          >
-            {running ? (
-              <>
-                <span
-                  className="webui-miniapp-view-badge"
-                  data-testid="miniapp-view-status"
-                >
-                  {row?.statusLabel ?? "运行中"}
-                </span>
-                <WebuiButton
-                  variant="secondary"
-                  size="compact"
-                  data-testid="miniapp-refresh"
-                  onClick={reload}
-                >
-                  刷新
-                </WebuiButton>
-                <WebuiButton
-                  variant="secondary"
-                  size="compact"
-                  data-testid="miniapp-stop"
-                  onClick={() => void workflows?.stop(pluginId)}
-                >
-                  停止
-                </WebuiButton>
-              </>
-            ) : null}
-            {canMove ? (
-              <WebuiButton
-                variant="secondary"
-                size="compact"
-                data-testid="miniapp-open-standalone"
-                onClick={moveToStandalone}
-              >
-                在新标签页中打开
-              </WebuiButton>
-            ) : null}
-          </div>
-        ) : null}
+        {toolbarTarget !== undefined
+          ? toolbarTarget && viewActions ? createPortal(viewActions, toolbarTarget) : null
+          : viewActions}
         {presentation?.kind === "stopped" && !detached ? (
           <div
-            className="webui-miniapp-view-stopped"
+            className="webui-miniapp-view-state webui-miniapp-view-stopped"
             data-testid="miniapp-view-stopped"
           >
             <FeedbackError message={presentation.reason} />
-            <WebuiButton
-              variant="secondary"
-              size="compact"
-              onClick={() => void workflows?.open(pluginId)}
-            >
-              重新打开
-            </WebuiButton>
           </div>
         ) : null}
         {presentation === undefined && refusal ? (
-          <FeedbackError
-            message={webuiMiniAppRefusalText({
-              code: refusal.code,
-              message: refusal.message,
-              rows: state.listing.rows,
-            })}
-            className="webui-plugin-error"
-            testId="miniapp-view-refusal"
-          />
+          <div className="webui-miniapp-view-state">
+            <FeedbackError
+              message={webuiMiniAppRefusalText({
+                code: refusal.code,
+                message: refusal.message,
+                rows: state.listing.rows,
+              })}
+              testId="miniapp-view-refusal"
+            />
+          </div>
         ) : null}
         {presentation === undefined && !refusal && state.unavailable ? (
-          <FeedbackEmpty
-            className="webui-plugin-empty"
-            title={state.unavailable}
-          />
+          <div className="webui-miniapp-view-state">
+            <FeedbackEmpty title={state.unavailable} />
+          </div>
         ) : null}
       </div>
     </WebuiSkeletonProjection>

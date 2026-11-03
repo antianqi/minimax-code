@@ -9,7 +9,7 @@ import {
 } from "../../../bindings/use-query-state.js";
 import { WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconFile, WebuiIconRunLocation } from "../../../shell/icons.js";
 import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
-import { WebuiField, WebuiTextarea } from "../../../ui/field.js";
+import { WebuiField, WebuiTextarea, useWebuiFormValidation } from "../../../ui/field.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
@@ -111,9 +111,10 @@ function WorkspaceCommitDialog({ open, environment, workspaceDir, mutateGit, onC
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   const hasChanges = environment.changedFiles > 0;
   const submit = (action: "commit" | "commitAndPush" | "push") => {
-    if (action !== "push" && !message.trim()) return;
+    if (action !== "push" && !validateRequired([{ name: "message", label: "提交说明", value: message }])) return;
     setBusy(true);
     setError(undefined);
     // The mutation runs through the query owner, which invalidates exactly the
@@ -125,10 +126,10 @@ function WorkspaceCommitDialog({ open, environment, workspaceDir, mutateGit, onC
   };
   return <WebuiDialog id="workspace-commit-dialog" open={open} title={PROGRESS_COPY.commit} onClose={onClose} dismissOnEscape portalTarget={dom.portalTarget()} width="compact" footer={<WebuiDialogActions>
     <WebuiButton variant="secondary" onClick={onClose} disabled={busy}>取消</WebuiButton>
-    {hasChanges ? <WebuiButton variant="secondary" onClick={() => submit("commit")} disabled={busy || !message.trim()}>提交</WebuiButton> : null}
-    <WebuiButton variant="primary" onClick={() => submit(hasChanges ? "commitAndPush" : "push")} disabled={busy || (hasChanges && !message.trim())}>{hasChanges ? "提交并推送" : "推送"}</WebuiButton>
+    {hasChanges ? <WebuiButton variant="secondary" onClick={() => submit("commit")} disabled={busy}>提交</WebuiButton> : null}
+    <WebuiButton variant="primary" onClick={() => submit(hasChanges ? "commitAndPush" : "push")} disabled={busy}>{hasChanges ? "提交并推送" : "推送"}</WebuiButton>
   </WebuiDialogActions>}>
-    {hasChanges ? <WebuiField className="webui-commit-dialog-label" label="提交说明" control={(props) => <WebuiTextarea {...props} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="例如：修复搜索框样式" autoFocus />} /> : <p className="webui-commit-dialog-hint">当前没有未提交变更，将推送当前分支。</p>}
+    {hasChanges ? <WebuiField className="webui-commit-dialog-label" label="提交说明" required error={fieldErrors.message} control={(props) => <WebuiTextarea {...props} value={message} onChange={(event) => { setMessage(event.target.value); clearFieldError("message"); }} placeholder="例如：修复搜索框样式" autoFocus />} /> : <p className="webui-commit-dialog-hint">当前没有未提交变更，将推送当前分支。</p>}
     {error ? <FeedbackError message={error} className="webui-commit-dialog-error" /> : null}
   </WebuiDialog>;
 }

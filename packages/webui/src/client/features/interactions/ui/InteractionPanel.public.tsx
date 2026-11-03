@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactElement } from "react";
 import { IconChevronRight } from "@tabler/icons-react";
 import {
   buildWebuiQuestionnaireAnswers,
-  canAdvanceWebuiQuestionnaireStep,
   optionIdsForStep,
   sortWebuiQuestionnaireOptions,
   toggleWebuiQuestionnaireOption,
@@ -17,7 +16,7 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../../../shared/contracts/interactions.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
-import { WebuiCheckbox, WebuiRadio, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiCheckbox, WebuiFieldError, WebuiRadio, WebuiRequiredMark, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiCard } from "../../../ui/card.js";
 
@@ -55,6 +54,7 @@ export function WebuiInteractionPanel({
   );
   const [submitting, setSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   // The expiry countdown is the GOAL flow's auto-reply window, not a property
   // of questionnaires in general: the runtime's
   // `QuestionnaireAutoReplyScheduler` fires only for `purpose === 'goal'`
@@ -80,7 +80,8 @@ export function WebuiInteractionPanel({
     setOtherSelections({});
     setOtherTexts({});
     setCurrentStep(0);
-  }, [questionnaire?.id]);
+    validateRequired([]);
+  }, [questionnaire?.id, validateRequired]);
   useEffect(() => {
     if (!goalAutoReplyWindow) {
       setRemainingSeconds(undefined);
@@ -98,14 +99,19 @@ export function WebuiInteractionPanel({
     (permission) => permission.sessionId === sessionId,
   );
   const activeStep = questionnaire?.steps[currentStep];
-  const activeSelected = activeStep ? optionIdsForStep(selections, activeStep.id) : [];
-  const activeOther = activeStep ? otherSelections[activeStep.id] === true : false;
-  const activeStepValid = canAdvanceWebuiQuestionnaireStep(
-    activeStep,
-    activeSelected,
-    activeOther,
-    otherTexts[activeStep?.id ?? ""] ?? "",
-  );
+  const requiredFields = (questionnaire?.steps ?? []).map((step) => {
+    const selectedOther = otherSelections[step.id] === true;
+    const value = selectedOther
+      ? otherTexts[step.id] ?? ""
+      : optionIdsForStep(selections, step.id).length > 0 ? "selected" : "";
+    return {
+      name: step.id,
+      label: step.question,
+      value,
+      required: step.required,
+      message: selectedOther ? "请输入自定义回答。" : "请选择一个选项。",
+    };
+  });
   return (
     <WebuiStack
       gap="medium"
@@ -264,13 +270,13 @@ export function WebuiInteractionPanel({
               step.selectionMode === 1 ||
               (step.selectionMode as unknown) === "multiple";
             return (
-              <fieldset key={step.id} className="mb-4" data-testid={`questionnaire-step-${step.id}`}>
+              <fieldset key={step.id} className="mb-4" data-testid={`questionnaire-step-${step.id}`} aria-invalid={fieldErrors[step.id] ? true : undefined} aria-describedby={fieldErrors[step.id] ? `webui-questionnaire-${step.id}-error` : undefined}>
                 <legend
                   className="text-size_14 font-weight_medium"
                   data-webui-questionnaire-question="true"
                   data-testid={`questionnaire-step-title-${step.id}`}
                 >
-                  {step.question}
+                  {step.question}{step.required ? <WebuiRequiredMark /> : null}
                 </legend>
                 {step.description ? (
                   <span className="text-text_default_secondary text-size_12">
@@ -302,6 +308,7 @@ export function WebuiInteractionPanel({
                               ...current,
                               [step.id]: toggleWebuiQuestionnaireOption(selected, option.id, multiple),
                             }));
+                            clearFieldError(step.id);
                             if (!multiple)
                               setOtherSelections((current) => ({
                                 ...current,
@@ -316,6 +323,7 @@ export function WebuiInteractionPanel({
                         onChange={() => {
                           setSelections((current) => ({ ...current, [step.id]: [option.id] }));
                           setOtherSelections((current) => ({ ...current, [step.id]: false }));
+                          clearFieldError(step.id);
                         }}
                       />}
                       <span className="webui-questionnaire-letter" aria-hidden="true">
@@ -360,6 +368,7 @@ export function WebuiInteractionPanel({
                           ...current,
                           [step.id]: next,
                         }));
+                        clearFieldError(step.id);
                         if (next && !multiple)
                           setSelections((current) => ({
                             ...current,
@@ -373,6 +382,7 @@ export function WebuiInteractionPanel({
                       onChange={() => {
                         setOtherSelections((current) => ({ ...current, [step.id]: true }));
                         setSelections((current) => ({ ...current, [step.id]: [] }));
+                        clearFieldError(step.id);
                       }}
                     />}
                     <span
@@ -405,16 +415,18 @@ export function WebuiInteractionPanel({
                             [step.id]: [],
                           }));
                         }}
-                        onChange={(event) =>
+                        onChange={(event) => {
                           setOtherTexts((current) => ({
                             ...current,
                             [step.id]: event.target.value,
-                          }))
-                        }
+                          }));
+                          clearFieldError(step.id);
+                        }}
                       />
                     </span>
                   </WebuiInline>
                 ) : null}
+                {fieldErrors[step.id] ? <WebuiFieldError id={`webui-questionnaire-${step.id}-error`} message={fieldErrors[step.id]!} /> : null}
               </fieldset>
             );
           })}
@@ -427,18 +439,18 @@ export function WebuiInteractionPanel({
           </div>
           <WebuiInline gap="small" wrap className="webui-questionnaire-actions">
             {questionnaire.steps.length > 1 && currentStep > 0 ? <WebuiButton variant="grouped" size="pill" disabled={submitting} data-testid="questionnaire-back" onClick={() => setCurrentStep((value) => Math.max(0, value - 1))}>上一步</WebuiButton> : null}
-            {questionnaire.steps.length > 1 && currentStep < questionnaire.steps.length - 1 ? <WebuiButton variant="accent" size="action" disabled={submitting || !activeStepValid} data-testid="questionnaire-next" onClick={() => setCurrentStep((value) => Math.min(questionnaire.steps.length - 1, value + 1))}>下一步</WebuiButton> : null}
+            {questionnaire.steps.length > 1 && currentStep < questionnaire.steps.length - 1 ? <WebuiButton variant="accent" size="action" disabled={submitting} data-testid="questionnaire-next" onClick={() => {
+              const activeField = requiredFields.find((field) => field.name === activeStep?.id);
+              if (!validateRequired(activeField ? [activeField] : [])) return;
+              setCurrentStep((value) => Math.min(questionnaire.steps.length - 1, value + 1));
+            }}>下一步</WebuiButton> : null}
             <WebuiButton variant="accent" size="action"
               disabled={
                 submitting ||
-                currentStep < questionnaire.steps.length - 1 || !questionnaire.steps.every((step) => {
-                  if (!step.required) return true;
-                  if (otherSelections[step.id] === true)
-                    return Boolean((otherTexts[step.id] ?? "").trim());
-                  return optionIdsForStep(selections, step.id).length > 0;
-                })
+                currentStep < questionnaire.steps.length - 1
               }
               onClick={() => {
+                if (!validateRequired(requiredFields)) return;
                 setSubmitting(true);
                 void onQuestionnaire(
                   questionnaire,

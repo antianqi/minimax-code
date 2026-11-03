@@ -26,6 +26,16 @@
     outline: none;
     box-shadow: none;
   }
+  .webui-control[aria-invalid="true"],
+  .webui-select-menu-trigger[aria-invalid="true"] {
+    border-color: var(--border_status_error);
+  }
+  .webui-control[aria-invalid="true"]:focus,
+  .webui-select-menu-trigger[aria-invalid="true"]:focus-visible {
+    border-color: var(--border_status_error);
+    outline: 2px solid var(--border_status_error);
+    outline-offset: 1px;
+  }
   .webui-control:disabled {
     cursor: default;
     opacity: 0.55;

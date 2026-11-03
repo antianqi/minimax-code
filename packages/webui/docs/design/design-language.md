@@ -387,7 +387,11 @@ contract owns; if no published size fits, the size is the contract's to add.
   icon slot, its trailing slot and its disabled state.
 - **The field** — `WebuiField` owns the label, the description, the validation error and the wiring
   between them: the control is named by `for`, described by `aria-describedby` and marked invalid by
-  `aria-invalid`. `WebuiTextInput`, `WebuiTextarea`, `WebuiSelect`, `WebuiCheckbox`, `WebuiRadio` and
+  `aria-invalid`; a required field also exposes `aria-required`, and an invalid control uses the
+  shared error border. `useWebuiFormValidation` and `validateWebuiRequiredFields` give forms one
+  empty-value check and field-error state, while each form still declares which values are required.
+  `WebuiFieldError` is the same inline error presentation for grouped controls without one native
+  input. `WebuiTextInput`, `WebuiTextarea`, `WebuiSelect`, `WebuiCheckbox`, `WebuiRadio` and
   `WebuiFileInput` own the common native control markup, appearance, focus, hidden-picker geometry
   and disabled states; `WebuiSelectMenu` uses the shared dropdown surface for a WebUI-rendered option
   list. Form layout owns field placement and column spans; fields and their controls fill the space

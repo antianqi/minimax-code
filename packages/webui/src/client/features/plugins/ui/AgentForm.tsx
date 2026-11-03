@@ -13,7 +13,7 @@ import {
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiField, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 
 export interface AgentFormProps {
   readonly editing: Row | undefined;
@@ -35,9 +35,11 @@ export function AgentForm({
   const [description, setDescription] = useState(read(editing ?? {}, "description"));
   const [prompt, setPrompt] = useState(read(editing ?? {}, "systemPrompt", "system_prompt"));
   const [model, setModel] = useState(read(editing ?? {}, "model"));
+  const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
 
   const save = async () => {
     const trimmed = name.trim();
+    if (!validateRequired([{ name: "name", label: "名称", value: trimmed, required: editing === undefined }])) return;
     const saved = await onSubmit(
       editing
         ? {
@@ -74,8 +76,10 @@ export function AgentForm({
     <div className="webui-plugin-form webui-agent-form">
       <WebuiField
         label="名称"
+        required={!editing}
+        error={errors.name}
         control={(props) => (
-          <WebuiTextInput {...props} value={name} placeholder="例如：代码审查助手" onChange={(event) => setName(event.currentTarget.value)} />
+          <WebuiTextInput {...props} value={name} placeholder="例如：代码审查助手" onChange={(event) => { setName(event.currentTarget.value); clearFieldError("name"); }} />
         )}
       />
       <WebuiField

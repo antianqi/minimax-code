@@ -93,7 +93,7 @@ import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
-import { WebuiField, WebuiFormActions, WebuiFormLayout, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiFormActions, WebuiFormLayout, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
 
@@ -206,13 +206,14 @@ function ChannelBindForm(props: {
   const [name, setName] = useState("");
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
+  const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
   return (
     <form
       data-webui-channel-bind-form="true"
       className="py-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (name.trim() === "") return;
+        if (!validateRequired([{ name: "name", label: "客户端名称", value: name }])) return;
         props.onSubmit({
           name: name.trim(),
           connectionId: props.connectionId,
@@ -225,6 +226,8 @@ function ChannelBindForm(props: {
         <p className="text-sm leading-5 text-text_default_primary">{WEBUI_CHANNEL_SECTION_BIND}</p>
         <WebuiField
           label="客户端名称"
+          required
+          error={errors.name}
           control={(fieldProps) => (
             <WebuiTextInput
               {...fieldProps}
@@ -232,7 +235,10 @@ function ChannelBindForm(props: {
               controlSize="compact"
               placeholder="例如：团队飞书机器人"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                clearFieldError("name");
+              }}
             />
           )}
         />

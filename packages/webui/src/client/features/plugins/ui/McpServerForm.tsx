@@ -22,7 +22,7 @@ import {
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiField, WebuiFormGrid, WebuiSelectMenu, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiFormGrid, WebuiSelectMenu, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
 import { FeedbackError } from "../../../ui/feedback.js";
@@ -155,6 +155,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
   // owner's answer to report, and a mutation failure is its own state — the
   // three are not the same thing and must not collapse into one string.
   const [localError, setLocalError] = useState("");
+  const { errors, validateRequired, setFieldError, clearFieldError, clearErrors } = useWebuiFormValidation();
 
   /** Form fields → one server config, validating as it goes. */
   const configFromForm = (): Row => {
@@ -246,6 +247,20 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
   };
 
   const save = async () => {
+    setLocalError("");
+    clearErrors();
+    if (jsonMode) {
+      if (!validateRequired([{ name: "json", label: "MCP 配置 JSON", value: json }])) return;
+    } else {
+      if (!validateRequired([
+        { name: "name", label: "名称", value: name },
+        { name: "endpoint", label: isStdio ? "命令" : "地址", value: isStdio ? command : url },
+      ])) return;
+      if (!isStdio && !isConnectionValid) {
+        setFieldError("endpoint", "请输入有效的 http:// 或 https:// 地址。");
+        return;
+      }
+    }
     let serverName = name.trim();
     let serverEnabled = enabled;
     let config: Row;
@@ -282,7 +297,6 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
   };
 
   const isStdio = transport === "stdio";
-  const isTimeoutValid = !timeoutMs.trim() || (Number.isSafeInteger(Number(timeoutMs)) && Number(timeoutMs) > 0);
   const isConnectionValid = isStdio
     ? command.trim().length > 0
     : (() => {
@@ -293,29 +307,6 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
           return false;
         }
       })();
-  const isJsonValid = (() => {
-    try {
-      const draft = serverFromJson(json, name, enabled);
-      const draftTransport = read(draft.config, "transport");
-      const endpointValid = draftTransport === "stdio"
-        ? read(draft.config, "command").trim().length > 0
-        : (() => {
-            try {
-              const parsed = new URL(read(draft.config, "url").trim());
-              return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname.length > 0;
-            } catch {
-              return false;
-            }
-          })();
-      return draft.name.trim().length > 0 && endpointValid;
-    } catch {
-      return false;
-    }
-  })();
-  const canSave = jsonMode
-    ? isJsonValid
-    : name.trim().length > 0 && isConnectionValid && isTimeoutValid;
-
   return (
     <div className="webui-mcp-form">
       <WebuiSegmentedControl
@@ -328,19 +319,27 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
         onChange={(mode) => (mode === "json" ? toJson() : toForm())}
       />
       {jsonMode ? (
-          <WebuiTextarea
-          aria-label="MCP 配置 JSON"
-          value={json}
-          placeholder={'{\n  "mcpServers": {}\n}'}
-          onChange={(event) => setJson(event.currentTarget.value)}
+        <WebuiField
+          label="MCP 配置 JSON"
+          required
+          error={errors.json}
+          control={(props) => (
+            <WebuiTextarea
+              {...props}
+              value={json}
+              placeholder={'{\n  "mcpServers": {}\n}'}
+              onChange={(event) => { setJson(event.currentTarget.value); clearFieldError("json"); }}
+            />
+          )}
         />
       ) : (
         <WebuiFormGrid className="webui-mcp-form-fields">
           <WebuiField
             label="名称"
             required
+            error={errors.name}
             control={(props) => (
-              <WebuiTextInput {...props} required value={name} placeholder="例如：本地文件服务" onChange={(event) => setName(event.currentTarget.value)} />
+              <WebuiTextInput {...props} required value={name} placeholder="例如：本地文件服务" onChange={(event) => { setName(event.currentTarget.value); clearFieldError("name"); }} />
             )}
           />
           <WebuiField
@@ -365,8 +364,9 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
               <WebuiField
                 label="命令"
                 required
+                error={errors.endpoint}
                 control={(props) => (
-                  <WebuiTextInput {...props} required value={command} placeholder="输入启动服务的命令" onChange={(event) => setCommand(event.currentTarget.value)} />
+                  <WebuiTextInput {...props} required value={command} placeholder="输入启动服务的命令" onChange={(event) => { setCommand(event.currentTarget.value); clearFieldError("endpoint"); }} />
                 )}
               />
               <WebuiField
@@ -380,8 +380,9 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
             <WebuiField
               label="地址"
               required
+              error={errors.endpoint}
               control={(props) => (
-                <WebuiTextInput {...props} required value={url} placeholder="https://example.com/mcp" onChange={(event) => setUrl(event.currentTarget.value)} />
+                <WebuiTextInput {...props} required value={url} placeholder="https://example.com/mcp" onChange={(event) => { setUrl(event.currentTarget.value); clearFieldError("endpoint"); }} />
               )}
             />
           )}
@@ -443,7 +444,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
         <WebuiButton variant="secondary" size="dialog" onClick={onClose}>
           取消
         </WebuiButton>
-        <WebuiButton variant="primary" size="dialog" disabled={!canSave} onClick={save}>
+        <WebuiButton variant="primary" size="dialog" onClick={save}>
           {editing ? "保存" : "添加服务器"}
         </WebuiButton>
       </WebuiDialogActions>

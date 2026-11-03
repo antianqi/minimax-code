@@ -15,7 +15,7 @@ import {
   type WebuiSshEndpointValues,
 } from "../projection/ssh-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiField, WebuiRadio, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiRadio, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 
 export interface SshHostFormProps {
@@ -64,6 +64,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
   const [password, setPassword] = useState("");
   /** What the form itself refuses, next to what the runtime answered. */
   const [formError, setFormError] = useState<string | undefined>(undefined);
+  const { errors, validateRequired, setFieldError, clearFieldError, clearErrors } = useWebuiFormValidation();
 
   // The editor opens before the config file has been read, so the values it shows arrive
   // afterwards. The fields follow them.
@@ -86,11 +87,16 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
 
   const submit = (): void => {
     setFormError(undefined);
+    clearErrors();
+    if (!validateRequired([
+      { name: "alias", label: "别名", value: alias },
+      { name: "host", label: "主机", value: host, required: kind === "manual" },
+    ])) return;
     const portProblem = webuiSshPortInputError(port);
     if (portProblem) {
       // A port that cannot be read is refused here: the runtime would drop it, and the
       // connection would land on a different port than the one that was named.
-      setFormError(portProblem);
+      setFieldError("port", portProblem);
       return;
     }
     const aliasValue = alias.trim();
@@ -170,6 +176,8 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
         <WebuiField
           className="col-span-2"
           label="别名"
+          required
+          error={errors.alias}
           control={(controlProps) => (
             <WebuiTextInput
               {...controlProps}
@@ -179,7 +187,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               placeholder="例如：production"
               value={alias}
               readOnly={editing}
-              onChange={(event) => setAlias(event.target.value)}
+              onChange={(event) => { setAlias(event.target.value); clearFieldError("alias"); }}
               className="mt-0.5"
             />
           )}
@@ -202,6 +210,8 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
         />
         <WebuiField
           label="主机"
+          required={kind === "manual"}
+          error={errors.host}
           control={(controlProps) => (
             <WebuiTextInput
               {...controlProps}
@@ -210,13 +220,14 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               data-webui-ssh-field="host"
               placeholder="主机名或 IP 地址"
               value={host}
-              onChange={(event) => setHost(event.target.value)}
+              onChange={(event) => { setHost(event.target.value); clearFieldError("host"); }}
               className="mt-0.5"
             />
           )}
         />
         <WebuiField
           label="端口"
+          error={errors.port}
           control={(controlProps) => (
             <WebuiTextInput
               {...controlProps}
@@ -225,7 +236,7 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
               data-webui-ssh-field="port"
               placeholder="22"
               value={port}
-              onChange={(event) => setPort(event.target.value)}
+              onChange={(event) => { setPort(event.target.value); clearFieldError("port"); }}
               className="mt-0.5"
             />
           )}

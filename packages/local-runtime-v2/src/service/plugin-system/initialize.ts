@@ -151,6 +151,7 @@ export function initializePluginService(
     mcpNames: compatibility.mcp.getRuntimeNameRegistry(),
     dataDir: compatibility.dataDir,
     officialCacheRoot,
+    ...(compatibility.appVersion ? { appVersion: compatibility.appVersion } : {}),
     repository,
     authContextGetter: compatibility.authContextGetter,
     deploymentGetter,

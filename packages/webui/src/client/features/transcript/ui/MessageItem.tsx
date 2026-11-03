@@ -41,7 +41,7 @@ import {
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 
 /**
@@ -125,6 +125,7 @@ export function MessageItem({
   // title is a late reply. Track whether the person has typed a name, so a
   // late reply cannot overwrite what they wrote.
   const forkTitleEdited = useRef(false);
+  const { errors: editErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   const openRewind = () => {
     setRewindOpen(true);
     setRewindPreview(undefined);
@@ -146,6 +147,7 @@ export function MessageItem({
   };
   const submitEdit = () => {
     if (!sessionId || !transcriptCommands.editSessionMessage) return;
+    if (!validateRequired([{ name: "text", label: "消息内容", value: editText }])) return;
     const request = buildWebuiEditRequest(sessionId, messageId, webuiClientRequestId("edit"), editText);
     if (!request) return;
     setMutationBusy(true);
@@ -181,7 +183,7 @@ export function MessageItem({
     copyText: role === "user" ? userText ?? "" : answers?.join("\n\n") ?? "",
     actions,
     onRewind: role === "user" ? openRewind : undefined,
-    onEdit: role === "user" ? () => { setEditText(userText ?? ""); setEditing(true); } : undefined,
+    onEdit: role === "user" ? () => { setEditText(userText ?? ""); validateRequired([]); setEditing(true); } : undefined,
     onFork: role === "assistant" ? openFork : undefined,
     timestamp,
   };
@@ -213,8 +215,8 @@ export function MessageItem({
           <WebuiStack gap="small" align="end" className="w-full">
             {editing ? (
               <WebuiStack gap="medium" className="webui-user-inline-editor" data-testid="user-message-inline-editor">
-                <WebuiTextarea aria-label="编辑" className="webui-user-inline-editor-control" value={editText} placeholder="编辑消息内容" onChange={(event) => setEditText(event.target.value)} autoFocus />
-                <div className="webui-inline-editor-actions"><WebuiButton variant="secondary" onClick={() => setEditing(false)} disabled={mutationBusy}>取消</WebuiButton><WebuiButton variant="primary" onClick={submitEdit} disabled={mutationBusy || !editText.trim()}>发送</WebuiButton></div>
+                <WebuiField label="消息内容" required error={editErrors.text} control={(props) => <WebuiTextarea {...props} className="webui-user-inline-editor-control" value={editText} placeholder="编辑消息内容" onChange={(event) => { setEditText(event.target.value); clearFieldError("text"); }} autoFocus />} />
+                <div className="webui-inline-editor-actions"><WebuiButton variant="secondary" onClick={() => { validateRequired([]); setEditing(false); }} disabled={mutationBusy}>取消</WebuiButton><WebuiButton variant="primary" onClick={submitEdit} disabled={mutationBusy}>发送</WebuiButton></div>
               </WebuiStack>
             ) : <div
               className="webui-user-bubble rounded-[16px] px-3 py-2 max-w-[80%]"

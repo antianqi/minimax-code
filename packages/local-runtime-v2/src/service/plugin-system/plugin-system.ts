@@ -160,7 +160,7 @@ export class PluginSystem implements AgentHostTurnCapabilityProvider {
   private readonly localDirectoryWatcher: LocalPluginDirectoryWatcherPort;
 
   constructor(private readonly options: PluginSystemOptions) {
-    this.builder = new PluginSnapshotBuilder(options.mcpNames);
+    this.builder = new PluginSnapshotBuilder(options.mcpNames, options.appVersion);
     this.metrics = new PluginSystemMetrics(options.metrics);
     this.packageStorage = new PluginPackageStorage({
       dataDir: options.dataDir,

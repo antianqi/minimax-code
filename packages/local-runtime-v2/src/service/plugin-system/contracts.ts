@@ -79,6 +79,8 @@ export interface PluginSystemOptions {
   readonly mcpNames?: McpNameRegistry;
   readonly dataDir: string;
   readonly officialCacheRoot: string;
+  /** The Host's own release, when it declares one; a Mini App's `engines.mcode` is compared to it. */
+  readonly appVersion?: string;
   readonly repository: SqlitePluginRepository;
   readonly authContextGetter: () => PluginSystemAuthContext | undefined;
   readonly deploymentGetter: () => string;

@@ -17,7 +17,7 @@ import { unavailableWebuiProviderOutcome } from "../../../features/models/contra
 import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";
 import { FeedbackError, FeedbackLiveRegion, FeedbackProgress } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMotionSlot, WebuiSkeleton } from "../../../ui/page.js";
 
@@ -90,6 +90,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const [quotaClock, setQuotaClock] = useState(() => Date.now());
   const [savingKey, setSavingKey] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
+  const { errors: keyErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   const [keyResult, setKeyResult] = useState<string>();
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const [providerActionError, setProviderActionError] = useState<string>();
@@ -146,7 +147,9 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
   };
   const testKey = async () => {
-    if ((!apiKey.trim() && !apiValid) || !models) return;
+    if (!apiKey.trim() && !apiValid && !validateRequired([{ name: "apiKey", label: "API Key", value: apiKey }])) return;
+    if (apiKey.trim() || apiValid) clearFieldError("apiKey");
+    if (!models) return;
     setTestingKey(true); setKeyResult(undefined);
     try {
       const result = recordOf(await models.testProvider({ providerId: "minimax_api", ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }));
@@ -155,7 +158,8 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     finally { setTestingKey(false); }
   };
   const saveKey = async () => {
-    if (!apiKey.trim() || !models) return;
+    if (!validateRequired([{ name: "apiKey", label: "API Key", value: apiKey }])) return;
+    if (!models) return;
     setSavingKey(true); setKeyResult(undefined);
     try { await models.upsertApiKey({ apiKey: apiKey.trim(), saveAndUse: true }); void settings?.loadModelSource(); }
     catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
@@ -306,9 +310,9 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     {sourceTab === "minimax-api" ? <WebuiStack as="section" gap="small" className="w-full pt-1" data-testid="settings-minimax-api-panel">
       <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span><span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span></WebuiInline>
       {apiLoading ? <p>加载中…</p> : apiError ? <FeedbackError message={apiError} layout="inline" action={<WebuiButton variant="quiet-highlight" size="inline" onClick={() => void loadApiStatus()}>重试</WebuiButton>} /> : <>
-        <WebuiInline gap="medium"><WebuiTextInput controlSize="compact" className="min-w-0 flex-[1_0_0]" aria-label="API Key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} /><IconButton label="测试连通性" disabled={testingKey || (!apiKey.trim() && !apiValid)} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>
+        <WebuiInline gap="medium" align="start"><WebuiField className="min-w-0 flex-[1_0_0]" label="API Key" required error={keyErrors.apiKey} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" value={apiKey} onChange={(event) => { setApiKey(event.target.value); clearFieldError("apiKey"); }} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} />} /><IconButton label="测试连通性" disabled={testingKey} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>
         {/* 保存结果要被听到，播报通道交给共享契约。 */}
-        {keyResult ? <FeedbackLiveRegion>{keyResult}</FeedbackLiveRegion> : null}<WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={!apiKey.trim() || savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
+        {keyResult ? <FeedbackLiveRegion>{keyResult}</FeedbackLiveRegion> : null}<WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
       </>}
     </WebuiStack> : null}
 

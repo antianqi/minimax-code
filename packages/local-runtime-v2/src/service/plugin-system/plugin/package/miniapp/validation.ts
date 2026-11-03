@@ -3,6 +3,12 @@ import path from 'node:path';
 import { MINIAPP_AGENT_MAX_CONCURRENCY } from '../../../../miniapp/contracts.js';
 
 import {
+  MINIAPP_DEVICE_ACCESS_ITEMS,
+  isMiniAppDeviceAccessItem,
+  type MiniAppDeviceAccessItem,
+} from '@mavis/shared/miniapp-surface';
+
+import {
   isRecord,
   resolvePluginDirectory,
   resolvePluginFile,
@@ -16,6 +22,7 @@ import type {
   MiniAppMcpEndpoint,
   MiniAppProcessRuntime,
 } from '../types.js';
+import { parseMcodeEngineRequirement } from './engines.js';
 import { isMiniAppRuntimePayloadExcludedPath, isPathCoveredByRoots } from './path.js';
 
 const MINIAPP_FIELDS = new Set([
@@ -27,12 +34,16 @@ const MINIAPP_FIELDS = new Set([
   'hostConnectorAccess',
   'agentAccess',
   'agentConcurrency',
+  'engines',
+  'toolAccess',
+  'deviceAccess',
 ]);
 const ARTIFACT_FIELDS = new Set(['client', 'node']);
 const PROCESS_RUNTIME_FIELDS = new Set(['kind', 'entry', 'lifecycle']);
 const SURFACE_FIELDS = new Set(['path', 'window']);
 const MCP_ENDPOINT_FIELDS = new Set(['server', 'path']);
 const HOST_CONNECTOR_ACCESS_FIELDS = new Set(['providers']);
+const ENGINES_FIELDS = new Set(['mcode']);
 const CONNECTOR_PROVIDER = /^[a-z0-9_-]{1,64}$/u;
 const MCP_SERVER = /^[a-zA-Z0-9_-]{1,128}$/u;
 
@@ -42,7 +53,14 @@ export async function readMiniAppManifest(
   mcpServerNames: readonly string[],
   payloadDirectory: 'liveboard' | 'miniapp',
 ): Promise<Omit<MiniAppContribution, 'manifestPath'>> {
-  if (hasUnknownField(value, MINIAPP_FIELDS) || value.schemaVersion !== 1) {
+  const unsupported = Object.keys(value).filter((key) => !MINIAPP_FIELDS.has(key));
+  if (unsupported.length > 0) {
+    miniAppFail(
+      'MANIFEST_FIELD_UNSUPPORTED',
+      `Mini App manifest field(s) not supported by this MCode version: ${unsupported.sort().join(', ')}. Update MCode or remove the field.`,
+    );
+  }
+  if (value.schemaVersion !== 1) {
     miniAppFail('MANIFEST_SCHEMA_INVALID', 'Mini App manifest must use strict schemaVersion 1');
   }
   const artifacts = await readArtifacts(root, value.artifacts, payloadDirectory);
@@ -52,6 +70,9 @@ export async function readMiniAppManifest(
   const hostConnectorAccess = readHostConnectorAccess(value.hostConnectorAccess);
   const agentAccess = readAgentAccess(value.agentAccess);
   const agentConcurrency = readAgentConcurrency(value.agentConcurrency);
+  const engines = readEngines(value.engines);
+  const toolAccess = readToolAccess(value.toolAccess);
+  const deviceAccess = readDeviceAccess(value.deviceAccess);
   return {
     artifacts,
     runtime,
@@ -60,6 +81,9 @@ export async function readMiniAppManifest(
     ...(hostConnectorAccess ? { hostConnectorAccess } : {}),
     ...(agentAccess ? { agentAccess } : {}),
     ...(agentConcurrency === undefined ? {} : { agentConcurrency }),
+    ...(engines ? { engines } : {}),
+    ...(toolAccess ? { toolAccess } : {}),
+    ...(deviceAccess ? { deviceAccess } : {}),
   };
 }
 
@@ -233,6 +257,45 @@ function readAgentConcurrency(value: unknown): number | undefined {
     );
   }
   return value;
+}
+
+/**
+ * `engines.mcode` is the Host release the package needs. It is read, not enforced, here: the
+ * snapshot builder withholds a Mini App this Host is too old for, because only the Host knows its
+ * own version.
+ */
+function readEngines(value: unknown): { readonly mcode: string } | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    hasUnknownField(value, ENGINES_FIELDS) ||
+    typeof value.mcode !== 'string' ||
+    parseMcodeEngineRequirement(value.mcode) === undefined
+  ) {
+    miniAppFail('ENGINES_INVALID', 'engines.mcode must be ">=MAJOR.MINOR.PATCH"');
+  }
+  return { mcode: value.mcode.trim() };
+}
+
+/** `toolAccess` grants one ability, like `agentAccess`; which tools may run is the Host's rules. */
+function readToolAccess(value: unknown): readonly 'call'[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((capability) => capability !== 'call')) {
+    miniAppFail('TOOL_ACCESS_INVALID', 'toolAccess may only contain call');
+  }
+  return [...new Set(value as 'call'[])];
+}
+
+/** `deviceAccess` lists the device permissions the page may hold, each a user switch. */
+function readDeviceAccess(value: unknown): readonly MiniAppDeviceAccessItem[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || !value.every(isMiniAppDeviceAccessItem)) {
+    miniAppFail(
+      'DEVICE_ACCESS_INVALID',
+      `deviceAccess may only contain ${MINIAPP_DEVICE_ACCESS_ITEMS.join(', ')}`,
+    );
+  }
+  return [...new Set(value as MiniAppDeviceAccessItem[])];
 }
 
 async function resolveFileOrDirectory(

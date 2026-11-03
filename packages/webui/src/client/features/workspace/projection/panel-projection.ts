@@ -69,6 +69,47 @@ export function projectWebuiUnifiedDiffLines(diff: string): WebuiUnifiedDiffLine
   return lines;
 }
 
+export type WebuiSplitDiffRow =
+  | { readonly kind: "hunk"; readonly content: string }
+  | { readonly kind: "noNewline"; readonly content: string }
+  | { readonly kind: "context"; readonly oldLine: WebuiUnifiedDiffLine; readonly newLine: WebuiUnifiedDiffLine }
+  | { readonly kind: "change"; readonly oldLine?: WebuiUnifiedDiffLine; readonly newLine?: WebuiUnifiedDiffLine };
+
+/** Pair each contiguous change block into old and new columns for split review. */
+export function projectWebuiSplitDiffRows(lines: readonly WebuiUnifiedDiffLine[]): WebuiSplitDiffRow[] {
+  const rows: WebuiSplitDiffRow[] = [];
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index]!;
+    if (line.kind === "hunk" || line.kind === "noNewline") {
+      rows.push({ kind: line.kind, content: line.content });
+      index += 1;
+      continue;
+    }
+    if (line.kind === "context") {
+      rows.push({ kind: "context", oldLine: line, newLine: line });
+      index += 1;
+      continue;
+    }
+
+    const deletions: WebuiUnifiedDiffLine[] = [];
+    const additions: WebuiUnifiedDiffLine[] = [];
+    while (index < lines.length && (lines[index]?.kind === "deletion" || lines[index]?.kind === "addition")) {
+      const changed = lines[index]!;
+      if (changed.kind === "deletion") deletions.push(changed);
+      else additions.push(changed);
+      index += 1;
+    }
+    for (let changeIndex = 0; changeIndex < Math.max(deletions.length, additions.length); changeIndex += 1) {
+      rows.push({
+        kind: "change",
+        ...(deletions[changeIndex] ? { oldLine: deletions[changeIndex] } : {}),
+        ...(additions[changeIndex] ? { newLine: additions[changeIndex] } : {}),
+      });
+    }
+  }
+  return rows;
+}
+
 export function projectWebuiTodos(messages: readonly Record<string, unknown>[]): WebuiTodo[] {
   return projectWebuiWorkspaceHistory(
     messages as never,

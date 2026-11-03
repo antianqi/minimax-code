@@ -12,4 +12,4 @@
  * The runtime never reads this. The host declares it, because the runtime
  * does not know which client it runs for and must not answer for one.
  */
-export const MARKETPLACE_VISIBILITY_DESKTOP_VERSION = '3.1.3';
+export const MARKETPLACE_VISIBILITY_DESKTOP_VERSION = '3.1.6';

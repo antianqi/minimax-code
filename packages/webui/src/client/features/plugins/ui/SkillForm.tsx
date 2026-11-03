@@ -10,7 +10,7 @@ import { useState, type ReactElement } from "react";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
-import { WebuiField, WebuiTextarea, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 
 export interface SkillFormProps {
   readonly onSubmit: (intent: WebuiPluginIntent) => Promise<boolean>;
@@ -21,8 +21,10 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
+  const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
 
   const save = async () => {
+    if (!validateRequired([{ name: "name", label: "名称", value: name }])) return;
     const created = await onSubmit({
       kind: "createSkill",
       name: name.trim(),
@@ -43,8 +45,10 @@ export function SkillForm({ onSubmit, onClose }: SkillFormProps): ReactElement {
     <div className="webui-plugin-form webui-skill-form">
       <WebuiField
         label="名称"
+        required
+        error={errors.name}
         control={(props) => (
-          <WebuiTextInput {...props} value={name} placeholder="例如：代码审查规范" onChange={(event) => setName(event.currentTarget.value)} />
+          <WebuiTextInput {...props} value={name} placeholder="例如：代码审查规范" onChange={(event) => { setName(event.currentTarget.value); clearFieldError("name"); }} />
         )}
       />
       <WebuiField

@@ -1,5 +1,6 @@
 import type { ResolvedMcpServer } from '@mavis/mcp';
 import type { PluginHookCommandHandler } from '@mavis/plugin-hooks';
+import type { MiniAppDeviceAccessItem } from '@mavis/shared/miniapp-surface';
 
 export const MARKETPLACE_CATEGORY_NAMES = [
   'Office',
@@ -107,6 +108,12 @@ export interface MiniAppContribution {
   readonly agentAccess?: readonly ('session.run' | 'session.read')[];
   /** Agent runs of this Mini App at once; absent means the Host default. */
   readonly agentConcurrency?: number;
+  /** The Host release the package requires, as declared; absent means no requirement. */
+  readonly engines?: { readonly mcode: string };
+  /** Host-tool abilities the page may use; `call` is the only one defined today. */
+  readonly toolAccess?: readonly 'call'[];
+  /** Device permissions the page may hold, each a user switch. */
+  readonly deviceAccess?: readonly MiniAppDeviceAccessItem[];
 }
 
 type ScannedMiniAppContribution = MiniAppContribution & {

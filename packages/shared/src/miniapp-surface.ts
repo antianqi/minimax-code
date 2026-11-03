@@ -119,6 +119,24 @@ export type MiniAppControlResponse =
  */
 export const MINIAPP_LOOPBACK_TOKEN_HEADER = 'x-mavis-miniapp-token';
 
+/**
+ * Device permissions a Mini App page may declare, named as `navigator.permissions.query` names them.
+ *
+ * The manifest reader rejects an item outside this list, and a client grants only what the parsed
+ * manifest declares: the list is the single authority for both halves. The desktop client and this
+ * one read the same names, so a package declares one set of items for both.
+ */
+export const MINIAPP_DEVICE_ACCESS_ITEMS = Object.freeze(['microphone'] as const);
+
+export type MiniAppDeviceAccessItem = (typeof MINIAPP_DEVICE_ACCESS_ITEMS)[number];
+
+export function isMiniAppDeviceAccessItem(value: unknown): value is MiniAppDeviceAccessItem {
+  return (
+    typeof value === 'string' &&
+    (MINIAPP_DEVICE_ACCESS_ITEMS as readonly string[]).includes(value)
+  );
+}
+
 /** Bounds one untrusted page request; input behavior remains owned by the chat input. */
 export const MINIAPP_COMPOSER_MAX_TEXT_LENGTH = 100_000;
 

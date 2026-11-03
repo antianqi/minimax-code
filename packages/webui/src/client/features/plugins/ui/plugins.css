@@ -473,6 +473,7 @@
   }
   .webui-plugin-management.is-managing .webui-agent-editor {
     width: min(768px, calc(100% - 64px));
+    margin-left: 0;
   }
   .webui-agent-list {
     display: flex;

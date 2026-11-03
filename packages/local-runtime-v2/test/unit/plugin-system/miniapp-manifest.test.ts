@@ -117,9 +117,19 @@ describe('Mini App manifest compatibility with the shipped generation', () => {
 });
 
 describe('Mini App manifest allowlist', () => {
-  it('fails a manifest with an unknown top-level key', async () => {
+  it('fails a manifest with an unknown top-level key, naming the field', async () => {
     await expect(readManifest({ detach: true })).rejects.toMatchObject({
+      // A field this build cannot honour is not a schema-version problem: say which field.
+      code: 'MINIAPP_MANIFEST_FIELD_UNSUPPORTED',
+      message:
+        'MINIAPP_MANIFEST_FIELD_UNSUPPORTED: Mini App manifest field(s) not supported by this MCode version: detach. Update MCode or remove the field.',
+    });
+  });
+
+  it('still reports a non-1 schemaVersion as a schema error', async () => {
+    await expect(readManifest({ schemaVersion: 2 })).rejects.toMatchObject({
       code: 'MINIAPP_MANIFEST_SCHEMA_INVALID',
+      message: 'MINIAPP_MANIFEST_SCHEMA_INVALID: Mini App manifest must use strict schemaVersion 1',
     });
   });
 
@@ -130,6 +140,55 @@ describe('Mini App manifest allowlist', () => {
       // The message is part of the behaviour: a relaxed predicate must not read as a pass.
       code: 'MINIAPP_SURFACE_INVALID',
       message: 'MINIAPP_SURFACE_INVALID: surface must contain only path and window',
+    });
+  });
+});
+
+describe('Mini App manifest permissions of the shipped generation', () => {
+  it('reads deviceAccess, toolAccess and engines', async () => {
+    const contribution = await readManifest({
+      deviceAccess: ['microphone'],
+      toolAccess: ['call'],
+      engines: { mcode: '>=3.1.6' },
+    });
+
+    expect(contribution).toMatchObject({
+      deviceAccess: ['microphone'],
+      toolAccess: ['call'],
+      engines: { mcode: '>=3.1.6' },
+    });
+  });
+
+  it('deduplicates a repeated device item', async () => {
+    const contribution = await readManifest({ deviceAccess: ['microphone', 'microphone'] });
+    expect(contribution?.deviceAccess).toEqual(['microphone']);
+  });
+
+  it('omits all three keys when the manifest does not declare them', async () => {
+    const contribution = await readManifest({});
+    expect(contribution).not.toHaveProperty('deviceAccess');
+    expect(contribution).not.toHaveProperty('toolAccess');
+    expect(contribution).not.toHaveProperty('engines');
+  });
+
+  it('rejects a device item the client cannot grant', async () => {
+    await expect(readManifest({ deviceAccess: ['camera'] })).rejects.toMatchObject({
+      code: 'MINIAPP_DEVICE_ACCESS_INVALID',
+      message: 'MINIAPP_DEVICE_ACCESS_INVALID: deviceAccess may only contain microphone',
+    });
+  });
+
+  it('rejects a tool ability other than call', async () => {
+    await expect(readManifest({ toolAccess: ['list'] })).rejects.toMatchObject({
+      code: 'MINIAPP_TOOL_ACCESS_INVALID',
+      message: 'MINIAPP_TOOL_ACCESS_INVALID: toolAccess may only contain call',
+    });
+  });
+
+  it('rejects an engines requirement it cannot compare', async () => {
+    await expect(readManifest({ engines: { mcode: '^3.1.0' } })).rejects.toMatchObject({
+      code: 'MINIAPP_ENGINES_INVALID',
+      message: 'MINIAPP_ENGINES_INVALID: engines.mcode must be ">=MAJOR.MINOR.PATCH"',
     });
   });
 });

@@ -15,7 +15,7 @@ import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui
 import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
 import { WebuiMotionSlot, WebuiTooltip } from "../../src/client/ui/page.js";
 import { projectWebuiDiffFile } from "../../src/client/projection/common/diff-workspace-boundary.js";
-import { projectWebuiUnifiedDiffLines } from "../../src/client/features/workspace/projection/panel-projection.js";
+import { projectWebuiUnifiedDiffLines, projectWebuiSplitDiffRows } from "../../src/client/features/workspace/projection/panel-projection.js";
 import {
   WebuiFeedbackActions,
   WebuiMessageActions,
@@ -226,6 +226,46 @@ describe("turn review unified diff projection", () => {
     expect(markup).toContain("webui-turn-review-line--addition");
     expect(markup).toContain('aria-current="true"');
     expect(markup).toContain("hljs-keyword");
+  });
+
+  it("supports the review toolbar's split layout and context visibility controls", () => {
+    const markup = renderToStaticMarkup(createElement(WebuiDiffFileSection, {
+      file: projectWebuiDiffFile({
+        file: "src/example.ts",
+        additions: 1,
+        deletions: 1,
+        diff: "@@ -1,3 +1,3 @@\n before();\n-return false;\n+return true;\n after();",
+      }, "/work/project"),
+      selected: true,
+      diffLayout: "split",
+      showContext: false,
+    }));
+
+    expect(markup).toContain("webui-turn-review-code--split");
+    expect(markup).toContain("webui-turn-review-line--split webui-turn-review-line--change");
+    expect(markup).toContain("webui-turn-review-split-side is-deletion");
+    expect(markup).toContain("webui-turn-review-split-side is-addition");
+    expect(markup).not.toContain("before();");
+    expect(markup).not.toContain("after();");
+  });
+
+  it("pairs contiguous deletions and additions on matching rows in split review", () => {
+    const lines = projectWebuiUnifiedDiffLines([
+      "@@ -10,3 +10,4 @@",
+      " keep();",
+      "-old line",
+      "+new first",
+      "+new second",
+      " keep after();",
+    ].join("\n"));
+
+    expect(projectWebuiSplitDiffRows(lines)).toEqual([
+      { kind: "hunk", content: "@@ -10,3 +10,4 @@" },
+      { kind: "context", oldLine: { kind: "context", oldLine: 10, newLine: 10, content: "keep();" }, newLine: { kind: "context", oldLine: 10, newLine: 10, content: "keep();" } },
+      { kind: "change", oldLine: { kind: "deletion", oldLine: 11, content: "old line" }, newLine: { kind: "addition", newLine: 11, content: "new first" } },
+      { kind: "change", newLine: { kind: "addition", newLine: 12, content: "new second" } },
+      { kind: "context", oldLine: { kind: "context", oldLine: 12, newLine: 13, content: "keep after();" }, newLine: { kind: "context", oldLine: 12, newLine: 13, content: "keep after();" } },
+    ]);
   });
 
   it("keeps workspace review diff requests within the runtime's five-file batch limit", () => {

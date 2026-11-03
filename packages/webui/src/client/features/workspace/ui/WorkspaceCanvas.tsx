@@ -32,7 +32,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import type { WebuiCanvasDocument } from "../../../../shared/contracts/canvas.js";
 
 /** Backing box for the stage; nodes are placed inside it in canvas units. */
@@ -97,6 +97,7 @@ export function WorkspaceCanvas({ sessionId }: {
   const canvasState = useWebuiWorkspaceQueriesState().canvas;
   const canvas = canvasState.document;
   const [localError, setLocalError] = useState<string>();
+  const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<CanvasPan>({ x: 0, y: 0 });
   const [preview, setPreview] = useState<CanvasLayoutPreview>();
@@ -254,7 +255,7 @@ export function WorkspaceCanvas({ sessionId }: {
   const handleAddSubmit = (event: FormEvent): void => {
     event.preventDefault();
     const relativePath = draftPath.trim();
-    if (!relativePath) { setLocalError(DESKTOP_COPY.canvasAddRequired); return; }
+    if (!validateRequired([{ name: "path", label: "文件路径", value: relativePath }])) return;
     if (readOnly) { setLocalError(DESKTOP_COPY.canvasReadOnly); return; }
     applyMutations(
       [buildCanvasAddFileMutation(createCanvasNodeId(), nextCanvasNodeLayout(confirmedNodes), { relativePath })],
@@ -347,18 +348,25 @@ export function WorkspaceCanvas({ sessionId }: {
     <span className="webui-canvas-zoom">{Math.round(zoom * 100)}%</span>
     <form
       onSubmit={handleAddSubmit}
-      style={{ position: "absolute", left: "var(--spacing_16)", top: "var(--spacing_16)", display: "flex", gap: "var(--spacing_8)", alignItems: "center" }}
+      style={{ position: "absolute", left: "var(--spacing_16)", top: "var(--spacing_16)", display: "flex", gap: "var(--spacing_8)", alignItems: "flex-end" }}
     >
-      <WebuiTextInput
-        controlSize="dense"
-        appearance="boxed"
-        textSize="small"
+      <WebuiField
+        label={DESKTOP_COPY.canvasAddLabel}
+        required
+        error={fieldErrors.path}
         className="w-[180px]"
-        aria-label={DESKTOP_COPY.canvasAddLabel}
-        placeholder={DESKTOP_COPY.canvasAddPlaceholder}
-        value={draftPath}
-        disabled={readOnly}
-        onChange={(event) => setDraftPath(event.target.value)}
+        control={(fieldProps) => (
+          <WebuiTextInput
+            {...fieldProps}
+            controlSize="dense"
+            appearance="boxed"
+            textSize="small"
+            placeholder={DESKTOP_COPY.canvasAddPlaceholder}
+            value={draftPath}
+            disabled={readOnly}
+            onChange={(event) => { setDraftPath(event.target.value); clearFieldError("path"); }}
+          />
+        )}
       />
       <WebuiButton
         variant="outline"

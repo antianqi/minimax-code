@@ -14,6 +14,7 @@ import type {
   ReadPluginPackage,
   RuntimeEligibleScannedReadPluginPackage,
 } from '../package/types.js';
+import { hostWithholdsMiniApp } from '../package/miniapp/engines.js';
 
 interface OfficialSnapshotPackageInput {
   readonly plugin: RuntimeEligibleScannedReadPluginPackage;
@@ -118,11 +119,19 @@ interface SnapshotBuildState {
 }
 
 export class PluginSnapshotBuilder {
-  constructor(private readonly names = new McpNameRegistry()) {}
+  constructor(
+    private readonly names = new McpNameRegistry(),
+    /**
+     * The Host's own release, when it has one. A package may declare `engines.mcode`; only the
+     * client knows the version it is running, and only this gate can tell whether the Mini App it
+     * would publish is one this build can actually run.
+     */
+    private readonly hostVersion?: string,
+  ) {}
   build(input: BuildPluginSnapshotInput): PluginSnapshot {
     const state = createSnapshotBuildState(input.reservations);
-    appendOfficialPackages(input.officialPackages, state);
-    appendLocalPackages(input, state);
+    appendOfficialPackages(input.officialPackages, state, this.hostVersion);
+    appendLocalPackages(input, state, this.hostVersion);
     const allocated = this.names.assignServers([
       ...input.reservations.mcpServerNames.map((name) => ({
         key: configuredMcpNameKey(name),
@@ -240,9 +249,39 @@ function createSnapshotBuildState(reservations: PluginCapabilityReservations): S
   };
 }
 
+/** True when the Host is a parsable release older than the package's `engines.mcode`. */
+export function withholdsMiniAppForHost(
+  plugin: RuntimeEligibleScannedReadPluginPackage,
+  hostVersion: string | undefined,
+): boolean {
+  return hostWithholdsMiniApp(hostVersion, plugin.miniapp?.engines?.mcode);
+}
+
+/**
+ * Withholds the Mini App and the MCP servers it would have served when the Host is too old.
+ *
+ * The package stays installed and listed: it is the *Mini App* this build cannot run, not a
+ * package that failed to install, and a diagnostic is the only trace — the same shape the shipped
+ * client reports. `engines.mcode` is the package's own statement about which release it needs, so
+ * this is the one place that compares it against the version actually running.
+ */
+function gateMiniAppEngines(
+  plugin: RuntimeEligibleScannedReadPluginPackage,
+  hostVersion: string | undefined,
+  diagnostics: PluginSnapshotDiagnostic[],
+): RuntimeEligibleScannedReadPluginPackage {
+  if (!withholdsMiniAppForHost(plugin, hostVersion)) return plugin;
+  diagnostics.push(freeze({ code: 'MINIAPP_HOST_TOO_OLD', pluginName: plugin.name }));
+  const managed = new Set(plugin.miniapp?.mcpEndpoints.map(({ server }) => server) ?? []);
+  const { miniapp: withheld, ...rest } = plugin;
+  void withheld;
+  return { ...rest, mcpServers: rest.mcpServers.filter(({ name }) => !managed.has(name)) };
+}
+
 function appendOfficialPackages(
   packages: readonly OfficialSnapshotPackageInput[],
   state: SnapshotBuildState,
+  hostVersion: string | undefined,
 ): void {
   const sorted = [...packages].sort(
     (left, right) =>
@@ -250,8 +289,9 @@ function appendOfficialPackages(
       left.contentDigest.localeCompare(right.contentDigest),
   );
   for (const entry of sorted) {
+    const plugin = gateMiniAppEngines(entry.plugin, hostVersion, state.diagnostics);
     const accepted = acceptPackageCapabilities({
-      plugin: entry.plugin,
+      plugin,
       packageContentDigest: entry.contentDigest,
       sourceKind: 'official',
       includeRuntimeCapabilities: true,
@@ -260,35 +300,41 @@ function appendOfficialPackages(
     if (!accepted) continue;
     state.officialPackages.push(
       freeze({
-        name: entry.plugin.name,
-        ...(entry.plugin.version ? { version: entry.plugin.version } : {}),
-        rootPath: entry.plugin.rootPath,
+        name: plugin.name,
+        ...(plugin.version ? { version: plugin.version } : {}),
+        rootPath: plugin.rootPath,
         contentDigest: entry.contentDigest,
-        ...(entry.plugin.miniapp ? { plugin: entry.plugin } : {}),
+        ...(plugin.miniapp ? { plugin } : {}),
       }),
     );
-    state.enabledPlugins.push(enabledProjection(entry.plugin));
+    state.enabledPlugins.push(enabledProjection(plugin));
     state.skills.push(...accepted.skills);
-    for (const skill of accepted.skills) state.skillOwners.set(skill, entry.plugin.name);
+    for (const skill of accepted.skills) state.skillOwners.set(skill, plugin.name);
     state.mcpServers.push(...accepted.mcpServers);
     state.hooks.push(...accepted.hooks);
     state.hostBindings.push(...accepted.hostBindings);
   }
 }
 
-function appendLocalPackages(input: BuildPluginSnapshotInput, state: SnapshotBuildState): void {
+function appendLocalPackages(
+  input: BuildPluginSnapshotInput,
+  state: SnapshotBuildState,
+  hostVersion: string | undefined,
+): void {
   const sorted = [...input.localPackages].sort((left, right) =>
     normalizedPath(left.plugin.rootPath).localeCompare(normalizedPath(right.plugin.rootPath)),
   );
-  for (const entry of sorted) appendLocalPlugin(entry, input.isLocalEnabled, state);
+  for (const entry of sorted) appendLocalPlugin(entry, input.isLocalEnabled, state, hostVersion);
 }
 
 function appendLocalPlugin(
   entry: LocalSnapshotPackageInput,
   isLocalEnabled: (canonicalRoot: string) => boolean,
   state: SnapshotBuildState,
+  hostVersion: string | undefined,
 ): void {
-  const { plugin } = entry;
+  const { plugin: scanned } = entry;
+  const plugin = gateMiniAppEngines(scanned, hostVersion, state.diagnostics);
   const enabled = isLocalEnabled(plugin.rootPath);
   if (state.pluginNames.has(collisionKey(plugin.name))) {
     state.diagnostics.push(freeze({ code: 'LOCAL_PLUGIN_NAME_CONFLICT', pluginName: plugin.name }));

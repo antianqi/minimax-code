@@ -4,7 +4,7 @@ import { WebuiInline } from "../../../ui/layout-primitives.js";
 import { WebuiSearchField, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
 import { Terminal } from "@xterm/xterm";
-import { IconEdit } from "@tabler/icons-react";
+import { IconAdjustmentsHorizontal, IconEdit, IconLayoutColumns, IconListCheck } from "@tabler/icons-react";
 import { FitAddon } from "@xterm/addon-fit";
 import { basenamePath } from "../../../projection/common/paths.js";
 import { webuiPanelWidthBounds, webuiSurfaceTier, type WebuiSurfaceTier } from "../../../ui/layout-thresholds.js";
@@ -81,7 +81,7 @@ import {
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip, webuiWorkspaceLauncherOpenPage, webuiWorkspaceLauncherUrl } from "./WebuiWorkspaceTabStrip.public.js";
-import { webuiFileLanguage, projectWebuiUnifiedDiffLines, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
+import { webuiFileLanguage, projectWebuiUnifiedDiffLines, projectWebuiSplitDiffRows, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import {
@@ -147,10 +147,12 @@ function highlightFileLine(line: string, language: string | undefined): string |
   }
 }
 
-export function WebuiDiffFileSection({ file, selected, loading = false, error, onSelect, defaultOpen = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: () => void; readonly defaultOpen?: boolean }): ReactElement {
+export function WebuiDiffFileSection({ file, selected, loading = false, error, onSelect, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: () => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
   const [expanded, setExpanded] = useState(defaultOpen);
   const diff = file.withinWorkspace && typeof file.diff === "string" ? file.diff : "";
-  const lines = projectWebuiUnifiedDiffLines(diff);
+  const allLines = projectWebuiUnifiedDiffLines(diff);
+  const lines = allLines.filter((line) => showContext || line.kind !== "context");
+  const splitRows = projectWebuiSplitDiffRows(allLines).filter((row) => showContext || row.kind !== "context");
   const language = webuiFileLanguage(file.file);
   return <section className="webui-turn-review-file" data-expanded={expanded} data-testid="turn-review-diff-file">
     <WebuiButton variant="plain" size="regular" type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(); setExpanded((value) => !value); }}>
@@ -170,15 +172,33 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
            * person can still act on. */
           ? <p className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>
           /* 加载中的差异是一条播报；播报通道交给共享契约，类名不变，样式继续命中。 */
-          : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : error ? <FeedbackError message={error} className="webui-turn-review-unavailable" /> : lines.length ? <pre className="webui-file-code webui-turn-review-code"><code className={language ? `hljs language-${language}` : ""}>{lines.map((line, index) => {
-      const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightFileLine(line.content, language);
-      return <span className={`webui-turn-review-line webui-turn-review-line--${line.kind}`} key={`${index}-${line.kind}`}>
-        {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : line.kind === "noNewline" ? line.content : <>
-          <span className="webui-turn-review-line-number">{line.oldLine ?? ""}</span>
-          <span className="webui-turn-review-line-number">{line.newLine ?? ""}</span>
-          <span className="webui-turn-review-marker">{line.kind === "addition" ? "+" : line.kind === "deletion" ? "−" : " "}</span>
-          <span className="webui-turn-review-source">{highlighted === undefined ? line.content : <span dangerouslySetInnerHTML={{ __html: highlighted }} />}</span>
-        </>}
+      : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : error ? <FeedbackError message={error} className="webui-turn-review-unavailable" /> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
+        if (row.kind === "hunk" || row.kind === "noNewline") {
+          return <span className={`webui-turn-review-line webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}><span className="webui-turn-review-hunk">{row.content}</span></span>;
+        }
+        const oldContent = row.oldLine;
+        const newContent = row.newLine;
+        const oldHighlight = oldContent ? highlightFileLine(oldContent.content, language) : undefined;
+        const newHighlight = newContent ? highlightFileLine(newContent.content, language) : undefined;
+        return <span className={`webui-turn-review-line webui-turn-review-line--split webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}>
+          <span className={`webui-turn-review-split-side${oldContent?.kind === "deletion" ? " is-deletion" : ""}`}>
+            <span className="webui-turn-review-line-number">{oldContent?.oldLine ?? ""}</span>
+            <span className="webui-turn-review-source">{oldContent ? oldHighlight === undefined ? oldContent.content : <span dangerouslySetInnerHTML={{ __html: oldHighlight }} /> : ""}</span>
+          </span>
+          <span className={`webui-turn-review-split-side${newContent?.kind === "addition" ? " is-addition" : ""}`}>
+            <span className="webui-turn-review-line-number">{newContent?.newLine ?? ""}</span>
+            <span className="webui-turn-review-source">{newContent ? newHighlight === undefined ? newContent.content : <span dangerouslySetInnerHTML={{ __html: newHighlight }} /> : ""}</span>
+          </span>
+        </span>;
+      }) : lines.map((line, index) => {
+        const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightFileLine(line.content, language);
+        return <span className={`webui-turn-review-line webui-turn-review-line--${line.kind}`} key={`${index}-${line.kind}`}>
+          {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : line.kind === "noNewline" ? line.content : <>
+            <span className="webui-turn-review-line-number">{line.oldLine ?? ""}</span>
+            <span className="webui-turn-review-line-number">{line.newLine ?? ""}</span>
+            <span className="webui-turn-review-marker">{line.kind === "addition" ? "+" : line.kind === "deletion" ? "−" : " "}</span>
+            <span className="webui-turn-review-source">{highlighted === undefined ? line.content : <span dangerouslySetInnerHTML={{ __html: highlighted }} />}</span>
+          </>}
         </span>;
       })}</code></pre> : <p className="webui-turn-review-unavailable">当前运行时没有提供该文件的文本 patch。</p>}
       </div>
@@ -350,6 +370,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const [fileCodeMode, setFileCodeMode] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
   const [reviewSearchAppliedQuery, setReviewSearchAppliedQuery] = useState("");
+  const [reviewSectionsExpanded, setReviewSectionsExpanded] = useState<boolean>();
+  const [reviewDiffLayout, setReviewDiffLayout] = useState<"unified" | "split">("unified");
+  const [reviewShowContext, setReviewShowContext] = useState(true);
+  const [miniAppToolbarTarget, setMiniAppToolbarTarget] = useState<HTMLDivElement | null>(null);
   const [terminals, setTerminalsState] = useState<readonly Record<string, unknown>[]>([]);
   /**
    * A terminal list answer is rendered directly (`terminals.find`, `terminals.map`),
@@ -409,6 +433,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const activeFileResult = activeTab?.content.kind === "file-preview" ? fileResults.get(activeFileKey!)?.content : undefined;
   const selectedFilePath = activeTab?.content.kind === "file-preview" ? activeFileResult?.resolvedPath ?? activeTab.content.path : undefined;
   const hasFileWorkspace = tab === "files" || activeTab?.content.kind === "file-preview" || activeTab?.content.kind === "review";
+  const hasMiniAppView = tab === "miniapp" && activeTab?.content.kind === "miniapp";
+  const hasWorkspaceToolbar = hasFileWorkspace || hasMiniAppView;
   const visibleFiles = filterWorkspaceFiles(fileTree.files ?? [], fileSearch);
   const currentPanelState = useRef(state);
   currentPanelState.current = state;
@@ -476,6 +502,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const turnReviewFiles = activeTab?.content.kind === "review" && activeTab.content.source === "turn"
     ? projectWebuiDiffFiles(activeTab.content.files, activeTab.content.workspaceDir)
     : [];
+  const reviewFileCount = activeTab?.content.kind !== "review" ? 0
+    : activeTab.content.source === "turn" ? turnReviewFiles.length
+      : workspaceReviewFiles.length;
+  const reviewFilesExpanded = reviewSectionsExpanded ?? !showingWorkspaceReviewSearchResults;
   const selectedReviewPath = activeTab?.content.kind === "review" && activeTab.content.source === "workspace"
     ? workspaceReviewFiles.some((file) => file.path === workspaceReviewSelectedPath) ? workspaceReviewSelectedPath : workspaceReviewFiles[0]?.path
     : activeTab?.content.kind === "review" && activeTab.content.source === "turn" ? activeTab.content.selectedPath ?? turnReviewFiles[0]?.file : undefined;
@@ -489,9 +519,9 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     void queries.loadReviewDiffs({ tabId: activeTab.id, workspaceDir: activeTab.content.workspaceDir, snapshotId: activeTab.content.reviewSnapshotId, fileIds: summary.files.map((file) => file.fileId) });
     return undefined;
   }, [activeTab?.id, activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? activeTab.content.reviewSnapshotId : undefined, activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? activeTab.content.workspaceDir : undefined, reviewSummary?.summary?.reviewSnapshotId, queries]);
-  const runReviewSearch = () => {
+  const runReviewSearch = (input: string) => {
     if (activeTab?.content.kind !== "review" || activeTab.content.source !== "workspace" || !activeTab.content.reviewSnapshotId || !queries) return;
-    const query = reviewSearchQuery.trim();
+    const query = input.trim();
     setReviewSearchAppliedQuery(query);
     if (!query) return;
     void queries.searchReviewDiffs({ tabId: activeTab.id, workspaceDir: activeTab.content.workspaceDir, snapshotId: activeTab.content.reviewSnapshotId, query });
@@ -762,7 +792,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action webui-workspace-panel-close" aria-label="关闭面板" disabled={panelClosing} onClick={startPanelClosing}><WebuiIconClose className="size-[18px]" /></WebuiButton>
       </div>
     </div>
-    {hasFileWorkspace ? <div className="webui-workspace-file-toolbar">
+    {hasWorkspaceToolbar ? <div className={`webui-workspace-file-toolbar${activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? " webui-workspace-file-toolbar--review" : ""}${hasMiniAppView ? " webui-workspace-file-toolbar--miniapp" : ""}`}>
       <div className="webui-workspace-file-breadcrumb" role="navigation" aria-label="文件路径">
         {activeFilePath ? activeFilePath.split("/").map((part, index) => <span key={`${part}-${index}`} className={index === activeFilePath.split("/").length - 1 ? "is-current" : ""}>{index ? <WebuiIconChevronRight className="size-3" /> : null}{part}</span>) : <span className="is-current">{basenamePath(workspaceDir ?? "") || "工作区"}</span>}
       </div>
@@ -771,7 +801,19 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <WebuiButton variant="segmented" size="compact" className="webui-workspace-file-mode-button" aria-pressed={fileCodeMode} onClick={() => setFileCodeMode(true)}>代码</WebuiButton>
       </div> : null}
       {activeTab?.content.kind === "file-preview" ? <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" aria-label="编辑文件（暂未支持）" disabled><IconEdit aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} /></WebuiButton> : null}
-      <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" aria-label={fileTreeOpen ? "隐藏文件树" : "显示文件树"} aria-pressed={fileTreeOpen} onClick={() => setFileTreeOpen((open) => !open)}><WebuiIconSidebarToggle className="size-5" /></WebuiButton>
+      {hasMiniAppView ? <div className="webui-workspace-miniapp-toolbar" role="toolbar" aria-label="应用工具栏" ref={setMiniAppToolbarTarget} /> : tab === "review" ? <div className="webui-workspace-review-toolbar" role="toolbar" aria-label="差异工具栏">
+        {activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? <WebuiSearchField className="webui-workspace-review-search-field" icon={<WebuiIconSearch className="size-4" />} label="搜索变更" value={reviewSearchQuery} onChange={(event) => { const query = event.currentTarget.value; setReviewSearchQuery(query); runReviewSearch(query); }} placeholder="搜索变更" /> : null}
+        <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" type="button" disabled={!reviewFileCount} aria-label={reviewFilesExpanded ? "收起所有文件差异" : "展开所有文件差异"} aria-pressed={reviewFilesExpanded} title={reviewFilesExpanded ? "收起所有文件差异" : "展开所有文件差异"} data-testid="workspace-review-toolbar-expand" onClick={() => setReviewSectionsExpanded(!reviewFilesExpanded)}>
+          <IconListCheck aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} />
+        </WebuiButton>
+        <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" type="button" aria-label={reviewDiffLayout === "unified" ? "切换到并排差异视图" : "切换到统一差异视图"} aria-pressed={reviewDiffLayout === "split"} title={reviewDiffLayout === "unified" ? "并排差异视图" : "统一差异视图"} data-testid="workspace-review-toolbar-layout" onClick={() => setReviewDiffLayout((layout) => layout === "unified" ? "split" : "unified")}>
+          <IconLayoutColumns aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} />
+        </WebuiButton>
+        <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" type="button" aria-label={reviewShowContext ? "隐藏未修改行" : "显示未修改行"} aria-pressed={!reviewShowContext} title={reviewShowContext ? "隐藏未修改行" : "显示未修改行"} data-testid="workspace-review-toolbar-context" onClick={() => setReviewShowContext((visible) => !visible)}>
+          <IconAdjustmentsHorizontal aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} />
+        </WebuiButton>
+        <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" aria-label={fileTreeOpen ? "隐藏文件树" : "显示文件树"} aria-pressed={fileTreeOpen} title={fileTreeOpen ? "隐藏文件树" : "显示文件树"} data-testid="workspace-review-toolbar-tree" onClick={() => setFileTreeOpen((open) => !open)}><WebuiIconSidebarToggle className="size-5" /></WebuiButton>
+      </div> : <WebuiButton variant="quiet-action" size="inline" className="webui-workspace-panel-action" aria-label={fileTreeOpen ? "隐藏文件树" : "显示文件树"} aria-pressed={fileTreeOpen} onClick={() => setFileTreeOpen((open) => !open)}><WebuiIconSidebarToggle className="size-5" /></WebuiButton>}
     </div> : null}
     <div className="webui-workspace-panel-body">
       <div className="webui-workspace-view">
@@ -782,10 +824,6 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <FeedbackLiveRegion className="webui-turn-review-empty">正在收集变更…</FeedbackLiveRegion> : reviewSummary.error && !reviewSummary.summary ? <FeedbackError message={reviewSummary.error} className="webui-turn-review-empty" /> : reviewSummary.summary ? <>
         <WebuiInline gap="medium" justify="between" className="webui-turn-review-summary"><span>{reviewSummary.summary.totals.files} 个文件</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{reviewSummary.summary.totals.additions}</span>{reviewSummary.summary.totals.deletions ? <span className="webui-diff-del">-{reviewSummary.summary.totals.deletions}</span> : null}</span></WebuiInline>
         {reviewSummary.summary.files.length ? <>
-          <form className="webui-workspace-review-search" onSubmit={(event) => { event.preventDefault(); runReviewSearch(); }}>
-            <WebuiSearchField className="webui-workspace-review-search-field" icon={<WebuiIconSearch className="size-4" />} label="搜索变更" value={reviewSearchQuery} onChange={(event) => setReviewSearchQuery(event.currentTarget.value)} placeholder="搜索变更" />
-            <WebuiButton variant="secondary" size="compact" type="submit" className="webui-workspace-review-search-submit" disabled={!queries?.canSearchReviewDiffs || reviewSearch?.loading}>搜索</WebuiButton>
-          </form>
           {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.loading ? <FeedbackLiveRegion className="webui-workspace-review-status">正在搜索变更…</FeedbackLiveRegion> : null}
           {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.error ? <FeedbackError message={currentWorkspaceReviewSearch.error} className="webui-workspace-review-status" /> : null}
           {reviewDiffs?.error && reviewDiffs.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? <FeedbackError message={reviewDiffs.error} className="webui-workspace-review-status" /> : null}
@@ -793,14 +831,14 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
           {!reviewSearchAppliedQuery || !currentWorkspaceReviewSearch?.loading && !currentWorkspaceReviewSearch?.error && matchedWorkspaceReviewFiles.length > 0 ? <div className="webui-turn-review-files" data-testid={showingWorkspaceReviewSearchResults ? "workspace-review-search-results" : undefined}>{matchedWorkspaceReviewFiles.map((file) => {
             const result = reviewDiffs?.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? reviewDiffs.diffs[file.fileId] : undefined;
             const loading = !result && (reviewDiffs?.tabId !== activeTab.id || reviewDiffs.snapshotId !== activeReview?.reviewSnapshotId || reviewDiffs.loading);
-            return <WebuiDiffFileSection key={`${file.fileId}:${showingWorkspaceReviewSearchResults ? "search" : "list"}`} file={projectWebuiDiffFile({ file: file.path, additions: file.additions, deletions: file.deletions, status: file.status, ...(result?.diff !== undefined ? { diff: result.diff } : {}) }, workspaceReviewWorkspaceDir)} selected={selectedReviewPath === file.path} loading={loading} error={result?.binary ? "二进制文件无法显示文本差异。" : result?.error} defaultOpen={!showingWorkspaceReviewSearchResults} onSelect={() => dispatch({ type: "select-review-file", tabId: activeTab.id, path: file.path })} />;
+            return <WebuiDiffFileSection key={`${file.fileId}:${showingWorkspaceReviewSearchResults ? "search" : "list"}:${reviewSectionsExpanded ?? "default"}`} file={projectWebuiDiffFile({ file: file.path, additions: file.additions, deletions: file.deletions, status: file.status, ...(result?.diff !== undefined ? { diff: result.diff } : {}) }, workspaceReviewWorkspaceDir)} selected={selectedReviewPath === file.path} loading={loading} error={result?.binary ? "二进制文件无法显示文本差异。" : result?.error} defaultOpen={reviewSectionsExpanded ?? !showingWorkspaceReviewSearchResults} diffLayout={reviewDiffLayout} showContext={reviewShowContext} onSelect={() => dispatch({ type: "select-review-file", tabId: activeTab.id, path: file.path })} />;
           })}</div> : null}
         </> : <FeedbackEmpty className="webui-turn-review-empty" title={"当前没有变更。"} />}
       </> : null}
     </div> : null}
     {tab === "review" && activeTab?.content.kind === "review" && activeTab.content.source === "turn" ? <div className="webui-turn-review" data-testid="turn-review-panel" data-session-id={activeTab.content.sessionId} data-message-id={activeTab.content.messageId} data-turn-id={activeTab.content.turnId} data-change-set-id={activeTab.content.changeSetId}>
       <WebuiInline gap="medium" justify="between" className="webui-turn-review-summary"><span>本轮改动</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{turnReviewFiles.reduce((sum, file) => sum + file.additions, 0)}</span>{turnReviewFiles.some((file) => file.deletions > 0) ? <span className="webui-diff-del">-{turnReviewFiles.reduce((sum, file) => sum + file.deletions, 0)}</span> : null}</span></WebuiInline>
-      {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={file.file} file={file} selected={selectedReviewPath === file.file} />)}</div> : <FeedbackEmpty className="webui-turn-review-empty" title={"本轮没有可审查的文件差异。"} />}
+      {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={`${file.file}:${reviewSectionsExpanded ?? "default"}`} file={file} selected={selectedReviewPath === file.file} defaultOpen={reviewSectionsExpanded ?? true} diffLayout={reviewDiffLayout} showContext={reviewShowContext} />)}</div> : <FeedbackEmpty className="webui-turn-review-empty" title={"本轮没有可审查的文件差异。"} />}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
     {browserTab ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={browserTab.id} data-inactive={!activeWebTab ? "true" : undefined} aria-hidden={!activeWebTab}>
@@ -872,6 +910,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <MiniAppView
           pluginId={activeTab.content.pluginId}
           sessionId={activeTab.content.sessionId}
+          toolbarTarget={miniAppToolbarTarget}
         />
       </div>
     ) : null}

@@ -6,11 +6,11 @@
 // (`previewPlugin` sets the error and leaves the preview alone) and a failed import from closing the
 // dialog (`importPlugin` closes and clears only after `mutate` reports success).
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../contracts/plugin-rows.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiField, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 
@@ -30,6 +30,10 @@ export interface PluginImportDialogProps {
 export function PluginImportDialog({ open, url, onUrlChange, preview, error, busy, onPreview, onImport, onClose }: PluginImportDialogProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   const portalTarget = dom.portalTarget();
+  const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
+  const previewIfValid = (): void => {
+    if (validateRequired([{ name: "url", label: "仓库 URL", value: url }])) onPreview();
+  };
   return (
       <WebuiDialog
         id="plugin-import-dialog"
@@ -56,8 +60,8 @@ export function PluginImportDialog({ open, url, onUrlChange, preview, error, bus
             ) : (
               <WebuiButton
                 variant="primary"
-                size="dialog" disabled={busy || !url.trim()}
-                onClick={onPreview}
+                size="dialog" disabled={busy}
+                onClick={previewIfValid}
               >
                 预览
               </WebuiButton>
@@ -69,12 +73,15 @@ export function PluginImportDialog({ open, url, onUrlChange, preview, error, bus
           <WebuiField
             className="wide"
             label="仓库 URL"
+            required
+            error={errors.url}
             control={(props) => (
               <WebuiTextInput
                 {...props}
                 value={url}
                 onChange={(event) => {
                   onUrlChange(event.currentTarget.value);
+                  clearFieldError("url");
                 }}
                 placeholder="https://github.com/owner/repository"
               />

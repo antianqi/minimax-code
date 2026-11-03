@@ -91,9 +91,14 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
   }, [query, rows]);
   const selectedRow = rows.find((row) => row.cronId === props.selectedTaskId) ?? rows[0];
   const selectedTask = selectedRow ? tasksById.get(selectedRow.cronId) : undefined;
+  const hasLoadedBefore = props.snapshot.loadedAtMs !== undefined;
+  const initialLoading = props.snapshot.status === "loading" && !hasLoadedBefore;
   // "No task exists yet" is only true of a *successful* empty read: a failed one is not empty, and
   // saying so would invite the person to create a task they may already have.
-  const showEmpty = rows.length === 0 && props.snapshot.status === "ready";
+  // Keep the last successful empty state visible while the background refresh is in flight.
+  const showEmpty = rows.length === 0 && (
+    props.snapshot.status === "ready" || (props.snapshot.status === "loading" && hasLoadedBefore)
+  );
   const templates = [
     {
       title: "每日工作总结",
@@ -124,7 +129,7 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
     <PanelFrame
       className="bg-bg_default_primary"
       bodyClassName="webui-scheduling-layout"
-      loading={props.snapshot.status === "loading" && rows.length === 0}
+      loading={initialLoading && rows.length === 0}
       ariaLabel="定时任务"
       dataAttributes={{ "data-webui-component": "scheduling-panel" }}
     >
@@ -159,7 +164,7 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
             <span>即将执行</span>
             <span>{matchingRows.length}</span>
           </div>
-          {props.snapshot.status === "loading" && rows.length === 0
+          {initialLoading && rows.length === 0
             ? <p data-webui-scheduling-loading="true" className="webui-scheduling-sidebar-empty">{WEBUI_SCHEDULING_LOADING_TEXT}</p>
             : null}
           {props.snapshot.status === "error" && rows.length === 0

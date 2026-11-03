@@ -11,7 +11,7 @@ import type { WebuiSshDirectoryListing } from "../application/ssh-owner.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
-import { WebuiField, WebuiSelectMenu, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiField, WebuiSelectMenu, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 
 export interface SshProjectFormProps {
@@ -37,6 +37,7 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
   const [displayName, setDisplayName] = useState("");
   const [listing, setListing] = useState<WebuiSshDirectoryListing | undefined>(undefined);
   const [browsing, setBrowsing] = useState(false);
+  const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
   const requestedAlias = props.alias;
 
   // The host can change while the form is open — another row's 新建远程项目 was pressed.
@@ -74,6 +75,7 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
+    if (!validateRequired([{ name: "alias", label: "远程主机", value: alias }])) return;
     props.onSubmit({ alias, path, ...(displayName.trim() === "" ? {} : { displayName: displayName.trim() }) });
   };
 
@@ -119,6 +121,8 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
         />
         <WebuiField
           label="远程主机"
+          required
+          error={errors.alias}
           gap="small"
           control={(controlProps, field) => (
             <WebuiSelectMenu
@@ -130,7 +134,7 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
                 label: `${host.displayName || host.alias} · ${host.endpoint.host || host.alias}`,
               }))}
               value={alias}
-              onChange={setAlias}
+              onChange={(value) => { setAlias(value); clearFieldError("alias"); }}
             />
           )}
         />

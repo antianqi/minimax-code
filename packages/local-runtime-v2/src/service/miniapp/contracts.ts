@@ -145,9 +145,40 @@ export interface MiniAppNodeRuntime {
   stop(): Promise<{ readonly proven: boolean }>;
 }
 
+/**
+ * Why a cross-client stop did not stop anything.
+ *
+ * The reasons are ordered by how far the attempt got: there was no process to
+ * stop, the port answered but not as a Mini App guard, the recorded process was
+ * already gone, or the process refused to leave.
+ */
+export type MiniAppForeignStopReason =
+  | 'not-running'
+  | 'guard-missing'
+  | 'process-gone'
+  | 'stop-failed';
+
+/** The outcome of stopping a Mini App this client does not own. */
+export interface MiniAppForeignStopResult {
+  readonly stopped: boolean;
+  readonly reason?: MiniAppForeignStopReason;
+}
+
 export interface MiniAppNodeRuntimeFactory {
   /** Reads the renderer-safe owner label after the process guard proves another client is live. */
   ownerClient?(pluginId: string): Promise<string | undefined>;
+  /**
+   * Stops a Mini App this client does not own, by terminating the process that
+   * answers on its port.
+   *
+   * The owner client cannot be asked, so the process is ended directly. That
+   * leaves the owner's own bookkeeping to its next read; it does not make the
+   * Mini App's endpoint reachable for this client.
+   */
+  stopElsewhere?(
+    pluginId: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<MiniAppForeignStopResult>;
   prepare(input: {
     readonly candidate: ProcessMiniAppCandidate;
     readonly processGeneration: string;
@@ -266,6 +297,17 @@ interface MiniAppPublicationCoordinator {
   }): boolean;
   disable(pluginId: string): Promise<void>;
   stop(pluginId: string, options?: MiniAppStopOptions): Promise<void>;
+  /**
+   * Stops a Mini App this client does not own.
+   *
+   * The owner of a Mini App is the only client that can stop it through the
+   * publication; this is the other direction, for the client that is looking at
+   * a Mini App another client is running.
+   */
+  stopElsewhere(
+    pluginId: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<MiniAppForeignStopResult>;
 }
 
 export interface MiniAppSupervisor extends MiniAppPublicationCoordinator {

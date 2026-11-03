@@ -25,6 +25,7 @@ import {
   type MiniAppRunnerLaunch,
 } from './runner-entry.js';
 import { probeMiniAppPortOwnership } from './loopback-ownership.js';
+import { stopMiniAppRuntimeElsewhere } from './runtime-record.js';
 import {
   acquireMiniAppOwner,
   readMiniAppOwnerIdentity,
@@ -165,6 +166,40 @@ export function createMiniAppNodeRuntimeAdapter(
     async ownerClient(pluginId) {
       const dataDir = await resolveDataDir(resolved, pluginId);
       return (await readMiniAppOwnerIdentity(dataDir))?.client;
+    },
+    /**
+     * Stops a Mini App this client does not own.
+     *
+     * The record names the process that serves the Mini App and the guard on
+     * that port proves the process is still the one serving it. Both have to
+     * agree before a signal is sent, so a record left behind by a dead process
+     * cannot end up pointing at whatever inherited its pid.
+     */
+    async stopElsewhere(pluginId, options) {
+      const dataDir = await resolveDataDir(resolved, pluginId);
+      const controller = new AbortController();
+      const abort = () => controller.abort(options?.signal?.reason);
+      options?.signal?.addEventListener('abort', abort, { once: true });
+      try {
+        return await stopMiniAppRuntimeElsewhere({
+          pluginDataDir: dataDir,
+          probeGuard: async (port) => {
+            const ownership = await probeMiniAppPortOwnership({
+              port,
+              timeoutMs: resolved.tcpConnectTimeoutMs,
+              signal: controller.signal,
+            });
+            return ownership === 'guarded';
+          },
+          isProcessAlive: isProcessAlive,
+          kill: (pid, name) => {
+            process.kill(pid, name);
+          },
+          wait: (ms) => resolved.wait(ms, controller.signal),
+        });
+      } finally {
+        options?.signal?.removeEventListener('abort', abort);
+      }
     },
     async prepare(input) {
       assertCapabilities(resolved, input.candidate);
@@ -932,6 +967,22 @@ function candidatePort(input: Parameters<typeof prepareRuntime>[0], index: numbe
     available += 1;
   }
   throw new MiniAppNodeRuntimeError('NO_CANDIDATE_PORT', 'No Host-approved port is available');
+}
+
+/**
+ * Whether a process is still running.
+ *
+ * Signal 0 asks the operating system without touching the process. A process
+ * this client may not signal is still alive, so a permission error counts as
+ * alive rather than as gone.
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
 }
 
 export function deriveMiniAppNodePort(pluginId: string): number {

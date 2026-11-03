@@ -38,6 +38,15 @@ export interface WebuiMiniAppRow {
   /** True while the runtime is up, which is when the row offers "stop". */
   readonly running: boolean;
   /**
+   * True when the row offers "stop".
+   *
+   * A Mini App another client is running is stoppable from here as well: the
+   * process serving it can be ended, so the row offers the same action a row
+   * this client runs offers. The decision lives here so the two surfaces that
+   * render a Mini App row cannot disagree about it.
+   */
+  readonly canStop: boolean;
+  /**
    * False for a package that is installed but disabled.
    *
    * Such a row can be enabled but not started: the runtime refuses to launch a
@@ -108,6 +117,10 @@ export function webuiMiniAppRows(
             : "其他客户端运行中"
           : webuiMiniAppStatusLabel(miniApp.runtime.status),
       running: enabled && miniApp.runtime.status === "running",
+      canStop:
+        (enabled && miniApp.runtime.status === "running") ||
+        miniApp.runtime.status === "starting" ||
+        miniApp.runtime.ownership === "other-client",
       enabled,
       ownedElsewhere: miniApp.runtime.ownership === "other-client",
       ...(miniApp.runtime.ownerClient ? { ownerClient: miniApp.runtime.ownerClient } : {}),

@@ -393,6 +393,40 @@ test("a Mini App owned by another client reports the refusal and stays unopened 
   ).toBe(1);
 });
 
+test("a Mini App another client is running can be stopped from here", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.shared",
+        displayName: "共享应用",
+        runtime: {
+          kind: "process",
+          status: "stopped",
+          ownership: "other-client",
+          ownerClient: "electron",
+        },
+      }] });
+    });
+  });
+  await openApp(page);
+  await openWorkspacePanel(page);
+  await openLauncherTile(page, "miniapp-picker");
+
+  const row = page.getByTestId("miniapp-picker-row-demo.shared");
+  await expect(row).toContainText("其他客户端运行中（electron）");
+  // The row names the other client and still offers the action that ends the
+  // Mini App. The click has to reach the operation, not just draw a button.
+  await row.getByRole("button", { name: "停止" }).click();
+  await expect.poll(() =>
+    page.evaluate(() =>
+      window.__fixture.requests.filter(
+        (request) => request.operation === "stopMiniApp" && request.body.pluginId === "demo.shared",
+      ).length,
+    ),
+  ).toBe(1);
+});
+
 test("a stopped Mini App clears its view and reopens only when the person asks", async ({ page }) => {
   await configureFixture(page, () => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];

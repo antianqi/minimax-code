@@ -189,6 +189,32 @@ describe("the plugin catalogue's apps area", () => {
     expect(picker).toMatch(/data-testid="miniapp-picker-open-shared"[^>]*disabled=""/u);
   });
 
+  it("offers to stop a Mini App another client is running", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: port({
+        miniApps: [
+          summary("shared", "stopped", { ownership: "other-client", ownerClient: "electron" }),
+        ],
+      }),
+    });
+    await workflows.loadListing();
+
+    const picker = render(
+      createElement(MiniAppPicker, {
+        sessionId: "session-1",
+        onOpened: () => undefined,
+        onClose: () => undefined,
+      }),
+      workflows,
+    );
+
+    // The row names the other client and still offers the action that ends the
+    // Mini App: the process serving it can be stopped from here too.
+    expect(picker).toContain("其他客户端运行中（electron）");
+    expect(picker).toContain('data-testid="miniapp-picker-stop-shared"');
+    expect(picker).not.toMatch(/data-testid="miniapp-picker-stop-shared"[^>]*disabled=""/u);
+  });
+
   it("offers 启用 for a disabled Mini App instead of a start it cannot do", async () => {
     const workflows = createWebuiMiniAppWorkflows({
       port: port({

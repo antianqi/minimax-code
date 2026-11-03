@@ -307,7 +307,8 @@ export function MiniAppAppsList({
                         ) : null}
                         <WebuiMenuItem
                           icon={<IconPlayerStop size={18} stroke={1.7} />}
-                          disabled={!row.running && row.status !== "starting"}
+                          data-testid={`miniapp-app-stop-${row.pluginId}`}
+                          disabled={!row.canStop}
                           onClick={() => {
                             setOpenMenuKey(undefined);
                             void workflows?.stop(row.pluginId);

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   MiniAppCandidate,
+  MiniAppForeignStopResult,
   MiniAppGenerationLease,
   MiniAppNodeRuntime,
   MiniAppPreparationOptions,
@@ -584,6 +585,24 @@ export class DefaultMiniAppSupervisor implements MiniAppSupervisor {
     const transition = await this.prepareStop(pluginId, options);
     await transition.commit();
     await transition.finalize();
+  }
+
+  /**
+   * Stops a Mini App this client does not own.
+   *
+   * The owner of a Mini App is the only client that can stop it through the
+   * publication; this is the other direction, for the client that is looking at
+   * a Mini App another client is running. The process is ended directly, so the
+   * owner learns about it on its next read rather than being asked to stop.
+   */
+  async stopElsewhere(
+    pluginId: string,
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<MiniAppForeignStopResult> {
+    this.assertOpen();
+    const stopElsewhere = this.options.nodeRuntime.stopElsewhere;
+    if (!stopElsewhere) return { stopped: false, reason: 'not-running' };
+    return stopElsewhere.call(this.options.nodeRuntime, pluginId, options);
   }
 
   async prepareDisable(pluginId: string): Promise<PreparedMiniAppDisableTransition> {

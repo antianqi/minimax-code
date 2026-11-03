@@ -361,6 +361,28 @@ describe("the Mini App business", () => {
     expect(snapshot.presentations["shared-app"]).toBeUndefined();
   });
 
+  it("offers to stop a Mini App another client is running", () => {
+    const rows = webuiMiniAppRows([
+      miniApp("shared", "stopped", {
+        runtime: {
+          kind: "process",
+          status: "stopped",
+          ownership: "other-client",
+          ownerClient: "electron",
+        },
+      }),
+      miniApp("live", "running"),
+      miniApp("idle", "stopped"),
+    ]);
+    const byId = new Map(rows.map((row) => [row.pluginId, row]));
+    // Another client's Mini App can be stopped from here: the process serving
+    // it can be ended, so the row offers the action a running row offers.
+    expect(byId.get("shared")?.canStop).toBe(true);
+    expect(byId.get("live")?.canStop).toBe(true);
+    // A row with nothing running offers nothing to stop.
+    expect(byId.get("idle")?.canStop).toBe(false);
+  });
+
   it("is unavailable rather than empty when the host has no Mini App cell", () => {
     const workflows = createWebuiMiniAppWorkflows({ port: {} });
     expect(workflows.available).toBe(false);

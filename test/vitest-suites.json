@@ -60,6 +60,8 @@
       "packages/local-runtime-v2/test/unit/miniapp/node-runtime-runner-startup.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/runner-entry.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/owner-lease.test.ts",
+      "packages/local-runtime-v2/test/unit/miniapp/runtime-record.test.ts",
+      "packages/local-runtime-v2/test/unit/miniapp/stop-elsewhere.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/runtime-miniapp-options.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/installed-miniapp-inventory.test.ts",
       "packages/local-runtime-v2/test/unit/miniapp/cli-service-miniapp.test.ts",

@@ -16,6 +16,10 @@ import {
 } from '../../contracts.js';
 import { boundMiniAppRuntimeErrorText } from '../../errors.js';
 import {
+  removeMiniAppRuntimeRecord,
+  writeMiniAppRuntimeRecord,
+} from './runtime-record.js';
+import {
   createMiniAppHostConnectorRuntimeClient,
   type HostConnectorClient,
   type MiniAppAgentClient,
@@ -313,9 +317,43 @@ export function runMiniAppHostRunner(
   let running: RunningMiniAppModule | undefined;
   let initialized = false;
   let stopping: Promise<void> | undefined;
+  let runtimeRecordDir: string | undefined;
+  /**
+   * Publishes which process serves this Mini App.
+   *
+   * Another client cannot stop a Mini App it does not own through its owner, so
+   * the pid has to be written somewhere the owner controls. The record is
+   * written once the port is bound, which makes its presence a promise that the
+   * guard is listening on the recorded port.
+   */
+  const recordRuntime = async (init: MiniAppRunnerInitMessage) => {
+    runtimeRecordDir = init.dataDir;
+    try {
+      await writeMiniAppRuntimeRecord(init.dataDir, {
+        pid: process.pid,
+        port: init.listen.port,
+        startedAtMs: Date.now(),
+      });
+    } catch {
+      // The Mini App runs either way. Without the record another client cannot
+      // stop this process, which is worse than a stale one, not better.
+    }
+  };
+  const releaseRuntimeRecord = async () => {
+    const dir = runtimeRecordDir;
+    if (!dir) return;
+    runtimeRecordDir = undefined;
+    try {
+      await removeMiniAppRuntimeRecord(dir);
+    } catch {
+      // A leftover record is stale by the time anyone reads it: the reader
+      // proves the process is gone before it acts on one.
+    }
+  };
   const stop = (exitCode: number) => {
     stopping ??= (async () => {
       await running?.stop();
+      await releaseRuntimeRecord();
       await sendStopped();
       processPort.exitCode = exitCode;
       disconnect();
@@ -353,6 +391,7 @@ export function runMiniAppHostRunner(
             return;
           }
           running = started;
+          await recordRuntime(message);
           send({
             type: 'miniapp:started',
             pluginId: message.pluginId,

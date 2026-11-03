@@ -21,7 +21,9 @@ type ProcessLocalMiniAppApplication = NonNullable<LocalRuntimeApplication['miniA
 /** Projects installed MiniApp definitions and Supervisor state for the Electron bridge. */
 export function createProcessLocalMiniAppApplication(
   plugins: MiniAppPluginControl,
-  supervisor: Pick<MiniAppSupervisor, 'inspect' | 'launchCredential' | 'ownerClient'> | undefined,
+  supervisor:
+    | Pick<MiniAppSupervisor, 'inspect' | 'launchCredential' | 'ownerClient' | 'stopElsewhere'>
+    | undefined,
 ): ProcessLocalMiniAppApplication | undefined {
   if (!supervisor) return undefined;
 
@@ -120,8 +122,32 @@ export function createProcessLocalMiniAppApplication(
       return { miniApps: await listRows(definitions, statuses) };
     },
     open: ({ pluginId, signal }) => open(pluginId, signal),
+    /**
+     * Stops one Mini App, whichever client is running it.
+     *
+     * A Mini App this client owns is stopped through its publication. One that
+     * another client owns cannot be stopped that way — this client has no
+     * generation of it — so the process serving it is ended instead. The port
+     * probe is what proves another client owns it, and it is the same probe the
+     * row's label comes from, so the button and the label cannot disagree.
+     */
     stop: async ({ pluginId, signal }) => {
       await requireDefinition(pluginId);
+      const status = supervisor.inspect(pluginId)[0];
+      if (
+        status?.phase === 'active' ||
+        status?.phase === 'starting' ||
+        status?.phase === 'preparing'
+      ) {
+        await plugins.stopMiniApp({ pluginId, ...(signal ? { signal } : {}) });
+        return;
+      }
+      const stopped = await supervisor.stopElsewhere(pluginId, {
+        ...(signal ? { signal } : {}),
+      });
+      if (stopped.stopped) return;
+      // Nothing of another client's was running either: the refusal the
+      // publication raises is the honest answer.
       await plugins.stopMiniApp({ pluginId, ...(signal ? { signal } : {}) });
     },
   };

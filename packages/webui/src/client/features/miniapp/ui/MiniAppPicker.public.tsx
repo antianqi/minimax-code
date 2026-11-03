@@ -158,11 +158,12 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
                 >
                   {row.ownedElsewhere ? `其他客户端运行中${row.ownerClient ? `（${row.ownerClient}）` : ""}` : "使用"}
                 </WebuiButton>
-                {row.running || row.status === "starting" ? (
+                {row.canStop ? (
                   <WebuiButton
                     variant="quiet-subtle"
                     size="compact"
                     type="button"
+                    data-testid={`miniapp-picker-stop-${row.pluginId}`}
                     onClick={() => void workflows?.stop(row.pluginId)}
                   >
                     停止

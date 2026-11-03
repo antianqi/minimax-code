@@ -25,6 +25,7 @@ import {
   type MiniAppRunnerLaunch,
 } from './runner-entry.js';
 import { probeMiniAppPortOwnership } from './loopback-ownership.js';
+import { readPortOwnerPid } from './port-owner-pid.js';
 import { stopMiniAppRuntimeElsewhere } from './runtime-record.js';
 import {
   acquireMiniAppOwner,
@@ -183,6 +184,7 @@ export function createMiniAppNodeRuntimeAdapter(
       try {
         return await stopMiniAppRuntimeElsewhere({
           pluginDataDir: dataDir,
+          fallbackPort: deriveMiniAppNodePort(pluginId),
           probeGuard: async (port) => {
             const ownership = await probeMiniAppPortOwnership({
               port,
@@ -196,6 +198,7 @@ export function createMiniAppNodeRuntimeAdapter(
             process.kill(pid, name);
           },
           wait: (ms) => resolved.wait(ms, controller.signal),
+          readPortOwnerPid: (port) => readPortOwnerPid({ port }),
         });
       } finally {
         options?.signal?.removeEventListener('abort', abort);

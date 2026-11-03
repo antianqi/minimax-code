@@ -27,8 +27,17 @@ const RUNTIME_RECORD_FILE = 'runtime.json';
 
 export interface StopMiniAppRuntimeElsewhereInput {
   readonly pluginDataDir: string;
+  /** The port the Mini App serves on when no runtime record names one. */
+  readonly fallbackPort: number;
   /** True when a Mini App guard answers on the port, so a Mini App owns it. */
   readonly probeGuard: (port: number) => Promise<boolean>;
+  /**
+   * The process listening on the port, when the platform can name one.
+   *
+   * A Mini App started by a client that predates the runtime record has no
+   * record to read, and the port is the only thing left that names it.
+   */
+  readonly readPortOwnerPid?: (port: number) => Promise<number | undefined>;
   readonly isProcessAlive: (pid: number) => boolean;
   readonly kill: (pid: number, signal: NodeJS.Signals) => void;
   readonly wait: (ms: number) => Promise<void>;
@@ -84,11 +93,13 @@ export async function removeMiniAppRuntimeRecord(pluginDataDir: string): Promise
  * Stops a Mini App this client does not own, by terminating the process that
  * answers on its port.
  *
- * Three facts have to agree before a process is signalled: the record names a
+ * Three facts have to agree before a process is signalled: something names a
  * process, that process is still alive, and the Mini App guard answers on the
- * recorded port. The guard is what makes the kill safe — it proves the port
- * belongs to a Mini App rather than to whatever inherited the number after the
- * original process died — and the record is what names the process to kill.
+ * port. The guard is what makes the kill safe — it proves the port belongs to a
+ * Mini App rather than to whatever inherited the number after the original
+ * process died — and the name is what says which process to kill. The name is
+ * the runtime record when there is one, and the process listening on the port
+ * when there is not, which is the case for a Mini App an older client started.
  *
  * The client that owned the Mini App keeps its own bookkeeping; this only ends
  * the process, and that client's next read sees the process gone.
@@ -97,23 +108,31 @@ export async function stopMiniAppRuntimeElsewhere(
   input: StopMiniAppRuntimeElsewhereInput,
 ): Promise<MiniAppForeignStopResult> {
   const record = await readMiniAppRuntimeRecord(input.pluginDataDir);
-  if (!record) return { stopped: false, reason: 'not-running' };
-  if (!(await input.probeGuard(record.port))) {
-    return { stopped: false, reason: 'guard-missing' };
+  const port = record?.port ?? input.fallbackPort;
+  if (!(await input.probeGuard(port))) {
+    // A recorded Mini App whose port no longer answers is a port something
+    // else took, and the record is not a licence to signal whatever holds it
+    // now. With no record there is nothing of another client's running here.
+    return {
+      stopped: false,
+      reason: record ? 'guard-missing' : 'not-running',
+    };
   }
-  if (!input.isProcessAlive(record.pid)) {
+  const pid = record?.pid ?? (await input.readPortOwnerPid?.(port));
+  if (pid === undefined) return { stopped: false, reason: 'not-running' };
+  if (!input.isProcessAlive(pid)) {
     await removeMiniAppRuntimeRecord(input.pluginDataDir);
     return { stopped: false, reason: 'process-gone' };
   }
   const graceMs = input.graceMs ?? 2_000;
   const settleMs = input.settleMs ?? 4_000;
-  signal(input, record.pid, 'SIGTERM');
-  if (await waitForExit(input, record.pid, graceMs)) {
+  signal(input, pid, 'SIGTERM');
+  if (await waitForExit(input, pid, graceMs)) {
     await removeMiniAppRuntimeRecord(input.pluginDataDir);
     return { stopped: true };
   }
-  signal(input, record.pid, 'SIGKILL');
-  if (!(await waitForExit(input, record.pid, settleMs))) {
+  signal(input, pid, 'SIGKILL');
+  if (!(await waitForExit(input, pid, settleMs))) {
     return { stopped: false, reason: 'stop-failed' };
   }
   await removeMiniAppRuntimeRecord(input.pluginDataDir);

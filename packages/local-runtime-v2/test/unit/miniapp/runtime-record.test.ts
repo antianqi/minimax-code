@@ -58,6 +58,7 @@ describe('stopping a Mini App another client is running', () => {
 
     const result = await stopMiniAppRuntimeElsewhere({
       pluginDataDir: dir,
+      fallbackPort: 50_123,
       probeGuard: async () => true,
       isProcessAlive: (pid) => alive.has(pid),
       kill: (pid, name) => {
@@ -80,6 +81,7 @@ describe('stopping a Mini App another client is running', () => {
 
     const result = await stopMiniAppRuntimeElsewhere({
       pluginDataDir: dir,
+      fallbackPort: 50_123,
       probeGuard: async () => false,
       isProcessAlive: () => true,
       kill: (pid, name) => {
@@ -99,6 +101,7 @@ describe('stopping a Mini App another client is running', () => {
 
     const result = await stopMiniAppRuntimeElsewhere({
       pluginDataDir: dir,
+      fallbackPort: 50_123,
       probeGuard: async () => true,
       isProcessAlive: () => false,
       kill: (pid, name) => {
@@ -112,11 +115,78 @@ describe('stopping a Mini App another client is running', () => {
     expect(await readMiniAppRuntimeRecord(dir)).toBeUndefined();
   });
 
+  it('ends the process that holds the port when no runtime ever recorded one', async () => {
+    const dir = await pluginDataDir();
+    const alive = new Set([777]);
+    const signals: string[] = [];
+
+    // A Mini App an older client started has no record. The port still names
+    // the process, and the guard still proves that the port is a Mini App's.
+    const result = await stopMiniAppRuntimeElsewhere({
+      pluginDataDir: dir,
+      fallbackPort: 50_999,
+      probeGuard: async () => true,
+      readPortOwnerPid: async (port) => (port === 50_999 ? 777 : undefined),
+      isProcessAlive: (pid) => alive.has(pid),
+      kill: (pid, name) => {
+        signals.push(name);
+        if (name === 'SIGTERM') alive.delete(pid);
+      },
+      wait: async () => undefined,
+    });
+
+    expect(result).toEqual({ stopped: true });
+    expect(signals).toEqual(['SIGTERM']);
+  });
+
+  it('reports that nothing of another client is running when the port does not answer', async () => {
+    const dir = await pluginDataDir();
+    const signals: string[] = [];
+
+    const result = await stopMiniAppRuntimeElsewhere({
+      pluginDataDir: dir,
+      fallbackPort: 50_999,
+      probeGuard: async () => false,
+      readPortOwnerPid: async () => 777,
+      isProcessAlive: () => true,
+      kill: (pid, name) => {
+        signals.push(name);
+      },
+      wait: async () => undefined,
+    });
+
+    // Nothing is serving the port, so there is nothing of another client's to
+    // stop, and no process may be signalled on the strength of a port alone.
+    expect(result).toEqual({ stopped: false, reason: 'not-running' });
+    expect(signals).toEqual([]);
+  });
+
+  it('reports that nothing of another client is running when the port names no process', async () => {
+    const dir = await pluginDataDir();
+    const signals: string[] = [];
+
+    const result = await stopMiniAppRuntimeElsewhere({
+      pluginDataDir: dir,
+      fallbackPort: 50_999,
+      probeGuard: async () => true,
+      readPortOwnerPid: async () => undefined,
+      isProcessAlive: () => true,
+      kill: (pid, name) => {
+        signals.push(name);
+      },
+      wait: async () => undefined,
+    });
+
+    expect(result).toEqual({ stopped: false, reason: 'not-running' });
+    expect(signals).toEqual([]);
+  });
+
   it('reports that there is nothing to stop when no runtime ever recorded one', async () => {
     const dir = await pluginDataDir();
 
     const result = await stopMiniAppRuntimeElsewhere({
       pluginDataDir: dir,
+      fallbackPort: 50_123,
       probeGuard: async () => true,
       isProcessAlive: () => true,
       kill: () => undefined,
@@ -134,6 +204,7 @@ describe('stopping a Mini App another client is running', () => {
 
     const result = await stopMiniAppRuntimeElsewhere({
       pluginDataDir: dir,
+      fallbackPort: 50_123,
       probeGuard: async () => true,
       isProcessAlive: (pid) => alive.has(pid),
       kill: (pid, name) => {
@@ -155,6 +226,7 @@ describe('stopping a Mini App another client is running', () => {
 
     const result = await stopMiniAppRuntimeElsewhere({
       pluginDataDir: dir,
+      fallbackPort: 50_123,
       probeGuard: async () => true,
       isProcessAlive: () => true,
       kill: () => undefined,

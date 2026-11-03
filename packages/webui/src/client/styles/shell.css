@@ -455,6 +455,53 @@
     border: 0;
     background: var(--bg_grouped_secondary);
   }
+  /**
+   * The question a page's `ask` is waiting on.
+   *
+   * Above the frame rather than over it: the page's own document is opaque and owned by
+   * another origin, so the panel states what is being asked instead of drawing on it.
+   */
+  .webui-miniapp-approvals {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--spacing_8);
+    padding: var(--spacing_12);
+    border: 1px solid var(--border_light);
+    border-radius: var(--radius_12);
+    background: var(--bg_default_primary);
+  }
+  .webui-miniapp-approvals-question {
+    margin: 0;
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+  }
+  .webui-miniapp-approvals-arguments {
+    overflow: auto;
+    max-height: 120px;
+    margin: 0;
+    padding: var(--spacing_8);
+    border-radius: var(--radius_8);
+    background: var(--bg_grouped_secondary);
+    color: var(--text_default_secondary);
+    font-family: var(--font_mono);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .webui-miniapp-approvals-more {
+    margin: 0;
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+  }
+  .webui-miniapp-approvals-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing_8);
+    justify-content: flex-end;
+  }
   .webui-miniapp-view-state {
     display: flex;
     flex: 1 1 auto;

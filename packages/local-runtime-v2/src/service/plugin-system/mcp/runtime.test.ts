@@ -126,3 +126,59 @@ describe('The Host reaches a Mini App managed MCP server with its own loopback c
     expect(listTools.mock.calls[0]?.[1]).toBeUndefined();
   });
 });
+
+describe('The page channel reads the servers this Host serves', () => {
+  it('names the served servers, once each', async () => {
+    const { pool } = recordingPool();
+    const runtime = new PluginMcpRuntime({ pool });
+
+    await runtime.reconcile([ordinaryPluginServer('notes'), ordinaryPluginServer('docs')], {
+      inventoryMode: 'discover',
+    });
+
+    expect(runtime.pageServers()).toEqual(['notes', 'docs']);
+  });
+
+  it('lists one server tool with its description and no credential of its own', async () => {
+    const { pool } = recordingPool();
+    const runtime = new PluginMcpRuntime({ pool });
+
+    await runtime.reconcile([ordinaryPluginServer()], { inventoryMode: 'discover' });
+
+    expect(await runtime.listPageTools('notes')).toEqual([
+      { name: 'fablecut_status', description: 'Synthetic tool' },
+    ]);
+  });
+
+  it('answers nothing for a server it does not serve', async () => {
+    const { pool } = recordingPool();
+    const runtime = new PluginMcpRuntime({ pool });
+
+    await runtime.reconcile([ordinaryPluginServer()], { inventoryMode: 'discover' });
+
+    expect(await runtime.listPageTools('gone')).toEqual([]);
+  });
+
+  it('calls a page tool through the same pool, with the managed credential', async () => {
+    const { pool, callTool } = recordingPool();
+    const runtime = new PluginMcpRuntime({
+      pool,
+      resolveMiniAppTokenOverrides: hostCredentialResolver(),
+    });
+    await runtime.reconcile([managedMiniAppServer()], { inventoryMode: 'discover-managed' });
+
+    const result = await runtime.callPageTool({
+      serverName: 'cutline',
+      name: 'fablecut_status',
+      arguments: { scene: 1 },
+    });
+
+    expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+    expect(callTool).toHaveBeenCalledTimes(1);
+    const call = callTool.mock.calls[0] as unknown[] | undefined;
+    expect(call?.[1]).toBe('fablecut_status');
+    expect(call?.[2]).toEqual({ scene: 1 });
+    const overrides = call?.[3] as { headers?: Record<string, string> } | undefined;
+    expect(overrides?.headers?.[MINIAPP_LOOPBACK_TOKEN_HEADER]).toBe(HOST_LOOPBACK_CREDENTIAL);
+  });
+});

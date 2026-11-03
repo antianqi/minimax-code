@@ -25,8 +25,11 @@ import { MINIAPP_CAPABILITY_ABSENT } from "../../src/runtime/port.js";
 import type { WebuiOperationPort } from "../../src/server/operation/bind-handlers.js";
 import { createMiniAppHandlerEntries } from "../../src/server/operation/handlers/miniapp.js";
 import {
+  callMiniAppToolOperation,
   listMiniAppsOperation,
+  listMiniAppPermissionsOperation,
   openMiniAppOperation,
+  setMiniAppPermissionOperation,
   stopMiniAppOperation,
   watchMiniAppPresentationOperation,
   watchMiniAppPresenterOperation,
@@ -297,6 +300,69 @@ describe("the Mini App descriptors", () => {
         body: { pluginId: "fixture.miniapp" },
       });
     }
+  });
+
+  it("requires only a pluginId on the permission list", () => {
+    expect(listMiniAppPermissionsOperation.validate({ pluginId: " fixture.miniapp " })).toEqual({
+      ok: true,
+      body: { pluginId: "fixture.miniapp" },
+    });
+    expect(listMiniAppPermissionsOperation.validate(undefined)).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: "listMiniAppPermissions body must be an object",
+    });
+  });
+
+  it("requires a bounded permission id and a boolean on the permission writer", () => {
+    const operation = setMiniAppPermissionOperation;
+    // The message text is part of the behaviour: a relaxed predicate must not read as a pass.
+    expect(operation.validate({ pluginId: "fixture.miniapp" })).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires a non-empty permission`,
+    });
+    expect(operation.validate({ pluginId: "fixture.miniapp", permission: 7 })).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires a non-empty permission`,
+    });
+    expect(
+      operation.validate({ pluginId: "fixture.miniapp", permission: "x".repeat(201) }),
+    ).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} permission must be at most 200 characters`,
+    });
+    expect(
+      operation.validate({ pluginId: "fixture.miniapp", permission: "device:microphone" }),
+    ).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires a boolean enabled`,
+    });
+    // A string that reads as a boolean is not one: the switch must not be guessed at.
+    expect(
+      operation.validate({
+        pluginId: "fixture.miniapp",
+        permission: "device:microphone",
+        enabled: "false",
+      }),
+    ).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires a boolean enabled`,
+    });
+    expect(
+      operation.validate({
+        pluginId: " fixture.miniapp ",
+        permission: " device:microphone ",
+        enabled: false,
+      }),
+    ).toEqual({
+      ok: true,
+      body: { pluginId: "fixture.miniapp", permission: "device:microphone", enabled: false },
+    });
   });
 
   it("accepts an origin-relative path on the open and refuses the rest", () => {
@@ -866,5 +932,153 @@ describe("watchMiniAppPresenter", () => {
     });
     controller.abort();
     expect(await frames.next()).toMatchObject({ done: true });
+  });
+});
+
+describe("the Mini App permission operations on the wire", () => {
+  const permissionPort = () => {
+    const written: { pluginId: string; permission: string; enabled: boolean }[] = [];
+    const port = {
+      listMiniAppPermissions: async (pluginId: string) => ({
+        pluginId,
+        source: "official" as const,
+        items: [{ id: "device:microphone", enabled: true }],
+      }),
+      setMiniAppPermission: async (request: {
+        pluginId: string;
+        permission: string;
+        enabled: boolean;
+      }) => {
+        written.push({ ...request });
+        return {
+          pluginId: request.pluginId,
+          source: "official" as const,
+          items: [{ id: request.permission, enabled: request.enabled }],
+        };
+      },
+    } as unknown as WebuiOperationPort;
+    return { port, written };
+  };
+
+  it("answers the declared list a row asked for", async () => {
+    const { port } = permissionPort();
+    const call = createHandlers(port);
+
+    expect(
+      await call(listMiniAppPermissionsOperation.name, { pluginId: "minimax-pet" }),
+    ).toEqual({
+      pluginId: "minimax-pet",
+      source: "official",
+      items: [{ id: "device:microphone", enabled: true }],
+    });
+  });
+
+  it("forwards a switch and answers the list the runtime now holds", async () => {
+    const { port, written } = permissionPort();
+    const call = createHandlers(port);
+
+    expect(
+      await call(setMiniAppPermissionOperation.name, {
+        pluginId: "minimax-pet",
+        permission: "device:microphone",
+        enabled: false,
+      }),
+    ).toEqual({
+      pluginId: "minimax-pet",
+      source: "official",
+      items: [{ id: "device:microphone", enabled: false }],
+    });
+    expect(written).toEqual([
+      { pluginId: "minimax-pet", permission: "device:microphone", enabled: false },
+    ]);
+  });
+
+  it("reports the capability missing rather than an empty list", async () => {
+    // A host without the permission methods must say so: an empty list would read
+    // as "this Mini App declares nothing", which is a different answer.
+    const call = createHandlers({} as unknown as WebuiOperationPort);
+
+    await expect(
+      call(listMiniAppPermissionsOperation.name, { pluginId: "minimax-pet" }),
+    ).rejects.toMatchObject({ code: WebuiErrorCode.capabilityUnavailable });
+  });
+});
+
+describe("the Mini App tool operation on the wire", () => {
+  it("requires a method this channel has, and nothing else for a listing", () => {
+    const operation = callMiniAppToolOperation;
+
+    expect(operation.validate({ pluginId: "minimax-pet" })).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires a method`,
+    });
+    expect(operation.validate({ pluginId: "minimax-pet", method: "invoke" })).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} method must be list, request or call`,
+    });
+    expect(operation.validate({ pluginId: "minimax-pet", method: "list" })).toEqual({
+      ok: true,
+      body: { pluginId: "minimax-pet", method: "list" },
+    });
+  });
+
+  it("requires a tool name for a call and bounded, non-empty names for a request", () => {
+    const operation = callMiniAppToolOperation;
+
+    expect(operation.validate({ pluginId: "minimax-pet", method: "call" })).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires a tool name`,
+    });
+    expect(operation.validate({ pluginId: "minimax-pet", method: "request", names: [] })).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires between 1 and 10 tool names`,
+    });
+    expect(
+      operation.validate({
+        pluginId: "minimax-pet",
+        method: "request",
+        names: Array.from({ length: 11 }, (_, index) => `tool-${index}`),
+      }),
+    ).toEqual({
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: `${operation.name} body requires between 1 and 10 tool names`,
+    });
+  });
+
+  it("answers a refusal as a body, because the page has to receive its code", async () => {
+    const call = createHandlers({
+      miniAppToolCall: async () => {
+        throw Object.assign(new Error("refused"), { code: "TOOL_NOT_PERMITTED" });
+      },
+    } as unknown as WebuiOperationPort);
+
+    expect(
+      await call(callMiniAppToolOperation.name, {
+        pluginId: "minimax-pet",
+        method: "call",
+        name: "mcp__files__read",
+        arguments: {},
+      }),
+    ).toEqual({ ok: false, code: "TOOL_NOT_PERMITTED" });
+  });
+
+  it("forwards the answer the channel gave", async () => {
+    const delivered: unknown[] = [];
+    const call = createHandlers({
+      miniAppToolCall: async (request: unknown) => {
+        delivered.push(request);
+        return { tools: [{ name: "mcp__files__read", decision: "allow" }] };
+      },
+    } as unknown as WebuiOperationPort);
+
+    expect(
+      await call(callMiniAppToolOperation.name, { pluginId: "minimax-pet", method: "list" }),
+    ).toEqual({ ok: true, value: { tools: [{ name: "mcp__files__read", decision: "allow" }] } });
+    expect(delivered).toEqual([{ pluginId: "minimax-pet", method: "list" }]);
   });
 });

@@ -211,12 +211,13 @@ export function installFixtureTransport() {
     canReapply: false,
     fileChanges: [{ file: "a.ts", additions: 2, deletions: 1 }],
   };
-  const workspaceReviewSummary = {
+  let workspaceReviewSummary = {
     repositoryId: "repo-1",
     reviewSnapshotId: "snap-1",
     files: [{ fileId: "a.ts", path: "a.ts", additions: 2, deletions: 1 }],
     totals: { files: 1, additions: 2, deletions: 1 },
   };
+  let workspaceReviewDiffs = [];
   // The browser family.
   //
   // The workspace's browser half -- the strip's web tabs, the toolbar, the
@@ -503,6 +504,10 @@ export function installFixtureTransport() {
       return { ...clone(turnDiff), success: true };
     }
     if (operation === "getWorkspaceReviewSummary") return clone(workspaceReviewSummary);
+    if (operation === "listWorkspaceReviewFileDiffs") return {
+      reviewSnapshotId: body?.reviewSnapshotId ?? workspaceReviewSummary.reviewSnapshotId,
+      diffs: (body?.fileIds ?? []).map((fileId) => workspaceReviewDiffs.find((entry) => entry.fileId === fileId) ?? { fileId }),
+    };
     // ---- the browser family
     if (operation === "getBrowserAuthorization") return clone(browserAuthorization);
     if (operation === "setBrowserAuthorization") {
@@ -987,6 +992,10 @@ export function installFixtureTransport() {
     archived() { return [...archivedIds]; },
     /** What the runtime answers for a turn's diff, and what a revert returns. */
     setTurnDiff(next) { turnDiff = clone(next); },
+    setWorkspaceReview(summary, diffs) {
+      workspaceReviewSummary = clone(summary);
+      workspaceReviewDiffs = clone(diffs);
+    },
     /** Answer this operation with an empty object, as an unknown op would be. */
     unanswer(operation) { unanswered.add(operation); },
     // The tree projection the rail and the composer both read. Mutable for the

@@ -2,7 +2,7 @@
 // file lookup/filter helpers. A different implementer works in this file; the
 // container in `WorkspacePanels.tsx` only imports from it.
 
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.js";
 import { WebuiIconChevronRight, WebuiIconFile } from "../../../shell/icons.js";
 import { WebuiButton } from "../../../ui/button.js";
@@ -41,7 +41,7 @@ function FileTreeRowMeta({ file }: { readonly file: WebuiWorkspaceFile }): React
   return <span className="webui-file-tree-meta shrink-0 text-size_12 leading-line_height_16 text-text_default_tertiary">{parts.join(" · ")}</span>;
 }
 
-export function FileTree({ files, onOpen, expandedPaths, loadingPaths, directoryErrors, onToggle, selectedPath }: { readonly files: readonly WebuiWorkspaceFile[]; readonly onOpen: (file: WebuiWorkspaceFile) => void; readonly expandedPaths: ReadonlySet<string>; readonly loadingPaths: ReadonlySet<string>; readonly directoryErrors: Readonly<Record<string, string>>; readonly onToggle: (file: WebuiWorkspaceFile) => void; readonly selectedPath?: string }): ReactElement {
+function FileTreeView({ files, onOpen, expandedPaths, loadingPaths, directoryErrors, onToggle, selectedPath }: { readonly files: readonly WebuiWorkspaceFile[]; readonly onOpen: (file: WebuiWorkspaceFile) => void; readonly expandedPaths: ReadonlySet<string>; readonly loadingPaths: ReadonlySet<string>; readonly directoryErrors: Readonly<Record<string, string>>; readonly onToggle: (file: WebuiWorkspaceFile) => void; readonly selectedPath?: string }): ReactElement {
   return <div className="webui-file-tree">{files.map((file) => {
     const expanded = expandedPaths.has(file.path);
     return <div key={file.path}>
@@ -53,7 +53,7 @@ export function FileTree({ files, onOpen, expandedPaths, loadingPaths, directory
         ) : <WebuiIconFile className="inline size-3" />} <span className="min-w-0 flex-1 truncate">{file.name}</span>
         <FileTreeRowMeta file={file} />
       </WebuiButton>
-      {file.type === "directory" ? <WebuiDisclosure as="div" open={expanded} className="webui-file-tree-disclosure">
+      {file.type === "directory" ? <WebuiDisclosure as="div" open={expanded} mountOnOpen className="webui-file-tree-disclosure">
         <div className="webui-file-tree-children">
           {/* 目录在读取中是一条播报；契约的 div 仍带 role="status"，
               `.webui-file-tree-children > [role="status"]` 继续命中。 */}
@@ -66,3 +66,5 @@ export function FileTree({ files, onOpen, expandedPaths, loadingPaths, directory
     </div>;
   })}</div>;
 }
+
+export const FileTree = memo(FileTreeView);

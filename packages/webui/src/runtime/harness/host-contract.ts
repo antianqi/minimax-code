@@ -642,6 +642,43 @@ export interface WebuiRuntimeCliService {
     request: WebuiHostRequest<"stopMiniApp">,
   ): Promise<HostResult<"stopMiniApp">>;
   /**
+   * One package's declared Mini App permissions with the stored switches.
+   *
+   * Optional on its own: the adapter refuses only the permission operations when
+   * these are absent, because a host that cannot answer this still has a catalogue
+   * worth showing.
+   */
+  listMiniAppPermissions?(
+    pluginId: string,
+  ): Promise<HostResult<"listMiniAppPermissions">>;
+  /** Stores one switch; the answer is the list as it now stands. */
+  setMiniAppPermission?(
+    input: WebuiHostRequest<"setMiniAppPermission">,
+  ): Promise<HostResult<"setMiniAppPermission">>;
+  /**
+   * One request from a framed page's tool channel.
+   *
+   * Absent when the host composed no channel, which is a different answer from a host
+   * whose channel refuses: the first is `capability_unavailable`, the second keeps the
+   * runtime's own code in the body.
+   */
+  miniAppToolCall?(input: {
+    readonly pluginId: string;
+    readonly method: "list" | "request" | "call";
+    readonly name?: string;
+    readonly names?: readonly string[];
+    readonly arguments?: unknown;
+  }): Promise<HostResult<"miniAppToolCall">>;
+  /**
+   * The tool prompts waiting for a person.
+   *
+   * Taken from the runtime's own declaration: the adapter converts its items into this
+   * wire's DTO, and a hand-written copy here would be a copy that drifts.
+   */
+  watchMiniAppToolApprovals?: CliService["watchMiniAppToolApprovals"];
+  /** One answer to one prompt. */
+  replyMiniAppToolApproval?: CliService["replyMiniAppToolApproval"];
+  /**
    * The Mini App Agent facade.
    *
    * Present together or absent together: the runtime composes all nine from one

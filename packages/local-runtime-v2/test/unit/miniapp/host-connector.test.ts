@@ -32,6 +32,7 @@ import {
 import type {
   MiniAppAgentPolicy,
   MiniAppIpcMessage,
+  MiniAppPermissionSwitchPort,
 } from '../../../src/service/miniapp/contracts.js';
 import {
   createMiniAppHostConnectorRuntimeClient,
@@ -76,6 +77,7 @@ function bridge(
     readonly agentGateway?: MiniAppAgentGateway;
     readonly providers?: readonly string[];
     readonly agentPolicy?: MiniAppAgentPolicy;
+    readonly permissionSwitches?: MiniAppPermissionSwitchPort;
     readonly logger?: { warn(fields: Record<string, unknown>, message: string): void };
   } = {},
 ) {
@@ -3450,5 +3452,85 @@ describe('Mini App Host Connector admission budget', () => {
     const replyPending = Array.from({ length: 16 }, () => ({ method: 'agent.reply' as const }));
     expect(hasHostConnectorRequestCapacity('agent.reply', replyPending)).toBe(false);
     expect(hasHostConnectorRequestCapacity('connector.call', replyPending)).toBe(true);
+  });
+});
+
+describe('Mini App Host Connector permission switches', () => {
+  function weatherGateway(call: HostGatewayFixture['call'] = vi.fn()): {
+    readonly gateway: HostGatewayFixture;
+  } {
+    const handle = Object.freeze({}) as ConnectorToolHandle;
+    const tool = {
+      handle,
+      provider: 'weather',
+      providerToolName: 'forecast',
+      runtimeToolName: 'weather_forecast',
+      inputSchemaJson: '{"type":"object"}',
+    };
+    return {
+      gateway: {
+        // The real gateway filters by the allowlist it is handed; a fixture that returned every
+        // tool regardless would make the switch invisible to these tests.
+        list: vi.fn(async ({ providerAllowlist }: { readonly providerAllowlist: readonly string[] }) => ({
+          tools: providerAllowlist.includes('weather') ? [tool] : [],
+          providerFailures: [],
+          partial: false,
+        })),
+        call,
+        releaseHostProcess: vi.fn(),
+      },
+    };
+  }
+
+  it('drops a provider the user turned off from the listing', async () => {
+    const { gateway } = weatherGateway();
+    const { runtime, session } = bridge(gateway, {
+      permissionSwitches: { isEnabled: () => false },
+    });
+    session.activate();
+
+    // The child never learns a tool the switch does not allow, so it cannot call one either.
+    await expect(runtime.client.list()).resolves.toMatchObject({ tools: [] });
+    expect(gateway.list).toHaveBeenCalledWith(
+      expect.objectContaining({ providerAllowlist: [] }),
+    );
+  });
+
+  it('turns a provider back on without a restart', async () => {
+    let enabled = false;
+    const { gateway } = weatherGateway();
+    const { runtime, session } = bridge(gateway, {
+      permissionSwitches: { isEnabled: () => enabled },
+    });
+    session.activate();
+
+    await expect(runtime.client.list()).resolves.toMatchObject({ tools: [] });
+    enabled = true;
+    await expect(runtime.client.list()).resolves.toMatchObject({
+      tools: [{ toolRef: 'tool-ref-1', provider: 'weather', name: 'forecast' }],
+    });
+  });
+
+  it('refuses a call whose provider was turned off after the listing', async () => {
+    const call = vi.fn();
+    const { gateway } = weatherGateway(call);
+    let enabled = true;
+    const { runtime, session } = bridge(gateway, {
+      permissionSwitches: { isEnabled: () => enabled },
+    });
+    session.activate();
+
+    const inventory = await runtime.client.list();
+    const tool = inventory.tools[0];
+    if (!tool) throw new Error('Expected Host Connector inventory tool');
+
+    enabled = false;
+    // A stale reference is the one answer that tells the page to list again, and the listing is
+    // what stops offering the provider.
+    await expect(runtime.client.call(tool.toolRef, {})).rejects.toMatchObject({
+      code: 'TOOL_REF_STALE',
+      disposition: 'not_dispatched',
+    });
+    expect(call).not.toHaveBeenCalled();
   });
 });

@@ -137,6 +137,7 @@ import {
   type InitializedMcpService,
   type McpSettingsService,
 } from "./service/mcp/index.js";
+import { createMiniAppToolRulePort } from "./service/miniapp/tool-rules.js";
 import {
   composeMiniAppRuntimeCapability,
   createDeferredRuntimeOwnersLifecycle,
@@ -558,6 +559,8 @@ export async function createRuntimeServices(
     plugins: owners.plugin.plugin,
     pluginControl: owners.plugin,
     miniApp: owners.miniAppComposition.services.miniApp,
+    miniAppTools: owners.miniAppComposition.services.miniAppTools,
+    miniAppApprovals: owners.miniAppComposition.services.miniAppToolApprovals,
     // The composed facade carries the client-facing agent operations, never the gateway itself.
     miniAppAgent: owners.miniAppAgent,
     planEntryEnabled,
@@ -717,6 +720,23 @@ async function initializeRuntimeServiceOwners(
       deactivateLocalPluginHooks,
     );
     bindTaskAgentBindingCapture(input, { plugin, mcp }, pluginLogger);
+    // The Agent gateway is assembled before this service, so this is where the switches start
+    // existing for it: a stored change from here on is read by the next request.
+    if (miniAppAgent && plugin.miniAppPermissionSwitches) {
+      miniAppAgent.attachPermissionSwitches(plugin.miniAppPermissionSwitches);
+    }
+    // A page has no turn, so its tool calls are judged against the global rules alone.
+    // Built here because this is where the stored rules and the stored mode meet.
+    const permissionRules = input.options.compatibility.peripherals?.permissions;
+    const toolRules =
+      permissionRules?.listGlobalRules && permissionRules.addGlobalAllowRule
+        ? createMiniAppToolRulePort({
+          readPermissionMode: () => input.product.preparation.configBuilder.config().permissionMode,
+          readDataDir: () => input.options.dataDir,
+          listGlobalRules: () => permissionRules.listGlobalRules!(),
+          addGlobalAllowRule: (name) => permissionRules.addGlobalAllowRule!(name),
+        })
+        : undefined;
     miniAppComposition = await composeMiniAppRuntimeCapability({
       options: miniAppOptions
         ? {
@@ -731,6 +751,12 @@ async function initializeRuntimeServiceOwners(
       nowMs: input.nowMs,
       plugin,
       ...(miniAppAgent ? { agentGateway: miniAppAgent } : {}),
+      // The page's tool channel records into the same log the Connector gateway writes to:
+      // one audit sink for the Host's capabilities, not one per channel.
+      toolAudit: {
+        record: (event) => pluginLogger.info({ ...event }, "Mini App tool audit"),
+      },
+      ...(toolRules ? { toolRules } : {}),
       readyOwners: input.readyOwners,
       closeOwners: input.closeOwners,
     });

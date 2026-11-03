@@ -137,6 +137,91 @@ export function isMiniAppDeviceAccessItem(value: unknown): value is MiniAppDevic
   );
 }
 
+/** The Agent capabilities a Mini App may declare in `agentAccess`. */
+export const MINIAPP_AGENT_ACCESS_ITEMS = Object.freeze([
+  'session.run',
+  'session.read',
+] as const);
+
+export type MiniAppAgentAccessItem = (typeof MINIAPP_AGENT_ACCESS_ITEMS)[number];
+
+export function isMiniAppAgentAccessItem(value: unknown): value is MiniAppAgentAccessItem {
+  return (
+    typeof value === 'string' && (MINIAPP_AGENT_ACCESS_ITEMS as readonly string[]).includes(value)
+  );
+}
+
+/** The one Host-tool ability a Mini App may declare in `toolAccess`. */
+export const MINIAPP_TOOL_ACCESS_ITEMS = Object.freeze(['call'] as const);
+
+export type MiniAppToolAccessItem = (typeof MINIAPP_TOOL_ACCESS_ITEMS)[number];
+
+export function isMiniAppToolAccessItem(value: unknown): value is MiniAppToolAccessItem {
+  return typeof value === 'string' && (MINIAPP_TOOL_ACCESS_ITEMS as readonly string[]).includes(value);
+}
+
+/** Domains a switchable Mini App permission can belong to. */
+export const MINIAPP_PERMISSION_DOMAINS = Object.freeze([
+  'connector',
+  'agent',
+  'tool',
+  'device',
+] as const);
+
+export type MiniAppPermissionDomain = (typeof MINIAPP_PERMISSION_DOMAINS)[number];
+
+const MINIAPP_CONNECTOR_PROVIDER = /^[a-z0-9_-]{1,64}$/u;
+
+/**
+ * The id one declared item is stored and compared by: `<domain>:<item>`.
+ *
+ * Written in one place because three layers meet on it — the manifest reader records items, the
+ * switch store persists them, and a client sends them back — and a second spelling would make a
+ * stored decision silently stop matching the item it was about.
+ */
+export function miniAppPermissionId(domain: MiniAppPermissionDomain, item: string): string {
+  return `${domain}:${item}`;
+}
+
+/** An item is valid when its domain admits it; `undefined` means the id names nothing. */
+function isMiniAppPermissionItem(domain: MiniAppPermissionDomain, item: string): boolean {
+  switch (domain) {
+    case 'connector':
+      return MINIAPP_CONNECTOR_PROVIDER.test(item);
+    case 'agent':
+      return isMiniAppAgentAccessItem(item);
+    case 'tool':
+      return isMiniAppToolAccessItem(item);
+    case 'device':
+      return isMiniAppDeviceAccessItem(item);
+    default:
+      return false;
+  }
+}
+
+export interface ParsedMiniAppPermissionId {
+  readonly id: string;
+  readonly domain: MiniAppPermissionDomain;
+  readonly item: string;
+}
+
+/**
+ * Reads an id a client sent back.
+ *
+ * The whole string is the id, so it round-trips unchanged; the domain and item are read out of it
+ * for the store's primary key. An id that names no admissible item is refused here rather than
+ * stored and never matched.
+ */
+export function parseMiniAppPermissionId(value: string): ParsedMiniAppPermissionId | undefined {
+  const separator = value.indexOf(':');
+  if (separator <= 0 || separator === value.length - 1) return undefined;
+  const domain = value.slice(0, separator);
+  const item = value.slice(separator + 1);
+  if (!(MINIAPP_PERMISSION_DOMAINS as readonly string[]).includes(domain)) return undefined;
+  if (!isMiniAppPermissionItem(domain as MiniAppPermissionDomain, item)) return undefined;
+  return { id: value, domain: domain as MiniAppPermissionDomain, item };
+}
+
 /** Bounds one untrusted page request; input behavior remains owned by the chat input. */
 export const MINIAPP_COMPOSER_MAX_TEXT_LENGTH = 100_000;
 

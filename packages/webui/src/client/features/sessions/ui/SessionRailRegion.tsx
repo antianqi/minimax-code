@@ -1,12 +1,13 @@
 import type { ChangeEvent, ComponentProps, ReactElement, ReactNode, RefObject } from "react";
 import { WebuiProjectList } from "./SessionRail.js";
 import { RailRow } from "./RailRow.js";
-import { WebuiIconBrand, WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSchedule, WebuiIconSessionImport, WebuiIconSites } from "../../../shell/icons.js";
+import { WebuiIconBrand, WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSchedule, WebuiIconSessionImport } from "../../../shell/icons.js";
 import { IconSearch } from "@tabler/icons-react";
 import { WebuiFileInput, WebuiSearchField } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiPage } from "../../../ui/page.js";
+import { MiniAppLauncher } from "../../miniapp/ui/MiniAppPicker.public.js";
 
 type ProjectListProps = ComponentProps<typeof WebuiProjectList>;
 
@@ -34,6 +35,7 @@ export function SessionRailRegion(props: {
   readonly openPlugins: () => void;
   readonly openScheduling: () => void;
   readonly openRemote: () => void;
+  readonly selectedSessionId?: string;
   readonly projectList: ProjectListProps;
   readonly hasSearchResults: boolean;
   readonly footer?: ReactNode;
@@ -54,8 +56,7 @@ export function SessionRailRegion(props: {
       {props.collapsed
         ? <div className="h-[50px] flex-shrink-0" aria-hidden="true" />
         : null}
-      {!props.collapsed ? <>
-        <div data-webui-rail-brand="true">
+      {!props.collapsed ? <div data-webui-rail-brand="true">
           <div className="webui-rail-primary-action flex-shrink-0 px-4 pb-2" data-webui-rail-fixed-row="true">
             <img className="webui-brand-create-mascot" src="/assets/img/minimax-octopus-rail.png" alt="" aria-hidden="true" />
             <WebuiButton
@@ -80,8 +81,8 @@ export function SessionRailRegion(props: {
               </span>
             </WebuiButton>
           </div>
-        </div>
-        {props.searchOpen ? <div className="flex-shrink-0 px-4 pb-px pt-1" data-webui-rail-fixed-row="true">
+        </div> : null}
+        {!props.collapsed && props.searchOpen ? <div className="flex-shrink-0 px-4 pb-px pt-1" data-webui-rail-fixed-row="true">
           <WebuiSearchField
             icon={<IconSearch />}
             id="webui-rail-search"
@@ -94,7 +95,7 @@ export function SessionRailRegion(props: {
             onKeyDown={(event) => { if (event.key !== "Escape") return; event.preventDefault(); props.closeSearch(); }}
           />
         </div> : null}
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1" hidden={props.collapsed}>
           <div className="webui-rail-scroll h-full overflow-x-hidden overflow-y-auto px-4">
             <WebuiStack gap="hairline" className="pb-3">
               <WebuiFileInput ref={props.importInputRef} accept=".json,application/json" data-webui-session-import-input="true" aria-label="导入会话文件" onChange={props.onImportPicked} />
@@ -105,7 +106,7 @@ export function SessionRailRegion(props: {
                 <div className="webui-rail-group-label">工作区</div>
                 <RailRow label="插件" icon={<WebuiIconPlugins />} active={props.pluginManagementOpen} onSelect={props.openPlugins} />
                 <RailRow label="定时任务" icon={<WebuiIconSchedule />} active={props.schedulingOpen} onSelect={props.openScheduling} />
-                <RailRow label="网站" icon={<WebuiIconSites />} inert />
+                <MiniAppLauncher sessionId={props.selectedSessionId} />
                 <RailRow label="远程" icon={<WebuiIconRemote />} active={props.remoteOpen} onSelect={props.openRemote} />
               </div>
             </WebuiStack>
@@ -114,7 +115,7 @@ export function SessionRailRegion(props: {
           </div>
           <div className="webui-scroll-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6" aria-hidden="true" data-webui-scroll-fade="true" />
         </div>
-      </> : null}
+
       {props.footer}
     </WebuiPage>
   );

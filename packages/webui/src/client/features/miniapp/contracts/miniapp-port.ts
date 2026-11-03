@@ -19,6 +19,7 @@
 
 import type {
   WebuiMiniAppCatalogue,
+  WebuiMiniAppPermissionList,
   WebuiMiniAppPresentationState,
   WebuiMiniAppPresentationIntent,
   WebuiMiniAppView,
@@ -29,6 +30,11 @@ import type {
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../../../shared/contracts/miniapp-agent.js";
+import type {
+  WebuiMiniAppToolApprovalAnswer,
+  WebuiMiniAppToolApprovalFrame,
+  WebuiMiniAppToolResult,
+} from "../../../../shared/contracts/miniapp-tools.js";
 
 export interface MiniAppPort {
   /** Follow the host-owned agent presentation request and enact it in the shell. */
@@ -45,6 +51,24 @@ export interface MiniAppPort {
    * row says about presentation is not something the runtime knows.
    */
   readonly listMiniApps?: () => Promise<WebuiMiniAppCatalogue>;
+  /**
+   * One package's declared Mini App permissions with the stored switches.
+   *
+   * Optional with the rest of the cell. The items come from the installed manifest,
+   * so a package that dropped an item is simply no longer asked about it.
+   */
+  readonly listMiniAppPermissions?: (pluginId: string) => Promise<WebuiMiniAppPermissionList>;
+  /**
+   * Stores one switch; the answer is the list as it now stands.
+   *
+   * A refusal is the runtime's: an id the package does not declare is
+   * `MINIAPP_PERMISSION_UNKNOWN`, reported rather than retried.
+   */
+  readonly setMiniAppPermission?: (request: {
+    readonly pluginId: string;
+    readonly permission: string;
+    readonly enabled: boolean;
+  }) => Promise<WebuiMiniAppPermissionList>;
   /**
    * Starts one Mini App and answers with the loopback URL the panel frames.
    *
@@ -109,6 +133,35 @@ export interface MiniAppPort {
   readonly miniAppAgentCall?: (
     request: WebuiMiniAppAgentCallRequest,
   ) => Promise<WebuiMiniAppAgentCallResponse>;
+  /**
+   * One request from a framed page's tool channel.
+   *
+   * The page names a method and a tool; `pluginId` is this client's, taken from the view
+   * that framed the document. The answer is already the page's shape (`ok` / `ok: false`
+   * with the runtime's code), so nothing here interprets a refusal.
+   */
+  readonly miniAppToolCall?: (request: {
+    readonly pluginId: string;
+    readonly method: "list" | "request" | "call";
+    readonly name?: string;
+    readonly names?: readonly string[];
+    readonly arguments?: unknown;
+  }) => Promise<WebuiMiniAppToolResult>;
+  /**
+   * The tool prompts waiting for a person, pushed whenever the list changes.
+   *
+   * A stream: a prompt appears while a page's call is already waiting, so a client that
+   * only read once would never see it. The first frame is the list as it stands.
+   */
+  readonly watchMiniAppToolApprovals?: (
+    request: undefined,
+    onFrame: (frame: WebuiMiniAppToolApprovalFrame) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
+  /** One answer to one prompt. An id that is gone is the runtime's refusal. */
+  readonly replyMiniAppToolApproval?: (
+    input: WebuiMiniAppToolApprovalAnswer,
+  ) => Promise<{ readonly success: true }>;
   /** The standalone page's URL, token included. Built by the wire, not the UI. */
   readonly miniappStandaloneUrl?: (request: {
     readonly pluginId: string;

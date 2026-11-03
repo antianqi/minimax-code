@@ -1,4 +1,5 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import { check, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const pluginOfficialStates = sqliteTable(
   'local_runtime_plugin_official_state',
@@ -15,3 +16,28 @@ export const pluginDisabledLocalRoots = sqliteTable('local_runtime_plugin_local_
   canonicalRoot: text('canonical_root').primaryKey(),
   updatedAtMs: integer('updated_at_ms').notNull(),
 });
+
+/**
+ * The Mini App permissions a person turned off, one row per declared item.
+ *
+ * A missing row is enabled, so install, update and a newly declared item all read as on without a
+ * seeding step. `permission` is the `domain:item` id from `@mavis/shared/miniapp-surface`.
+ */
+export const pluginMiniAppPermissions = sqliteTable(
+  'local_runtime_plugin_miniapp_permission',
+  {
+    pluginId: text('plugin_id').notNull(),
+    pluginSource: text('plugin_source', { enum: ['local', 'official'] }).notNull(),
+    permission: text('permission').notNull(),
+    enabled: integer('enabled').notNull(),
+    updatedAtMs: integer('updated_at_ms').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.pluginId, table.pluginSource, table.permission] }),
+    check(
+      'local_runtime_plugin_miniapp_permission_source',
+      sql`${table.pluginSource} IN ('local', 'official')`,
+    ),
+    check('local_runtime_plugin_miniapp_permission_enabled', sql`${table.enabled} IN (0, 1)`),
+  ],
+);

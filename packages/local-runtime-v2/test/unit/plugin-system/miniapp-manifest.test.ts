@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { readOptionalMiniAppContribution } from '../../../src/service/plugin-system/plugin/package/miniapp/reader.js';
+import { hostWithholdsMiniApp } from '../../../src/service/plugin-system/plugin/package/miniapp/engines.js';
 
 const roots: string[] = [];
 
@@ -190,5 +191,32 @@ describe('Mini App manifest permissions of the shipped generation', () => {
       code: 'MINIAPP_ENGINES_INVALID',
       message: 'MINIAPP_ENGINES_INVALID: engines.mcode must be ">=MAJOR.MINOR.PATCH"',
     });
+  });
+});
+
+describe('the Host releases a Mini App requires', () => {
+  // `engines.mcode` is the package's statement about which build it needs. Only a
+  // parsable Host release is ever compared: a dev build without a version, or no
+  // requirement at all, must never withhold an app.
+  it.each([
+    ['an older patch of the same line', '3.1.5', '>=3.1.6', true],
+    ['the exact release it asked for', '3.1.6', '>=3.1.6', false],
+    ['a newer minor', '3.2.0', '>=3.1.6', false],
+    ['a newer major', '4.0.0', '>=3.1.6', false],
+    ['an older minor regardless of patch', '3.0.9', '>=3.1.6', true],
+    ['an older major regardless of minor', '2.9.9', '>=3.1.6', true],
+    // A pre-release counts as the release it precedes.
+    ['a pre-release of the required release', '3.1.6-beta.1', '>=3.1.6', false],
+    ['a pre-release below it', '3.1.6-rc.1', '>=3.1.7', true],
+  ] as const)('decides %s', (_label, hostVersion, requirement, withholds) => {
+    expect(hostWithholdsMiniApp(hostVersion, requirement)).toBe(withholds);
+  });
+
+  it.each([
+    ['the package declares no requirement', '3.1.6', undefined],
+    ['the Host reports no version', undefined, '>=3.1.6'],
+    ['the Host version is not a release', 'dev', '>=3.1.6'],
+  ] as const)('never withholds when %s', (_label, hostVersion, requirement) => {
+    expect(hostWithholdsMiniApp(hostVersion, requirement)).toBe(false);
   });
 });

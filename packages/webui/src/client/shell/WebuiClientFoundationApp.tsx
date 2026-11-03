@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ComponentProps,
   type ReactElement,
 } from "react";
 import { ArchonShell } from "./ArchonShell.js";
@@ -985,6 +986,38 @@ export function WebuiClientFoundationApp(
 
   const progressPanelContent = <WebuiProgressOverviewPanel open={progressPanelOpen} workspaceDir={selectedSession?.workspaceDir} isDefaultWorkspace={selectedSession?.isDefaultWorkspace} environmentLoading={loading} todos={progressTodos} subagents={progressSubagents} showProgress={!homeMode} environmentCollapsed={workspaceEnvironmentCollapsed} progressCollapsed={workspaceProgressCollapsed} subagentsCollapsed={workspaceSubagentsCollapsed} onToggleEnvironment={() => setWorkspaceEnvironmentCollapsed((value) => !value)} onToggleProgress={() => setWorkspaceProgressCollapsed((value) => !value)} onToggleSubagents={() => setWorkspaceSubagentsCollapsed((value) => !value)} onMemberClick={handleWorkspaceSubagentClick} onOpenChanges={() => selectedSession?.workspaceDir && selectedSessionId ? dispatchWorkspacePanel({ type: "open-workspace-review", sessionId: selectedSessionId, workspaceDir: selectedSession.workspaceDir }) : undefined} onOpenTerminal={() => dispatchWorkspacePanel({ type: "open-tab", kind: "terminal", workspaceDir: selectedSession?.workspaceDir })} />;
 
+  const openTranscriptFile = useCallback<NonNullable<ComponentProps<typeof WebuiSessionTranscript>["onOpenFile"]>>(
+    ({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({
+      type: "open-file",
+      sessionId,
+      workspaceDir,
+      path: reference.path,
+      ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}),
+      ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}),
+    }),
+    [dispatchWorkspacePanel],
+  );
+  const openTranscriptTurnReview = useCallback<NonNullable<ComponentProps<typeof WebuiSessionTranscript>["onOpenTurnReview"]>>(
+    (command) => dispatchWorkspacePanel(command),
+    [dispatchWorkspacePanel],
+  );
+  const openTranscriptPlanFile = useCallback<NonNullable<ComponentProps<typeof WebuiSessionTranscript>["onOpenPlanFile"]>>(
+    ({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({
+      type: "open-plan-file",
+      sessionId: planSessionId,
+      workspaceDir: selectedSession?.workspaceDir ?? "",
+      path,
+      content,
+    }),
+    [dispatchWorkspacePanel, selectedSession?.workspaceDir],
+  );
+  const createTaskInProject = useCallback<NonNullable<ComponentProps<typeof SessionRailRegion>["projectList"]["onCreateTaskInProject"]>>(
+    (project) => startNewTask(project.workspaceDir),
+    [startNewTask],
+  );
+  const closeWorkspacePanel = useCallback(() => dispatchWorkspacePanel({ type: "close-panel" }), [dispatchWorkspacePanel]);
+  const manageMiniApps = useCallback(() => openPluginManagement("plugins"), [openPluginManagement]);
+
   return (
     <>
       {/* The slices are provided, not only read: a consumer below reads its
@@ -1054,12 +1087,13 @@ export function WebuiClientFoundationApp(
               openScheduling={openScheduling}
               remoteOpen={remoteOpen}
               openRemote={openRemote}
+              selectedSessionId={selectedSessionId}
               hasSearchResults={railPage.sessions.length > 0}
               projectList={{
                 teamModeLabel: props.teamModeLabel, page: railPage, treePage: railTreePage,
                 projectRecords, projectLoadError: projectState.error, query: railSearchQuery,
                 loading, onLoadMore: loadMore, selectedSessionId, activity: sessionActivity,
-                now: activityNow, onCreateTaskInProject: (project) => startNewTask(project.workspaceDir),
+                now: activityNow, onCreateTaskInProject: createTaskInProject,
                 error: pageError, pinnedSessions, pinnedProjects, projectNames,
                 onRenameProject: handleRenameProject, onToggleProjectPin: handleToggleProjectPin,
                 onArchiveProject: handleArchiveProject, onRenameSession: handleRenameSession,
@@ -1236,20 +1270,20 @@ export function WebuiClientFoundationApp(
                 ><WebuiSessionTranscript
                   sessionId={selectedSessionId}
                   workspaceDir={selectedSession?.workspaceDir}
-                  onOpenFile={({ sessionId, workspaceDir, reference }) => dispatchWorkspacePanel({ type: "open-file", sessionId, workspaceDir, path: reference.path, ...(reference.lineStart !== undefined ? { lineStart: reference.lineStart } : {}), ...(reference.lineEnd !== undefined ? { lineEnd: reference.lineEnd } : {}) })}
-                  onOpenTurnReview={(command) => dispatchWorkspacePanel(command)}
+                  onOpenFile={openTranscriptFile}
+                  onOpenTurnReview={openTranscriptTurnReview}
                   {...(initialMessages ? { initialMessages } : {})}
                   transcriptCommands={transcriptCommandsWithForkNavigation}
                   answerPlanBuild={planReviewWorkflow.answerPlanBuild}
-                  onOpenPlanFile={({ sessionId: planSessionId, path, content }) => dispatchWorkspacePanel({ type: "open-plan-file", sessionId: planSessionId, workspaceDir: selectedSession?.workspaceDir ?? "", path, content })}
+                  onOpenPlanFile={openTranscriptPlanFile}
                 /></WebuiZoneBoundary></Transcript> : null}
               </>}
               progressPanel={progressPanelContent}
               workspacePanel={workspacePanel.open ? <WebuiZoneBoundary zone="workspace"><WebuiWorkspacePanel
                 state={workspacePanel} dispatch={dispatchWorkspacePanel} sessionId={selectedSessionId}
                 workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl}
-                terminal={terminalOwner} onClose={() => dispatchWorkspacePanel({ type: "close-panel" })}
-                onManageMiniApps={() => openPluginManagement("plugins")}
+                terminal={terminalOwner} onClose={closeWorkspacePanel}
+                onManageMiniApps={manageMiniApps}
               /></WebuiZoneBoundary> : undefined}
             />
           </WebuiPage>}

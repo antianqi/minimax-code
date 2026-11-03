@@ -208,6 +208,7 @@ export class PluginSystem implements AgentHostTurnCapabilityProvider {
         this.localStateRevision += 1;
         this.marketplacePreview.invalidate();
       },
+      miniAppPermissions: this.options.repository,
     });
     const onLocalDirectoryChange = () => this.publishExternalLocalPluginChanges();
     this.localDirectoryWatcher = options.localDirectoryWatcherFactory
@@ -245,6 +246,36 @@ export class PluginSystem implements AgentHostTurnCapabilityProvider {
   get currentSnapshot(): PluginSnapshot {
     return this.snapshot;
   }
+
+  /**
+   * The page channel's MCP half, read from whichever runtime currently serves the
+   * Agent path.
+   *
+   * The runtime is replaced when the snapshot generation changes, so these are reads
+   * through `this.mcpRuntime` rather than a captured instance: a captured one would
+   * keep answering for the generation it was reconciled with.
+   */
+  pageMcpServers(): readonly string[] {
+    return this.mcpRuntime.pageServers?.() ?? [];
+  }
+
+  listPageMcpTools(
+    serverName: string,
+  ): Promise<readonly { readonly name: string; readonly description?: string }[]> {
+    return this.mcpRuntime.listPageTools?.(serverName) ?? Promise.resolve([]);
+  }
+
+  callPageMcpTool(input: {
+    readonly serverName: string;
+    readonly name: string;
+    readonly arguments: unknown;
+    readonly signal?: AbortSignal;
+  }): Promise<unknown> {
+    const call = this.mcpRuntime.callPageTool;
+    if (!call) throw new Error('Plugin MCP runtime does not serve Mini App pages');
+    return call.call(this.mcpRuntime, input);
+  }
+
   attachPublicationPort(port: AgentHostTurnPublicationPort): void {
     if (this.publicationPort)
       throw new PluginSystemError('ALREADY_ATTACHED', 'publication port is already attached');
@@ -535,6 +566,9 @@ export class PluginSystem implements AgentHostTurnCapabilityProvider {
       });
       this.localStateRevision += 1;
       this.options.onPluginDeactivated?.(target.name);
+      // The package is gone from the publication: its stored switches go with it, so installing the
+      // same id again is a fresh decision rather than an inherited one.
+      this.miniAppPublication.forgetPermissions(target.name, 'local');
       this.marketplacePreview.invalidate();
       return { installExists: false, enabled: false };
     });

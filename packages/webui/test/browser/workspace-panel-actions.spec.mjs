@@ -87,6 +87,82 @@ test("the panel opens a file, closes the tab, and keeps its place across a sessi
   await expect(page.locator("body")).not.toContainText("界面出现错误");
 });
 
+test("the workspace review stays responsive with 70 expanded diff files", async ({ page }) => {
+  const files = Array.from({ length: 70 }, (_, index) => ({
+    fileId: `src/file-${String(index).padStart(2, "0")}.ts`,
+    path: `src/file-${String(index).padStart(2, "0")}.ts`,
+    additions: 80,
+    deletions: 0,
+    status: "modified",
+  }));
+  const summary = {
+    repositoryId: "repo-1",
+    reviewSnapshotId: "perf-snapshot",
+    files,
+    totals: { files: files.length, additions: files.length * 80, deletions: 0 },
+  };
+  const diffs = files.map((file) => ({
+    fileId: file.fileId,
+    diff: {
+      type: "text",
+      diff: [
+        `diff --git a/${file.path} b/${file.path}`,
+        `--- a/${file.path}`,
+        `+++ b/${file.path}`,
+        "@@ -0,0 +1,80 @@",
+        ...Array.from({ length: 80 }, (_, line) => `+export const value${line} = ${line};`),
+      ].join("\n"),
+    },
+  }));
+  await page.addInitScript((value) => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => window.__fixture.setWorkspaceReview(value.summary, value.diffs));
+  }, { summary, diffs });
+  await openApp(page);
+  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
+  await page.getByTestId("workspace-launcher-tile-review").click();
+  const review = page.getByTestId("workspace-review");
+  await expect(review.locator('[data-testid="turn-review-diff-file"]')).toHaveCount(70);
+  await expect(review.locator(".webui-turn-review-code")).toHaveCount(70);
+
+  const elapsed = await page.evaluate(async () => {
+    const button = document.querySelector('[data-testid="workspace-review-toolbar-context"]');
+    if (!(button instanceof HTMLButtonElement)) throw new Error("review context control missing");
+    const start = performance.now();
+    button.click();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return performance.now() - start;
+  });
+  console.info(`70-file review interaction: ${elapsed.toFixed(1)} ms`);
+  expect(elapsed, `70-file review interaction took ${elapsed.toFixed(1)} ms`).toBeLessThan(100);
+
+  await page.evaluate(() => {
+    window.__reviewLongTasks = [];
+    window.__reviewLongTaskObserver = new PerformanceObserver((entries) => {
+      window.__reviewLongTasks.push(...entries.getEntries().map((entry) => entry.duration));
+    });
+    window.__reviewLongTaskObserver.observe({ type: "longtask" });
+  });
+  const handle = page.getByRole("separator", { name: "调整工作区面板宽度" });
+  const bounds = await handle.boundingBox();
+  if (!bounds) throw new Error("workspace panel resize handle is not laid out");
+  const panelWidthBefore = await page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width);
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width / 2 + 96, bounds.y + bounds.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
+  const dragLongTasks = await page.evaluate(() => {
+    window.__reviewLongTaskObserver.disconnect();
+    return [...window.__reviewLongTasks, ...window.__reviewLongTaskObserver.takeRecords().map((entry) => entry.duration)];
+  });
+  expect(dragLongTasks.filter((duration) => duration >= 50), `workspace panel drag produced ${dragLongTasks} ms long tasks`).toEqual([]);
+  const lastFile = review.locator('[data-testid="turn-review-diff-file"]').last();
+  await lastFile.scrollIntoViewIfNeeded();
+  await expect(lastFile.locator(".webui-turn-review-line")).toHaveCount(81);
+  expect(await lastFile.locator(".webui-turn-review-code").evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(1000);
+});
+
 test("the workspace file tree uses the shared disclosure transition when a directory opens and closes", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);

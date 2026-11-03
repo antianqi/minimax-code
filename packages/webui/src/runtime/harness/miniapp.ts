@@ -33,7 +33,8 @@ import type {
 } from "./host-contract.js";
 import { requireCliService } from "./requirements.js";
 import { WebuiCapabilityUnavailableError } from "../../shared/envelope.js";
-import type { WebuiMiniAppSummary } from "../../shared/contracts/miniapp.js";
+import type { WebuiMiniAppSummary, WebuiMiniAppPermissionList } from "../../shared/contracts/miniapp.js";
+import type { WebuiMiniAppToolApprovalFrame } from "../../shared/contracts/miniapp-tools.js";
 
 /** The launch the runtime hands back, as much of it as this adapter reads. */
 interface RuntimeMiniAppLaunch {
@@ -129,7 +130,17 @@ export function toWebuiMiniAppLaunch(
 
 export function createMiniAppAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "listMiniApps" | "openMiniApp" | "stopMiniApp"> {
+): Pick<
+  WebuiHarnessPort,
+  | "listMiniApps"
+  | "openMiniApp"
+  | "stopMiniApp"
+  | "listMiniAppPermissions"
+  | "setMiniAppPermission"
+  | "miniAppToolCall"
+  | "watchMiniAppToolApprovals"
+  | "replyMiniAppToolApproval"
+> {
   return {
     async listMiniApps() {
       // The installed read when the host has one: it also answers for a Mini App
@@ -149,5 +160,148 @@ export function createMiniAppAdapter(
     async stopMiniApp(request) {
       await requireMiniApps(host).stopMiniApp(request);
     },
+
+    /**
+     * The permission list, field by field.
+     *
+     * The runtime's own result is not spread: it is free to grow a field that is not
+     * this wire's, and a spread would publish it the day it lands.
+     */
+    async listMiniAppPermissions(pluginId) {
+      return toWebuiMiniAppPermissionList(
+        await requireMiniAppPermissions(host).listMiniAppPermissions(pluginId),
+      );
+    },
+
+    async setMiniAppPermission(request) {
+      return toWebuiMiniAppPermissionList(
+        await requireMiniAppPermissions(host).setMiniAppPermission({
+          pluginId: request.pluginId,
+          permission: request.permission,
+          enabled: request.enabled,
+        }),
+      );
+    },
+
+    /**
+     * One page tool request.
+     *
+     * The runtime answers in the page's own shape (`ok` / `ok: false`), so this forwards
+     * rather than reshapes: a refusal already carries the code the page acts on, and
+     * rewrapping it here would be a second place that decides what a page is told.
+     */
+    async miniAppToolCall(request) {
+      return requireMiniAppToolCall(host).miniAppToolCall(request);
+    },
+
+    /**
+     * The prompts waiting for a person.
+     *
+     * The runtime hands its own item shape; this converts it field by field, because the
+     * wire's DTO is independently owned and a spread would publish whatever the runtime
+     * grows next. A host with no channel reports that through `onFailure` rather than
+     * presenting an empty list a person would read as "nothing needs you".
+     */
+    watchMiniAppToolApprovals(onFrame, onFailure) {
+      const cliService = requireCliService(host);
+      const watch = cliService.watchMiniAppToolApprovals;
+      if (!watch) {
+        onFailure?.(new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT));
+        return () => undefined;
+      }
+      return watch.call(cliService, (pending) =>
+        onFrame(toWebuiMiniAppToolApprovalFrame(pending)),
+      );
+    },
+
+    /** One answer; the runtime decides whether the id is still waiting. */
+    async replyMiniAppToolApproval(request) {
+      const cliService = requireCliService(host);
+      const reply = cliService.replyMiniAppToolApproval;
+      if (!reply) throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
+      return reply.call(cliService, {
+        pluginId: request.pluginId,
+        requestId: request.requestId,
+        decision: request.decision,
+        ...(request.names !== undefined ? { names: [...request.names] } : {}),
+      });
+    },
+  };
+}
+
+/**
+ * The two permission members, or one refusal.
+ *
+ * Kept apart from `requireMiniApps` so a host that serves Mini Apps without the
+ * permission read refuses only the permission operations: answering `unavailable`
+ * for the whole capability would take the catalogue away from a host that can show
+ * one.
+ */
+function requireMiniAppPermissions(host: WebuiRuntimeHostHandle): Required<
+  Pick<WebuiRuntimeCliService, "listMiniAppPermissions" | "setMiniAppPermission">
+> {
+  const cliService = requireCliService(host);
+  const { listMiniAppPermissions, setMiniAppPermission } = cliService;
+  if (!listMiniAppPermissions || !setMiniAppPermission)
+    throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
+  // Both read `this.options`, so the receiver has to be the service they were
+  // destructured from.
+  return {
+    listMiniAppPermissions: (pluginId) =>
+      listMiniAppPermissions.call(cliService, pluginId),
+    setMiniAppPermission: (input) => setMiniAppPermission.call(cliService, input),
+  };
+}
+
+/**
+ * The tool member, or the same refusal.
+ *
+ * Apart from the permission pair for the same reason it is apart from the catalogue: the
+ * channel can be composed after the switches exist, and a page that asks for tools then
+ * hears `capability_unavailable` rather than an empty shelf.
+ */
+function requireMiniAppToolCall(host: WebuiRuntimeHostHandle): Required<
+  Pick<WebuiRuntimeCliService, "miniAppToolCall">
+> {
+  const cliService = requireCliService(host);
+  const { miniAppToolCall } = cliService;
+  if (!miniAppToolCall) throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
+  // Reads `this.options`, so the receiver has to be the service it came from.
+  return { miniAppToolCall: (input) => miniAppToolCall.call(cliService, input) };
+}
+
+type RuntimePendingApprovals = Parameters<
+  Parameters<NonNullable<WebuiRuntimeCliService["watchMiniAppToolApprovals"]>>[0]
+>[0];
+
+/** The runtime's pending item as this wire's DTO: field by field, never a spread. */
+function toWebuiMiniAppToolApprovalFrame(
+  pending: RuntimePendingApprovals,
+): WebuiMiniAppToolApprovalFrame {
+  return {
+    pending: pending.map((item) => ({
+      requestId: item.requestId,
+      mode: item.mode,
+      pluginId: item.pluginId,
+      tools: item.tools.map((tool) => ({
+        name: tool.name,
+        ...(tool.kind !== undefined ? { kind: tool.kind } : {}),
+        ...(tool.owner !== undefined ? { owner: tool.owner } : {}),
+        ...(tool.tool !== undefined ? { tool: tool.tool } : {}),
+        ...(tool.argumentsPreview !== undefined
+          ? { argumentsPreview: tool.argumentsPreview }
+          : {}),
+      })),
+    })),
+  };
+}
+
+function toWebuiMiniAppPermissionList(
+  list: WebuiMiniAppPermissionList,
+): WebuiMiniAppPermissionList {
+  return {
+    pluginId: list.pluginId,
+    source: list.source,
+    items: list.items.map((item) => ({ id: item.id, enabled: item.enabled })),
   };
 }

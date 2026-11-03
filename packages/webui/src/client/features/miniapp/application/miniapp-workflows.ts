@@ -27,6 +27,7 @@ import { createWebuiPluginActions } from "../../plugins/contracts/plugin-actions
 import type {
   WebuiMiniAppCatalogue,
   WebuiMiniAppCatalogueRow,
+  WebuiMiniAppPermissionItem,
   WebuiMiniAppPresentationIntent,
 } from "../../../../shared/contracts/miniapp.js";
 import type {
@@ -35,6 +36,13 @@ import type {
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../../../shared/contracts/miniapp-agent.js";
+import type {
+  WebuiMiniAppToolApprovalAnswer,
+  WebuiMiniAppToolApprovalPrompt,
+  WebuiMiniAppToolRequest,
+  WebuiMiniAppToolResult,
+} from "../../../../shared/contracts/miniapp-tools.js";
+import { webuiMiniAppToolAnswer } from "./miniapp-tool-bridge.js";
 import type { MiniAppPort } from "../contracts/miniapp-port.js";
 import {
   webuiMiniAppPluginSource,
@@ -47,6 +55,8 @@ import {
 export type WebuiMiniAppPortSlice = Pick<
   MiniAppPort,
   | "listMiniApps"
+  | "listMiniAppPermissions"
+  | "setMiniAppPermission"
   | "watchMiniAppPresenter"
   | "openMiniApp"
   | "stopMiniApp"
@@ -54,6 +64,9 @@ export type WebuiMiniAppPortSlice = Pick<
   | "miniappStandaloneUrl"
   | "watchMiniAppAgentTurn"
   | "miniAppAgentCall"
+  | "miniAppToolCall"
+  | "watchMiniAppToolApprovals"
+  | "replyMiniAppToolApproval"
 > &
   Pick<PluginPort, "pluginManagement">;
 
@@ -113,8 +126,23 @@ export interface WebuiMiniAppStandalone {
   readonly session: "live" | "ended" | "unresolved";
 }
 
+/**
+ * One package's declared permissions, as a row renders them.
+ *
+ * `saving` names the item whose write is in flight, so one switch reports its own
+ * progress instead of the whole group disappearing.
+ */
+export interface WebuiMiniAppPermissionSlice {
+  readonly items: readonly WebuiMiniAppPermissionItem[];
+  readonly loading: boolean;
+  readonly error?: string;
+  readonly saving?: string;
+}
+
 export interface WebuiMiniAppWorkflowsState {
   readonly listing: WebuiMiniAppListing;
+  /** Per plugin: the declared permissions and their stored switches. */
+  readonly permissions: Readonly<Record<string, WebuiMiniAppPermissionSlice>>;
   /** Per plugin: the presentation this client holds. */
   readonly presentations: Readonly<Record<string, WebuiMiniAppPresentation>>;
   /** Per plugin: the last refusal a start of it earned. */
@@ -179,6 +207,7 @@ export const initialWebuiMiniAppListing: WebuiMiniAppListing = {
 
 export const initialWebuiMiniAppWorkflowsState: WebuiMiniAppWorkflowsState = {
   listing: initialWebuiMiniAppListing,
+  permissions: {},
   presentations: {},
   refusals: {},
 };
@@ -208,6 +237,24 @@ export interface WebuiMiniAppWorkflows {
 
   /** Read the catalogue. Rows carry the runtime's state; nothing is cached by key. */
   readonly loadListing: () => Promise<void>;
+  /**
+   * Read one package's declared permissions.
+   *
+   * On demand, per row: a catalogue of twenty Mini Apps would otherwise ask
+   * twenty questions nobody opened.
+   */
+  readonly loadPermissions: (pluginId: string) => Promise<void>;
+  /**
+   * Store one switch and answer whether the runtime accepted it.
+   *
+   * `false` means the write was refused; the reason is on the row it belongs to,
+   * and the switch is left as the runtime last reported it.
+   */
+  readonly setPermission: (
+    pluginId: string,
+    permission: string,
+    enabled: boolean,
+  ) => Promise<boolean>;
   /**
    * Start one Mini App and keep its view URL.
    *
@@ -292,6 +339,32 @@ export interface WebuiMiniAppWorkflows {
   readonly agentCall: (
     request: WebuiMiniAppAgentCallRequest,
   ) => Promise<WebuiMiniAppAgentCallResponse>;
+  /**
+   * One request from a framed page's tool channel.
+   *
+   * The page names a method and, where the method needs one, a tool. `pluginId` is this
+   * view's, never the page's: a page that sent one is answered for the Mini App it was
+   * framed as. A host that composed no channel answers `capability_unavailable`.
+   */
+  readonly toolCall: (input: {
+    readonly pluginId: string;
+    readonly request: WebuiMiniAppToolRequest;
+  }) => Promise<WebuiMiniAppToolResult>;
+  /**
+   * The prompts waiting for a person.
+   *
+   * Filtered to `pluginId` before it reaches a caller: a view renders the questions about
+   * the Mini App it frames, and another app's prompt is not its business.
+   */
+  readonly watchToolApprovals: (
+    pluginId: string,
+    onPending: (pending: readonly WebuiMiniAppToolApprovalPrompt[]) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
+  /** One answer to one prompt. */
+  readonly answerToolApproval: (
+    answer: WebuiMiniAppToolApprovalAnswer,
+  ) => Promise<{ readonly success: true }>;
   /**
    * Report that the client now shows `sessionId` for `pluginId`.
    *
@@ -422,16 +495,93 @@ export function createWebuiMiniAppWorkflows(deps: {
     }
   };
 
+  /**
+   * The permission slice of one row.
+   *
+   * Loading and saving are recorded per plugin, so two Mini Apps cannot overwrite
+   * each other's state and one switch reports its own progress.
+   */
+  const patchPermissions = (
+    pluginId: string,
+    patch: Partial<WebuiMiniAppPermissionSlice>,
+  ): void => {
+    set((current) => ({
+      ...current,
+      permissions: {
+        ...current.permissions,
+        [pluginId]: {
+          items: current.permissions[pluginId]?.items ?? [],
+          loading: false,
+          ...patch,
+        },
+      },
+    }));
+  };
+
+  const clearSaving = (pluginId: string): void => {
+    set((current) => {
+      const existing = current.permissions[pluginId];
+      if (!existing) return current;
+      const { saving: _saving, ...rest } = existing;
+      return {
+        ...current,
+        permissions: { ...current.permissions, [pluginId]: rest },
+      };
+    });
+  };
+
+  const loadPermissions = async (pluginId: string): Promise<void> => {
+    const list = port.listMiniAppPermissions;
+    if (!list) return;
+    patchPermissions(pluginId, { loading: true });
+    try {
+      const result = await list.call(port, pluginId);
+      patchPermissions(pluginId, { items: result.items });
+    } catch (error) {
+      patchPermissions(pluginId, { error: refusalOf(error).message });
+    }
+  };
+
+  const setPermission = async (
+    pluginId: string,
+    permission: string,
+    enabled: boolean,
+  ): Promise<boolean> => {
+    const write = port.setMiniAppPermission;
+    if (!write) return false;
+    patchPermissions(pluginId, { saving: permission });
+    try {
+      const result = await write.call(port, { pluginId, permission, enabled });
+      // The runtime answers the list as it now stands: no refetch, and no local
+      // guess about what the switch became.
+      patchPermissions(pluginId, { items: result.items });
+      return true;
+    } catch (error) {
+      patchPermissions(pluginId, { error: refusalOf(error).message });
+      return false;
+    } finally {
+      clearSaving(pluginId);
+    }
+  };
+
   const open = async (pluginId: string, path?: string): Promise<boolean> => {
     if (!available || !port.openMiniApp) return false;
     set((current) => ({ ...current, opening: pluginId }));
     setPresentation(pluginId, { kind: "opening" });
     setRefusal(pluginId, undefined);
+    // The frame's device grant is read once, when its document is created, so the
+    // switches are settled before that document exists — but after the opening state
+    // is up, because waiting on a read before saying "starting" would show nothing.
+    // `loadPermissions` keeps its own failure: a host that cannot answer must not
+    // stop the app from opening.
     try {
-      const view = await port.openMiniApp({
-        pluginId,
-        ...(path !== undefined ? { path } : {}),
-      });
+      const [view] = await Promise.all([
+        port.openMiniApp({
+          pluginId,
+          ...(path !== undefined ? { path } : {}),
+        }),
+        loadPermissions(pluginId),
+      ]);
       setPresentation(pluginId, {
         kind: "open",
         viewUrl: view.viewUrl,
@@ -679,6 +829,50 @@ export function createWebuiMiniAppWorkflows(deps: {
       return () => undefined;
     }
     return watch(request, onFrame, onFailure);
+  };
+
+  /**
+   * One page tool request, answered in the page's own shape.
+   *
+   * The bridge decides what to do with a host that has no channel; this only hands it the
+   * port and the identity the view was framed with.
+   */
+  const toolCall: WebuiMiniAppWorkflows["toolCall"] = (input) =>
+    webuiMiniAppToolAnswer({
+      request: input.request,
+      pluginId: input.pluginId,
+      port: {
+        ...(port.miniAppToolCall ? { miniAppToolCall: (body) => port.miniAppToolCall!(body) } : {}),
+      },
+    });
+
+  /**
+   * The prompts waiting for a person, filtered to the app this caller frames.
+   *
+   * A host with no prompt channel answers an empty list rather than failing: a page can
+   * still call tools the rules already allowed, and only an `ask` needs a person.
+   */
+  const watchToolApprovals: WebuiMiniAppWorkflows["watchToolApprovals"] = (
+    pluginId,
+    onPending,
+    onFailure,
+  ) => {
+    const watch = port.watchMiniAppToolApprovals;
+    if (!watch) return () => undefined;
+    return watch(
+      undefined,
+      (frame) =>
+        onPending(frame.pending.filter((prompt) => prompt.pluginId === pluginId)),
+      onFailure,
+    );
+  };
+
+  const answerToolApproval: WebuiMiniAppWorkflows["answerToolApproval"] = async (answer) => {
+    const reply = port.replyMiniAppToolApproval;
+    if (!reply) throw Object.assign(new Error("capability_unavailable"), {
+      code: "capability_unavailable",
+    });
+    return reply(answer);
   };
 
   const agentCall: WebuiMiniAppWorkflows["agentCall"] = async (request) => {
@@ -941,6 +1135,9 @@ export function createWebuiMiniAppWorkflows(deps: {
     watchPresenter: (onFrame, onFailure) =>
       port.watchMiniAppPresenter?.(onFrame, onFailure) ?? (() => undefined),
     loadListing,
+    /** Read one package's declared permissions; per row, on demand. */
+    loadPermissions,
+    setPermission,
     open,
     refreshInline,
     stop,
@@ -950,6 +1147,9 @@ export function createWebuiMiniAppWorkflows(deps: {
     claimStandalone,
     watchAgentTurn,
     agentCall,
+    toolCall,
+    watchToolApprovals,
+    answerToolApproval,
     reportShown,
     noteSelectedSession,
     awaitSelection,

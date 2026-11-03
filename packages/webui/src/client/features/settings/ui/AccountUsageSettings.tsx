@@ -221,7 +221,7 @@ export function AccountUsageSettings(): ReactElement {
             </WebuiInline>
             <div className="mt-3">
               {view.loading ? (
-                <WebuiSkeleton variant="pulse" className="mx-auto h-[118px] w-[696px] max-w-full rounded-[8px]" />
+                <WebuiSkeleton variant="shape" className="mx-auto h-[118px] w-[696px] max-w-full rounded-[8px]" />
               ) : view.failed ? (
                 <WebuiStack gap="medium" align="center" justify="center" className="h-[118px]">
                   <span className="text-[13px] leading-[18.57px] text-text_default_secondary">用量数据暂时不可用</span>

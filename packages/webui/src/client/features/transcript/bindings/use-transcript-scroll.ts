@@ -70,16 +70,19 @@ function observeTranscriptHeight(
  * tracks the same pair for its own purpose (a turn settling). Each keeps its own
  * two-field ref so neither depends on the other's effect ordering.
  *
- * `contentKey` is whatever changes when the rendered content does (the projected
- * items); it re-pins after a paint.
+ * The content-driven pin lives in the resize observer rather than in a
+ * layout effect. Both run before the reader sees the frame — a resize
+ * observer is delivered after the browser has laid the new content out and
+ * before it paints — but only the observer gets the scroll range for free.
+ * A layout effect reads it while the layout is still dirty, which forces the
+ * browser to lay the whole transcript out again on every streamed frame.
  */
 export function useWebuiTranscriptScroll(input: {
   readonly transcriptRef: RefObject<HTMLElement | null>;
   readonly sessionId: string;
   readonly turnLive: boolean;
-  readonly contentKey: unknown;
 }): { readonly releaseAutoFollow: () => void } {
-  const { transcriptRef, sessionId, turnLive, contentKey } = input;
+  const { transcriptRef, sessionId, turnLive } = input;
   const autoFollowRef = useRef(true);
   const manualScrollIntentRef = useRef(false);
   const previousTurnStateRef = useRef({ sessionId, turnLive });
@@ -135,11 +138,6 @@ export function useWebuiTranscriptScroll(input: {
       viewport.removeEventListener("touchmove", onTouchMove);
     };
   }, [sessionId, transcriptRef, turnLive]);
-
-  useLayoutEffect(() => {
-    const viewport = transcriptViewport(transcriptRef.current);
-    if (viewport) pinTranscriptToBottom(viewport, autoFollowRef.current);
-  }, [contentKey, transcriptRef]);
 
   /** Paging up is the reader walking away from the end: hand control back, or
    *  the older messages arriving would drag the viewport to the bottom. */

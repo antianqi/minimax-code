@@ -3,8 +3,11 @@ import { join } from 'node:path';
 
 import {
   isMiniAppAgentPermissionDecision,
+  miniAppPermissionId,
   MINIAPP_AGENT_MAX_TEXT_LENGTH,
 } from '@mavis/shared/miniapp-surface';
+
+import type { MiniAppPermissionSwitchPort } from '../contracts.js';
 
 import {
   MINIAPP_AGENT_NAME,
@@ -82,6 +85,9 @@ interface GatewayState {
   readonly panels: Map<string, Set<string>>;
   ports?: MiniAppAgentSessionPorts;
   unsubscribeAsks?: () => void;
+  /** Attached once the Plugin service exists; read on every request, never cached. */
+  permissionSwitches?: MiniAppPermissionSwitchPort;
+  unsubscribeSwitches?: () => void;
 }
 
 interface Admitted {
@@ -136,7 +142,19 @@ export function createMiniAppAgentGateway(
     listeners: new Map(),
     panels: new Map(),
   };
+  // A revoked run capability stops what it authorized: the page is told the runs ended, instead of
+  // the switch applying only to the next request while a turn keeps spending tokens.
+  const attachSwitches = (switches: MiniAppPermissionSwitchPort): void => {
+    state.unsubscribeSwitches?.();
+    state.permissionSwitches = switches;
+    state.unsubscribeSwitches = switches.subscribe?.((change) => {
+      if (change.permission === MINIAPP_AGENT_RUN_PERMISSION && !change.enabled) {
+        abortPluginRuns(state, change.pluginId);
+      }
+    });
+  };
   return {
+    attachPermissionSwitches: attachSwitches,
     bind(next) {
       state.unsubscribeAsks?.();
       state.ports = next;
@@ -178,9 +196,18 @@ export function createMiniAppAgentGateway(
     },
     models: (caller) => listModelOptions(state, caller),
     agents: (caller) => listAgentOptions(state, caller),
-    sessions: (caller) => readUserSessions(state, caller),
-    session: (caller, input) => readHostSession(state, caller, input),
-    create: (caller, input = {}) => createBoundSession(state, caller, input.agent),
+    sessions: async (caller) => {
+      assertMiniAppPermission(state, caller, MINIAPP_AGENT_READ_PERMISSION);
+      return readUserSessions(state, caller);
+    },
+    session: async (caller, input) => {
+      assertMiniAppPermission(state, caller, MINIAPP_AGENT_READ_PERMISSION);
+      return readHostSession(state, caller, input);
+    },
+    create: async (caller, input = {}) => {
+      assertMiniAppPermission(state, caller, MINIAPP_AGENT_READ_PERMISSION);
+      return createBoundSession(state, caller, input.agent);
+    },
     reply: (caller, input) => replyPermission(state, caller, input),
     open: (caller, input) => openSession(state, caller, input),
     panelOpened({ sessionId, hostSessionId }) {
@@ -386,8 +413,39 @@ function requireSessionRead(
   );
 }
 
+const MINIAPP_AGENT_RUN_PERMISSION = miniAppPermissionId('agent', 'session.run');
+const MINIAPP_AGENT_READ_PERMISSION = miniAppPermissionId('agent', 'session.read');
+
+/**
+ * The switch behind the manifest allowlist: off means refused, not queued.
+ *
+ * The allowlist says what the package asked for; the switch says whether the person still wants it.
+ * Reading it per request is what makes a switch take effect on the next call instead of the next
+ * restart.
+ */
+function assertMiniAppPermission(
+  state: GatewayState,
+  caller: MiniAppAgentCaller,
+  permission: string,
+): void {
+  if (state.permissionSwitches?.isEnabled(caller.pluginId, permission) ?? true) return;
+  throw reject(
+    state,
+    caller,
+    new MiniAppAgentError('NOT_PERMITTED', 'Mini App does not have this Agent permission'),
+  );
+}
+
+/** Stops the runs a revoked `agent:session.run` was authorizing. */
+function abortPluginRuns(state: GatewayState, pluginId: string): void {
+  const arena = state.arenas.get(pluginId);
+  if (!arena) return;
+  for (const controller of [...arena.inflight]) controller.abort();
+}
+
 function admit(state: GatewayState, call: TurnCall, invalid: string | undefined): Admitted {
   const { caller, sessionId } = call;
+  assertMiniAppPermission(state, caller, MINIAPP_AGENT_RUN_PERMISSION);
   const admitted = authorize(state, caller);
   if (invalid !== undefined) {
     throw reject(state, caller, new MiniAppAgentError('INVALID_ARGUMENTS', invalid));

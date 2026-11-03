@@ -23,31 +23,26 @@ export interface UsageState {
   readonly errorMessage?: string;
 }
 
-function UsageSkeleton({ animated }: { readonly animated?: boolean }): ReactElement {
-  const shouldAnimate = animated === true;
+function UsageSkeleton({ loading }: { readonly loading?: boolean }): ReactElement {
   const bars = () => (
     <>
       <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
         <WebuiSkeleton
-          animated={shouldAnimate}
-          variant={shouldAnimate ? "pulse" : "shape"}
+          variant="shape"
           className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--a"
         />
         <WebuiSkeleton
-          animated={shouldAnimate}
-          variant={shouldAnimate ? "pulse" : "shape"}
+          variant="shape"
           className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--b"
         />
       </WebuiInline>
       <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
         <WebuiSkeleton
-          animated={shouldAnimate}
-          variant={shouldAnimate ? "pulse" : "shape"}
+          variant="shape"
           className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--c"
         />
         <WebuiSkeleton
-          animated={shouldAnimate}
-          variant={shouldAnimate ? "pulse" : "shape"}
+          variant="shape"
           className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--d"
         />
       </WebuiInline>
@@ -57,7 +52,7 @@ function UsageSkeleton({ animated }: { readonly animated?: boolean }): ReactElem
     <WebuiStack
       gap="small"
       className="webui-user-menu-usage-skeleton"
-      data-testid={animated ? "usage-popover-loading" : "usage-popover-pending"}
+      data-testid={loading ? "usage-popover-loading" : "usage-popover-pending"}
     >
       <WebuiStack gap="small" className="webui-user-menu-usage-skeleton-row">{bars()}</WebuiStack>
       <WebuiStack gap="small" className="webui-user-menu-usage-skeleton-row">{bars()}</WebuiStack>
@@ -221,7 +216,7 @@ export function UsagePanel({
     // focus or click and cannot be dismissed from inside itself, so it needs no
     // trigger and no outside-press handling — only the shared look and motion.
     <WebuiFlyoutSurface present={present} kind="dialog" className="webui-user-menu-usage-panel" role="dialog" aria-label="用量" data-testid="usage-popover">
-      {state.status === "loading" ? <UsageSkeleton animated /> : null}
+      {state.status === "loading" ? <UsageSkeleton loading /> : null}
       {state.status === "idle" ? <UsageSkeleton /> : null}
       {state.status === "error" ? (
         <WebuiStack gap="micro" className="webui-user-menu-usage-error" data-testid="usage-popover-error">

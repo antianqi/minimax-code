@@ -58,17 +58,6 @@
     color: var(--icon_default_secondary);
   }
 
-  /* Footer placement stays with this chooser; its actions use the shared button contract. */
-  .webui-workspace-browser-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--spacing_8);
-    margin-top: var(--spacing_4);
-    border-top: 1px solid var(--border_default);
-    padding-top: var(--spacing_8);
-  }
-
   /* Workspace panel, progress overview and workspace review surfaces. */
   /*
    * The panel has two forms, and the form is chosen by the surface's tier
@@ -223,6 +212,20 @@
   .webui-workspace-miniapp-tab .webui-miniapp-picker-status { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
   .webui-workspace-miniapp-tab .webui-miniapp-picker .webui-plugin-actions { display: flex; flex: 0 0 auto; grid-area: auto; align-items: center; gap: var(--spacing_8); }
   .webui-workspace-miniapp-tab .webui-miniapp-picker-create { width: 100%; margin-top: var(--spacing_8); }
+  .webui-miniapp-launcher-body { padding: var(--spacing_20); }
+  .webui-miniapp-launcher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--spacing_16); }
+  .webui-miniapp-launcher-card { position: relative; display: flex; min-width: 0; min-height: 164px; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); border: 1px solid var(--border_light); border-radius: var(--radius_16); background: var(--bg_default_primary); padding: var(--spacing_16) var(--spacing_12); text-align: center; }
+  .webui-miniapp-launcher-open, .webui-miniapp-launcher-face { display: flex; width: 100%; flex-direction: column; align-items: center; gap: var(--spacing_8); border: 0; background: transparent; color: var(--text_default_primary); }
+  .webui-miniapp-launcher-open { align-self: stretch; flex: 1 1 auto; width: auto; margin: calc(-1 * var(--spacing_16)) calc(-1 * var(--spacing_12)); cursor: pointer; padding: var(--spacing_16) var(--spacing_12); }
+  .webui-miniapp-launcher-open:focus-visible { outline: 2px solid var(--border_interaction_focus); outline-offset: 3px; }
+  .webui-miniapp-launcher-open > img, .webui-miniapp-launcher-face > img { width: 76px; height: 76px; border-radius: var(--radius_16); object-fit: cover; }
+  .webui-miniapp-launcher-open > svg, .webui-miniapp-launcher-face > svg { width: 76px; height: 76px; border-radius: var(--radius_16); background: var(--bg_default_secondary); padding: 18px; color: var(--icon_default_secondary); }
+  .webui-miniapp-launcher-name { display: block; width: 100%; overflow: hidden; font-size: var(--size_14); text-overflow: ellipsis; white-space: nowrap; }
+  .webui-miniapp-launcher-status { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
+  .webui-miniapp-launcher-stop { position: absolute; right: var(--spacing_8); bottom: var(--spacing_8); opacity: 0; pointer-events: none; }
+  .webui-miniapp-launcher-card.is-running:hover .webui-miniapp-launcher-stop,
+  .webui-miniapp-launcher-card.is-running:focus-within .webui-miniapp-launcher-stop { opacity: 1; pointer-events: auto; }
+  .webui-miniapp-launcher-hint { margin: var(--spacing_16) 0 0; color: var(--text_default_tertiary); font-size: var(--size_12); text-align: center; }
   .webui-workspace-image-preview { display: block; max-width: 100%; max-height: calc(100vh - 180px); margin: 24px auto; object-fit: contain; }
   .webui-file-code { min-width: max-content; min-height: 100%; margin: 0; overflow: auto; background: var(--bg_default_primary); padding: 20px 0; color: var(--text_default_primary); font-family: Hack, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.65; tab-size: 2; white-space: pre; }
   .webui-file-code code { display: block; min-width: 100%; }
@@ -275,6 +278,7 @@
   .webui-turn-review { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }
   .webui-turn-review-summary { min-height: 48px; flex: 0 0 48px; border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); color: var(--text_default_primary); font-size: var(--size_14); }
   .webui-turn-review-files { min-width: 0; flex: 1 1 auto; overflow: auto; }
+  .webui-turn-review-files[data-show-context="false"] .webui-turn-review-line--context { display: none; }
   .webui-turn-review-file { min-width: 0; border-bottom: 1px solid var(--border_default); }
   .webui-turn-review-file-heading { position: sticky; top: 0; z-index: 1; display: flex; width: 100%; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); border-radius: 0; background: var(--bg_default_primary); padding: 0 var(--spacing_12); text-align: left; }
   .webui-turn-review-chevron { width: 12px; height: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); }

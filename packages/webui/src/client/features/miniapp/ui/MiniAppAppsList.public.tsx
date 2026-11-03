@@ -8,6 +8,7 @@ import {
   IconExternalLink,
   IconPlayerPlay,
   IconPlayerStop,
+  IconShieldLock,
   IconTrash,
 } from "@tabler/icons-react";
 
@@ -24,7 +25,7 @@ import {
 } from "../projection/miniapp-view.js";
 import { readWebuiPluginRow } from "../../plugins/contracts/plugin-rows.js";
 import { FeedbackBusy, FeedbackError } from "../../../ui/feedback.js";
-import { WebuiIconButton } from "../../../ui/button.js";
+import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
@@ -63,7 +64,11 @@ export function MiniAppAppsList({
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const [openMenuKey, setOpenMenuKey] = useState<string>();
+  /** The row whose permissions are open; one at a time, and loaded on open. */
+  const [permissionsPluginId, setPermissionsPluginId] = useState<string>();
   const { rows, loading, error } = state.listing;
+  const permissionSlice =
+    permissionsPluginId === undefined ? undefined : state.permissions[permissionsPluginId];
   // The page's visibility is the platform's fact, not this component's: the
   // dependency rules keep `document` out of the bindings, and the browser port
   // already answers both questions this surface asks of it.
@@ -317,6 +322,17 @@ export function MiniAppAppsList({
                           停止
                         </WebuiMenuItem>
                         <WebuiMenuItem
+                          icon={<IconShieldLock size={18} stroke={1.7} />}
+                          data-testid={`miniapp-app-permissions-${row.pluginId}`}
+                          onClick={() => {
+                            setOpenMenuKey(undefined);
+                            setPermissionsPluginId(row.pluginId);
+                            void workflows?.loadPermissions(row.pluginId);
+                          }}
+                        >
+                          权限
+                        </WebuiMenuItem>
+                        <WebuiMenuItem
                           danger
                           icon={<IconTrash size={18} stroke={1.7} />}
                           onClick={() => {
@@ -339,6 +355,45 @@ export function MiniAppAppsList({
             );
           })}
         </PluginRowList>
+        {permissionsPluginId !== undefined && permissionSlice !== undefined ? (
+          <div className="webui-miniapp-permissions" data-testid="miniapp-permissions">
+            <h3 className="webui-miniapp-permissions-title">
+              {items.get(permissionsPluginId.toLocaleLowerCase())?.name ??
+                permissionsPluginId}
+              的权限
+            </h3>
+            {permissionSlice.error ? (
+              <FeedbackError message={permissionSlice.error} />
+            ) : null}
+            {permissionSlice.items.length > 0 ? (
+              permissionSlice.items.map((permission) => (
+                <ToggleSwitch
+                  key={permission.id}
+                  checked={permission.enabled}
+                  label={permission.id}
+                  testId={`miniapp-permission-${permission.id}`}
+                  loading={permissionSlice.saving === permission.id}
+                  onChange={(next) => {
+                    void workflows?.setPermission(permissionsPluginId, permission.id, next);
+                  }}
+                />
+              ))
+            ) : permissionSlice.loading ? (
+              <FeedbackBusy label="加载中…" />
+            ) : (
+              <p className="webui-miniapp-permissions-empty">
+                这个 Mini App 没有声明可切换的权限。
+              </p>
+            )}
+            <WebuiButton
+              variant="secondary"
+              size="compact"
+              onClick={() => setPermissionsPluginId(undefined)}
+            >
+              关闭
+            </WebuiButton>
+          </div>
+        ) : null}
       </div>
     </WebuiSkeletonProjection>
   );

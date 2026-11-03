@@ -23,6 +23,7 @@ import type {
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../shared/contracts/miniapp-agent.js";
+import type { WebuiMiniAppToolApprovalFrame } from "../../shared/contracts/miniapp-tools.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
   WebuiBrowserImageFrame,
@@ -195,6 +196,17 @@ export interface WebuiWire {
     operation: string,
     requestBody: { readonly pluginId: string; readonly sessionId: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
+  /**
+   * The tool prompts waiting for a person.
+   *
+   * A watch for the same reason as the presenter: a prompt appears while a page's call is
+   * already waiting, and the socket staying open is what lets the answer reach it.
+   */
+  watchMiniAppToolApprovals(
+    operation: string,
+    onFrame: (frame: WebuiMiniAppToolApprovalFrame) => void,
     onFailure?: (error: Error) => void,
   ): () => void;
   watchMiniAppPresenter(
@@ -736,6 +748,30 @@ export function createWebuiWire({
     onFrame: (intent: WebuiMiniAppPresentationIntent) => void,
     onFailure?: (error: Error) => void,
   ): () => void {
+    return watchWireFrames<WebuiMiniAppPresentationIntent>(operation, onFrame, onFailure);
+  }
+
+  /**
+   * The prompts waiting for a person.
+   *
+   * The same stream mechanics as the presenter watcher — one socket, reconnects on a
+   * close, a refusal is a failure — because a prompt that appeared while the socket was
+   * down must not be lost.
+   */
+  function watchMiniAppToolApprovals(
+    operation: string,
+    onFrame: (frame: WebuiMiniAppToolApprovalFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    return watchWireFrames<WebuiMiniAppToolApprovalFrame>(operation, onFrame, onFailure);
+  }
+
+  /** One frame per event on a body-less stream, with the reconnect every watcher shares. */
+  function watchWireFrames<T>(
+    operation: string,
+    onFrame: (frame: T) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
     let stopped = false;
     let session: WebuiWireSession | undefined;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -772,7 +808,7 @@ export function createWebuiWire({
             stableTimer = undefined;
             delayMs = 250;
           }, 10_000);
-          onFrame(frame.body as WebuiMiniAppPresentationIntent);
+          onFrame(frame.body as T);
         },
         invalidFrame: (current, reason) => reconnect(current, rejectionError(reason, operation)),
         closed: (current) => reconnect(current, new WebuiWireError("runtime_unavailable", `${operation} connection closed`)),
@@ -827,6 +863,7 @@ export function createWebuiWire({
     watchBrowserWebTabs,
     watchMiniAppPresentation,
     watchMiniAppPresenter,
+    watchMiniAppToolApprovals,
     watchMiniAppAgentTurn,
     workspaceFileUrl,
     miniappStandaloneUrl,

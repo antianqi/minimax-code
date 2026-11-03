@@ -241,7 +241,10 @@ describe("SigninCard desktop parity", () => {
   it("renders the skeleton while loading without a panel", () => {
     const html = renderCard({ loading: true });
     expect(html).toContain('data-testid="signin-card-skeleton"');
-    expect(html).toContain("signin-progress");
+    expect(html).toContain("webui-skeleton");
+    expect(html).not.toContain("signin-progress");
+    expect(html).not.toContain('data-testid="signin-day-1"');
+    expect(html).not.toContain('data-testid="signin-day-reward-1"');
   });
 
   it("renders the error card with desktop copy and retry", () => {

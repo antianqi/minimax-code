@@ -133,14 +133,6 @@
     transition-duration: var(--webui-motion-duration-disclosure);
     transition-timing-function: var(--webui-motion-ease-standard);
   }
-  .webui-motion[data-webui-motion="panel"] {
-    transition-property: flex-basis, width;
-    transition-duration: var(--webui-motion-duration-surface);
-    transition-timing-function: var(--webui-motion-ease-standard);
-  }
-  .webui-motion-panel-layout {
-    transition: padding-inline-end var(--webui-motion-duration-surface) var(--webui-motion-ease-standard);
-  }
   .webui-motion[data-webui-motion="disclosure"][data-webui-disclosure-axis="vertical"] {
     display: grid;
     grid-template-rows: 0fr;
@@ -224,9 +216,6 @@
     animation-timing-function: linear;
     animation-iteration-count: infinite;
   }
-  .webui-motion-loading-pulse {
-    animation: webui-skeleton-pulse var(--webui-motion-duration-loading) ease-in-out infinite;
-  }
   .webui-skeleton {
     display: block;
     max-width: 100%;
@@ -237,12 +226,8 @@
   }
   .webui-skeleton--text { height: 12px; border-radius: var(--radius_4); }
   .webui-skeleton--control { height: 36px; border-radius: var(--radius_8); }
-  .webui-skeleton.webui-motion-loading {
-    animation-name: webui-skeleton-pulse;
-    animation-timing-function: ease-in-out;
-  }
-  .webui-skeleton--pulse.webui-motion-loading {
-    background-image: none;
+  .webui-skeleton.webui-motion-loading,
+  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"].webui-motion-loading {
     animation-name: webui-skeleton-pulse;
     animation-timing-function: ease-in-out;
   }
@@ -254,7 +239,7 @@
   .webui-page { min-width: 0; min-height: 0; color: var(--text_default_primary); }
   .webui-page-skeleton-node { pointer-events: none !important; color: transparent !important; }
   .webui-page-skeleton-node:not([data-webui-page-skeleton-surface="true"]) { background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
-  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: transparent !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; animation: none !important; }
+  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: var(--border_default) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; }
   .webui-page-skeleton-shape { display: block !important; pointer-events: none !important; color: transparent !important; background-color: var(--border_default) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; }
   .webui-page-loading-status {
     position: absolute;
@@ -306,8 +291,7 @@
       --webui-motion-duration-loading: 0.01ms;
       --webui-motion-duration-popup-exit: 0.01ms;
     }
-    .webui-motion-loading,
-    .webui-motion-loading-pulse {
+    .webui-motion-loading {
       animation-iteration-count: 1;
     }
   }

@@ -108,6 +108,13 @@ const client = await build({
   outdir: path.join(outdir, "client"),
   metafile: true,
   jsx: "automatic",
+  // The browser bundle ships the PRODUCTION React build. esbuild leaves
+  // `process.env.NODE_ENV` at "development" unless the bundle is minified,
+  // and React's development build carries validation the production build
+  // does not (jsxDEV, the prop/ARIA/key checks). On a streamed reply those
+  // checks are about a quarter of the render cost, because every wire frame
+  // is its own render.
+  define: { "process.env.NODE_ENV": '"production"' },
   loader: { ".html": "text" },
   plugins: [workspacePlugin],
   logLevel: "info",

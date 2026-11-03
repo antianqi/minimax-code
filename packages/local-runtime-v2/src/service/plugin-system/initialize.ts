@@ -3,7 +3,7 @@ import path from "node:path";
 import { getRuntimeBuildEnv, getRuntimeRegion } from "@mavis/config";
 import type { AgentHostTurnCapabilityLifecycle } from "../turn-system/index.js";
 
-import { MINIAPP_LOOPBACK_TOKEN_HEADER } from "@mavis/shared/miniapp-surface";
+import { MINIAPP_LOOPBACK_TOKEN_HEADER, miniAppPermissionId } from "@mavis/shared/miniapp-surface";
 
 import type {
   MiniAppPluginPublicationCapability,
@@ -192,6 +192,32 @@ export function initializePluginService(
     mcp: compatibility.mcp,
     skill: compatibility.skill,
     hostConnectorGateway: hostConnectorSystem.gateway,
+    /**
+     * The page channel's MCP half.
+     *
+     * A page reaches the same servers the Agent path does, through the runtime serving
+     * them now; the join of "which servers" and "which tools" stays in the Plugin system,
+     * and the Mini App service only names them for a page.
+     */
+    miniAppMcp: {
+      servers: () => system.pageMcpServers(),
+      listTools: (serverName) => system.listPageMcpTools(serverName),
+      callTool: (input) => system.callPageMcpTool(input),
+    },
+    /**
+     * Whether the installed package's manifest grants a page the Host's tools.
+     *
+     * Read from the same declared list the permission switches are, so "declared" cannot
+     * come to mean two different things; an unreadable package is a refusal.
+     */
+    declaresMiniAppToolAccess: async (pluginId) => {
+      try {
+        const list = await system.miniAppPublication.permissionList(pluginId);
+        return list.items.some((item) => item.id === miniAppPermissionId('tool', 'call'));
+      } catch {
+        return false;
+      }
+    },
     attachMiniAppPublication: (input) => {
       miniAppSupervisor = input.supervisor;
       system.miniAppPublication.attach(input);
@@ -204,6 +230,11 @@ export function initializePluginService(
       system.miniAppPublication.listAvailableMiniApps(),
     listInstalledMiniApps: () =>
       system.miniAppPublication.listInstalledMiniApps(),
+    listMiniAppPermissions: (pluginId) =>
+      system.miniAppPublication.permissionList(pluginId),
+    setMiniAppPermission: (input) => system.miniAppPublication.setPermission(input),
+    /** The switches the Mini App service reads; a stored change reaches the gateways through it. */
+    miniAppPermissionSwitches: system.miniAppPublication.permissionSwitches,
     activateMiniApp: (input) => system.miniAppPublication.activate(input),
     initializeWorkspaceMiniApp: (input) =>
       system.miniAppPublication.initializeWorkspace(input),

@@ -52,6 +52,25 @@ export interface PluginMcpRuntimePort {
   exportInventory?(): readonly PluginMcpInventorySeed[];
   /** Seed a fresh generation before reconciling its server declarations. */
   importInventory?(seed: readonly PluginMcpInventorySeed[]): void;
+  /**
+   * The servers a Mini App page may reach, by the name the package declared.
+   *
+   * The page channel names tools `mcp__<server>__<tool>` from these names, so it reads
+   * them here rather than from the turn runtime's name allocation: a page has its own
+   * flat namespace and must not inherit a collision suffix meant for the Agent path.
+   */
+  pageServers?(): readonly string[];
+  /** One served server's tools, as its own `tools/list` answered them. */
+  listPageTools?(
+    serverName: string,
+  ): Promise<readonly { readonly name: string; readonly description?: string }[]>;
+  /** One tool of one served server, called through the same pool the Agent path uses. */
+  callPageTool?(input: {
+    readonly serverName: string;
+    readonly name: string;
+    readonly arguments: unknown;
+    readonly signal?: AbortSignal;
+  }): Promise<McpToolCallResult>;
 }
 
 export interface PluginMcpInventorySeed {
@@ -247,6 +266,58 @@ export class PluginMcpRuntime implements PluginMcpRuntimePort {
       });
       return [];
     });
+  }
+
+  /**
+   * The served servers, by declared name.
+   *
+   * Two packages may declare one server name; the page sees one name, and the first
+   * registration answers for it — the same "first one wins" rule the page's tool list
+   * follows when two sources claim a name.
+   */
+  pageServers(): readonly string[] {
+    const names = new Set<string>();
+    for (const entry of this.servers.values()) names.add(entry.server.name);
+    return [...names];
+  }
+
+  async listPageTools(
+    serverName: string,
+  ): Promise<readonly { readonly name: string; readonly description?: string }[]> {
+    const entry = this.pageEntry(serverName);
+    // A server this runtime does not serve has no tools, not an error: the page's
+    // adapter already refuses a server that stopped being served.
+    if (!entry) return [];
+    const inventory = await this.resolveInventory(entry, true);
+    if (inventory.failed) return [];
+    return inventory.tools.map((tool) => ({
+      name: tool.name,
+      ...(tool.description !== undefined ? { description: tool.description } : {}),
+    }));
+  }
+
+  async callPageTool(input: {
+    readonly serverName: string;
+    readonly name: string;
+    readonly arguments: unknown;
+    readonly signal?: AbortSignal;
+  }): Promise<McpToolCallResult> {
+    const entry = this.pageEntry(input.serverName);
+    if (!entry) throw new Error(`Plugin MCP server is not served: ${input.serverName}`);
+    return this.pool.callTool(
+      poolName(entry),
+      input.name,
+      toRecord(input.arguments),
+      this.miniAppTokenOverrides(entry),
+      input.signal ? { signal: input.signal } : undefined,
+    );
+  }
+
+  private pageEntry(serverName: string): PluginSnapshotMcpServer | undefined {
+    for (const entry of this.servers.values()) {
+      if (entry.server.name === serverName) return entry;
+    }
+    return undefined;
   }
 
   exportInventory(): readonly PluginMcpInventorySeed[] {

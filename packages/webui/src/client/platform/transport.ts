@@ -179,6 +179,11 @@ import {
   LIST_MINI_APPS_OPERATION_NAME,
   OPEN_MINI_APP_OPERATION_NAME,
   STOP_MINI_APP_OPERATION_NAME,
+  LIST_MINI_APP_PERMISSIONS_OPERATION_NAME,
+  SET_MINI_APP_PERMISSION_OPERATION_NAME,
+  CALL_MINI_APP_TOOL_OPERATION_NAME,
+  WATCH_MINI_APP_TOOL_APPROVALS_OPERATION_NAME,
+  REPLY_MINI_APP_TOOL_APPROVAL_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
   WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
@@ -208,6 +213,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchBrowserWebTabs,
     watchMiniAppPresentation,
     watchMiniAppPresenter,
+    watchMiniAppToolApprovals,
     watchMiniAppAgentTurn,
     workspaceFileUrl,
     miniappStandaloneUrl,
@@ -317,6 +323,9 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     listMiniApps: () => request(LIST_MINI_APPS_OPERATION_NAME, undefined),
     openMiniApp: (body) => request(OPEN_MINI_APP_OPERATION_NAME, body),
     stopMiniApp: (body) => request(STOP_MINI_APP_OPERATION_NAME, body),
+    listMiniAppPermissions: (pluginId) =>
+      request(LIST_MINI_APP_PERMISSIONS_OPERATION_NAME, { pluginId }),
+    setMiniAppPermission: (body) => request(SET_MINI_APP_PERMISSION_OPERATION_NAME, body),
     watchMiniAppPresentation: (body, onFrame, onFailure) =>
       watchMiniAppPresentation(WATCH_MINI_APP_PRESENTATION_OPERATION_NAME, body, onFrame, onFailure),
     watchMiniAppPresenter: (onFrame, onFailure) =>
@@ -324,6 +333,15 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchMiniAppAgentTurn: (body, onFrame, onFailure) =>
       watchMiniAppAgentTurn(WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME, body, onFrame, onFailure),
     miniAppAgentCall: (body) => request(MINI_APP_AGENT_CALL_OPERATION_NAME, body),
+    miniAppToolCall: (body) => request(CALL_MINI_APP_TOOL_OPERATION_NAME, body),
+    watchMiniAppToolApprovals: (_body, onFrame, onFailure) =>
+      watchMiniAppToolApprovals(
+        WATCH_MINI_APP_TOOL_APPROVALS_OPERATION_NAME,
+        onFrame,
+        onFailure,
+      ),
+    replyMiniAppToolApproval: (body) =>
+      request(REPLY_MINI_APP_TOOL_APPROVAL_OPERATION_NAME, body),
     miniappStandaloneUrl,
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>

@@ -10,11 +10,12 @@
 // The shell still decides which source owns the turn (history after done,
 // composer while active), but the DOM for either role is produced here.
 
-import { useRef, useState, type ReactElement } from "react";
+import { memo, useCallback, useRef, useState, type ReactElement } from "react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import type {
   WebuiGetSessionForkOptionsResult,
   WebuiGetSessionRewindPreviewResult,
+  WebuiTurnDiffView,
 } from "../../../../shared/contracts/session.js";
 import type { WebuiTranscriptCommands } from "../contracts/session-read-port.js";
 import type { WebuiMessageFileReference } from "../projection/message-file-reference.js";
@@ -54,23 +55,46 @@ import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
  * computes it on the group and passes it here. Documented in
  * `transcript-shape.ts:170-180`.
  */
-export function MessageItem({
+interface MessageItemProps {
+  readonly view: WebuiTurnView;
+  readonly wallClockDurationMs?: number;
+  readonly workspaceDir?: string;
+  readonly onOpenFile?: (input: { readonly sessionId: string; readonly workspaceDir: string; readonly reference: WebuiMessageFileReference }) => void;
+  readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
+  readonly transcriptCommands?: WebuiTranscriptCommands;
+}
+
+function sameRenderValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) && Array.isArray(right))
+    return left.length === right.length && left.every((value, index) => sameRenderValue(value, right[index]));
+  if (left && right && typeof left === "object" && typeof right === "object") {
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const keys = Object.keys(leftRecord);
+    return keys.length === Object.keys(rightRecord).length &&
+      keys.every((key) => sameRenderValue(leftRecord[key], rightRecord[key]));
+  }
+  return false;
+}
+
+function areMessageItemPropsEqual(previous: MessageItemProps, next: MessageItemProps): boolean {
+  return previous.wallClockDurationMs === next.wallClockDurationMs &&
+    previous.workspaceDir === next.workspaceDir &&
+    previous.onOpenFile === next.onOpenFile &&
+    previous.onOpenTurnReview === next.onOpenTurnReview &&
+    previous.transcriptCommands === next.transcriptCommands &&
+    sameRenderValue(previous.view, next.view);
+}
+
+function MessageItemView({
   view,
   wallClockDurationMs,
   transcriptCommands = {},
   workspaceDir,
   onOpenFile,
   onOpenTurnReview,
-}: {
-  /** Narrowed leaf-renderer input (historical or live). */
-  readonly view: WebuiTurnView;
-  /** Group-level turn duration; computed by SessionTranscript's group collapse. */
-  readonly wallClockDurationMs?: number;
-  readonly workspaceDir?: string;
-  readonly onOpenFile?: (input: { readonly sessionId: string; readonly workspaceDir: string; readonly reference: WebuiMessageFileReference }) => void;
-  readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
-  readonly transcriptCommands?: WebuiTranscriptCommands;
-}): ReactElement {
+}: MessageItemProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
   // Narrowing: historical view can read historical-only fields; live view
   // can read live-only fields. The union member types live in
@@ -177,6 +201,23 @@ export function MessageItem({
       })
       .catch((error: unknown) => setMutationError(error instanceof Error ? error.message : String(error)));
   };
+  // The two callbacks the body hands down are stable across renders. An
+  // inline arrow would give the body a new identity on every streamed frame,
+  // which defeats the markdown renderer's own memo and its block reuse — the
+  // answer is re-rendered from scratch on every frame that arrives.
+  const handleOpenFile = useCallback(
+    (reference: WebuiMessageFileReference) => {
+      if (sessionId && workspaceDir) onOpenFile?.({ sessionId, workspaceDir, reference });
+    },
+    [onOpenFile, sessionId, workspaceDir],
+  );
+  const handleOpenTurnReview = useCallback(
+    (review: WebuiTurnDiffView, selectedPath?: string) => {
+      if (!sessionId || !workspaceDir) return;
+      onOpenTurnReview?.({ type: "open-turn-review", sessionId, workspaceDir, messageId, assistantMessageId: review.sourceMessageId ?? assistantMessageId ?? messageId, ...(turnId ? { turnId } : {}), ...(review.changeSetId ? { changeSetId: review.changeSetId } : {}), files: projectWebuiDiffFiles(review.fileChanges, workspaceDir), ...(selectedPath ? { selectedPath } : {}) });
+    },
+    [assistantMessageId, messageId, onOpenTurnReview, sessionId, turnId, workspaceDir],
+  );
   const actionProps = {
     role,
     messageId,
@@ -259,11 +300,8 @@ export function MessageItem({
         messageId={messageId}
         sessionId={sessionId}
         workspaceDir={workspaceDir}
-        onOpenFile={(reference) => { if (sessionId && workspaceDir) onOpenFile?.({ sessionId, workspaceDir, reference }); }}
-        onOpenTurnReview={(review, selectedPath) => {
-          if (!sessionId || !workspaceDir) return;
-          onOpenTurnReview?.({ type: "open-turn-review", sessionId, workspaceDir, messageId, assistantMessageId: review.sourceMessageId ?? assistantMessageId ?? messageId, ...(turnId ? { turnId } : {}), ...(review.changeSetId ? { changeSetId: review.changeSetId } : {}), files: projectWebuiDiffFiles(review.fileChanges, workspaceDir), ...(selectedPath ? { selectedPath } : {}) });
-        }}
+        onOpenFile={handleOpenFile}
+        onOpenTurnReview={handleOpenTurnReview}
         assistantMessageId={assistantMessageId ?? initialDiff?.sourceMessageId ?? messageId}
         turnId={turnId}
         changeSetId={initialDiff?.changeSetId}
@@ -287,3 +325,5 @@ export function MessageItem({
     </div>
   );
 }
+
+export const MessageItem = memo(MessageItemView, areMessageItemPropsEqual);

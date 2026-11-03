@@ -37,6 +37,10 @@ export function composeProcessLocalApplication(input: {
   readonly plugins: ProcessLocalApplicationOptions['plugins'];
   readonly pluginControl: ProcessLocalMiniAppArgs[0];
   readonly miniApp: ProcessLocalMiniAppArgs[1];
+  /** The page's tool channel, when the Host composed one. */
+  readonly miniAppTools?: ProcessLocalMiniAppArgs[2];
+  /** The prompts a page's `ask` is waiting on. */
+  readonly miniAppApprovals?: ProcessLocalMiniAppArgs[3];
   readonly miniAppAgent?: ProcessLocalMiniAppAgentGateway;
   readonly planEntryEnabled: () => boolean;
   readonly sessionReports?: ProcessLocalApplicationOptions['sessionReports'];
@@ -58,7 +62,12 @@ export function composeProcessLocalApplication(input: {
       installSkill: (request) => input.compatibility.skills.installSkill(request),
     },
     plugins: input.plugins,
-    miniApps: createProcessLocalMiniAppApplication(input.pluginControl, input.miniApp),
+    miniApps: createProcessLocalMiniAppApplication(
+      input.pluginControl,
+      input.miniApp,
+      input.miniAppTools,
+      input.miniAppApprovals,
+    ),
     workspace: {
       ...(input.compatibility.peripherals.workspace ?? {}),
       git: {

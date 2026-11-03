@@ -23,6 +23,90 @@ import { expect } from "@playwright/test";
 
 import { configureFixture, openApp, openLauncherTile, test } from "./harness.mjs";
 
+test("the left rail 应用 entry shows every installed Mini App as icon cards", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [
+        {
+          pluginId: "demo.miniapp",
+          displayName: "演示应用",
+          description: "可启动的应用",
+          iconUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='red'/%3E%3C/svg%3E",
+          runtime: { kind: "process", status: "stopped" },
+        },
+        {
+          pluginId: "disabled.miniapp",
+          displayName: "停用应用",
+          description: "仍然属于已安装列表",
+          enabled: false,
+          runtime: { kind: "process", status: "stopped" },
+        },
+      ] });
+    });
+  });
+  await openApp(page);
+
+  await page.getByRole("button", { name: "应用" }).click();
+
+  const launcher = page.getByTestId("miniapp-launcher");
+  await expect(launcher).toBeVisible();
+  await expect(launcher.getByTestId("miniapp-launcher-card-demo.miniapp")).toBeVisible();
+  await expect(launcher.getByTestId("miniapp-launcher-card-disabled.miniapp")).toBeVisible();
+  await expect(launcher).toContainText("演示应用");
+  await expect(launcher).toContainText("停用应用");
+  await expect(launcher.getByTestId("miniapp-launcher-icon-demo.miniapp")).toHaveAttribute("src", /^data:image\/svg\+xml/u);
+  await expect(launcher.getByTestId("miniapp-launcher-icon-demo.miniapp")).toHaveCSS("width", "76px");
+});
+
+test("a stopped app card opens its standalone tab directly", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.miniapp",
+        displayName: "演示应用",
+        runtime: { kind: "process", status: "stopped" },
+      }] });
+    });
+  });
+  await openApp(page);
+  await page.getByRole("button", { name: "应用" }).click();
+  const launcher = page.getByTestId("miniapp-launcher");
+  await expect(launcher.getByTestId("miniapp-launcher-card-demo.miniapp")).toBeVisible();
+
+  const popupPromise = page.waitForEvent("popup");
+  await launcher.getByRole("button", { name: "打开演示应用" }).click();
+  const popup = await popupPromise;
+  await expect(popup).toHaveURL(/\/miniapp\?token=synthetic-token&plugin=demo\.miniapp&session=A/u);
+  await expect(popup.getByTestId("miniapp-standalone")).toBeVisible();
+});
+
+test("a running app card cannot reopen and only exposes stop on hover", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "running.miniapp",
+        displayName: "运行中的应用",
+        runtime: { kind: "process", status: "running" },
+      }] });
+    });
+  });
+  await openApp(page);
+  await page.getByRole("button", { name: "应用" }).click();
+  const launcher = page.getByTestId("miniapp-launcher");
+  const card = launcher.getByTestId("miniapp-launcher-card-running.miniapp");
+  const stop = card.getByRole("button", { name: "关闭运行中的应用" });
+
+  await expect(card.getByRole("button", { name: "打开运行中的应用" })).toHaveCount(0);
+  await expect(stop).toHaveCSS("opacity", "0");
+  await card.hover();
+  await expect(stop).toHaveCSS("opacity", "1");
+  await stop.click();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "stopMiniApp"))).toBe(true);
+});
+
 /** The catalogue row the fixture answers with. */
 const MINI_APP = {
   pluginId: "demo.miniapp",

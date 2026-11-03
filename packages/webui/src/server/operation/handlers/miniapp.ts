@@ -21,8 +21,13 @@ import { WebuiCapabilityUnavailableError } from "../../../shared/envelope.js";
 import { MINIAPP_CAPABILITY_ABSENT } from "../../../runtime/port.js";
 import type { WebuiOperationPort } from "../bind-handlers.js";
 import {
+  callMiniAppToolOperation,
   listMiniAppsOperation,
+  replyMiniAppToolApprovalOperation,
+  watchMiniAppToolApprovalsOperation,
+  listMiniAppPermissionsOperation,
   openMiniAppOperation,
+  setMiniAppPermissionOperation,
   stopMiniAppOperation,
   watchMiniAppPresentationOperation,
   watchMiniAppPresenterOperation,
@@ -49,6 +54,10 @@ import type {
   WebuiMiniAppCatalogue,
   WebuiMiniAppPresentationState,
 } from "../../../shared/contracts/miniapp.js";
+import {
+  webuiMiniAppToolRefusalCode,
+  type WebuiMiniAppToolValue,
+} from "../../../shared/contracts/miniapp-tools.js";
 import type {
   WebuiOperationContext,
   WebuiOperationHandler,
@@ -96,6 +105,63 @@ function requireMiniApps(port: WebuiOperationPort): MiniAppCapability {
   // `executeBinding` does: a capability that reads `this` must see the object it
   // was taken from, not this wrapper.
   return { list: listMiniApps, open: openMiniApp, stop: stopMiniApp };
+}
+
+/**
+ * The permission members, or the same refusal.
+ *
+ * Separate from the trio above because it is a separate cell in practice: a host
+ * can serve Mini Apps while its runtime predates the permission read, and the
+ * catalogue must keep working in that host.
+ */
+function requireMiniAppPermissions(port: WebuiOperationPort): {
+  readonly listPermissions: NonNullable<WebuiOperationPort["listMiniAppPermissions"]>;
+  readonly setPermission: NonNullable<WebuiOperationPort["setMiniAppPermission"]>;
+} {
+  const { listMiniAppPermissions, setMiniAppPermission } = port;
+  if (typeof listMiniAppPermissions !== "function" || typeof setMiniAppPermission !== "function")
+    throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
+  // Called with the port as receiver, exactly as `executeBinding` does.
+  return {
+    listPermissions: (pluginId) => listMiniAppPermissions.call(port, pluginId),
+    setPermission: (input) => setMiniAppPermission.call(port, input),
+  };
+}
+
+/**
+ * The tool channel, or the same refusal.
+ *
+ * Its own cell because a Host can compose the Mini App surface without the page
+ * channel; only the tool operation refuses then.
+ */
+function requireMiniAppToolCall(port: WebuiOperationPort): NonNullable<
+  WebuiOperationPort["miniAppToolCall"]
+> {
+  const call = port.miniAppToolCall;
+  if (typeof call !== "function")
+    throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
+  // Called with the port as receiver, exactly as `executeBinding` does.
+  return (request) => call.call(port, request);
+}
+
+/**
+ * The prompt channel, or the same refusal.
+ *
+ * Its own cell because the channel can be composed without the tool channel: a host may
+ * serve `callMiniAppTool` and still have no way to ask a person anything.
+ */
+function requireMiniAppToolApprovals(port: WebuiOperationPort): {
+  readonly watch: NonNullable<WebuiOperationPort["watchMiniAppToolApprovals"]>;
+  readonly reply: NonNullable<WebuiOperationPort["replyMiniAppToolApproval"]>;
+} {
+  const watch = port.watchMiniAppToolApprovals;
+  const reply = port.replyMiniAppToolApproval;
+  if (typeof watch !== "function" || typeof reply !== "function")
+    throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
+  return {
+    watch: (onFrame, onFailure) => watch.call(port, onFrame, onFailure),
+    reply: (input) => reply.call(port, input),
+  };
 }
 
 export interface MiniAppHandlerOptions {
@@ -468,7 +534,140 @@ export function createMiniAppHandlerEntries(
     });
   };
 
+  /**
+   * The permission list and its writer.
+   *
+   * Both refuse with `capability_unavailable` when the host has no permission read,
+   * and only these two do: a host that serves Mini Apps without it still shows a
+   * catalogue.
+   */
+  const listMiniAppPermissions: DedicatedHandler<typeof listMiniAppPermissionsOperation> = async (
+    _context,
+    body,
+  ) => {
+    const { listPermissions } = requireMiniAppPermissions(port);
+    return { body: await listPermissions(body.pluginId) };
+  };
+
+  const setMiniAppPermission: DedicatedHandler<typeof setMiniAppPermissionOperation> = async (
+    _context,
+    body,
+  ) => {
+    const { setPermission } = requireMiniAppPermissions(port);
+    return { body: await setPermission(body) };
+  };
+
+  /**
+   * One page tool request.
+   *
+   * A refusal is a body, not an envelope error: the page compares `ok` and acts on the
+   * code (`TOOL_NOT_PERMITTED`, `TOOL_APPROVAL_REQUIRED`), and an error raised here would
+   * reach it through the transport with the difference already erased.
+   */
+  const callMiniAppTool: DedicatedHandler<typeof callMiniAppToolOperation> = async (
+    _context,
+    body,
+  ) => {
+    const call = requireMiniAppToolCall(port);
+    try {
+      return { body: { ok: true as const, value: (await call(body)) as WebuiMiniAppToolValue } };
+    } catch (error) {
+      return { body: { ok: false as const, code: webuiMiniAppToolRefusalCode(error) } };
+    }
+  };
+
+  /**
+   * The prompts waiting for a person.
+   *
+   * A stream rather than a read: a prompt appears while a call is already waiting, so the
+   * client has to be told, and it has to still be connected when the answer is given. The
+   * first frame is the list as it stands, so a client that connects late still renders it.
+   */
+  const watchMiniAppToolApprovals: DedicatedHandler<
+    typeof watchMiniAppToolApprovalsOperation
+  > = async (context: WebuiOperationContext) => {
+    const { watch } = requireMiniAppToolApprovals(port);
+    const source = (async function* () {
+      const queued: Parameters<Parameters<typeof watch>[0]>[0][] = [];
+      let wake: (() => void) | undefined;
+      const stop = watch((frame) => {
+        queued.push(frame);
+        wake?.();
+      });
+      try {
+        while (!context.signal?.aborted) {
+          const frame = queued.shift();
+          if (frame) {
+            yield frame;
+            continue;
+          }
+          await new Promise<void>((resolve) => {
+            const finish = (): void => {
+              context.signal?.removeEventListener("abort", finish);
+              wake = undefined;
+              resolve();
+            };
+            wake = finish;
+            context.signal?.addEventListener("abort", finish, { once: true });
+          });
+        }
+      } finally {
+        stop();
+      }
+    })();
+    return {
+      stream: {
+        ok: true,
+        source: source as unknown as AsyncIterable<Record<string, unknown>>,
+      },
+    };
+  };
+
+  /** One answer. An id that is gone, or another package's, is the runtime's refusal. */
+  const replyMiniAppToolApproval: DedicatedHandler<
+    typeof replyMiniAppToolApprovalOperation
+  > = async (_context, body) => {
+    const { reply } = requireMiniAppToolApprovals(port);
+    await reply(body);
+    return { body: { success: true as const } };
+  };
+
   return new Map([
+    [
+      watchMiniAppToolApprovalsOperation.name,
+      {
+        operation: watchMiniAppToolApprovalsOperation,
+        handle: watchMiniAppToolApprovals as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      replyMiniAppToolApprovalOperation.name,
+      {
+        operation: replyMiniAppToolApprovalOperation,
+        handle: replyMiniAppToolApproval as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      callMiniAppToolOperation.name,
+      {
+        operation: callMiniAppToolOperation,
+        handle: callMiniAppTool as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      listMiniAppPermissionsOperation.name,
+      {
+        operation: listMiniAppPermissionsOperation,
+        handle: listMiniAppPermissions as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      setMiniAppPermissionOperation.name,
+      {
+        operation: setMiniAppPermissionOperation,
+        handle: setMiniAppPermission as WebuiOperationHandler<unknown>,
+      },
+    ],
     [
       listMiniAppsOperation.name,
       {

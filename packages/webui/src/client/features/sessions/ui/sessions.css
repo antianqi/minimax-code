@@ -339,11 +339,11 @@
     padding-right: var(--spacing_8);
     text-align: left;
   }
-  .webui-project-child-session-card > span:first-of-type {
+  .webui-project-child-session-title {
     clip-path: inset(0 0 0 0);
   }
-  .webui-project-child-session-row:hover .webui-project-child-session-card > span:first-of-type,
-  .webui-project-child-session-row:focus-within .webui-project-child-session-card > span:first-of-type {
+  .webui-project-child-session-row:hover .webui-project-child-session-title,
+  .webui-project-child-session-row:focus-within .webui-project-child-session-title {
     clip-path: inset(0 28px 0 0);
   }
   .webui-project-child-session-card:hover,

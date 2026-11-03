@@ -114,6 +114,9 @@ test("the sign-in loading skeleton stays visible while its panel request is pend
 
   const skeleton = page.locator('[data-testid="signin-card-skeleton"]');
   await expect(skeleton).toBeVisible();
+  await expect(skeleton.locator(".signin-progress, [data-testid^='signin-day-']")).toHaveCount(0);
+  await expect(skeleton.locator(".webui-skeleton")).toHaveCount(8);
+  await expect.poll(() => skeleton.locator(".webui-skeleton").first().evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-skeleton-pulse");
   const surface = skeleton.locator(".signin-card-surface");
   const surfaceBackground = await surface.evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(surfaceBackground).not.toBe("rgba(0, 0, 0, 0)");

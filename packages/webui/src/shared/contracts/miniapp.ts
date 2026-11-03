@@ -270,3 +270,28 @@ export interface WebuiMiniAppBridgeAppendReply {
   readonly requestId: string;
   readonly result: WebuiMiniAppComposerResult;
 }
+
+/**
+ * One declared Mini App permission and whether it is on.
+ *
+ * `id` is the runtime's `domain:item` string, published unchanged: it is the value a
+ * client sends back, so translating it here would create a second spelling of the
+ * same decision.
+ */
+export interface WebuiMiniAppPermissionItem {
+  readonly id: string;
+  readonly enabled: boolean;
+}
+
+/**
+ * One package's declared permissions, with the switches as stored.
+ *
+ * `source` says which half of the Plugin inventory answered — an official package
+ * and a local one can serve the same id, and the stored decision follows the
+ * package it was made for.
+ */
+export interface WebuiMiniAppPermissionList {
+  readonly pluginId: string;
+  readonly source: "local" | "official";
+  readonly items: readonly WebuiMiniAppPermissionItem[];
+}

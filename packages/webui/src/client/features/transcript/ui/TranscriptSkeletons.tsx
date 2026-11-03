@@ -51,7 +51,6 @@ export function ChatSkeleton(): React.JSX.Element {
   return (
     <WebuiStack className="flex-1 overflow-hidden" data-testid="chat-skeleton">
       <WebuiStack
-        className="mx-auto"
         style={{ maxWidth: `${SKELETON_CONTENT_MAX_WIDTH_PX}px` }}
       >
         <WebuiInline justify="end">

@@ -7,6 +7,8 @@
 // the state they own.
 
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -83,7 +85,7 @@ interface RailMenuHandlers {
   readonly onArchiveProject?: (project: WebuiProjectGroup) => void;
 }
 
-export function WebuiProjectList({
+function WebuiProjectListView({
   page,
   treePage,
   projectRecords,
@@ -231,6 +233,30 @@ export function WebuiProjectList({
   const [visibleProjectSessionCounts, setVisibleProjectSessionCounts] =
     useState<Readonly<Record<string, number>>>({});
   const [visibleProjectCount, setVisibleProjectCount] = useState(PROJECT_GROUP_BATCH_SIZE);
+  const toggleProjectExpansion = useCallback((projectKey: string) => {
+    projectExpansionTouched.current = true;
+    setExpandedProjects((current) => {
+      const next = new Set(current);
+      if (next.has(projectKey)) next.delete(projectKey);
+      else next.add(projectKey);
+      return next;
+    });
+  }, []);
+  const toggleSessionExpansion = useCallback((sessionId: string) => {
+    sessionExpansionTouched.current = true;
+    setExpandedSessions((current) => {
+      const next = new Set(current);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  }, []);
+  const showMoreProjectSessions = useCallback((projectKey: string) => {
+    setVisibleProjectSessionCounts((current) => ({
+      ...current,
+      [projectKey]: (current[projectKey] ?? PROJECT_SESSION_BATCH_SIZE) + PROJECT_SESSION_BATCH_SIZE,
+    }));
+  }, []);
   const menuAttachment = useRailContextMenu();
   const sessionsById = useMemo(
     () => new Map(page.sessions.map((session) => [session.sessionId, session])),
@@ -369,47 +395,60 @@ export function WebuiProjectList({
     }).map(render);
   };
 
-  const openSessionMenu = (
+  const railMenuContext = useRef({
+    menuAttachment, buildRailMenu, pinnedSessions, pinnedProjects,
+    onToggleSessionPin, onRenameSession, onArchiveSession, onForkSession,
+    onCopySession, onExportSession, onDeleteSession, onRenameProject,
+    onToggleProjectPin, onArchiveProject,
+  });
+  railMenuContext.current = {
+    menuAttachment, buildRailMenu, pinnedSessions, pinnedProjects,
+    onToggleSessionPin, onRenameSession, onArchiveSession, onForkSession,
+    onCopySession, onExportSession, onDeleteSession, onRenameProject,
+    onToggleProjectPin, onArchiveProject,
+  };
+  const openSessionMenu = useCallback((
     event: MouseEvent<HTMLElement>,
     session: WebuiClientSession,
     isChild = false,
   ) => {
-    menuAttachment.open(
+    const context = railMenuContext.current;
+    context.menuAttachment.open(
       event,
-      buildRailMenu(isChild ? "child-session" : "session", {
+      context.buildRailMenu(isChild ? "child-session" : "session", {
         session,
-        pinned: Boolean(pinnedSessions?.[session.sessionId]),
+        pinned: Boolean(context.pinnedSessions?.[session.sessionId]),
         archived: Boolean(session.archived),
         hasWorkspaceDir: Boolean(session.workspaceDir),
-        onToggleSessionPin,
-        onRenameSession,
-        onArchiveSession,
-        onForkSession,
-        onCopySession,
-        onExportSession,
-        onDeleteSession,
+        onToggleSessionPin: context.onToggleSessionPin,
+        onRenameSession: context.onRenameSession,
+        onArchiveSession: context.onArchiveSession,
+        onForkSession: context.onForkSession,
+        onCopySession: context.onCopySession,
+        onExportSession: context.onExportSession,
+        onDeleteSession: context.onDeleteSession,
       }),
     );
-  };
-
-  const openProjectMenu = (
+  }, []);
+  const openProjectMenu = useCallback((
     event: MouseEvent<HTMLElement>,
     project: WebuiProjectGroup,
   ) => {
+    const context = railMenuContext.current;
     if (!project.workspaceDir) return;
-    menuAttachment.open(
+    context.menuAttachment.open(
       event,
-      buildRailMenu("project", {
+      context.buildRailMenu("project", {
         project,
-        pinned: Boolean(pinnedProjects?.[project.key]),
+        pinned: Boolean(context.pinnedProjects?.[project.key]),
         archived: false,
         hasWorkspaceDir: true,
-        onRenameProject,
-        onToggleProjectPin,
-        onArchiveProject,
+        onRenameProject: context.onRenameProject,
+        onToggleProjectPin: context.onToggleProjectPin,
+        onArchiveProject: context.onArchiveProject,
       }),
     );
-  };
+  }, []);
 
   useEffect(() => {
     const key = resolveDefaultExpandedProjectKey(
@@ -507,34 +546,11 @@ export function WebuiProjectList({
         expandedSessions={expandedSessionsForRender}
         visibleProjectSessionCounts={visibleProjectSessionCounts}
         onProjectSelect={onProjectSelect}
-        onToggleProject={(projectKey) => {
-          projectExpansionTouched.current = true;
-          setExpandedProjects((current) => {
-            const next = new Set(current);
-            if (next.has(projectKey)) next.delete(projectKey);
-            else next.add(projectKey);
-            return next;
-          });
-        }}
+        onToggleProject={toggleProjectExpansion}
         onOpenProjectMenu={openProjectMenu}
         onCreateTaskInProject={onCreateTaskInProject}
-        onToggleChildren={(sessionId) => {
-          sessionExpansionTouched.current = true;
-          setExpandedSessions((current) => {
-            const next = new Set(current);
-            if (next.has(sessionId)) next.delete(sessionId);
-            else next.add(sessionId);
-            return next;
-          });
-        }}
-        onShowMore={(projectKey) => {
-          setVisibleProjectSessionCounts((current) => ({
-            ...current,
-            [projectKey]:
-              (current[projectKey] ?? PROJECT_SESSION_BATCH_SIZE) +
-              PROJECT_SESSION_BATCH_SIZE,
-          }));
-        }}
+        onToggleChildren={toggleSessionExpansion}
+        onShowMore={showMoreProjectSessions}
         onToggleSessionPin={onToggleSessionPin}
         onArchiveSession={onArchiveSession}
         onSessionContextMenu={openSessionMenu}
@@ -550,3 +566,5 @@ export function WebuiProjectList({
     </section>
   );
 }
+
+export const WebuiProjectList = memo(WebuiProjectListView);

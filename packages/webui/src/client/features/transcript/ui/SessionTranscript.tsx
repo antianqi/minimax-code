@@ -2,7 +2,7 @@
 // flattening, history paging, streaming loader, and the embedded
 // WebuiQuestionnaireResponse renderer for historical questionnaire answers.
 
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { IconChevronUp } from "@tabler/icons-react";
 import { ChatSkeleton } from "./TranscriptSkeletons.js";
 import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
@@ -152,7 +152,7 @@ export function projectTurnNavigatorPreview(input: {
   };
 }
 
-export function WebuiSessionTranscript({
+function WebuiSessionTranscriptView({
   sessionId,
   initialMessages,
   transcriptCommands,
@@ -263,7 +263,6 @@ export function WebuiSessionTranscript({
     transcriptRef,
     sessionId,
     turnLive,
-    contentKey: items,
   });
   // The navigator's tick interactions: hover decides which turn the preview
   // card describes, activation jumps the viewport to that turn's message root.
@@ -565,3 +564,5 @@ export function WebuiSessionTranscript({
     </section>
   );
 }
+
+export const WebuiSessionTranscript = memo(WebuiSessionTranscriptView);

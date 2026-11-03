@@ -3,7 +3,7 @@ import type { HostProcessConnectorGateway } from '../host-connector-system/index
 import type { MiniAppAgentGateway } from './agent/contracts.js';
 import { HostMiniAppPortRegistry } from './process/node-runtime/port-registry.js';
 import { DrizzleMiniAppStateStore } from './supervisor/state.repository.js';
-import type { MiniAppCandidate, MiniAppSupervisor } from './contracts.js';
+import type { MiniAppCandidate, MiniAppSupervisor, MiniAppPermissionSwitchPort } from './contracts.js';
 import { createMiniAppHostConnectorSessionFactory } from './process/host-connector/host-connector.js';
 import { createMiniAppNodeRuntimeAdapter } from './process/node-runtime/node-runtime.js';
 import { DefaultMiniAppSupervisor } from './supervisor/supervisor.js';
@@ -13,6 +13,8 @@ export interface InitializeMiniAppSupervisorOptions {
   readonly connectorGateway: HostProcessConnectorGateway;
   /** The runtime's Agent gateway; the child IPC connector registers its arena against it. */
   readonly agentGateway?: MiniAppAgentGateway;
+  /** The user's permission switches, read when a Connector or Agent request arrives. */
+  readonly permissionSwitches?: MiniAppPermissionSwitchPort;
   /** Stable runtime-owner label shown when another client already owns a Mini App. */
   readonly ownerClient?: string;
   readonly verifyCandidate: (candidate: MiniAppCandidate) => Promise<boolean>;
@@ -43,6 +45,7 @@ export function initializeMiniAppSupervisor(
     hostConnectorSessionFactory: createMiniAppHostConnectorSessionFactory({
       gateway: options.connectorGateway,
       ...(options.agentGateway ? { agentGateway: options.agentGateway } : {}),
+      ...(options.permissionSwitches ? { permissionSwitches: options.permissionSwitches } : {}),
     }),
   });
   const supervisor = new DefaultMiniAppSupervisor({

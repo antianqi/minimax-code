@@ -174,8 +174,14 @@ import type {
 import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.js";
 import type {
   WebuiMiniAppList,
+  WebuiMiniAppPermissionList,
   WebuiMiniAppSummary,
 } from "../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppToolApprovalAnswer,
+  WebuiMiniAppToolApprovalFrame,
+  WebuiMiniAppToolValue,
+} from "../shared/contracts/miniapp-tools.js";
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
 import type { WebuiUsageQuotaResult } from "../shared/contracts/usage-quota.js";
 import type {
@@ -668,6 +674,51 @@ export interface WebuiHarnessPort {
     readonly pluginId: string;
     readonly signal?: AbortSignal;
   }): Promise<void>;
+  /**
+   * One package's declared Mini App permissions with the stored switches.
+   *
+   * Optional with the rest of the cell, and refused separately: a host that serves
+   * Mini Apps but cannot answer this still shows a catalogue, so the permission
+   * operations refuse alone (`MINIAPP_CAPABILITY_ABSENT`) instead of taking the
+   * whole surface down with them.
+   */
+  listMiniAppPermissions?(pluginId: string): Promise<WebuiMiniAppPermissionList>;
+  /** Stores one switch; the reply is the list as it now stands. */
+  setMiniAppPermission?(request: {
+    readonly pluginId: string;
+    readonly permission: string;
+    readonly enabled: boolean;
+  }): Promise<WebuiMiniAppPermissionList>;
+  /**
+   * One request from a framed page's tool channel.
+   *
+   * Separate from the permission cell: a Host can publish switches before it composes
+   * the channel, and the page then hears `capability_unavailable` for tools while its
+   * switches still list and set. The answer is the channel's own shape (`unknown` here),
+   * which the handler wraps into the page's `ok` / `ok: false` contract.
+   */
+  miniAppToolCall?(request: {
+    readonly pluginId: string;
+    readonly method: "list" | "request" | "call";
+    readonly name?: string;
+    readonly names?: readonly string[];
+    readonly arguments?: unknown;
+  }): Promise<WebuiMiniAppToolValue>;
+  /**
+   * The tool prompts waiting for a person, pushed whenever the list changes.
+   *
+   * A subscription, not a read: a prompt appears while a page's call is already waiting,
+   * and it leaves when someone answers it or it times out. `onFailure` fires when the
+   * host has no channel at all, which is a different state from an empty list.
+   */
+  watchMiniAppToolApprovals?(
+    onFrame: (frame: WebuiMiniAppToolApprovalFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
+  /** One answer to one prompt. The prompt it names is settled by it. */
+  replyMiniAppToolApproval?(
+    input: WebuiMiniAppToolApprovalAnswer,
+  ): Promise<{ readonly success: true }>;
   /**
    * The Mini App Agent API: what a page's `window.mcode.miniapp.agent` reaches.
    *

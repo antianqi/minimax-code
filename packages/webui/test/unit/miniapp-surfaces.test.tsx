@@ -56,6 +56,13 @@ function port(input: {
   readonly open?: (pluginId: string) => Promise<{ pluginId: string; viewUrl: string }>;
   readonly stop?: () => Promise<void>;
   readonly standaloneUrl?: (input: { pluginId: string; sessionId: string }) => string;
+  readonly permissions?: (
+    pluginId: string,
+  ) => Promise<{
+    pluginId: string;
+    source: "local" | "official";
+    items: readonly { id: string; enabled: boolean }[];
+  }>;
   readonly watch?: (
     request: { pluginId: string; sessionId: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
@@ -70,6 +77,7 @@ function port(input: {
       await input.stop?.();
       return { success: true as const };
     },
+    ...(input.permissions ? { listMiniAppPermissions: input.permissions } : {}),
     ...(input.standaloneUrl ? { miniappStandaloneUrl: input.standaloneUrl } : {}),
     ...(input.watch ? { watchMiniAppPresentation: input.watch } : {}),
   };
@@ -824,5 +832,96 @@ describe("a detached view whose standalone tab goes away", () => {
     expect(confirmationReads).toBe(2);
     expect(opens).toBe(1);
     expect(workflows.getSnapshot().presentations[PLUGIN]).toMatchObject({ connection: 1 });
+  });
+});
+
+describe("the device access a Mini App is framed with", () => {
+  // The frame's `allow` attribute is the browser's own gate: a document without it
+  // cannot reach the device, whatever the page inside asks for. That makes it the
+  // one place a `device:*` switch takes effect on the client.
+  const list = (items: readonly { id: string; enabled: boolean }[]) =>
+    async (pluginId: string) => ({ pluginId, source: "official" as const, items });
+
+  async function framed(permissions?: ReturnType<typeof list>): Promise<string> {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: port({ miniApps: [summary("pet", "running")], permissions }),
+    });
+    await workflows.loadListing();
+    await workflows.open("pet");
+    return render(
+      createElement(MiniAppView, { pluginId: "pet", sessionId: "session-1" }),
+      workflows,
+    );
+  }
+
+  it("frames the page with the microphone when the package's switch is on", async () => {
+    const markup = await framed(list([{ id: "device:microphone", enabled: true }]));
+
+    expect(markup).toContain("miniapp-view-frame");
+    expect(markup).toContain('allow="microphone"');
+  });
+
+  it("frames it without the microphone once the switch is off", async () => {
+    const markup = await framed(list([{ id: "device:microphone", enabled: false }]));
+
+    expect(markup).toContain("miniapp-view-frame");
+    expect(markup).not.toContain("microphone");
+  });
+
+  it("asks for nothing when the package declares no device", async () => {
+    const markup = await framed(list([{ id: "agent:session.run", enabled: true }]));
+
+    expect(markup).toContain("miniapp-view-frame");
+    expect(markup).not.toContain("microphone");
+  });
+
+  it("opens the page with no device when the host cannot report switches", async () => {
+    // No port method means no answer, and no answer must not read as a grant.
+    expect(await framed(undefined)).not.toContain("microphone");
+  });
+
+  it("remounts the frame when the switch changes, because the browser reads it once", async () => {
+    // The feature policy is latched at navigation: changing the attribute on a
+    // loaded document changes nothing, so the frame has to be replaced.
+    let microphone = true;
+    const items = () => [{ id: "device:microphone", enabled: microphone }];
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        ...port({ miniApps: [summary("pet", "running")] }),
+        listMiniAppPermissions: async (pluginId: string) => ({
+          pluginId,
+          source: "official" as const,
+          items: items(),
+        }),
+        setMiniAppPermission: async ({
+          pluginId,
+          permission,
+          enabled,
+        }: {
+          pluginId: string;
+          permission: string;
+          enabled: boolean;
+        }) => {
+          if (permission === "device:microphone") microphone = enabled;
+          return { pluginId, source: "official" as const, items: items() };
+        },
+      },
+    });
+    await workflows.loadListing();
+    await workflows.open("pet");
+    const before = render(
+      createElement(MiniAppView, { pluginId: "pet", sessionId: "session-1" }),
+      workflows,
+    );
+
+    await workflows.setPermission("pet", "device:microphone", false);
+    const after = render(
+      createElement(MiniAppView, { pluginId: "pet", sessionId: "session-1" }),
+      workflows,
+    );
+
+    expect(before).toContain('allow="microphone"');
+    expect(after).not.toBe(before);
+    expect(after).not.toContain('allow="microphone"');
   });
 });

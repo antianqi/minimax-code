@@ -152,6 +152,9 @@ export class OfficialPluginReconciler {
     try {
       if (!mutation.installExists) {
         byName.delete(mutation.pluginName);
+        // An explicit uninstall takes the stored switches with it: a package installed again later
+        // is a fresh decision, and a stale row would silently pre-deny what it declares.
+        this.options.repository.deleteMiniAppPermissions(mutation.pluginName, 'official');
       } else {
         if (!mutation.package || mutation.package.name !== mutation.pluginName) {
           throw new Error('installed Plugin mutation is missing its current package');

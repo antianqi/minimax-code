@@ -137,7 +137,7 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
   const popover = page.getByTestId("usage-popover");
   await expect(popover).toHaveAttribute("data-webui-motion", "surface");
   await expect(popover).toHaveAttribute("data-webui-motion-state", "enter");
-  const skeletons = page.locator('[data-testid="usage-popover-loading"] .webui-skeleton--pulse.webui-motion-loading');
+  const skeletons = page.locator('[data-testid="usage-popover-loading"] .webui-skeleton.webui-motion-loading');
   await expect(skeletons).toHaveCount(8);
   await expect.poll(() => skeletons.first().evaluate((element) => getComputedStyle(element).animationName))
     .toBe("webui-skeleton-pulse");

@@ -559,7 +559,29 @@
     max-height: 320px;
     flex-direction: column;
     overflow-y: auto;
-    padding: var(--spacing_4);
+    gap: var(--spacing_2);
+    padding: var(--spacing_8);
+  }
+  .webui-workspace-menu-header {
+    padding: var(--spacing_4) var(--spacing_12) var(--spacing_6);
+    color: var(--text_default_tertiary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+  }
+  .webui-workspace-option {
+    width: 100%;
+    min-height: 40px;
+    justify-content: flex-start;
+    gap: var(--spacing_8);
+    border-radius: var(--radius_8);
+    padding: 0 var(--spacing_12);
+    text-align: left;
+  }
+  .webui-workspace-menu-separator {
+    height: 1px;
+    flex: 0 0 auto;
+    margin: var(--spacing_4) var(--spacing_8);
+    background: var(--border_default);
   }
   /* The command palette is a dropdown now: the shared layer places it against
    * the composer's input box and gives it the surface and the motion. Which

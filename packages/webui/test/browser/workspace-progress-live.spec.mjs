@@ -72,6 +72,10 @@ test("environment loading skeleton geometry", async ({ page }) => {
   ))).toBe(true);
   const environment = page.locator(".webui-environment-panel.is-loading");
   await expect(environment).toBeVisible();
+  const loadingActions = environment.locator(".webui-environment-actions > .webui-environment-action.webui-motion-loading");
+  await expect(loadingActions).toHaveCount(3);
+  await expect.poll(() => loadingActions.first().evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-skeleton-pulse");
+  await expect.poll(() => loadingActions.first().evaluate((element) => getComputedStyle(element).backgroundColor !== "rgba(0, 0, 0, 0)")).toBe(true);
   const rowGeometry = await environment.locator(".webui-environment-actions > .webui-environment-action").evaluateAll((elements) => elements.map((element) => {
     const rect = element.getBoundingClientRect();
     return { top: rect.top, bottom: rect.bottom, height: rect.height };

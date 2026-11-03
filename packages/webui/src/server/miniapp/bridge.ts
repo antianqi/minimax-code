@@ -27,6 +27,11 @@ import {
   WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST,
   WEBUI_MINIAPP_BRIDGE_AGENT_RESULT,
 } from "../../shared/contracts/miniapp-agent.js";
+import {
+  WEBUI_MINIAPP_BRIDGE_TOOL_REQUEST,
+  WEBUI_MINIAPP_BRIDGE_TOOL_RESULT,
+  WEBUI_MINIAPP_TOOL_MAX_NAMES,
+} from "../../shared/contracts/miniapp-tools.js";
 import type { MiniAppPageBridge } from "./proxy.js";
 
 /**
@@ -80,6 +85,9 @@ const SCRIPT = `(function () {
   mcode.miniapp = mcode.miniapp || {};
   var capabilities = [
     "message.append",
+    "tools.list",
+    "tools.request",
+    "tools.call",
     "agent.run",
     "agent.open",
     "agent.models",
@@ -220,6 +228,71 @@ const SCRIPT = `(function () {
       } catch (ignored) {
         // The document is going away; there is nothing left to cancel.
       }
+    }
+  };
+  // ---------------------------------------------------------------------
+  // The tool block: window.mcode.miniapp.tools.
+  //
+  // A page asks which tools the Host may let it use, asks for approval of the rest,
+  // and calls one. Identity never travels from here: the host knows which Mini App it
+  // framed, and a page that could name another would be calling with someone else's
+  // permissions. A request that cannot be one this host answers is refused before it
+  // is sent, so a malformed call never reaches the client.
+  // ---------------------------------------------------------------------
+  var TOOL_REQUEST = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_TOOL_REQUEST)};
+  var TOOL_RESULT = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_TOOL_RESULT)};
+  var TOOL_MAX_NAMES = ${WEBUI_MINIAPP_TOOL_MAX_NAMES};
+  var toolSequence = 0;
+  var toolPending = new Map();
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent) return;
+    var data = event.data;
+    if (!data || typeof data !== "object" || data.type !== TOOL_RESULT) return;
+    if (typeof data.requestId !== "string") return;
+    var settle = toolPending.get(data.requestId);
+    if (!settle) return;
+    toolPending.delete(data.requestId);
+    settle(data.result);
+  });
+  function toolRequest(method, body) {
+    return new Promise(function (resolve, reject) {
+      toolSequence += 1;
+      var requestId = "tool-" + Date.now().toString(36) + "-" + toolSequence;
+      toolPending.set(requestId, function (result) {
+        if (result && result.ok === true) {
+          resolve(result.value);
+          return;
+        }
+        reject(new Error(result && typeof result.code === "string" ? result.code : "result_unknown"));
+      });
+      var message = { type: TOOL_REQUEST, requestId: requestId, method: method };
+      if (body && typeof body === "object") {
+        for (var key in body) {
+          if (Object.prototype.hasOwnProperty.call(body, key)) message[key] = body[key];
+        }
+      }
+      window.parent.postMessage(message, "*");
+    });
+  }
+  function rejectInvalid() {
+    return Promise.reject(new Error("invalid_request"));
+  }
+  mcode.miniapp.tools = {
+    list: function () {
+      return toolRequest("list");
+    },
+    request: function (names) {
+      if (!Array.isArray(names) || names.length === 0 || names.length > TOOL_MAX_NAMES) {
+        return rejectInvalid();
+      }
+      for (var index = 0; index < names.length; index += 1) {
+        if (typeof names[index] !== "string" || names[index].length === 0) return rejectInvalid();
+      }
+      return toolRequest("request", { names: names });
+    },
+    call: function (name, input) {
+      if (typeof name !== "string" || name.length === 0) return rejectInvalid();
+      return toolRequest("call", { name: name, arguments: input });
     }
   };
 })();

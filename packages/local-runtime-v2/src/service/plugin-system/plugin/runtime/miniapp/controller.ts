@@ -38,6 +38,15 @@ import {
   SupervisedMiniAppPublicationParticipant,
 } from './publication.js';
 import { projectColdMiniAppPublication, type MiniAppSnapshotBuildContext } from './projection.js';
+import {
+  createMiniAppPermissionSwitches,
+  findMiniAppPermissionTarget,
+  miniAppPermissionList,
+  type MiniAppPermissionListResult,
+  type MiniAppPermissionSwitches,
+  type MiniAppPermissionTarget,
+} from './permissions.js';
+import type { MiniAppPermissionSource } from '../repository.js';
 import { restartSupervisedMiniAppPublication, type MiniAppRestartInput } from './restart.js';
 
 interface PluginMiniAppPublicationHost {
@@ -84,6 +93,20 @@ export class PluginMiniAppPublicationController {
       >;
       readonly readSnapshotBuildInputs: () => Promise<PluginSnapshotBuildInputs>;
       readonly recordLocalMutation: () => void;
+      /** The persisted switches; writes stay here so a stored decision is one operation. */
+      readonly miniAppPermissions: {
+        listDisabledMiniAppPermissions(
+          pluginId: string,
+          source: MiniAppPermissionSource,
+        ): ReadonlySet<string>;
+        setMiniAppPermissionEnabled(
+          pluginId: string,
+          source: MiniAppPermissionSource,
+          permission: string,
+          enabled: boolean,
+        ): void;
+        deleteMiniAppPermissions(pluginId: string, source: MiniAppPermissionSource): void;
+      };
     },
   ) {
     this.nameReservation = new PluginNameReservation({
@@ -91,9 +114,19 @@ export class PluginMiniAppPublicationController {
       readLocalPackages: () => options.packageStorage.scanLocalPackages(),
       isLocalEnabled: options.isLocalEnabled,
     });
+    this.permissionSwitchesValue = createMiniAppPermissionSwitches({
+      store: options.miniAppPermissions,
+      snapshots: () => [options.host.currentSnapshot],
+    });
   }
 
   private readonly nameReservation: PluginNameReservation;
+  private readonly permissionSwitchesValue: MiniAppPermissionSwitches;
+
+  /** The switches every gateway reads; a change published here reaches them all. */
+  get permissionSwitches(): MiniAppPermissionSwitches {
+    return this.permissionSwitchesValue;
+  }
 
   get participant(): SupervisedMiniAppPublicationParticipant | undefined {
     return this.participantValue;
@@ -131,6 +164,77 @@ export class PluginMiniAppPublicationController {
     return accepted
       ? (this.participantValue?.isAcceptedCandidateRunning(accepted.candidate) ?? false)
       : false;
+  }
+
+  /** One package's declared items with their stored switches. */
+  async permissionList(pluginId: string): Promise<MiniAppPermissionListResult> {
+    return this.permissionListFor(await this.requirePermissionTarget(pluginId));
+  }
+
+  /**
+   * Stores one decision and tells the gateways.
+   *
+   * Only a declared item can be switched: an id the package never asked for is a client mistake, not
+   * a permission to grant. Writing the stored value again changes nothing and publishes nothing,
+   * because the gateways already hold it.
+   */
+  async setPermission(input: {
+    readonly pluginId: string;
+    readonly permission: string;
+    readonly enabled: boolean;
+  }): Promise<MiniAppPermissionListResult> {
+    const target = await this.requirePermissionTarget(input.pluginId);
+    if (!target.declared.includes(input.permission)) {
+      throw new PluginSystemError(
+        'MINIAPP_PERMISSION_UNKNOWN',
+        'Mini App does not declare this permission',
+      );
+    }
+    const disabled = this.options.miniAppPermissions.listDisabledMiniAppPermissions(
+      target.pluginId,
+      target.source,
+    );
+    const stored = !disabled.has(input.permission);
+    if (stored !== input.enabled) {
+      this.options.miniAppPermissions.setMiniAppPermissionEnabled(
+        target.pluginId,
+        target.source,
+        input.permission,
+        input.enabled,
+      );
+      this.permissionSwitchesValue.publish({
+        pluginId: target.pluginId,
+        permission: input.permission,
+        enabled: input.enabled,
+      });
+    }
+    return this.permissionListFor(target);
+  }
+
+  /** Called after an explicit uninstall: a reinstalled package starts with every item enabled. */
+  forgetPermissions(pluginId: string, source: MiniAppPermissionSource): void {
+    this.options.miniAppPermissions.deleteMiniAppPermissions(pluginId, source);
+  }
+
+  private permissionListFor(target: MiniAppPermissionTarget): MiniAppPermissionListResult {
+    return miniAppPermissionList({
+      pluginId: target.pluginId,
+      source: target.source,
+      declared: target.declared,
+      disabled: this.options.miniAppPermissions.listDisabledMiniAppPermissions(
+        target.pluginId,
+        target.source,
+      ),
+    });
+  }
+
+  private async requirePermissionTarget(pluginId: string): Promise<MiniAppPermissionTarget> {
+    const snapshot = await this.options.readAvailableSnapshot();
+    const target = findMiniAppPermissionTarget(snapshot, pluginId);
+    if (!target) {
+      throw new PluginSystemError('MINIAPP_NOT_FOUND', 'Mini App is not installed');
+    }
+    return target;
   }
 
   materializeRuntimePackage(input: {

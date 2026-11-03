@@ -923,10 +923,8 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
       // popup in the client slide. The fly-out surface is the same sheet: it
       // carries the same motion, so it carries the same override.
       ".webui-dropdown-popup, .webui-dropdown-popup.is-leaving, .webui-flyout-surface",
-      // The shared motion foundations: the loading bar states itself, and the
-      // pulse that says "working" stops its iteration — it is the one
-      // animation that must keep being drawn.
-      ".webui-motion-loading, .webui-motion-loading-pulse",
+      // The shared motion foundation stops its loading pulse after one pass.
+      ".webui-motion-loading",
       // The TurnNavigator jump: the destination message flashes once, so
       // reduced motion replaces the flash with a steady highlight.
       ".webui-turn-jump-flash",

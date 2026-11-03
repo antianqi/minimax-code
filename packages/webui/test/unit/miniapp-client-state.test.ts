@@ -430,3 +430,110 @@ describe("the panel's own state stays layout", () => {
     expect(webuiMiniAppCapacityText([])).toContain("其他应用");
   });
 });
+
+describe("the Mini App permission switches", () => {
+  // Declared on the package, answered by the runtime. The client never derives a
+  // switch from what it asked for: it shows what the runtime last said.
+  const DECLARED = [
+    { id: "agent:session.run", enabled: true },
+    { id: "device:microphone", enabled: true },
+  ];
+
+  const permissionPort = (input: {
+    readonly answer: (
+      request: { pluginId: string; permission: string; enabled: boolean },
+    ) => Promise<{ pluginId: string; source: "local" | "official"; items: typeof DECLARED }>;
+  }) => {
+    const asked: string[] = [];
+    const written: { pluginId: string; permission: string; enabled: boolean }[] = [];
+    return {
+      asked,
+      written,
+      port: {
+        listMiniApps: async () => ({ miniApps: [] }),
+        listMiniAppPermissions: async (pluginId: string) => {
+          asked.push(pluginId);
+          return { pluginId, source: "official" as const, items: DECLARED };
+        },
+        setMiniAppPermission: async (request: {
+          pluginId: string;
+          permission: string;
+          enabled: boolean;
+        }) => {
+          written.push({ ...request });
+          return input.answer(request);
+        },
+      } satisfies WebuiMiniAppPortSlice,
+    };
+  };
+
+  it("reads one package's declared permissions on demand, not the whole catalogue", async () => {
+    const { port, asked } = permissionPort({
+      answer: async (request) => ({
+        pluginId: request.pluginId,
+        source: "official",
+        items: DECLARED,
+      }),
+    });
+    const workflows = createWebuiMiniAppWorkflows({ port });
+    // Nothing is read before a row asks: the catalogue is not a permission survey.
+    expect(workflows.getSnapshot().permissions).toEqual({});
+
+    await workflows.loadPermissions("com.minimax.pet");
+
+    expect(asked).toEqual(["com.minimax.pet"]);
+    expect(workflows.getSnapshot().permissions["com.minimax.pet"]).toEqual({
+      items: DECLARED,
+      loading: false,
+    });
+  });
+
+  it("shows the list the runtime answered, not the switch it was asked for", async () => {
+    // The runtime answers the stored state as it now stands. Here the write was
+    // refused in effect: the item is still on, and the row must say so.
+    const { port, written } = permissionPort({
+      answer: async (request) => ({
+        pluginId: request.pluginId,
+        source: "official",
+        items: DECLARED,
+      }),
+    });
+    const workflows = createWebuiMiniAppWorkflows({ port });
+    await workflows.loadPermissions("com.minimax.pet");
+
+    const accepted = await workflows.setPermission(
+      "com.minimax.pet",
+      "device:microphone",
+      false,
+    );
+
+    expect(accepted).toBe(true);
+    expect(written).toEqual([
+      { pluginId: "com.minimax.pet", permission: "device:microphone", enabled: false },
+    ]);
+    const slice = workflows.getSnapshot().permissions["com.minimax.pet"]!;
+    expect(slice.items).toEqual(DECLARED);
+    // The in-flight marker is gone once the write settled.
+    expect(slice.saving).toBeUndefined();
+  });
+
+  it("keeps a refusal on the row and leaves the last reported list in place", async () => {
+    const { port } = permissionPort({
+      answer: async () => {
+        throw Object.assign(new Error("permission not declared by this package"), {
+          code: "MINIAPP_PERMISSION_UNKNOWN",
+        });
+      },
+    });
+    const workflows = createWebuiMiniAppWorkflows({ port });
+    await workflows.loadPermissions("com.minimax.pet");
+
+    const accepted = await workflows.setPermission("com.minimax.pet", "tool:call", false);
+
+    expect(accepted).toBe(false);
+    const slice = workflows.getSnapshot().permissions["com.minimax.pet"]!;
+    expect(slice.items).toEqual(DECLARED);
+    expect(slice.error).toBe("permission not declared by this package");
+    expect(slice.saving).toBeUndefined();
+  });
+});

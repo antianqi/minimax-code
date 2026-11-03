@@ -33,6 +33,7 @@ import type {
   OfficialPluginMutationState,
   PreparedOfficialPluginReconciliation,
 } from "./plugin/runtime/official-reconciler.js";
+import type { MiniAppPermissionListResult } from './plugin/runtime/miniapp/permissions.js';
 import type {
   OfficialPluginInstallationRecord,
   OfficialPluginRepositoryState,
@@ -234,6 +235,23 @@ export interface MiniAppPluginControl {
    * being visible to the surface that can enable it.
    */
   listInstalledMiniApps(): Promise<readonly AvailableMiniAppDefinition[]>;
+  /**
+   * One package's declared Mini App permissions with their stored switches.
+   *
+   * The declared items come from the installed manifest, not from a client list: a switch a package
+   * no longer declares cannot be read, listed, or turned back on.
+   */
+  listMiniAppPermissions(pluginId: string): Promise<MiniAppPermissionListResult>;
+  /**
+   * Stores one switch and tells the gateways.
+   *
+   * An id the package does not declare is refused; writing the stored value again is a no-op.
+   */
+  setMiniAppPermission(input: {
+    readonly pluginId: string;
+    readonly permission: string;
+    readonly enabled: boolean;
+  }): Promise<MiniAppPermissionListResult>;
   activateMiniApp(input: {
     readonly pluginId: string;
     readonly signal?: AbortSignal;

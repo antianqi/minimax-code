@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactElement } from "react";
+import { useMemo, type MouseEvent, type ReactElement } from "react";
 
 import {
   WebuiIconContextArchive,
@@ -124,6 +124,23 @@ export function ProjectList({
   readonly error?: string;
   readonly projectLoadError?: string;
 }): ReactElement {
+  const visibleSessionsByProject = useMemo(() => {
+    const result = new Map<string, { readonly sessionIds: readonly string[]; readonly hasMore: boolean }>();
+    for (const project of [...pinnedProjectGroups, ...projects]) {
+      const orderedSessionIds = sortWebuiProjectSessionIds(
+        page.sessions,
+        pinnedSessionState ?? {},
+        project.sessionIds.filter((sessionId) => !pinnedSessionState?.[sessionId]),
+      );
+      const visibleSessionCount = visibleProjectSessionCounts[project.key] ?? PROJECT_SESSION_BATCH_SIZE;
+      result.set(project.key, {
+        sessionIds: orderedSessionIds.slice(0, visibleSessionCount),
+        hasMore: orderedSessionIds.length > visibleSessionCount,
+      });
+    }
+    return result;
+  }, [page.sessions, pinnedProjectGroups, pinnedSessionState, projects, visibleProjectSessionCounts]);
+
   if (catalogLoading) {
     return (
       <>
@@ -148,20 +165,7 @@ export function ProjectList({
       {items.map((project) => {
         const expanded = expandedProjects.has(project.key);
         const projectName = projectNames?.[project.key] ?? project.name;
-        const orderedSessionIds = sortWebuiProjectSessionIds(
-          page.sessions,
-          pinnedSessionState ?? {},
-          project.sessionIds.filter(
-            (sessionId) => !pinnedSessionState?.[sessionId],
-          ),
-        );
-        const visibleSessionCount =
-          visibleProjectSessionCounts[project.key] ??
-          PROJECT_SESSION_BATCH_SIZE;
-        const visibleSessionIds = orderedSessionIds.slice(
-          0,
-          visibleSessionCount,
-        );
+        const visibleSessions = visibleSessionsByProject.get(project.key) ?? { sessionIds: [], hasMore: false };
         return (
           <li key={project.key}>
             <div className="webui-project-row group/project">
@@ -220,15 +224,15 @@ export function ProjectList({
               expanded={expanded}
               sessionsById={sessionsById}
               childrenByParentId={childrenByParentId}
-              visibleSessionIds={visibleSessionIds}
-              hasMore={orderedSessionIds.length > visibleSessionCount}
+              visibleSessionIds={visibleSessions.sessionIds}
+              hasMore={visibleSessions.hasMore}
               expandedSessionIds={expandedSessions}
               selectedSessionId={selectedSessionId}
               activity={activity}
               now={now}
               pinnedSessions={pinnedSessionState}
               onToggleChildren={onToggleChildren}
-              onShowMore={() => onShowMore(project.key)}
+              onShowMore={onShowMore}
               onToggleSessionPin={onToggleSessionPin}
               onArchiveSession={onArchiveSession}
               onSessionContextMenu={onSessionContextMenu}

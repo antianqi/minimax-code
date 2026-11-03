@@ -58,6 +58,12 @@ import {
   webuiMiniAppBridgeSenderAllowed,
 } from "../application/miniapp-bridge.js";
 import { createWebuiMiniAppAgentBridge } from "../application/miniapp-agent-bridge.js";
+import {
+  WEBUI_MINIAPP_BRIDGE_TOOL_RESULT,
+  type WebuiMiniAppToolApprovalPrompt,
+} from "../../../../shared/contracts/miniapp-tools.js";
+import { MiniAppToolApprovals } from "./MiniAppToolApprovals.public.js";
+import { webuiMiniAppToolRequest } from "../application/miniapp-tool-bridge.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiIconButton } from "../../../ui/button.js";
@@ -123,6 +129,19 @@ export function MiniAppView({
    * so reporting itself as "open elsewhere" would be the one wrong answer.
    */
   const detached = !standalone && row?.detached === true;
+  /**
+   * The devices this frame may reach.
+   *
+   * The browser reads a frame's `allow` once, when the document is created, and
+   * changing it on a loaded document does nothing — so the grant travels in the
+   * frame's key too, and toggling a switch replaces the document instead of
+   * leaving the old policy in force. An unknown switch grants nothing: a missing
+   * answer is not a permission.
+   */
+  const grantsMicrophone =
+    state.permissions[pluginId]?.items.some(
+      (item) => item.id === "device:microphone" && item.enabled,
+    ) ?? false;
   const frameRef = useRef<HTMLIFrameElement>(null);
   /**
    * The bridge this view currently answers through, and how many documents it has
@@ -144,6 +163,15 @@ export function MiniAppView({
    * the document it already has.
    */
   const [reloadRevision, setReloadRevision] = useState(0);
+  /**
+   * The tool prompts this app's page is waiting on.
+   *
+   * Held here rather than in the workflows store: a prompt is a question about the view
+   * that framed the page, and it stops existing when someone answers it or the call times
+   * out. The workflows filter the stream to this `pluginId`, so another app's question
+   * never reaches this panel.
+   */
+  const [toolPrompts, setToolPrompts] = useState<readonly WebuiMiniAppToolApprovalPrompt[]>([]);
   /**
    * Whether the load being reported is the one this view asked for.
    *
@@ -333,6 +361,67 @@ export function MiniAppView({
   }, [answer, composer, detached, name, presentation, sessionId]);
 
   /**
+   * The questions this page's `ask` is waiting on.
+   *
+   * A closed view has no question to ask: the subscription ends with the frame, and an
+   * `ask` raised while nothing is framed is answered by the runtime's own timeout.
+   */
+  useEffect(() => {
+    if (!workflows || presentation?.kind !== "open" || detached) return;
+    return workflows.watchToolApprovals(pluginId, setToolPrompts);
+  }, [detached, pluginId, presentation?.kind, workflows]);
+
+  /**
+   * The page's tool channel.
+   *
+   * The same sender rules as the composer and agent channels: only the frame this view
+   * created, on the origin this view framed, and the answer goes back to that origin. The
+   * identity is this view's — `pluginId` comes from the tab, never from the message.
+   */
+  useEffect(() => {
+    if (presentation?.kind !== "open" || detached) return;
+    const viewUrl = presentation.viewUrl;
+    const onMessage = (event: MessageEvent): void => {
+      const request = webuiMiniAppToolRequest(event.data);
+      if (!request) return;
+      const frame = frameRef.current?.contentWindow;
+      if (
+        !frame ||
+        !webuiMiniAppBridgeSenderAllowed({
+          origin: event.origin,
+          viewUrl,
+          source: event.source,
+          frame,
+        })
+      )
+        return;
+      const origin = event.origin;
+      const answer = workflows
+        ? workflows.toolCall({ pluginId, request })
+        : Promise.resolve({ ok: false as const, code: "capability_unavailable" });
+      void answer
+        .then((result) =>
+          frame.postMessage(
+            { type: WEBUI_MINIAPP_BRIDGE_TOOL_RESULT, requestId: request.requestId, result },
+            origin,
+          ),
+        )
+        .catch(() =>
+          frame.postMessage(
+            {
+              type: WEBUI_MINIAPP_BRIDGE_TOOL_RESULT,
+              requestId: request.requestId,
+              result: { ok: false, code: "tool_error" },
+            },
+            origin,
+          ),
+        );
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [detached, pluginId, presentation, workflows]);
+
+  /**
    * The page's agent bridge.
    *
    * One host per framed document, created with the generation the service issued
@@ -486,15 +575,34 @@ export function MiniAppView({
           </div>
         ) : null}
         {presentation?.kind === "open" && !detached ? (
+          <MiniAppToolApprovals
+            prompts={toolPrompts}
+            // The answer leaves this panel immediately: the prompt it settled is gone
+            // whether or not the runtime's next frame has arrived, and a control that
+            // stayed drawn would invite a second answer to a decision already made.
+            onAnswer={(answer) => {
+              setToolPrompts((current) =>
+                current.filter((prompt) => prompt.requestId !== answer.requestId),
+              );
+              void workflows
+                ?.answerToolApproval({ pluginId, ...answer })
+                .catch(() => undefined);
+            }}
+          />
+        ) : null}
+        {presentation?.kind === "open" && !detached ? (
           <iframe
             // Keyed on the presentation revision so a lease that came and went
             // remounts the frame: the page's in-page state is gone either way
             // (ADR 0020), and a stale document would otherwise keep rendering from
             // an origin the service has already re-pointed.
-            key={`${pluginId}:${row?.presentationRevision ?? 0}:${reloadRevision}`}
+            key={`${pluginId}:${row?.presentationRevision ?? 0}:${reloadRevision}:${
+              grantsMicrophone ? "device" : "no-device"
+            }`}
             ref={frameRef}
             className="webui-miniapp-view-frame"
             data-testid="miniapp-view-frame"
+            allow={grantsMicrophone ? "microphone" : undefined}
             title={title ?? name}
             src={presentation.viewUrl}
             onLoad={() => {

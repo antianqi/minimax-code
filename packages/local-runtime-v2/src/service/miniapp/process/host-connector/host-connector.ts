@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
 
+import { miniAppPermissionId } from '@mavis/shared/miniapp-surface';
+
 import {
   ConnectorGatewayError,
   type HostProcessConnectorGateway,
@@ -15,6 +17,7 @@ import type {
   MiniAppHostConnectorSessionFactory,
   MiniAppIpcMessage,
   MiniAppIpcTransport,
+  MiniAppPermissionSwitchPort,
 } from '../../contracts.js';
 import {
   bindMiniAppIpcChannel,
@@ -422,9 +425,20 @@ function registerActiveHostRequest(
   return request;
 }
 
+/**
+ * Metadata the session is created with: the two gateways, the switches, and the request bounds.
+ */
 interface HostSessionFactoryOptions {
   readonly gateway: HostProcessConnectorGateway;
   readonly agentGateway?: MiniAppAgentGateway;
+  /**
+   * The user's switches.
+   *
+   * Read on every `connector.list` and every `connector.call`, never cached into the generation: a
+   * provider turned off has to stop answering without restarting the Mini App, and a provider
+   * turned back on has to appear again on the next listing.
+   */
+  readonly permissionSwitches?: MiniAppPermissionSwitchPort;
   readonly makeToolRef?: () => string;
   readonly makeInvocationId?: () => string;
   readonly graceTimeoutMs?: number;
@@ -463,6 +477,14 @@ function createHostConnectorSession(
   let writeTail = Promise.resolve();
   let retirePromise: Promise<void> | undefined;
   const releaseGateway = createHostConnectorGatewayRelease(options.gateway, input);
+  /** The provider each listed tool came from, so a call can be re-judged when it arrives. */
+  const providersByHandle = new Map<ConnectorToolHandle, string>();
+  const providerEnabled = (provider: string): boolean =>
+    options.permissionSwitches?.isEnabled(
+      input.pluginId,
+      miniAppPermissionId('connector', provider),
+    ) ?? true;
+  const enabledProviders = (): readonly string[] => input.providers.filter(providerEnabled);
   const agent = createHostAgentSession({
     gateway: options.agentGateway,
     identity: input,
@@ -551,7 +573,7 @@ function createHostConnectorSession(
         gateway: options.gateway,
         pluginId: input.pluginId,
         processGeneration: input.processGeneration,
-        providers: input.providers,
+        providers: enabledProviders(),
         signal,
         makeToolRef,
         previousRefs: refsByHandle,
@@ -559,6 +581,11 @@ function createHostConnectorSession(
       });
       refs = inventory.refs;
       refsByHandle = inventory.refsByHandle;
+      providersByHandle.clear();
+      for (const tool of inventory.tools) {
+        const handle = inventory.refs.get(tool.toolRef);
+        if (handle !== undefined) providersByHandle.set(handle, tool.provider);
+      }
       await respond(id, { tools: inventory.tools, partial: inventory.partial });
     } catch (error) {
       await respondError(id, normalizeGatewayError(error));
@@ -571,6 +598,15 @@ function createHostConnectorSession(
     arguments_: Record<string, unknown>,
     signal: AbortSignal,
   ): Promise<void> {
+    const handle = refs.get(toolRef);
+    const provider = handle === undefined ? undefined : providersByHandle.get(handle);
+    if (provider !== undefined && !providerEnabled(provider)) {
+      // The switch went off after this reference was handed out. Answering as a stale reference is
+      // the one wire answer that tells the page to list again — and the listing is what stops
+      // offering the provider — instead of retrying a call that will never be dispatched.
+      await respondError(id, staleToolWireError());
+      return;
+    }
     await dispatchHostConnectorCall({
       id,
       toolRef,

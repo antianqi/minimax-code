@@ -9,6 +9,8 @@ import type {
 } from "@mavis/shared/questionnaire";
 import type { LocalSkillService } from "@mavis/local-runtime";
 import type { LocalMcpPublicFacade } from "../../service/mcp/index.js";
+import type { MiniAppToolApprovalPending } from "../../service/miniapp/tool-approvals.js";
+import type { MiniAppToolAnswer } from "../../service/miniapp/tool-sessions.js";
 import type {
   ListInstalledPluginsInput as ListInstalledPluginsReq,
   ListInstalledPluginsResult as ListInstalledPluginsResp,
@@ -116,6 +118,22 @@ interface LocalRuntimeBackgroundTaskQuery {
   readonly limit?: number;
 }
 
+/**
+ * One stored permission rule, as the Host's store holds it.
+ *
+ * Spelled structurally here rather than imported from `@mavis/permission`: the
+ * application contract is a boundary, and a rule a Mini App page is judged by is the
+ * store's own record.
+ */
+export interface LocalPermissionRule {
+  readonly source: "global" | "agent" | "session";
+  readonly ruleBehavior: "allow" | "deny" | "ask";
+  readonly ruleValue: {
+    readonly toolName: string;
+    readonly ruleContent?: string;
+  };
+}
+
 /** Internal peripheral Application surface consumed by process-local delivery. */
 export interface LocalRuntimeApplication {
   readonly events: {
@@ -164,6 +182,63 @@ export interface LocalRuntimeApplication {
      * existing consumer starts seeing packages it cannot start.
      */
     listInstalled(): Promise<{ readonly miniApps: readonly MiniAppSurfaceSummary[] }>;
+    /** One package's declared Mini App permissions with their stored switches. */
+    listPermissions(
+      pluginId: string,
+    ): Promise<{
+      readonly pluginId: string;
+      readonly source: 'local' | 'official';
+      readonly items: readonly { readonly id: string; readonly enabled: boolean }[];
+    }>;
+    /** Stores one switch; an undeclared id is refused. */
+    setPermission(input: {
+      readonly pluginId: string;
+      readonly permission: string;
+      readonly enabled: boolean;
+    }): Promise<{
+      readonly pluginId: string;
+      readonly source: 'local' | 'official';
+      readonly items: readonly { readonly id: string; readonly enabled: boolean }[];
+    }>;
+    /**
+     * One request from a framed page's tool channel.
+     *
+     * `pluginId` and `processGeneration` are the Host's, resolved from the view that
+     * sent the request; the page names a method and, where the method needs one, a tool.
+     * The answer is the channel's own shape: a listing with its rules, the state of the
+     * tools a request asked about, or one call's result.
+     */
+    callTool(input: {
+      readonly pluginId: string;
+      readonly processGeneration?: string;
+      readonly method: 'list' | 'request' | 'call';
+      readonly name?: string;
+      readonly names?: readonly string[];
+      readonly arguments?: unknown;
+      readonly signal?: AbortSignal;
+    }): Promise<MiniAppToolAnswer>;
+    /**
+     * The tool prompts waiting for a person, pushed as the list changes.
+     *
+     * The first callback is the list as it stands, so a client that connects late renders
+     * what an earlier one already has; the returned function stops the subscription.
+     */
+    watchToolApprovals(
+      onPending: (pending: readonly MiniAppToolApprovalPending[]) => void,
+    ): () => void;
+    /**
+     * Settles one prompt.
+     *
+     * `pluginId` is checked against the prompt: a client that can frame one Mini App must
+     * not answer another's question. An id that is gone, or a package that does not match,
+     * is `NOT_FOUND` rather than a silent no-op.
+     */
+    replyToolApproval(input: {
+      readonly pluginId: string;
+      readonly requestId: string;
+      readonly decision: 'allow' | 'deny' | 'allowAlways';
+      readonly names?: readonly string[];
+    }): Promise<{ readonly success: true }>;
     open(input: {
       readonly pluginId: string;
       readonly signal?: AbortSignal;
@@ -346,6 +421,20 @@ export interface LocalRuntimeApplication {
       requestIds: readonly string[];
       decision: "allowAlways" | "allowOnce" | "deny";
     }): Promise<{ processed: readonly string[]; skipped: readonly string[] }>;
+    /**
+     * The global permission rules, as stored.
+     *
+     * Present when this Host can state its rules to something other than a turn. A Mini
+     * App page has no turn, so its tool calls are judged against exactly these.
+     */
+    listGlobalRules?(): Promise<readonly LocalPermissionRule[]>;
+    /**
+     * Writes one global allow rule — the same rule an Agent turn reads.
+     *
+     * This is what "always allow" means for a page: not a Mini App's own copy, so
+     * approving once here also stops the prompt on a later turn.
+     */
+    addGlobalAllowRule?(toolName: string): Promise<void>;
   };
   readonly account?: {
     getStatus(input?: {

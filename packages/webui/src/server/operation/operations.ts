@@ -371,6 +371,9 @@ export function createOperationRegistry(
   // The page bridge, appended so the registry order before it is unchanged.
   registerOperation(registry, entry("watchMiniAppAgentTurn"));
   registerOperation(registry, entry("miniAppAgentCall"));
+  registerOperation(registry, entry("callMiniAppTool"));
+  registerOperation(registry, entry("watchMiniAppToolApprovals"));
+  registerOperation(registry, entry("replyMiniAppToolApproval"));
   // Appended: ADR 0027 scheduled tasks. The registry order is the wire order, so a new operation
   // lands at the end rather than in the domain it reads like.
   registerOperation(registry, entry("listCronTasks"));

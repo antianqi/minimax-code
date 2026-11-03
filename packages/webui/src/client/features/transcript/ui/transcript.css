@@ -101,6 +101,8 @@
   .webui-message {
     width: 100%;
     margin-bottom: var(--spacing_16);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 180px;
   }
 
   /* Transcript-specific message entrance; its cadence is recorded in the motion inventory. */

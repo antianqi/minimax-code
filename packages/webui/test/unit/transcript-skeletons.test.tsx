@@ -19,14 +19,14 @@ function countByClass(html: string, className: string): number {
 }
 
 describe("TranscriptSkeletons", () => {
-  it("ChatSkeleton emits the desktop testid and the centred column", () => {
+  it("ChatSkeleton emits the desktop testid and a left-aligned column", () => {
     const html = renderToStaticMarkup(createElement(ChatSkeleton));
     expect(html).toContain('data-testid="chat-skeleton"');
     // The column width comes from the shared constant rather than a literal,
     // so it can be asserted against `.message-list`'s max-width elsewhere and
     // cannot drift back to a hard-coded value.
     expect(html).toContain(`max-width:${SKELETON_CONTENT_MAX_WIDTH_PX}px`);
-    expect(html).toContain("mx-auto");
+    expect(html).not.toContain("mx-auto");
     expect(html).toContain("webui-skeleton--shape");
     expect(html).toContain("webui-motion-loading");
   });

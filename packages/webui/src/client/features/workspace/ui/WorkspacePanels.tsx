@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import { WebuiSearchField, WebuiTextInput } from "../../../ui/field.js";
@@ -147,15 +147,23 @@ function highlightFileLine(line: string, language: string | undefined): string |
   }
 }
 
-export function WebuiDiffFileSection({ file, selected, loading = false, error, onSelect, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: () => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
+function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSelect, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: (path: string) => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
   const [expanded, setExpanded] = useState(defaultOpen);
   const diff = file.withinWorkspace && typeof file.diff === "string" ? file.diff : "";
-  const allLines = projectWebuiUnifiedDiffLines(diff);
-  const lines = allLines.filter((line) => showContext || line.kind !== "context");
-  const splitRows = projectWebuiSplitDiffRows(allLines).filter((row) => showContext || row.kind !== "context");
+  const allLines = useMemo(() => projectWebuiUnifiedDiffLines(diff), [diff]);
+  const lines = useMemo(() => allLines.filter((line) => showContext || line.kind !== "context"), [allLines, showContext]);
+  const splitRows = useMemo(() => projectWebuiSplitDiffRows(allLines).filter((row) => showContext || row.kind !== "context"), [allLines, showContext]);
   const language = webuiFileLanguage(file.file);
+  const highlightedByContent = useMemo(() => {
+    const highlighted = new Map<string, string | undefined>();
+    for (const line of allLines) {
+      if (line.kind !== "hunk" && line.kind !== "noNewline" && !highlighted.has(line.content))
+        highlighted.set(line.content, highlightFileLine(line.content, language));
+    }
+    return highlighted;
+  }, [allLines, language]);
   return <section className="webui-turn-review-file" data-expanded={expanded} data-testid="turn-review-diff-file">
-    <WebuiButton variant="plain" size="regular" type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(); setExpanded((value) => !value); }}>
+    <WebuiButton variant="plain" size="regular" type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(file.file); setExpanded((value) => !value); }}>
       <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
         <WebuiIconChevronRight className="webui-turn-review-chevron" />
       </WebuiMotionSlot>
@@ -172,14 +180,14 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
            * person can still act on. */
           ? <p className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>
           /* 加载中的差异是一条播报；播报通道交给共享契约，类名不变，样式继续命中。 */
-      : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : error ? <FeedbackError message={error} className="webui-turn-review-unavailable" /> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
+      : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : error ? <FeedbackError message={error} className="webui-turn-review-unavailable" /> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${lines.length * 19.8}px` }}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
         if (row.kind === "hunk" || row.kind === "noNewline") {
           return <span className={`webui-turn-review-line webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}><span className="webui-turn-review-hunk">{row.content}</span></span>;
         }
         const oldContent = row.oldLine;
         const newContent = row.newLine;
-        const oldHighlight = oldContent ? highlightFileLine(oldContent.content, language) : undefined;
-        const newHighlight = newContent ? highlightFileLine(newContent.content, language) : undefined;
+        const oldHighlight = oldContent ? highlightedByContent.get(oldContent.content) : undefined;
+        const newHighlight = newContent ? highlightedByContent.get(newContent.content) : undefined;
         return <span className={`webui-turn-review-line webui-turn-review-line--split webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}>
           <span className={`webui-turn-review-split-side${oldContent?.kind === "deletion" ? " is-deletion" : ""}`}>
             <span className="webui-turn-review-line-number">{oldContent?.oldLine ?? ""}</span>
@@ -191,7 +199,7 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
           </span>
         </span>;
       }) : lines.map((line, index) => {
-        const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightFileLine(line.content, language);
+        const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightedByContent.get(line.content);
         return <span className={`webui-turn-review-line webui-turn-review-line--${line.kind}`} key={`${index}-${line.kind}`}>
           {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : line.kind === "noNewline" ? line.content : <>
             <span className="webui-turn-review-line-number">{line.oldLine ?? ""}</span>
@@ -205,6 +213,23 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
     </WebuiDisclosure>
   </section>;
 }
+
+export const WebuiDiffFileSection = memo(WebuiDiffFileSectionView, (previous, next) =>
+  previous.file.file === next.file.file
+  && previous.file.additions === next.file.additions
+  && previous.file.deletions === next.file.deletions
+  && previous.file.status === next.file.status
+  && previous.file.diff === next.file.diff
+  && previous.file.patch === next.file.patch
+  && previous.file.withinWorkspace === next.file.withinWorkspace
+  && previous.selected === next.selected
+  && previous.loading === next.loading
+  && previous.error === next.error
+  && previous.onSelect === next.onSelect
+  && previous.defaultOpen === next.defaultOpen
+  && previous.diffLayout === next.diffLayout
+  && previous.showContext === next.showContext,
+);
 
 export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFileUrl, }: {
   readonly tabId: string;
@@ -244,7 +269,7 @@ export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFi
   </div>;
 }
 
-export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, terminal: terminalOwner, onClose, onManageMiniApps }: {
+function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, terminal: terminalOwner, onClose, onManageMiniApps }: {
   readonly state: WorkspacePanelState;
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly sessionId?: string; readonly workspaceDir?: string;
@@ -278,7 +303,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   panelStateRef.current = state;
   const panelClosingRef = useRef(false);
   const pendingPanelClose = useRef<WorkspacePanelCommand | undefined>(undefined);
-  const resizeGesture = useRef<{ readonly pointerId: number; readonly startX: number; readonly startWidth: number } | undefined>(undefined);
+  const resizeGesture = useRef<{ readonly pointerId: number; readonly startX: number; readonly startWidth: number; requestedWidth: number } | undefined>(undefined);
   const panelRef = useRef<HTMLElement | null>(null);
   /** The surface's width, read by the drag without a re-render on every frame. */
   const surfaceWidthRef = useRef<number>();
@@ -367,6 +392,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const [fileSearch, setFileSearch] = useState("");
   const [fileTreeOpen, setFileTreeOpen] = useState(true);
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set());
+  const expandedDirectoriesRef = useRef(expandedDirectories);
+  expandedDirectoriesRef.current = expandedDirectories;
   const [fileCodeMode, setFileCodeMode] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
   const [reviewSearchAppliedQuery, setReviewSearchAppliedQuery] = useState("");
@@ -435,7 +462,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const hasFileWorkspace = tab === "files" || activeTab?.content.kind === "file-preview" || activeTab?.content.kind === "review";
   const hasMiniAppView = tab === "miniapp" && activeTab?.content.kind === "miniapp";
   const hasWorkspaceToolbar = hasFileWorkspace || hasMiniAppView;
-  const visibleFiles = filterWorkspaceFiles(fileTree.files ?? [], fileSearch);
+  const visibleFiles = useMemo(
+    () => filterWorkspaceFiles(fileTree.files ?? [], fileSearch),
+    [fileSearch, fileTree.files],
+  );
   const currentPanelState = useRef(state);
   currentPanelState.current = state;
   const filesRef = useRef(fileResults);
@@ -526,9 +556,13 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     if (!query) return;
     void queries.searchReviewDiffs({ tabId: activeTab.id, workspaceDir: activeTab.content.workspaceDir, snapshotId: activeTab.content.reviewSnapshotId, query });
   };
-  const toggleWorkspaceDirectory = (directory: WebuiWorkspaceFile) => {
+  const activeReviewTabId = activeTab?.content.kind === "review" ? activeTab.id : undefined;
+  const selectWorkspaceReviewFile = useCallback((path: string) => {
+    if (activeReviewTabId) dispatch({ type: "select-review-file", tabId: activeReviewTabId, path });
+  }, [activeReviewTabId, dispatch]);
+  const toggleWorkspaceDirectory = useCallback((directory: WebuiWorkspaceFile) => {
     const path = directory.path;
-    if (expandedDirectories.has(path)) {
+    if (expandedDirectoriesRef.current.has(path)) {
       setExpandedDirectories((current) => {
         const next = new Set(current);
         next.delete(path);
@@ -540,7 +574,21 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     if (directory.children !== undefined || fileTree.loadedDirectories.has(path) || fileTree.loadingDirectories.has(path)) return;
     if (!activeWorkspace || !queries) return;
     void queries.loadDirectory(activeWorkspace, path);
-  };
+  }, [activeWorkspace, fileTree.loadedDirectories, fileTree.loadingDirectories, queries]);
+  const workspaceTreeOpenContext = useRef({ activeTab, activeWorkspace, sessionId, turnReviewFiles, workspaceReviewFiles });
+  workspaceTreeOpenContext.current = { activeTab, activeWorkspace, sessionId, turnReviewFiles, workspaceReviewFiles };
+  const openWorkspaceTreeFile = useCallback((entry: WebuiWorkspaceFile) => {
+    const { activeTab, activeWorkspace, sessionId, turnReviewFiles, workspaceReviewFiles } = workspaceTreeOpenContext.current;
+    const context = activeTab && "sessionId" in activeTab.content ? activeTab.content.sessionId : sessionId;
+    if (!activeWorkspace || !context || entry.type === "directory") return;
+    const isReviewFile = activeTab?.content.kind === "review" && (
+      activeTab.content.source === "turn"
+        ? turnReviewFiles.some((file) => file.file === entry.path)
+        : workspaceReviewFiles.some((file) => file.path === entry.path)
+    );
+    if (isReviewFile && activeTab) dispatch({ type: "select-review-file", tabId: activeTab.id, path: entry.path });
+    else dispatch({ type: "open-file", sessionId: context, workspaceDir: activeWorkspace, path: entry.path });
+  }, [dispatch]);
   useEffect(() => {
     if (activeTab?.content.kind !== "file-preview" || !selectedFilePath || !activeWorkspace || !queries || fileTree.workspaceDir !== activeWorkspace || fileTree.loading) return;
     let cancelled = false;
@@ -724,7 +772,8 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     event.preventDefault();
     const panel = event.currentTarget.parentElement;
     if (!panel) return;
-    resizeGesture.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: panel.getBoundingClientRect().width };
+    const startWidth = panel.getBoundingClientRect().width;
+    resizeGesture.current = { pointerId: event.pointerId, startX: event.clientX, startWidth, requestedWidth: startWidth };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const movePanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -738,12 +787,21 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     // share is what let the conversation be squeezed to nothing.
     const bounds = webuiPanelWidthBounds(surfaceWidth);
     const requestedWidth = Math.min(bounds.max, Math.max(bounds.min, gesture.startWidth - (event.clientX - gesture.startX)));
-    setPanelWidth(requestedWidth);
+    gesture.requestedWidth = requestedWidth;
+    const panel = panelRef.current;
+    if (!panel) return;
+    // A drag is continuous input. Write its geometry directly so each pointer
+    // sample does not reconcile the panel's file tree, diff view and transcript.
+    panel.style.width = `${requestedWidth}px`;
+    panel.style.flex = `0 0 ${requestedWidth}px`;
   };
   const stopPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (resizeGesture.current?.pointerId !== event.pointerId) return;
+    const gesture = resizeGesture.current;
+    if (gesture?.pointerId !== event.pointerId) return;
     resizeGesture.current = undefined;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (Math.abs(gesture.requestedWidth - gesture.startWidth) > 0.5)
+      setPanelWidth(gesture.requestedWidth);
   };
   const nudgePanelResize = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (state.expanded || surfaceTier !== "split" || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
@@ -828,10 +886,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
           {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.error ? <FeedbackError message={currentWorkspaceReviewSearch.error} className="webui-workspace-review-status" /> : null}
           {reviewDiffs?.error && reviewDiffs.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? <FeedbackError message={reviewDiffs.error} className="webui-workspace-review-status" /> : null}
           {showingWorkspaceReviewSearchResults && matchedWorkspaceReviewFiles.length === 0 ? <FeedbackLiveRegion className="webui-turn-review-empty">没有匹配的变更文件。</FeedbackLiveRegion> : null}
-          {!reviewSearchAppliedQuery || !currentWorkspaceReviewSearch?.loading && !currentWorkspaceReviewSearch?.error && matchedWorkspaceReviewFiles.length > 0 ? <div className="webui-turn-review-files" data-testid={showingWorkspaceReviewSearchResults ? "workspace-review-search-results" : undefined}>{matchedWorkspaceReviewFiles.map((file) => {
+          {!reviewSearchAppliedQuery || !currentWorkspaceReviewSearch?.loading && !currentWorkspaceReviewSearch?.error && matchedWorkspaceReviewFiles.length > 0 ? <div className="webui-turn-review-files" data-show-context={reviewShowContext ? "true" : "false"} data-testid={showingWorkspaceReviewSearchResults ? "workspace-review-search-results" : undefined}>{matchedWorkspaceReviewFiles.map((file) => {
             const result = reviewDiffs?.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? reviewDiffs.diffs[file.fileId] : undefined;
             const loading = !result && (reviewDiffs?.tabId !== activeTab.id || reviewDiffs.snapshotId !== activeReview?.reviewSnapshotId || reviewDiffs.loading);
-            return <WebuiDiffFileSection key={`${file.fileId}:${showingWorkspaceReviewSearchResults ? "search" : "list"}:${reviewSectionsExpanded ?? "default"}`} file={projectWebuiDiffFile({ file: file.path, additions: file.additions, deletions: file.deletions, status: file.status, ...(result?.diff !== undefined ? { diff: result.diff } : {}) }, workspaceReviewWorkspaceDir)} selected={selectedReviewPath === file.path} loading={loading} error={result?.binary ? "二进制文件无法显示文本差异。" : result?.error} defaultOpen={reviewSectionsExpanded ?? !showingWorkspaceReviewSearchResults} diffLayout={reviewDiffLayout} showContext={reviewShowContext} onSelect={() => dispatch({ type: "select-review-file", tabId: activeTab.id, path: file.path })} />;
+            return <WebuiDiffFileSection key={`${file.fileId}:${showingWorkspaceReviewSearchResults ? "search" : "list"}:${reviewSectionsExpanded ?? "default"}`} file={projectWebuiDiffFile({ file: file.path, additions: file.additions, deletions: file.deletions, status: file.status, ...(result?.diff !== undefined ? { diff: result.diff } : {}) }, workspaceReviewWorkspaceDir)} selected={selectedReviewPath === file.path} loading={loading} error={result?.binary ? "二进制文件无法显示文本差异。" : result?.error} defaultOpen={reviewSectionsExpanded ?? !showingWorkspaceReviewSearchResults} diffLayout={reviewDiffLayout} onSelect={selectWorkspaceReviewFile} />;
           })}</div> : null}
         </> : <FeedbackEmpty className="webui-turn-review-empty" title={"当前没有变更。"} />}
       </> : null}
@@ -948,9 +1006,11 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <div className="webui-workspace-file-tree-scroll" ref={fileTreeScrollRef}>
           {/* 加载中是一条播报；播报通道交给共享契约。契约本身带 role="status"，
               仍是这个滚动容器的直接子元素，`.webui-workspace-file-tree-scroll > [role="status"]` 继续命中。 */}
-          {fileTree.workspaceDir !== activeWorkspace || fileTree.loading ? <FeedbackLiveRegion>正在加载文件…</FeedbackLiveRegion> : fileTree.error ? <FeedbackError message={fileTree.error} /> : fileTree.files.length ? visibleFiles.length ? <FileTree files={visibleFiles} expandedPaths={expandedDirectories} loadingPaths={fileTree.loadingDirectories} directoryErrors={fileTree.directoryErrors} onToggle={toggleWorkspaceDirectory} selectedPath={activeTab?.content.kind === "file-preview" ? selectedFilePath : activeTab?.content.kind === "review" ? selectedReviewPath : undefined} onOpen={(entry) => { const context = activeTab && "sessionId" in activeTab.content ? activeTab.content.sessionId : sessionId; if (!activeWorkspace || !context || entry.type === "directory") return; if (activeTab?.content.kind === "review" && activeTab.content.source === "turn" && turnReviewFiles.some((file) => file.file === entry.path) || activeTab?.content.kind === "review" && activeTab.content.source === "workspace" && workspaceReviewFiles.some((file) => file.path === entry.path)) dispatch({ type: "select-review-file", tabId: activeTab.id, path: entry.path }); else dispatch({ type: "open-file", sessionId: context, workspaceDir: activeWorkspace, path: entry.path }); }} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"没有匹配的文件。"} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"此工作区没有可显示的文件。"} />}
+          {fileTree.workspaceDir !== activeWorkspace || fileTree.loading ? <FeedbackLiveRegion>正在加载文件…</FeedbackLiveRegion> : fileTree.error ? <FeedbackError message={fileTree.error} /> : fileTree.files.length ? visibleFiles.length ? <FileTree files={visibleFiles} expandedPaths={expandedDirectories} loadingPaths={fileTree.loadingDirectories} directoryErrors={fileTree.directoryErrors} onToggle={toggleWorkspaceDirectory} selectedPath={activeTab?.content.kind === "file-preview" ? selectedFilePath : activeTab?.content.kind === "review" ? selectedReviewPath : undefined} onOpen={openWorkspaceTreeFile} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"没有匹配的文件。"} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"此工作区没有可显示的文件。"} />}
         </div>
       </WebuiDisclosure> : null}
     </div>
   </WebuiPage>;
 }
+
+export const WebuiWorkspacePanel = memo(WebuiWorkspacePanelView);

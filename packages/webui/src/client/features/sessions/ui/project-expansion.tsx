@@ -2,7 +2,7 @@
 // The declaration body is verbatim; the `export` keyword, this header and the
 // import specifiers are the only differences.
 
-import { type MouseEvent } from "react";
+import { memo, type MouseEvent } from "react";
 import {
   WebuiIconContextArchive,
   WebuiIconContextPin,
@@ -26,7 +26,30 @@ import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot } from "../../../ui/page.
  * A cut, not a move: the state stays in `WebuiProjectList` and arrives as props and
  * callbacks, so the lifetimes are exactly what they were. Nothing here is stateful.
  */
-export function ProjectExpansion({
+interface ProjectExpansionProps {
+  readonly projectKey: string;
+  readonly expanded: boolean;
+  readonly sessionsById: ReadonlyMap<string, WebuiClientSession>;
+  readonly childrenByParentId: ReadonlyMap<string, readonly WebuiClientSession[]>;
+  readonly visibleSessionIds: readonly string[];
+  readonly hasMore: boolean;
+  readonly expandedSessionIds: ReadonlySet<string>;
+  readonly selectedSessionId?: string;
+  readonly activity?: WebuiSessionActivityMap;
+  readonly now?: number;
+  readonly pinnedSessions?: Readonly<Record<string, boolean>>;
+  readonly onToggleChildren: (sessionId: string) => void;
+  readonly onShowMore: (projectKey: string) => void;
+  readonly onToggleSessionPin?: (session: WebuiClientSession) => void;
+  readonly onArchiveSession?: (session: WebuiClientSession) => void;
+  readonly onSessionContextMenu: (
+    event: MouseEvent<HTMLElement>,
+    session: WebuiClientSession,
+    isChild?: boolean,
+  ) => void;
+}
+
+function ProjectExpansionView({
   projectKey,
   expanded,
   sessionsById,
@@ -43,28 +66,7 @@ export function ProjectExpansion({
   onToggleSessionPin,
   onArchiveSession,
   onSessionContextMenu,
-}: {
-  readonly projectKey: string;
-  readonly expanded: boolean;
-  readonly sessionsById: ReadonlyMap<string, WebuiClientSession>;
-  readonly childrenByParentId: ReadonlyMap<string, readonly WebuiClientSession[]>;
-  readonly visibleSessionIds: readonly string[];
-  readonly hasMore: boolean;
-  readonly expandedSessionIds: ReadonlySet<string>;
-  readonly selectedSessionId?: string;
-  readonly activity?: WebuiSessionActivityMap;
-  readonly now?: number;
-  readonly pinnedSessions?: Readonly<Record<string, boolean>>;
-  readonly onToggleChildren: (sessionId: string) => void;
-  readonly onShowMore: () => void;
-  readonly onToggleSessionPin?: (session: WebuiClientSession) => void;
-  readonly onArchiveSession?: (session: WebuiClientSession) => void;
-  readonly onSessionContextMenu: (
-    event: MouseEvent<HTMLElement>,
-    session: WebuiClientSession,
-    isChild?: boolean,
-  ) => void;
-}) {
+}: ProjectExpansionProps) {
   return (
                 <WebuiDisclosure
                   as="div"
@@ -212,7 +214,7 @@ export function ProjectExpansion({
                                       >
                                         <WebuiAgentAvatar agentName={child.agentName} size="compact" />
                                         <WebuiMotionSlot kind="feedback-clip">
-                                          <span className="min-w-0 flex-1 truncate">{sessionLabel(child)}</span>
+                                          <span className="webui-project-child-session-title min-w-0 flex-1 truncate">{sessionLabel(child)}</span>
                                         </WebuiMotionSlot>
                                         <SessionActivityMeta
                                           session={child}
@@ -251,7 +253,7 @@ export function ProjectExpansion({
                           size="compact"
                           className="webui-project-session-more text-text_default_tertiary"
                           onClick={() => {
-                            onShowMore();
+                            onShowMore(projectKey);
                           }}
                         >
                           更多
@@ -262,3 +264,30 @@ export function ProjectExpansion({
                 </WebuiDisclosure>
   );
 }
+
+function sameExpandedSessions(previous: ProjectExpansionProps, next: ProjectExpansionProps): boolean {
+  return previous.visibleSessionIds.every((sessionId) =>
+    previous.expandedSessionIds.has(sessionId) === next.expandedSessionIds.has(sessionId),
+  );
+}
+
+export const ProjectExpansion = memo(
+  ProjectExpansionView,
+  (previous, next) =>
+    previous.projectKey === next.projectKey &&
+    previous.expanded === next.expanded &&
+    previous.sessionsById === next.sessionsById &&
+    previous.childrenByParentId === next.childrenByParentId &&
+    previous.visibleSessionIds === next.visibleSessionIds &&
+    previous.hasMore === next.hasMore &&
+    sameExpandedSessions(previous, next) &&
+    previous.selectedSessionId === next.selectedSessionId &&
+    previous.activity === next.activity &&
+    previous.now === next.now &&
+    previous.pinnedSessions === next.pinnedSessions &&
+    previous.onToggleChildren === next.onToggleChildren &&
+    previous.onShowMore === next.onShowMore &&
+    previous.onToggleSessionPin === next.onToggleSessionPin &&
+    previous.onArchiveSession === next.onArchiveSession &&
+    previous.onSessionContextMenu === next.onSessionContextMenu,
+);

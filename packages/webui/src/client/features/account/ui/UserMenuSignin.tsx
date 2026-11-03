@@ -9,7 +9,6 @@ import { Fragment, useState, type ReactElement } from "react";
 import { IconCheck, IconCoin, IconInfoCircle } from "@tabler/icons-react";
 import {
   SigninDayStatus,
-  SigninPanelScene,
   getCurrentSigninStreak,
   isSigninPanelClaimable,
   isSigninPanelClaimedToday,
@@ -17,8 +16,8 @@ import {
 import type { WebuiSigninPanelView } from "../../../../shared/contracts/account.js";
 import { FeedbackError, WebuiSpinner } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
-import { WebuiInline } from "../../../ui/layout-primitives.js";
-import { WebuiSkeletonProjection, WebuiTooltip } from "../../../ui/page.js";
+import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiSkeleton, WebuiTooltip } from "../../../ui/page.js";
 
 export interface SigninState {
   readonly loading: boolean;
@@ -152,16 +151,6 @@ function SigninArtwork({
   );
 }
 
-const LOADING_SIGNIN_PANEL: WebuiSigninPanelView = {
-  scene: SigninPanelScene.Unknown,
-  days: Array.from({ length: 7 }, (_, index) => ({
-    day_no: index + 1,
-    points: 0,
-    status: SigninDayStatus.Disabled,
-    is_today: index === 0,
-  })),
-};
-
 /** Seven-day progress row. */
 function SigninProgress({
   days,
@@ -282,6 +271,34 @@ function SigninCreditsInfo({
   );
 }
 
+/** Check-in loading surface: paired bars without placeholder day states or values. */
+function SigninCardSkeleton(): ReactElement {
+  const groups = [
+    ["44%", "72%"],
+    ["36%", "62%"],
+    ["52%", "78%"],
+    ["40%", "68%"],
+  ] as const;
+  return (
+    <section
+      data-testid="signin-card-skeleton"
+      aria-label={SIGNIN.title}
+      className="signin-card-container"
+    >
+      <div className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 px-1 py-2">
+          {groups.map(([shortWidth, longWidth], index) => (
+            <WebuiStack key={index} gap="small">
+              <WebuiSkeleton variant="shape" width={shortWidth} height={12} />
+              <WebuiSkeleton variant="shape" width={longWidth} height={12} />
+            </WebuiStack>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /**
  * The daily check-in card: its DOM, classes and copy.
  *
@@ -307,7 +324,9 @@ export function SigninCard({
   readonly onRetry: () => void;
   readonly onNavigateToUsage: () => void;
 }): ReactElement {
-  const displayPanel = panel ?? (loading ? LOADING_SIGNIN_PANEL : undefined);
+  if (loading && !panel) return <SigninCardSkeleton />;
+
+  const displayPanel = panel;
   const streak = displayPanel ? getCurrentSigninStreak(displayPanel.days) : 0;
   const today = displayPanel?.days.find((day) => day.is_today);
   const claimableDay =
@@ -330,9 +349,8 @@ export function SigninCard({
         : `${SIGNIN.claimEarn} ${points}`;
 
   return (
-    <WebuiSkeletonProjection loading={loading && !panel}>
       <section
-        data-testid={loading && !panel ? "signin-card-skeleton" : "signin-card"}
+        data-testid="signin-card"
         aria-label={SIGNIN.title}
         className="signin-card-container"
       >
@@ -481,6 +499,5 @@ export function SigninCard({
           )}
         </div>
       </section>
-    </WebuiSkeletonProjection>
   );
 }

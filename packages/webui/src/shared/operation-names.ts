@@ -175,6 +175,22 @@ export const SET_MEMORY_SETTINGS_OPERATION_NAME = "setMemorySettings" as const;
 export const LIST_MINI_APPS_OPERATION_NAME = "listMiniApps" as const;
 export const OPEN_MINI_APP_OPERATION_NAME = "openMiniApp" as const;
 export const STOP_MINI_APP_OPERATION_NAME = "stopMiniApp" as const;
+/** The declared permissions of one Mini App, with the stored switches. */
+export const LIST_MINI_APP_PERMISSIONS_OPERATION_NAME = "listMiniAppPermissions" as const;
+/** Stores one Mini App permission switch and answers the same list. */
+export const SET_MINI_APP_PERMISSION_OPERATION_NAME = "setMiniAppPermission" as const;
+/**
+ * One request from a framed page's tool channel.
+ *
+ * The page bridge answers `tools.list` / `tools.request` / `tools.call` with this, so it
+ * is one operation rather than three: the three differ in what they carry, not in what
+ * they are — one round trip the Host answers.
+ */
+export const CALL_MINI_APP_TOOL_OPERATION_NAME = "callMiniAppTool" as const;
+/** The tool prompts waiting for a person, pushed whenever the list changes. */
+export const WATCH_MINI_APP_TOOL_APPROVALS_OPERATION_NAME = "watchMiniAppToolApprovals" as const;
+/** One person's answer to one waiting prompt. */
+export const REPLY_MINI_APP_TOOL_APPROVAL_OPERATION_NAME = "replyMiniAppToolApproval" as const;
 export const WATCH_MINI_APP_PRESENTATION_OPERATION_NAME = "watchMiniAppPresentation" as const;
 export const WATCH_MINI_APP_PRESENTER_OPERATION_NAME = "watchMiniAppPresenter" as const;
 /**
@@ -454,6 +470,7 @@ import type {
 import type { WebuiPluginManagementRequest } from "./plugin-management.js";
 import type {
   WebuiMiniAppCatalogue,
+  WebuiMiniAppPermissionList,
   WebuiMiniAppPresentationIntent,
   WebuiMiniAppPresentationState,
   WebuiMiniAppView,
@@ -464,6 +481,11 @@ import type {
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "./contracts/miniapp-agent.js";
+import type {
+  WebuiMiniAppToolApprovalAnswer,
+  WebuiMiniAppToolApprovalFrame,
+  WebuiMiniAppToolResult,
+} from "./contracts/miniapp-tools.js";
 
 /**
  * The complete operation table: every wire operation name mapped to the
@@ -952,6 +974,64 @@ export interface OperationSpec {
     response: { readonly success: true };
   };
   /**
+   * One package's declared Mini App permissions with their stored switches.
+   *
+   * The items come from the installed manifest, so a package that dropped an item
+   * cannot be asked about it: what is not declared is not a switch.
+   */
+  listMiniAppPermissions: {
+    request: { readonly pluginId: string };
+    response: WebuiMiniAppPermissionList;
+  };
+  /**
+   * Stores one switch and answers the same list.
+   *
+   * Answering the list rather than an acknowledgement leaves no client holding a
+   * stale copy after a write it did not see the shape of.
+   */
+  setMiniAppPermission: {
+    request: {
+      readonly pluginId: string;
+      readonly permission: string;
+      readonly enabled: boolean;
+    };
+    response: WebuiMiniAppPermissionList;
+  };
+  /**
+   * One page tool request, answered with the channel's own shape.
+   *
+   * A refusal is a body (`ok: false` with the runtime's code), not an envelope error: the
+   * page has to distinguish "this Host offers no tools" from "you may not use them", and
+   * an error the transport raised would reach it without that difference.
+   */
+  callMiniAppTool: {
+    request: {
+      readonly pluginId: string;
+      readonly method: "list" | "request" | "call";
+      readonly name?: string;
+      readonly names?: readonly string[];
+      readonly arguments?: unknown;
+    };
+    response: WebuiMiniAppToolResult;
+  };
+  /**
+   * The prompts waiting for a person.
+   *
+   * A stream because a prompt is not a request: it appears while a page's call is
+   * already waiting, and it disappears when someone answers it or it times out. Every
+   * client gets the whole list and filters by `pluginId` — the same client already sees
+   * every Mini App it can frame.
+   */
+  watchMiniAppToolApprovals: {
+    request: undefined;
+    response: WebuiMiniAppToolApprovalStreamEnvelope;
+  };
+  /** One answer; the prompt it names is settled by it. */
+  replyMiniAppToolApproval: {
+    request: WebuiMiniAppToolApprovalAnswer;
+    response: { readonly success: true };
+  };
+  /**
    * The standalone presentation lease (ADR 0020).
    *
    * A standalone document declares its plugin, its session and its presentation
@@ -1255,6 +1335,14 @@ export interface WebuiBrowserWebTabStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiBrowserWebTabSnapshot>;
+  };
+}
+
+/** The `{ stream }` envelope for the tool prompts waiting for a person. */
+export interface WebuiMiniAppToolApprovalStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppToolApprovalFrame>;
   };
 }
 

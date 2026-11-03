@@ -110,7 +110,12 @@ export interface HostProcessConnectorGateway {
     readonly processGeneration: string;
   }): void;
   list(input: {
-    readonly providerAllowlist: readonly string[];
+    /**
+     * Which providers this caller may see. `'all'` admits every provider the account has
+     * granted — the page channel's rule, where the account's own grants are the only
+     * filter. A list filters to exactly those providers; an empty list admits none.
+     */
+    readonly providerAllowlist: readonly string[] | 'all';
     readonly caller: HostProcessConnectorCaller;
     readonly signal?: AbortSignal;
   }): Promise<ConnectorInventory>;

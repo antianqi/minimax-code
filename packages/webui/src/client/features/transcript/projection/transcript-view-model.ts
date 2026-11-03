@@ -16,7 +16,7 @@
 // - `trailingLiveGroupId` decides which group owns the live activity row, so the
 //   `推理中…` indicator renders exactly once and always trails the transcript.
 
-import type { WebuiClientMessagePage } from "../contracts/message-view.js";
+import type { WebuiClientMessage, WebuiClientMessagePage } from "../contracts/message-view.js";
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { projectWebuiTranscriptMessage } from "./message-projection.js";
 import {
@@ -35,6 +35,35 @@ type WebuiTranscriptStreamMessages = Parameters<typeof projectWebuiTranscriptMes
 type WebuiTranscriptStreamPhase = Parameters<typeof isTurnLive>[0];
 type WebuiTranscriptMessageProjection = ReturnType<typeof projectWebuiTranscriptMessage>;
 type WebuiTranscriptGroup = ReturnType<typeof groupWebuiTranscriptItems>[number];
+
+// Historical page messages are immutable snapshots. While the active stream
+// changes, their identity stays stable, so keep their expensive parts and view
+// projections instead of rebuilding them on every stream frame.
+const messageProjectionCache = new WeakMap<WebuiClientMessage, WebuiTranscriptMessageProjection>();
+const historicalViewCache = new WeakMap<
+  WebuiClientMessage,
+  { readonly sessionId: string; readonly items: WebuiTranscriptMessageProjection["items"]; readonly view: WebuiTurnView }
+>();
+
+function projectMessage(message: WebuiClientMessage): WebuiTranscriptMessageProjection {
+  const cached = messageProjectionCache.get(message);
+  if (cached) return cached;
+  const projection = projectWebuiTranscriptMessage(message);
+  messageProjectionCache.set(message, projection);
+  return projection;
+}
+
+function projectTurnView(
+  message: WebuiClientMessage,
+  sessionId: string,
+  items: WebuiTranscriptMessageProjection["items"],
+): WebuiTurnView {
+  const cached = historicalViewCache.get(message);
+  if (cached?.sessionId === sessionId && cached.items === items) return cached.view;
+  const view = projectHistoricalTurnView(message, sessionId, items);
+  historicalViewCache.set(message, { sessionId, items, view });
+  return view;
+}
 
 /** One assistant turn as the right-rail navigator lists it. */
 export interface WebuiTranscriptTurnRow {
@@ -79,15 +108,13 @@ export function projectWebuiTranscriptView(input: {
     streamMessages,
     streamPhase !== "done",
   );
-  const messageProjections = messages.map((message) =>
-    projectWebuiTranscriptMessage(message),
-  );
+  const messageProjections = messages.map(projectMessage);
   const items = messageProjections.flatMap((projection) => projection.items);
   // 每条消息使用统一视图；历史适配器提供持久化字段，实时适配器提供流式标记。
   const turnViewsByMessageId = new Map<string, WebuiTurnView>(
     messageProjections.map(({ message, items: projectedItems }) => [
       message.msgId,
-      projectHistoricalTurnView(message, sessionId, projectedItems),
+      projectTurnView(message, sessionId, projectedItems),
     ]),
   );
   // Group by message so one turn renders as one block: a process disclosure

@@ -169,6 +169,9 @@ test("A history is never rendered during B's delayed first page", async ({ page 
   const skeleton = page.locator(".webui-skeleton.webui-motion-loading").first();
   await expect(skeleton).toBeVisible();
   await expect.poll(() => skeleton.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-skeleton-pulse");
+  const skeletonColumnLeft = await page.locator('[data-testid="chat-skeleton"] > .webui-stack').evaluate((element) => element.getBoundingClientRect().left);
+  const messageListLeft = await page.locator('[data-webui-message-list="true"]').evaluate((element) => element.getBoundingClientRect().left);
+  expect(Math.abs(skeletonColumnLeft - messageListLeft)).toBeLessThanOrEqual(1);
   const skeletonLines = await page.locator(".webui-transcript-skeleton-lines .webui-skeleton").evaluateAll((elements) => elements.map((element) => {
     const rect = element.getBoundingClientRect();
     return { top: rect.top, bottom: rect.bottom };

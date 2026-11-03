@@ -11,6 +11,7 @@ import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -97,7 +98,7 @@ export function WebuiWorkspaceDirectoryBrowser({
         {error ? (
           <FeedbackError message={error} className="webui-commit-dialog-error" />
         ) : null}
-        <div className="webui-workspace-browser-actions">
+        <WebuiDialogActions>
           <WebuiButton
             variant="outline"
             size="compact"
@@ -114,7 +115,7 @@ export function WebuiWorkspaceDirectoryBrowser({
           >
             使用此目录
           </WebuiButton>
-        </div>
+        </WebuiDialogActions>
       </WebuiStack>
     );
 
@@ -167,7 +168,7 @@ export function WebuiWorkspaceDirectoryBrowser({
       {listing?.truncated ? (
         <FeedbackEmpty className="webui-composer-menu-empty" title={"子目录过多，仅显示前若干项"} />
       ) : null}
-      <div className="webui-workspace-browser-actions">
+      <WebuiDialogActions>
         <WebuiButton
           variant="outline"
           size="compact"
@@ -187,7 +188,7 @@ export function WebuiWorkspaceDirectoryBrowser({
         >
           使用此目录
         </WebuiButton>
-      </div>
+      </WebuiDialogActions>
     </WebuiStack>
   );
 }

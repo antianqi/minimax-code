@@ -20,6 +20,8 @@ import yaml from "highlight.js/lib/languages/yaml";
 import {
   createElement,
   Fragment,
+  memo,
+  useRef,
   type CSSProperties,
   type ReactElement,
   type ReactNode,
@@ -246,9 +248,33 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
   });
 }
 
-function blocks(tokens: readonly Token[] | undefined, onOpenFile?: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void, workspaceDir?: string): ReactNode[] {
+/**
+ * What identifies one block for reuse: its kind and its source text.
+ *
+ * Two blocks with the same signature render to the same element, because the
+ * renderer reads nothing else.
+ */
+function blockSignature(token: Token): string {
+  return `${token.type}\u0000${token.raw ?? ""}`;
+}
+
+function blocks(
+  tokens: readonly Token[] | undefined,
+  onOpenFile?: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void,
+  workspaceDir?: string,
+  reuse?: { readonly signatures: readonly string[]; readonly elements: readonly ReactNode[] },
+): ReactNode[] {
   return (tokens ?? []).map((token, index) => {
     const key = `${token.type}-${index}`;
+    // A block whose source text and kind are unchanged renders to the same
+    // element, so the previous rendering is reused rather than rebuilt. The
+    // reuse is what keeps a streamed answer affordable: the answer grows by
+    // appending, so every block before the one being written is identical
+    // between two frames, and re-rendering it cannot change the result.
+    // The kind is part of the comparison because the same source text can be
+    // a different kind of block once the surrounding text moves.
+    const reused = reuse?.elements[index];
+    if (reused !== undefined && reuse?.signatures[index] === blockSignature(token)) return reused;
     if (token.type === "paragraph")
       return <p key={key}>{inline(token.tokens, onOpenFile, workspaceDir)}</p>;
     if (token.type === "heading")
@@ -376,11 +402,28 @@ function blocks(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
   });
 }
 
-export function WebuiMarkdown({ source, onOpenFile, workspaceDir }: {
+/**
+ * The previous rendering of one answer, kept so the next one can reuse the
+ * blocks that did not change.
+ *
+ * It belongs to the component instance rather than to the module: an answer
+ * that leaves the transcript must take its elements with it.
+ */
+interface WebuiMarkdownBlockCache {
+  readonly onOpenFile: WebuiMarkdownViewProps["onOpenFile"];
+  readonly workspaceDir: string | undefined;
+  readonly signatures: readonly string[];
+  readonly elements: readonly ReactNode[];
+}
+
+interface WebuiMarkdownViewProps {
   readonly source: string;
   readonly onOpenFile?: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void;
   readonly workspaceDir?: string;
-}): ReactElement {
+}
+
+function WebuiMarkdownView({ source, onOpenFile, workspaceDir }: WebuiMarkdownViewProps): ReactElement {
+  const cacheRef = useRef<WebuiMarkdownBlockCache>();
   let tokens: Token[];
   try {
     const fileBullet = /^(\s*(?:[-*+]\s+|\d+[.)]\s+)?[^\n]*?)\[([^\]\n]+)\]\s*\r?\n\s*\(((?:\/[^\r\n()]+)|(?:[A-Za-z]:[\\/][^\r\n()]+))\)[ \t]*(?:[—-][ \t]*([^\r\n]+)|\r?\n\s*[—-]\s*([^\r\n]+))?/gmu;
@@ -389,9 +432,27 @@ export function WebuiMarkdown({ source, onOpenFile, workspaceDir }: {
   } catch {
     tokens = [{ type: "text", raw: source, text: source }];
   }
+  // The cache only applies to the same reader: a different file-reference
+  // handler or workspace changes what a block renders to.
+  const cache = cacheRef.current;
+  const reusable =
+    cache && cache.onOpenFile === onOpenFile && cache.workspaceDir === workspaceDir
+      ? cache
+      : undefined;
+  const signatures = tokens.map(blockSignature);
+  const elements = blocks(tokens, onOpenFile, workspaceDir, reusable);
+  cacheRef.current = { onOpenFile, workspaceDir, signatures, elements };
   return (
     <div data-webui-markdown="true" className="matrix-markdown webui-markdown">
-      {blocks(tokens, onOpenFile, workspaceDir)}
+      {elements}
     </div>
   );
 }
+
+export const WebuiMarkdown = memo(
+  WebuiMarkdownView,
+  (previous, next) =>
+    previous.source === next.source &&
+    previous.workspaceDir === next.workspaceDir &&
+    previous.onOpenFile === next.onOpenFile,
+);

@@ -105,6 +105,33 @@ test("a pinned session row has one pin action and no duplicate pin marker", asyn
   await expect(row.locator('[data-webui-rail-action="pin"][aria-label^="取消置顶"]')).toHaveCount(1);
 });
 
+test("hovering a child session keeps its avatar and clips only the title for the menu", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const parentDisclosure = page.getByRole("button", { name: "展开子会话：Synthetic session A" });
+  await expect(parentDisclosure).toBeVisible();
+  await parentDisclosure.click();
+
+  const childRow = page.locator(".webui-project-child-session-row")
+    .filter({ has: page.locator('[data-webui-session-link="C"]') });
+  const child = childRow.locator('[data-webui-session-link="C"]');
+  await expect(child).toBeVisible();
+  await childRow.hover();
+
+  const avatar = child.locator(".webui-agent-avatar");
+  const title = child.locator(".webui-project-child-session-title");
+  const action = childRow.locator(".webui-session-row-actions");
+  const titleBounds = await title.boundingBox();
+  const actionBounds = await action.boundingBox();
+  await expect(avatar).toBeVisible();
+  await expect(action.getByRole("button", { name: "子任务 C 更多操作" })).toBeVisible();
+  expect(await avatar.evaluate((element) => getComputedStyle(element).clipPath)).toBe("none");
+  expect(await title.evaluate((element) => getComputedStyle(element).clipPath)).toBe("inset(0px 28px 0px 0px)");
+  expect(titleBounds).not.toBeNull();
+  expect(actionBounds).not.toBeNull();
+  expect(titleBounds.x + titleBounds.width - 28).toBeLessThanOrEqual(actionBounds.x);
+});
+
 test("a running session title keeps its space before hover actions", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openApp(page, "#session=A");

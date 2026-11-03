@@ -1928,3 +1928,69 @@ function holdTurns(ports: ReturnType<typeof setup>['ports']) {
     texts: () => ports.runTurn.mock.calls.map(([input]) => input.text),
   };
 }
+
+describe('createMiniAppAgentGateway permission switches', () => {
+  type SwitchChange = {
+    readonly pluginId: string;
+    readonly permission: string;
+    readonly enabled: boolean;
+  };
+
+  function attach(
+    gateway: ReturnType<typeof setup>['gateway'],
+    enabled: (permission: string) => boolean,
+  ): { readonly listeners: Array<(change: SwitchChange) => void> } {
+    const listeners: Array<(change: SwitchChange) => void> = [];
+    gateway.attachPermissionSwitches({
+      isEnabled: (_pluginId, permission) => enabled(permission),
+      subscribe: (listener) => {
+        listeners.push(listener);
+        return () => undefined;
+      },
+    });
+    return { listeners };
+  }
+
+  it('refuses a run while agent:session.run is off', async () => {
+    const { gateway, ports } = setup();
+    gateway.registerArena(ARENA);
+    attach(gateway, () => false);
+
+    await expect(gateway.run(CALLER, { text: 'hi' })).rejects.toMatchObject({
+      code: 'NOT_PERMITTED',
+    });
+    expect(ports.createSession).not.toHaveBeenCalled();
+    expect(ports.runTurn).not.toHaveBeenCalled();
+  });
+
+  it('refuses a session read while agent:session.read is off', async () => {
+    const { gateway, ports } = setup();
+    gateway.registerArena(ARENA);
+    attach(gateway, (permission) => permission !== 'agent:session.read');
+
+    await expect(gateway.sessions(CALLER)).rejects.toMatchObject({ code: 'NOT_PERMITTED' });
+    expect(ports.listUserSessions).not.toHaveBeenCalled();
+  });
+
+  it('aborts a run in flight when the switch is turned off', async () => {
+    const { gateway, ports } = setup();
+    gateway.registerArena(ARENA);
+    const { listeners } = attach(gateway, () => true);
+    let release: (() => void) | undefined;
+    ports.runTurn.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return { turnId: 'turn-1', status: 'aborted' as const, text: '' };
+    });
+
+    const pending = gateway.run(CALLER, { text: 'hi' });
+    await vi.waitFor(() => expect(ports.runTurn).toHaveBeenCalled());
+    for (const listener of listeners) {
+      listener({ pluginId: CALLER.pluginId, permission: 'agent:session.run', enabled: false });
+    }
+    release?.();
+
+    await expect(pending).resolves.toMatchObject({ status: 'aborted' });
+  });
+});

@@ -11,6 +11,7 @@ import {
   type WebuiButtonSize,
   type WebuiButtonVariant,
 } from "../../src/client/ui/button.js";
+import { WebuiSkeletonProjection } from "../../src/client/ui/page.js";
 
 /* The button contract is a vocabulary, and the two halves of it can drift: a
  * variant the component offers but the stylesheet does not declare renders as
@@ -129,6 +130,21 @@ describe("the button contract", () => {
       </WebuiIconButton>,
     );
     expect(markup).toContain('aria-label="Close"');
+  });
+
+  it("projects every shared button-like control through the common page skeleton", () => {
+    const markup = renderToStaticMarkup(
+      <WebuiSkeletonProjection loading>
+        <>
+          <WebuiButton variant="secondary">Projected button</WebuiButton>
+          <WebuiIconButton label="Projected icon">O</WebuiIconButton>
+          <WebuiButtonLink variant="grouped" href="/projected">Projected link</WebuiButtonLink>
+        </>
+      </WebuiSkeletonProjection>,
+    );
+    const projectedControls = markup.match(/<(?:button|a)\b[^>]*data-webui-page-skeleton-control="true"[^>]*>/g) ?? [];
+    expect(projectedControls, projectedControls.join("\n")).toHaveLength(3);
+    expect(projectedControls.every((control) => control.includes("webui-motion-loading"))).toBe(true);
   });
 
   it("renders a link that looks like a button as a link", () => {

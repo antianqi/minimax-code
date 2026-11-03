@@ -11,7 +11,8 @@ import type {
   AskQuestionnaireReplyAnswer,
   AskQuestionnaireRequest,
 } from '@mavis/shared/questionnaire';
-import type { MiniAppAgentPolicy } from '../contracts.js';
+import type { MiniAppAgentPolicy, MiniAppPermissionSwitchPort } from '../contracts.js';
+
 
 /**
  * The two bounds are declared beside `MiniAppAgentPolicy` in `../contracts.ts`, which the manifest
@@ -492,4 +493,12 @@ export interface MiniAppAgentSessionPorts {
 /** Gateway that fails closed (`AGENT_UNAVAILABLE`) until `bind` supplies ports. */
 export interface BindableMiniAppAgentGateway extends MiniAppAgentGateway, MiniAppApprovalRouter {
   bind(ports: MiniAppAgentSessionPorts): void;
+  /**
+   * Attaches the user's switches.
+   *
+   * The gateway is assembled before the Plugin service that owns them, so this is where they start
+   * existing for it. Reading happens per request; subscribing is only for stopping what a revoked
+   * `agent:session.run` was already authorizing.
+   */
+  attachPermissionSwitches(switches: MiniAppPermissionSwitchPort): void;
 }

@@ -729,6 +729,26 @@ function createPeripheralApplication(
           [...requestIds],
           decision,
         ),
+      /**
+       * The stored rules a caller without a turn is judged by.
+       *
+       * `source: 'global'` is the scope a Mini App page has: it has no session and no
+       * agent, so the per-agent and per-session layers cannot speak for it.
+       */
+      listGlobalRules: async () =>
+        host.apiHost.permissionRouteContext().permissionRules.listRules({
+          source: 'global',
+        }),
+      /** Writes the same global allow rule an "always allow" answer writes on a turn. */
+      addGlobalAllowRule: async (toolName: string) => {
+        await host.apiHost.permissionRouteContext().permissionRules.applyUpdate({
+          type: 'addRules',
+          source: 'global',
+          destination: 'global',
+          behavior: 'allow',
+          rules: [{ toolName }],
+        });
+      },
     },
     account: {
       getStatus: async ({ sessionId, model } = {}) => {

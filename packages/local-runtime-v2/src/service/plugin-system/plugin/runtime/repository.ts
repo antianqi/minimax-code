@@ -9,6 +9,7 @@ import {
 import type { AppDb } from '../../../../infra/db/client.js';
 import {
   pluginDisabledLocalRoots,
+  pluginMiniAppPermissions,
   pluginOfficialStates,
 } from '../../../../infra/db/schema/plugin.js';
 
@@ -28,6 +29,14 @@ export interface PluginRepositoryScope {
   readonly principalId: string;
   readonly deployment: string;
 }
+
+/**
+ * Which half of the Plugin inventory a Mini App came from.
+ *
+ * Switches are stored per source because one id can be served by both an official package and a
+ * local one: the stored decision must follow the package it was made for.
+ */
+export type MiniAppPermissionSource = 'local' | 'official';
 
 export interface CachedPluginPackage {
   readonly name: string;
@@ -222,6 +231,87 @@ export class SqlitePluginRepository {
       });
   }
 
+  /**
+   * The declared Mini App permissions this package may not use, as `domain:item` ids.
+   *
+   * Only denials are stored, so a package with no rows answers an empty set: every declared item is
+   * on until someone turns it off.
+   */
+  listDisabledMiniAppPermissions(
+    pluginId: string,
+    source: MiniAppPermissionSource,
+  ): ReadonlySet<string> {
+    assertMiniAppPermissionSource(source);
+    const rows = this.db
+      .select({ permission: pluginMiniAppPermissions.permission })
+      .from(pluginMiniAppPermissions)
+      .where(
+        and(
+          eq(pluginMiniAppPermissions.pluginId, pluginId),
+          eq(pluginMiniAppPermissions.pluginSource, source),
+          eq(pluginMiniAppPermissions.enabled, 0),
+        ),
+      )
+      .all();
+    return new Set(
+      rows.map((row) => {
+        if (typeof row.permission !== 'string') {
+          fail('STATE_CORRUPT', 'Mini App permission row has an invalid permission id');
+        }
+        return row.permission;
+      }),
+    );
+  }
+
+  /**
+   * Stores one decision.
+   *
+   * A row is kept even when the item is turned back on: `enabled = 1` is the explicit "this was
+   * decided", which is what a reinstall keeps for comparison, while the reader treats both an
+   * absent row and an enabled row as on.
+   */
+  setMiniAppPermissionEnabled(
+    pluginId: string,
+    source: MiniAppPermissionSource,
+    permission: string,
+    enabled: boolean,
+  ): void {
+    assertMiniAppPermissionSource(source);
+    const updatedAtMs = this.nowMs();
+    this.db
+      .insert(pluginMiniAppPermissions)
+      .values({
+        pluginId,
+        pluginSource: source,
+        permission,
+        enabled: enabled ? 1 : 0,
+        updatedAtMs,
+      })
+      .onConflictDoUpdate({
+        target: [
+          pluginMiniAppPermissions.pluginId,
+          pluginMiniAppPermissions.pluginSource,
+          pluginMiniAppPermissions.permission,
+        ],
+        set: { enabled: enabled ? 1 : 0, updatedAtMs },
+      })
+      .run();
+  }
+
+  /** Called after an explicit uninstall: a reinstalled package starts with every item enabled. */
+  deleteMiniAppPermissions(pluginId: string, source: MiniAppPermissionSource): void {
+    assertMiniAppPermissionSource(source);
+    this.db
+      .delete(pluginMiniAppPermissions)
+      .where(
+        and(
+          eq(pluginMiniAppPermissions.pluginId, pluginId),
+          eq(pluginMiniAppPermissions.pluginSource, source),
+        ),
+      )
+      .run();
+  }
+
   pruneMissingLocalPlugins(existingCanonicalRoots: ReadonlySet<string>): void {
     const existing = new Set([...existingCanonicalRoots].map((root) => assertCanonicalRoot(root)));
     for (const disabledRoot of this.listDisabledLocalPluginRoots()) {
@@ -238,6 +328,12 @@ export class SqlitePluginRepository {
 function assertScope(scope: PluginRepositoryScope): void {
   if (!scope.principalId.trim() || !scope.deployment.trim()) {
     fail('SCOPE_INVALID', 'principal and deployment are required');
+  }
+}
+
+function assertMiniAppPermissionSource(source: string): asserts source is MiniAppPermissionSource {
+  if (source !== 'local' && source !== 'official') {
+    fail('PERMISSION_SOURCE_INVALID', 'Mini App permission source is neither local nor official');
   }
 }
 

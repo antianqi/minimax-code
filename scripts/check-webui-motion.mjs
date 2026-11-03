@@ -40,7 +40,6 @@ const COMPONENT_OWNED_MOTION_CLASSES = new Set([
   "webui-motion-feedback-clip",
   "webui-motion-feedback-opacity",
   "webui-motion-loading",
-  "webui-motion-loading-pulse",
   "webui-motion-panel-layout",
   "webui-motion-progress",
   "webui-motion-surface-enter",

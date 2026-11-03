@@ -9,7 +9,8 @@
 // workspace which tab to open. That direction is ADR 0020's: the business issues
 // the workspace panel's own command, it never reaches into the panel's state.
 
-import { useEffect, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
+import { IconApps, IconX } from "@tabler/icons-react";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -34,6 +35,92 @@ import {
 } from "../../plugins/ui/PluginRow.public.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
+import { WebuiDialog } from "../../../ui/dialog.js";
+import { WebuiIconButton } from "../../../ui/button.js";
+import { webuiMiniAppWindowName } from "../projection/miniapp-view.js";
+
+/** Icon-card launcher opened from the primary navigation rail. */
+export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }): ReactElement | null {
+  const [open, setOpen] = useState(false);
+  const workflows = useWebuiMiniAppWorkflows();
+  const state = useWebuiMiniAppWorkflowsState();
+  const { dom } = useWebuiBrowserCapabilities();
+  const rows = state.listing.rows;
+
+  useEffect(() => {
+    if (!open) return;
+    void workflows?.loadListing();
+  }, [open, workflows]);
+
+  return <>
+    <WebuiButton
+      variant="selectable-row"
+      size="regular"
+      className="webui-nav-item h-8 w-full pl-2 pr-2.5 text-sm font-normal"
+      data-webui-nav-item="应用"
+      data-webui-nav-active={open ? "true" : "false"}
+      aria-current={open ? "page" : undefined}
+      onClick={() => setOpen(true)}
+    >
+      <span className="flex flex-shrink-0 items-center justify-center"><IconApps /></span>
+      <span className="min-w-0 flex-1 truncate whitespace-nowrap">应用</span>
+    </WebuiButton>
+    <WebuiDialog
+      id="miniapp-launcher-dialog"
+      open={open}
+      title="应用"
+      onClose={() => setOpen(false)}
+      dismissOnEscape
+      dismissOnBackdrop
+      portalTarget={dom.portalTarget()}
+      testId="miniapp-launcher"
+      width="wide"
+      bodyClassName="webui-miniapp-launcher-body"
+    >
+      {state.unavailable ? <FeedbackEmpty title={state.unavailable} /> : null}
+      {!state.unavailable && state.listing.loading && rows.length === 0 ? <FeedbackLiveRegion>正在加载应用…</FeedbackLiveRegion> : null}
+      {!state.unavailable && !state.listing.loading && rows.length === 0 ? <FeedbackEmpty title="暂无已安装的 Mini App" /> : null}
+      <div className="webui-miniapp-launcher-grid">
+        {rows.map((row) => {
+          const running = row.enabled && row.status === "running";
+          const launchable = row.enabled && !running && row.status !== "starting" && row.status !== "stopping" && Boolean(sessionId);
+          const launch = () => {
+            if (!sessionId || !launchable) return;
+            const href = workflows?.standaloneUrl({ pluginId: row.pluginId, sessionId });
+            if (href) window.open(href, webuiMiniAppWindowName(row.pluginId));
+          };
+          return <div
+            className={`webui-miniapp-launcher-card${running ? " is-running" : ""}`}
+            key={row.pluginId}
+            data-testid={`miniapp-launcher-card-${row.pluginId}`}
+            data-status={row.status}
+            aria-disabled={!launchable && !running ? "true" : undefined}
+          >
+            {launchable ? <button className="webui-miniapp-launcher-open" type="button" onClick={launch} aria-label={`打开${row.name}`}>
+              {row.iconUrl ? <img data-testid={`miniapp-launcher-icon-${row.pluginId}`} src={row.iconUrl} alt="" /> : <IconApps />}
+              <span className="webui-miniapp-launcher-name">{row.name}</span>
+              <span className="webui-miniapp-launcher-status">{row.statusLabel}</span>
+            </button> : <div className="webui-miniapp-launcher-face" aria-label={`${row.name}，${row.statusLabel}`}>
+              {row.iconUrl ? <img data-testid={`miniapp-launcher-icon-${row.pluginId}`} src={row.iconUrl} alt="" /> : <IconApps />}
+              <span className="webui-miniapp-launcher-name">{row.name}</span>
+            </div>}
+            {!launchable ? <span className="webui-miniapp-launcher-status">{row.statusLabel}</span> : null}
+            {running ? <WebuiIconButton
+              className="webui-miniapp-launcher-stop"
+              tone="bare"
+              size="compact"
+              label={`关闭${row.name}`}
+              title={`关闭${row.name}`}
+              data-testid={`miniapp-launcher-stop-${row.pluginId}`}
+              onClick={() => void workflows?.stop(row.pluginId)}
+            ><IconX /></WebuiIconButton> : null}
+          </div>;
+        })}
+      </div>
+      {!sessionId && rows.length > 0 ? <p className="webui-miniapp-launcher-hint">选择一个任务后即可打开应用</p> : null}
+    </WebuiDialog>
+  </>;
+}
 export interface MiniAppPickerProps {
   /** The session the chosen Mini App's view belongs to. */
   readonly sessionId?: string;

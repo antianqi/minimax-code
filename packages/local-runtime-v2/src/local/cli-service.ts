@@ -8,6 +8,8 @@ import type {
   SearchSessionsInput,
 } from "../application/session/query-contract.js";
 import type { ProjectListInput } from "../service/session-system/projects/contracts.js";
+import type { MiniAppToolApprovalPending } from "../service/miniapp/tool-approvals.js";
+import type { MiniAppToolAnswer } from "../service/miniapp/tool-sessions.js";
 import type { SessionQueryApplication } from "../application/session/query-application.js";
 import type { PinnedItemRef } from "../application/session/pin-application.js";
 import type {
@@ -241,6 +243,62 @@ export class CliService {
    */
   listInstalledMiniApps() {
     return this.requireCapability("miniApps", "Mini App").listInstalled();
+  }
+
+  /** Declared Mini App permissions of one package with their stored switches. */
+  listMiniAppPermissions(pluginId: string) {
+    return this.requireCapability("miniApps", "Mini App").listPermissions(pluginId);
+  }
+
+  /** Stores one Mini App permission switch; an id the package does not declare is refused. */
+  setMiniAppPermission(input: {
+    readonly pluginId: string;
+    readonly permission: string;
+    readonly enabled: boolean;
+  }) {
+    return this.requireCapability("miniApps", "Mini App").setPermission(input);
+  }
+
+  /**
+   * One request from a framed page's tool channel.
+   *
+   * The Host resolves the package and generation from the view that sent the request; a
+   * page never names either. A refusal keeps the channel's code (`TOOL_NOT_PERMITTED`,
+   * `TOOL_APPROVAL_REQUIRED`, ...) so the page can act on it.
+   */
+  miniAppToolCall(input: {
+    readonly pluginId: string;
+    readonly processGeneration?: string;
+    readonly method: "list" | "request" | "call";
+    readonly name?: string;
+    readonly names?: readonly string[];
+    readonly arguments?: unknown;
+    readonly signal?: AbortSignal;
+  }): Promise<MiniAppToolAnswer> {
+    return this.requireCapability("miniApps", "Mini App").callTool(input);
+  }
+
+  /**
+   * The page tool prompts waiting for a person.
+   *
+   * A subscription rather than a read: a prompt appears while a page's call is already
+   * waiting, so a client that only read once would never see it. The first callback is the
+   * list as it stands.
+   */
+  watchMiniAppToolApprovals(
+    onPending: (pending: readonly MiniAppToolApprovalPending[]) => void,
+  ): () => void {
+    return this.requireCapability("miniApps", "Mini App").watchToolApprovals(onPending);
+  }
+
+  /** Settles one prompt; an id that is gone, or another package's, is refused. */
+  replyMiniAppToolApproval(input: {
+    readonly pluginId: string;
+    readonly requestId: string;
+    readonly decision: "allow" | "deny" | "allowAlways";
+    readonly names?: readonly string[];
+  }) {
+    return this.requireCapability("miniApps", "Mini App").replyToolApproval(input);
   }
 
   /**

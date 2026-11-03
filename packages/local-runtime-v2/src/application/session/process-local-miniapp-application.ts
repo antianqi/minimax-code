@@ -11,6 +11,8 @@ import type {
   AvailableMiniAppDefinition,
   MiniAppPluginControl,
 } from '../../service/plugin-system/index.js';
+import type { MiniAppToolSessions } from '../../service/miniapp/tool-sessions.js';
+import type { MiniAppToolApprovals } from '../../service/miniapp/tool-approvals.js';
 import type {
   LocalRuntimeApplication,
   ProcessLocalMiniAppLaunch,
@@ -24,6 +26,8 @@ export function createProcessLocalMiniAppApplication(
   supervisor:
     | Pick<MiniAppSupervisor, 'inspect' | 'launchCredential' | 'ownerClient' | 'stopElsewhere'>
     | undefined,
+  tools?: MiniAppToolSessions,
+  approvals?: MiniAppToolApprovals,
 ): ProcessLocalMiniAppApplication | undefined {
   if (!supervisor) return undefined;
 
@@ -78,6 +82,16 @@ export function createProcessLocalMiniAppApplication(
     return launch(miniApp, supervisor.inspect(pluginId)[0]);
   };
 
+  /**
+   * The generation a page's view belongs to.
+   *
+   * A page cannot name it: the client that framed the document knows the plugin, and the
+   * runtime knows which process is serving it. Reading it here keeps the connector
+   * gateway's registration key the Host's fact rather than a page's claim.
+   */
+  const runningGeneration = (pluginId: string): string | undefined =>
+    supervisor.inspect(pluginId)[0]?.active?.processGeneration;
+
   const listRows = async (
     definitions: readonly AvailableMiniAppDefinition[],
     statuses: ReadonlyMap<string, MiniAppStatus>,
@@ -120,6 +134,56 @@ export function createProcessLocalMiniAppApplication(
       const definitions = await plugins.listInstalledMiniApps();
       const statuses = new Map(supervisor.inspect().map((status) => [status.pluginId, status]));
       return { miniApps: await listRows(definitions, statuses) };
+    },
+    // Neither call needs the Supervisor: a switch is a stored decision, and the gateways read it
+    // when a call arrives, so turning one off does not restart or stop anything here.
+    listPermissions: (pluginId) => plugins.listMiniAppPermissions(pluginId),
+    setPermission: (input) => plugins.setMiniAppPermission(input),
+    /**
+     * The prompts waiting for a person.
+     *
+     * The subscription starts with the list as it stands: a client that connects after a
+     * prompt appeared must render it, not wait for the next change.
+     */
+    watchToolApprovals(onPending) {
+      if (!approvals) return () => undefined;
+      onPending(approvals.pending());
+      return approvals.subscribe(onPending);
+    },
+    /**
+     * One answer.
+     *
+     * The package is resolved first, so a request for a package this Host does not serve
+     * is `NOT_FOUND` before the queue is touched; an id that is gone, or belongs to
+     * another package, is `NOT_FOUND` too rather than a silent no-op.
+     */
+    async replyToolApproval(input) {
+      await requireDefinition(input.pluginId);
+      if (!approvals) throw applicationError('UNAVAILABLE');
+      const settled = approvals.answer({
+        requestId: input.requestId,
+        pluginId: input.pluginId,
+        decision: input.decision,
+        ...(input.names !== undefined ? { names: input.names } : {}),
+      });
+      if (!settled) throw applicationError('NOT_FOUND');
+      return { success: true as const };
+    },
+    /**
+     * One page tool request.
+     *
+     * The package is resolved first, so a request for a package this Host does not serve
+     * is refused as `NOT_FOUND` rather than as an absent channel. A channel this Host did
+     * not compose is `UNAVAILABLE`, which is not the same answer as "no tools".
+     */
+    async callTool(input) {
+      await requireDefinition(input.pluginId);
+      if (!tools) throw applicationError('UNAVAILABLE');
+      const generation = input.processGeneration ?? runningGeneration(input.pluginId);
+      return tools.run({
+        ...input,
+        ...(generation !== undefined ? { processGeneration: generation } : {}),
+      });
     },
     open: ({ pluginId, signal }) => open(pluginId, signal),
     /**

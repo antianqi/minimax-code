@@ -11,6 +11,67 @@ export const MINIAPP_AGENT_MAX_CONCURRENCY = 32;
  */
 export const MINIAPP_AGENT_PURPOSE_PREFIX = 'miniapp:';
 
+/**
+ * The permission a Mini App's tool calls need, in the permission panel's id form.
+ *
+ * It lives here rather than with the gateway because three parts read it: the gateway
+ * gate, the rule step, and the permission panel's declaration list.
+ */
+export const MINIAPP_TOOL_CALL_PERMISSION = 'tool:call';
+
+/** A name longer than this cannot have come from a listing this Host produced. */
+const TOOL_NAME_MAX_BYTES = 1024;
+
+export type MiniAppToolErrorCode =
+  | 'INVALID_ARGUMENTS'
+  | 'TOOL_APPROVAL_REQUIRED'
+  | 'TOOL_NOT_FOUND'
+  | 'TOOL_NOT_PERMITTED'
+  | 'TOOL_UNAVAILABLE';
+
+export type MiniAppToolErrorDisposition = 'dispatched' | 'not_dispatched';
+
+/**
+ * What a Mini App is told about a failed call.
+ *
+ * The text is the product's, not a log line: Host detail stays in Host logs, and a
+ * page that gets one of these is expected to list its tools again rather than guess.
+ */
+const MINIAPP_TOOL_ERROR_MESSAGES: Record<MiniAppToolErrorCode, string> = {
+  INVALID_ARGUMENTS: 'Mini App tool name or arguments are invalid; list tools again',
+  TOOL_APPROVAL_REQUIRED:
+    'Mini App tool call needs user approval and nobody can approve it now',
+  TOOL_NOT_FOUND: 'Mini App tool is no longer available; list tools again',
+  TOOL_NOT_PERMITTED: 'Mini App tool call is not permitted',
+  TOOL_UNAVAILABLE: 'Mini App tools are unavailable for this generation',
+};
+
+/** A tool-level refusal. `disposition` says whether anything reached the tool. */
+export class MiniAppToolError extends Error {
+  readonly code: MiniAppToolErrorCode;
+  readonly disposition: MiniAppToolErrorDisposition;
+  readonly retryable: boolean;
+  override readonly name = 'MiniAppToolError';
+
+  constructor(
+    code: MiniAppToolErrorCode,
+    disposition: MiniAppToolErrorDisposition = 'not_dispatched',
+    retryable = false,
+  ) {
+    super(MINIAPP_TOOL_ERROR_MESSAGES[code]);
+    this.code = code;
+    this.disposition = disposition;
+    this.retryable = retryable;
+  }
+}
+
+/** Whether a name could have come from a Host listing. */
+export function isMiniAppToolNameWithinLimit(value: unknown): value is string {
+  return (
+    typeof value === 'string' && value.length > 0 && Buffer.byteLength(value) <= TOOL_NAME_MAX_BYTES
+  );
+}
+
 
 /** Runs of one plugin at once when its manifest omits `agentConcurrency`. */
 export const MINIAPP_AGENT_DEFAULT_CONCURRENCY = 4;
@@ -31,6 +92,25 @@ export type MiniAppAgentPolicy =
 
 /** Every Mini App HTTP server answers this path from the guard, never from plugin code. */
 export const MINIAPP_LOOPBACK_HEALTH_PATH = '/__mavis/health';
+
+/**
+ * The user's permission switches, as the Mini App service sees them.
+ *
+ * One question, answered per request: may this Mini App use this item right now. The Plugin system
+ * owns the store and the announcement of a change; the Connector session and the Agent gateway only
+ * read, so a switch takes effect without restarting anything.
+ */
+export interface MiniAppPermissionSwitchPort {
+  isEnabled(pluginId: string, permission: string): boolean;
+  /** Optional: a stored change, so a gateway can stop what the revoked item was authorizing. */
+  subscribe?(
+    listener: (change: {
+      readonly pluginId: string;
+      readonly permission: string;
+      readonly enabled: boolean;
+    }) => void,
+  ): () => void;
+}
 
 /**
  * Request header carrying the Host-issued loopback credential.

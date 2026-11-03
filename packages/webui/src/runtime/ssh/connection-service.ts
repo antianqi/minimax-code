@@ -1,8 +1,8 @@
 // The saved SSH hosts: add, update, switch on and off, remove, probe.
 //
-// The shape of this service is Desktop's (`ssh-runtime/connection-service.js`): a save answers with
-// the saved host *and* the probe that followed it, a removal answers with the projects that went
-// with the host, and a host that cannot be reached is reported as such.
+// The shape of this service: a save answers with the saved host *and* the probe that followed
+// it, a removal answers with the projects that went with the host, and a host that cannot be
+// reached is reported as such.
 //
 // Two rules shape the answers:
 //
@@ -88,8 +88,6 @@ export function createSshConnectionService(
    *
    * A host named in the config file cannot be reached by any other route, so an alias the
    * config does not declare is refused rather than left to fail as an unknown host name.
-   * Desktop checks the same thing before it connects (`ssh-runtime/connection-service.js`,
-   * `validateConnection`).
    *
    * `unknown` means the config could not be read, or was never there: the runtime says
    * nothing about the alias then, and the handshake is left to answer.
@@ -203,8 +201,7 @@ export function createSshConnectionService(
       const saved = await options.repository.setEnabled(alias, enabled, enabled ? "idle" : "disabled");
       if (!enabled) return { success: true, connection: saved };
       // Enabling a host is a request to use it, so the runtime answers whether it can be
-      // reached. Desktop seeds the host's connection when it is switched on; here the probe is
-      // that connection, and the list shows what it answered.
+      // reached. The probe is that connection, and the list shows what it answered.
       const probed = await runProbe(alias);
       const verified = await options.repository.get(alias);
       return { success: true, connection: verified ?? saved, probe: probed };
@@ -232,8 +229,8 @@ export function createSshConnectionService(
  *
  * For a host named in `~/.ssh/config` the alias is enough: OpenSSH resolves the host, the
  * user, the port and the key from the config file when it is asked for that alias. The
- * overrides a request carries are the ones the person changed on purpose, and Desktop stores
- * nothing else (`ssh-runtime/connection-service.js`, `createPendingConnection`).
+ * overrides a request carries are the ones the person changed on purpose, and nothing else
+ * is stored.
  */
 function readEndpoint(
   value: SshEndpointRecord | undefined,

@@ -879,9 +879,9 @@ export function WebuiClientFoundationApp(
    * is the one element that spans the whole window — so this is the one form
    * the shell measures rather than queries.
    */
-  // The 远程 page's 设置 entry opens the connection settings, the way the Desktop's own entry
-  // opens its settings app at 连接. The dialog is the shell's, so the entry and the settings
-  // business meet at one place.
+  // The 远程 page's 设置 entry opens the connection settings, the way the electron app's own
+  // entry opens its settings app at 连接. The dialog is the shell's, so the entry and the
+  // settings business meet at one place.
   const [connectionSettingsOpen, setConnectionSettingsOpen] = useState(false);
   const openConnectionSettings = useCallback(() => setConnectionSettingsOpen(true), []);
   const settingsPortalTarget = browserDom.portalTarget();

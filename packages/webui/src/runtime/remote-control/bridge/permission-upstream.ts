@@ -1,7 +1,7 @@
 /**
  * T3 — event upstream: local-runtime bus → evt.* frames.
  *
- * Forwards the public desktop event catalog, not just permission.*. Every
+ * Forwards the public event catalog, not just permission.*. Every
  * decoded event is sent upstream:
  *   - permission.ask / permission.resolved  → dedicated frames (below)
  *   - every other admitted Global Event
@@ -9,13 +9,14 @@
  *       from event-frame-mapper (mapBusEventToFrame) or the generic
  *       frame-codec.makeBusEventFrame fallback — both keep the bus event
  *       type verbatim with an `evt.` prefix, dots preserved, so the
- *       domain/action hierarchy matches the desktop bus (session.finish →
+ *       domain/action hierarchy matches the bus (session.finish →
  *       evt.session.finish). The gateway strips the `evt.` prefix on its
- *       RC-events outlet, so the phone receives the bare desktop bus type.
+ *       RC-events outlet, so the phone receives the bare bus type.
  *
  * Bus subscription surface: a host-injected stream of events already admitted
- * by the shared frontend Global Event catalog. The Electron adapter owns the
- * generated DesktopService client, wire decoding, and stream close semantics.
+ * by the shared frontend Global Event catalog. The electron app's adapter owns
+ * the generated DesktopService client, wire decoding, and stream close
+ * semantics.
  *
  * Events consumed (train choke points @ api/routes/permissions.ts):
  *   permission.ask      payload = serializePermissionRequest(record):
@@ -25,10 +26,10 @@
  *     (single settle choke point: UI reply / IM reply / DELETE dismiss /
  *      session abort — preview_train ccf895f00)
  *
- * Outbound permission frames (type parity: bare bus type + evt. prefix; the
+ * Outbound permission frames (bare bus type + evt. prefix; the
  * gateway strips the prefix so the phone sees `permission.ask` /
  * `permission.resolved` — its isPermissionEventType bypass matches these
- * exact evt.permission.* strings, renamed in lockstep):
+ * exact evt.permission.* strings, so rename them together):
  *   evt.permission.ask
  *     {session_id, request_id, tool_name, tool_input, rule_contents?,
  *      tool_description?, reason?, ts_ms}
@@ -42,7 +43,7 @@
  * in_reply_to rule (IDL WsEnvelope note): permission_* born from an
  * RC-cmd-triggered turn carries in_reply_to = that cmd.id — resolved via the
  * stream-pump's session→cmd registry (getActiveCmdId). Anything else (a
- * local desktop turn) goes out WITHOUT in_reply_to as a broadcast frame.
+ * local producer turn) goes out WITHOUT in_reply_to as a broadcast frame.
  *
  * Delivery semantics: most frames are only sent while the WS is connected.
  * The three notification-trigger events (permission.ask, questionnaire.ask,
@@ -266,7 +267,7 @@ export class PermissionUpstream {
       return;
     }
     // IDL WsEnvelope in_reply_to rule: RC-cmd-triggered turn → tie the frame
-    // back to the cmd; local desktop turns broadcast without it.
+    // back to the cmd; local producer turns broadcast without it.
     const activeCmdId = this.deps.getActiveCmdId(sessionId);
     const frame =
       type === "permission.ask"

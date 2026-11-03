@@ -7,23 +7,23 @@
 // Split in two on purpose. `ChannelConnectPanelView` is a pure render of a snapshot, so a test can
 // pin every branch — the rows, the empty state, the load failure, the create menu, the two card
 // shapes, the sections the runtime has no route behind — through `renderToStaticMarkup` without a
-// DOM (there is no jsdom in this package). `ChannelConnectPanel` is the thin part that subscribes to
-// the owner and reads once when it opens.
+// DOM (there is no jsdom in this package). `ChannelConnectPanel` is the thin part that
+// subscribes to the owner and reads once when it opens.
 //
-// The pane is Desktop 3.1.6's 接入 IM tab, transcribed: a 220px list column with one row per bot (a
-// status dot, the platform's icon, the bot's name and the platform's label), the create action under
-// the rows, and, beside it, the selected bot's card.
+// The pane: a 220px list column with one row per bot (a status dot, the platform's icon, the
+// bot's name and the platform's label), the create action under the rows, and, beside it, the
+// selected bot's card.
 //
 // ## The two card shapes
 //
-// Desktop draws the card from one fact: the bot's state. A bound bot carries the association's bound
+// The card is drawn from one fact: the bot's state. A bound bot carries the association's bound
 // copy, 解除连接 and no QR. A bot that has not finished its authorization carries the unbound copy,
 // 刷新二维码 and the QR itself — including while it is authorizing, which is why a pending scan is
 // listed as 未绑定 rather than as a bound bot.
 //
 // ## The create flow
 //
-// The create action opens Desktop's platform menu. Choosing one creates the bot first (the runtime's
+// The create action opens the platform menu. Choosing one creates the bot first (the runtime's
 // own prepare route) and authorizes it second:
 //
 //   * 微信 — the QR authorization. The runtime owns that route; the pane shows the QR it produced
@@ -32,7 +32,7 @@
 //     credential path is the one it does serve, so the form asks for the app id and secret instead
 //     of showing a QR.
 //
-// A section the runtime has no route behind is rendered with Desktop's own copy and marked as not
+// A section the runtime has no route behind is rendered with its own copy and marked as not
 // wired, never as if it worked.
 import {
   IconBrandTelegram,
@@ -104,9 +104,9 @@ export interface ChannelConnectPanelProps {
 export interface ChannelConnectPanelViewProps {
   readonly snapshot: WebuiChannelSnapshot;
   readonly onSelect: (connectionId: string) => void;
-  /** Creates the bot for one platform — Desktop's create menu. */
+  /** Creates the bot for one platform — the create menu's action. */
   readonly onAdd: (platform: "wechat" | "feishu") => void;
-  /** Starts the bot's authorization over — Desktop's 刷新二维码. */
+  /** Starts the bot's authorization over — the 刷新二维码 action. */
   readonly onRefreshAuthorization: (connectionId: string) => void;
   readonly onUnbind: (connectionId: string) => void;
   readonly onDelete: (connectionId: string) => void;
@@ -132,7 +132,7 @@ function platformIcon(platform: string): ReactNode {
   return <IconMessageCircle aria-hidden="true" size={20} stroke={1.5} />;
 }
 
-/** One section of the detail card, in Desktop's shape: a title, a description and its content. */
+/** One section of the detail card: a title, a description and its content. */
 function DetailSection(props: {
   readonly title: string;
   readonly description: string;
@@ -166,11 +166,11 @@ function NotWired(): ReactElement {
 }
 
 /**
- * A selector the Desktop draws as a dropdown trigger.
+ * A selector the pane draws as a dropdown trigger.
  *
  * The value it shows is real — the Agent the bot talks to, the working directory it keeps its
  * conversations in — but choosing another one has no route behind it here, so the control carries
- * the Desktop's shape, the `aria-disabled` state and no handler.
+ * the dropdown's shape, the `aria-disabled` state and no handler.
  */
 function UnwiredSelect(props: {
   readonly icon: ReactNode;
@@ -194,9 +194,10 @@ function UnwiredSelect(props: {
 /**
  * The Feishu credential form.
  *
- * Desktop binds Feishu by a QR code and a link; this runtime has no onboarding route for it, and
- * the credential path is the one it does serve, so the form asks for the app id and the secret and
- * binds through the runtime's connect route — onto the bot the create flow already prepared.
+ * The electron app binds Feishu by a QR code and a link; this runtime has no onboarding
+ * route for it, and the credential path is the one it does serve, so the form asks for the app
+ * id and the secret and binds through the runtime's connect route — onto the bot the create
+ * flow already prepared.
  */
 function ChannelBindForm(props: {
   readonly connectionId: string;
@@ -288,10 +289,10 @@ function ChannelBindForm(props: {
 /**
  * The QR the bot's authorization shows.
  *
- * Desktop draws the picture the runtime produced; when the runtime answers with text instead of an
- * image, Desktop encodes that text as a QR and draws it inline. The WeChat bind route answers with
+ * The card draws the picture the runtime produced; when the runtime answers with text instead
+ * of an image, that text is encoded as a QR and drawn inline. The WeChat bind route answers with
  * the liteapp link the phone opens, so the text path is the one this authorization usually takes —
- * encoded by the same library Desktop uses, at the same size.
+ * encoded by the same QR library, at the same size.
  */
 function AuthorizationQr(props: {
   readonly authorization: WebuiChannelAuthorization | undefined;
@@ -358,7 +359,7 @@ function AuthorizationBlock(props: {
 /**
  * The selected bot's card.
  *
- * One component, two shapes, decided by the bot's state exactly as Desktop decides it: bound means
+ * One component, two shapes, decided by the bot's state: bound means
  * the association's bound copy and 解除连接; anything else means the unbound copy and the surface
  * that finishes the authorization — a QR for WeChat, the credential form for Feishu.
  */
@@ -429,7 +430,7 @@ function ChannelCard(props: {
               </WebuiButton>
             ) : props.row.platform === "wechat" ? (
               // A QR is the one authorization this pane drives itself, so it is the one shape that
-              // carries Desktop's 刷新二维码.
+              // carries the 刷新二维码 action.
               <WebuiButton
                 variant="quiet-secondary"
                 size="inline"
@@ -683,9 +684,9 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
     return props.owner.startRefreshing();
   }, [props.owner]);
 
-  // Desktop shows the first bot's card as soon as the list has one, so the detail column is never
+  // The first bot's card is shown as soon as the list has one, so the detail column is never
   // empty beside a populated list. "First" is the first *row*: the list is grouped by platform, and
-  // the row at the top is the one Desktop opens on.
+  // the row at the top is the one the card opens on.
   useEffect(() => {
     if (snapshot.selectedId !== undefined) return;
     const first = webuiChannelRows(snapshot.connections)[0];

@@ -3,16 +3,16 @@
 The 远程控制 tab of the 远程 page: pairing a phone with this service, and letting that phone
 drive the session it is paired with.
 
-## The split, and where it differs from Desktop
+## The split, and where it differs from the electron app
 
-Desktop splits the link across two processes. The renderer signs `GET /desktop/bindings` —
+The electron app splits the link across two processes. The renderer signs `GET /desktop/bindings` —
 only the renderer's axios holds the token — and pushes the one-shot ticket down to the main
 process, which holds the WebSocket.
 
 The WebUI has no renderer that holds the credential: the browser document never receives the
 account token, because it may be running on another machine and the WebUI's own transport is a
 local loopback socket. So the **service** signs the binding HTTP, and the service holds the
-socket. The shape of the Desktop's split is kept — the `applyRemoteControlCredentials`
+socket. The shape of the electron app's split is kept — the `applyRemoteControlCredentials`
 operation still exists and still works — but the signer moves.
 
 ## The credential
@@ -37,9 +37,9 @@ Two rules hold that cache together, and both were learned from a pairing that fa
   server cross-checks the `user_id` common-param against the token's own subject, and an
   identity that flips under the pairing poll ends that poll the same way.
 
-Desktop's main process cannot do any of this: under Shared OAuth it fails closed on the
-legacy SSO token projection (`getJwt: () => ''`), so Desktop 3.1.3's own pairing-code
-request is unsigned. The WebUI's service holds a first-party lease, so it signs.
+The electron app's main process cannot do any of this: under Shared OAuth it fails closed on the
+legacy SSO token projection (`getJwt: () => ''`), so the electron app's own pairing-code request
+at 3.1.3 is unsigned. The WebUI's service holds a first-party lease, so it signs.
 
 The ticket is one-shot. It is never persisted, never logged and never returned to the
 browser; `remote-control/state.json` holds the device id, the binding id and the account id
@@ -67,6 +67,6 @@ the user paired a second time.
 | `runtime/remote-control/bridge/` | The vendored `@mavis/remote-control-bridge`: the pairing client, the connection, the frame codec, the data plane, the command router seam. Host-neutral; the only dependency is `ws`. |
 | `runtime/remote-control/pairing.ts` | The pairing client, the origin resolution and the credential source. |
 | `runtime/remote-control/owner.ts` | The owner: the proxy, the status fan-out, the relink, the credential and the pairing session. |
-| `runtime/remote-control/command-router.ts` | The local runtime entry used by the bridge. It maps Desktop HTTP routes to runtime capabilities and converts typed session, project, pin, queue, permission and questionnaire responses to Desktop wire names. Unsupported paths return 404 and are logged without credentials or message content. |
+| `runtime/remote-control/command-router.ts` | The local runtime entry used by the bridge. It maps the electron app's HTTP routes to runtime capabilities and converts typed session, project, pin, queue, permission and questionnaire responses to the electron app's wire names. Unsupported paths return 404 and are logged without credentials or message content. |
 | `runtime/remote-control/global-events.ts` | The events the phone receives from the local runtime, decoded against the frontend global-event catalogue. |
 | `runtime/harness/remote-control.ts` | The adapter that answers the port's nine remote-control members. |

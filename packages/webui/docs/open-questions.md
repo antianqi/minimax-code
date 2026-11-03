@@ -49,7 +49,7 @@ loopback-reachable browser page can call every App the user has connected on thi
 
 ## 4. Is `titleSafetyBypass: true` the WebUI's permanent value?
 
-**Status:** closed on 2026-10-29 — the answer was no. The `webui` row was aligned with Desktop's
+**Status:** closed on 2026-10-29 — the answer was no. The `webui` row was aligned with the
 `electron` row, and `execution.titleSafetyBypass` is now `false`, the value every non-terminal
 client already had (`packages/local-runtime/src/runtime/runtime-owner-policy.ts`, `webui` row).
 

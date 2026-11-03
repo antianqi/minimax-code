@@ -16,10 +16,10 @@
 //
 // The runtime's own channel types (`LocalImConnectionView`, `LocalChannelMessageFilter`, …) are
 // deliberately absent: `src/shared` may not import them, so the harness adapter converts. The
-// shape that survives the conversion is the one Desktop's own IM client already speaks
+// shape that survives the conversion is the one the channel-bridge surface already speaks
 // (`channel-bridge-surface.ts` → `GET /channel-bridge/connections`).
 
-/** The IM platforms Desktop's channel bridge ships an adapter for. */
+/** The IM platforms the channel bridge ships an adapter for. */
 export type WebuiChannelPlatform = "feishu" | "wechat" | "telegram";
 
 /**
@@ -27,8 +27,8 @@ export type WebuiChannelPlatform = "feishu" | "wechat" | "telegram";
  *
  * `bound` is the only state in which the bot is bound to its platform. `configured` is a bot that
  * exists and has not been authorized yet, `authorizing` one whose QR is on screen, and `error` one
- * whose last authorization failed. Desktop draws the same two card shapes from this: bound, and
- * not-yet-bound.
+ * whose last authorization failed. The 接入 IM tab draws two card shapes from these states:
+ * bound, and not-yet-bound.
  */
 export type WebuiChannelConnectionState = "configured" | "authorizing" | "bound" | "error";
 
@@ -59,9 +59,9 @@ export interface WebuiChannelConnectionList {
 /**
  * The outcome of a channel mutation.
  *
- * Desktop's IM client resolves the runtime's connect/disconnect responses directly; the WebUI
- * turns them into one shape so the tab can render a failure without knowing which route produced
- * it. `error` carries the runtime's own code when it sent one.
+ * The runtime's connect/disconnect responses are turned into one shape so the tab can render a
+ * failure without knowing which route produced it. `error` carries the runtime's own code when
+ * it sent one.
  */
 export interface WebuiChannelOperationResult {
   readonly success: boolean;
@@ -70,7 +70,7 @@ export interface WebuiChannelOperationResult {
 
 export interface WebuiChannelConnectRequest {
   readonly name: string;
-  /** Feishu app id; Desktop's IM client sends it only when the user filled one in. */
+  /** Feishu app id; sent only when the user filled one in. */
   readonly appId?: string;
   /** Feishu app secret; never echoed back to the browser. */
   readonly appSecret?: string;

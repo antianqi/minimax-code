@@ -13,7 +13,7 @@
 // `连接` tab mounts this one component, and the 远程 page's own entry opens that tab rather than
 // carrying a second copy of the host list.
 //
-// The shape is the Desktop's `设置 > 连接 > SSH` half: the hosts in one grouped card, a switch
+// The shape is the `设置 > 连接 > SSH` half: the hosts in one grouped card, a switch
 // and the host's own menu on each row, and one 「添加」 button that opens the host picker.
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { IconLoader2, IconTerminal2 } from "@tabler/icons-react";
@@ -294,9 +294,8 @@ export function SshPanel(props: SshPanelProps): ReactElement {
     void props.owner.saveConnection({
       alias: host.alias,
       // Only the alias is stored. OpenSSH reads the host, the user, the port and the key from
-      // `~/.ssh/config` when it is asked for that alias, and Desktop stores nothing else for a
-      // host picked from the config file (`ssh-runtime/connection-service.js`,
-      // `createPendingConnection`). Stashing the values `ssh -G` reported instead would pin the
+      // `~/.ssh/config` when it is asked for that alias, and nothing else is stored for a
+      // host picked from the config file. Stashing the values `ssh -G` reported instead would pin the
       // host to the config as it reads today, and a key path that config file spells with a `~`
       // would not survive the runtime's own path check.
       endpoint: {
@@ -509,7 +508,7 @@ export function SshPanel(props: SshPanelProps): ReactElement {
   );
 }
 
-/** The Desktop asks before it drops a connection: the projects rooted on it go with it. */
+/** It asks before it drops a connection: the projects rooted on it go with it. */
 function SshRemoveConnectionDialog(props: {
   readonly open: boolean;
   readonly connection?: WebuiSshConnection;

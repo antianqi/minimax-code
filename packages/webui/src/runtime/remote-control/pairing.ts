@@ -6,9 +6,9 @@
 //
 // ## Who signs the binding
 //
-// Desktop splits the binding HTTP across two processes: the renderer owns it because only the
-// renderer's axios can sign `GET /desktop/bindings`, and the main process owns the WebSocket.
-// The WebUI keeps the same split in *shape* — the operation `applyRemoteControlCredentials`
+// The electron app splits the binding HTTP across two processes: the renderer owns it because
+// only the renderer's axios can sign `GET /desktop/bindings`, and the main process owns the
+// WebSocket. The WebUI's split is its own: the operation `applyRemoteControlCredentials`
 // carries a browser-signed ticket down to the service, and the service holds the socket — but the
 // signer is the **service**, not the browser document.
 //
@@ -27,23 +27,24 @@
 //
 // The bearer is the service's **OAuth lease**, not the legacy cli-auth projection.
 //
-// Desktop's main process cannot do this: under Shared OAuth it fails closed on the legacy SSO
-// token projection (`getJwt: () => ''`), so Desktop's own pairing-code request cannot be signed
-// from the main process. The WebUI's service does hold a first-party lease — the one the quota and
-// the daily check-in sign with — so it signs the pairing pipeline with that, and the account id
-// travels in the `user_id` common-param the server cross-checks against the token.
+// The electron app's main process cannot do this: under Shared OAuth it fails closed on the
+// legacy SSO token projection (`getJwt: () => ''`), so the electron app's own pairing-code
+// request cannot be signed from the main process. The WebUI's service does hold a first-party
+// lease — the one the quota and the daily check-in sign with — so it signs the pairing pipeline
+// with that, and the account id travels in the `user_id` common-param the server cross-checks
+// against the token.
 import { remoteControlDeviceName } from "./device-name.js";
 import { resolveAuthScope } from "../auth-context.js";
 import { PairingClient } from "./bridge/pairing-client.js";
 import type { RcLogger } from "./bridge/types.js";
 
-/** Mirrors `@mavis/config`'s unions without adding a dependency. */
+/** Declared here rather than imported from `@mavis/config`, to avoid the dependency. */
 type MavisRegion = "cn" | "en";
 type MavisBuildEnv = "dev" | "test" | "staging" | "prod";
 
 /**
- * The matrix gateway origins, copied from `check-in.ts` (which copied them from the TUI's
- * public gateway). The remote-control endpoints live under the same
+ * The matrix gateway origins, the same table `check-in.ts` uses — and the one the TUI's public
+ * gateway uses. The remote-control endpoints live under the same
  * `/minimax-cloud/api/v1/remote-control` prefix as the other first-party routes.
  */
 const MATRIX_ORIGINS: Readonly<

@@ -1,9 +1,9 @@
 // The 接入 IM cell of the harness port.
 //
 // The runtime already owns the IM channel bridge: `routeLocalChannelBridgeInfraApi` serves the
-// routes Desktop's IM client calls, and the runtime host exposes them through one narrow surface
-// (`LocalRuntimeApiHost.channelBridge`). This adapter forwards and converts, and it decides
-// nothing — not which clients are bound, not whether a bind worked.
+// routes the electron app's IM client calls, and the runtime host exposes them through one
+// narrow surface (`LocalRuntimeApiHost.channelBridge`). This adapter forwards and converts, and
+// it decides nothing — not which clients are bound, not whether a bind worked.
 //
 // Two things happen here:
 //

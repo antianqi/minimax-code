@@ -48,7 +48,7 @@ const MARKDOWN_CODE_LANGUAGES = {
   yaml,
 } as const;
 
-// Match Desktop's inline-code path rule: a path may contain directories, but a
+// The inline-code path rule: a path may contain directories, but a
 // bare filename is a file reference only when its extension is recognized.
 const DESKTOP_FILE_EXTENSIONS = new Set([
   "astro", "bash", "bat", "c", "cc", "cjs", "clj", "cljs", "cljc", "cmd", "cpp", "cs", "css", "cts", "cxx",
@@ -231,7 +231,7 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
         if (parsedInline.length !== 1 || parsedInline[0]?.type !== "text" || parsedInline[0]?.raw !== (token.raw ?? token.text))
           return <Fragment key={key}>{inline(parsedInline, onOpenFile, workspaceDir, false)}</Fragment>;
       }
-      // Desktop only promotes explicit Markdown links and recognized inline
+      // Only explicit Markdown links and recognized inline
       // code spans to file references. Scanning prose here turns identifiers
       // such as SQL table names into false file links.
       return token.text;

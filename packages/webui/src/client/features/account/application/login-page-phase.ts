@@ -1,6 +1,6 @@
 // Which phase the account login page is in.
 //
-// The Desktop's login page is a state machine of its own: signed out, opening
+// The login page is a state machine of its own: signed out, opening
 // the browser, waiting for the authorization, failed. This module derives
 // those states from the server's answer so the page renders a phase rather
 // than reading the answer's shape.

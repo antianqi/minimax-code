@@ -106,8 +106,8 @@ export interface SettingsModalProps {
   /**
    * The tab the dialog opens on.
    *
-   * The 远程 page's 设置 entry opens the connection tab, the way the Desktop's own entry opens
-   * its settings app at 连接. Without this the dialog would always open on the desktop tab and
+   * The 远程 page's 设置 entry opens the connection tab, the way the 设置 entry opens
+   * the settings at 连接. Without this the dialog would always open on the desktop tab and
    * the entry would land the reader one step away from what they asked for.
    */
   readonly initialTab?: SettingsTabKey;

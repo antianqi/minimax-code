@@ -160,7 +160,7 @@ export function SettingsDialog({
   /**
    * `preview` drops the frame: the surface is the preview itself. The account
    * page's share preview is the image it is about to save, and a card around a
-   * card would say something the Desktop does not.
+   * card would say something the account page does not.
    */
   readonly variant?: "default" | "preview";
   /**

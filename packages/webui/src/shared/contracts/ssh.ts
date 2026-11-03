@@ -23,16 +23,16 @@
 //
 // The service's own records (`SshConnection`, `SshProject`, …) stay inside the service: `src/shared`
 // may not import them, so the harness adapter converts. The status vocabulary and the endpoint
-// kinds are Desktop's own (`ssh-runtime/connection-service.js`).
+// kinds are the connection service's own (`ssh-runtime/connection-service.js`).
 
 /**
  * A host's connection state.
  *
- * The vocabulary is Desktop's own: `idle` before the first probe, `connecting` while a probe or
- * reconnect runs, `connected` when the host answered, `disconnected` after a clean drop,
- * `reconnecting` while a dropped link backs off, `failed` when the attempt failed, `probe_failed`
- * when the host answered but was not usable, `ready` when the host verified end to end, and
- * `disabled` for a host the user switched off.
+ * The vocabulary is the connection service's own: `idle` before the first probe, `connecting`
+ * while a probe or reconnect runs, `connected` when the host answered, `disconnected` after a
+ * clean drop, `reconnecting` while a dropped link backs off, `failed` when the attempt failed,
+ * `probe_failed` when the host answered but was not usable, `ready` when the host verified end
+ * to end, and `disabled` for a host the user switched off.
  */
 export type WebuiSshStatus =
   | "idle"
@@ -80,7 +80,8 @@ export interface WebuiSshDiscovery {
   /**
    * Whether `~/.ssh/config` was found at all.
    *
-   * Desktop tells the two empty states apart: no config file, versus a config file with no hosts.
+   * The discovery tells the two empty states apart: no config file, versus a config file with
+   * no hosts.
    */
   readonly configFound: boolean;
   readonly hosts: readonly WebuiSshDiscoveredHost[];

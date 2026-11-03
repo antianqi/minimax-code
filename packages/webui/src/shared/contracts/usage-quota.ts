@@ -42,9 +42,9 @@ export type WebuiUsageQuotaResult =
       readonly tokenPlanTier?: string;
       /**
        * The account's plan subscription kind as the membership API reports it
-       * (`mplan` / `token_plan` / `agent_plan` / `none`). The Desktop picks the
-       * model-source label from it: the legacy `token_plan` subscription still
-       * reads "Token Plan", every other kind reads "M Plan".
+       * (`mplan` / `token_plan` / `agent_plan` / `none`). The model-source label
+       * is picked from it: the legacy `token_plan` subscription still reads
+       * "Token Plan", every other kind reads "M Plan".
        */
       readonly subscriptionType?: string;
       /** The plan display name the membership API reports (`plan_name`). */

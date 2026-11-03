@@ -74,14 +74,14 @@
   /*
    * The page-header strip.
    *
-   * The numbers are the Desktop's, measured with getComputedStyle on its live
+   * The numbers are measured with getComputedStyle on the live
    * `ant-segmented mavis-segmented-page-header ant-segmented-sm`:
    * a 30px track (2px padding, 2px gaps, 8px radius) holding 26px items at
    * 14px/21px with a 6px radius and 12px side padding. Its track fill
    * (rgb(245,245,245)) and selected fill (rgb(255,255,255)) are already this
    * contract's `--bg_grouped_primary` and `--bg_grouped_secondary` roles.
    *
-   * The item weight is 430 — the Desktop's antd label weight, which is
+   * The item weight is 430 — the antd label weight, which is
    * lighter than this contract's `--weight_medium` and heavier than
    * `--weight_regular`. It is written as a number because the token scale
    * has no step between 400 and 500.

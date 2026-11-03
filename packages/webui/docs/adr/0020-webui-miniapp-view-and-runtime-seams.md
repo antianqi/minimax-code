@@ -6,7 +6,7 @@
 The WebUI will host Mini Apps. A Mini App's page is rendered as an iframe the client loads
 from a loopback origin that the WebUI service proxies. The Mini App's own page bridge — the
 `window.mcode.miniapp.*` namespace a Mini App page uses to call its host — is provided by a
-browser build of the desktop client's preload bridge, injected by that same proxy.
+browser build of the electron app's preload bridge, injected by that same proxy.
 
 Both presentations belong to the client. **Inline**, the Mini App view occupies a tab inside the
 WebUI workspace panel. **Standalone**, a browser tab is opened through a URL deep link; the tab runs
@@ -15,27 +15,27 @@ in-page close control: the tab is the Mini App's own. The deep link selects a se
 App, and the service injects its runtime configuration into every page it serves, so a tab opened
 this way is an ordinary client with the same credential as any other.
 
-The Mini App page is a first-party plugin page. The desktop client hosts it in a native
+The Mini App page is a first-party plugin page. The electron app hosts it in a native
 `WebContentsView` and draws none of it; the browser and Electron are both Chromium, so the page
-itself renders identically in the WebUI. Everything the port actually needs from the desktop
-client is three capabilities, and each has a browser-side counterpart.
+itself renders identically in the WebUI. Everything this client actually needs from the electron
+app is three capabilities, and each has a browser-side counterpart.
 
 ## What the browser cannot do, and what replaces it
 
-1. **Injecting the loopback credential.** The desktop client injects the Host-issued credential
+1. **Injecting the loopback credential.** The electron app injects the Host-issued credential
    into the Mini App's own requests with `session.webRequest.onBeforeSendHeaders`. A browser
    cannot add a header to an iframe navigation or to the page's subresources, so a Mini App
    reached directly is rejected by the guard. The WebUI service therefore proxies the Mini App's
-   origin, and injects the credential there. The guard is carried over into this repository as part
-   of this port, so the proxy injects into a contract that exists here rather than one it invents.
-2. **Injecting the page bridge.** The desktop client injects the bridge with a preload
+   origin, and injects the credential there. The guard is a contract that exists here rather than
+   one the proxy invents.
+2. **Injecting the page bridge.** The electron app injects the bridge with a preload
    (`contextBridge.exposeInMainWorld`). A parent page cannot script a cross-origin iframe, so the
    bridge cannot be installed from the client. The proxy rewrites the Mini App's HTML and injects
    a browser build of the same bridge. The bridge reaches the host over `postMessage` to the WebUI
    client, which already holds the client credential and the stream.
-3. **Hosting the page.** The desktop client positions a native view with `setBounds`. The browser
+3. **Hosting the page.** The electron app positions a native view with `setBounds`. The browser
    uses an iframe, whose placement is the document's own layout. This is strictly simpler: the
-   coordinate protocol the desktop client needs to keep the native view aligned with the panel
+   coordinate protocol the electron app needs to keep the native view aligned with the panel
    does not exist here.
 
 The proxy must listen on its own loopback origin, separate from the WebUI's own origin. Serving a
@@ -60,23 +60,23 @@ hold two credentials instead of one.
 
 ## What is not carried over
 
-- **Native window semantics.** The desktop client's detached presentation is a separate operating
+- **Native window semantics.** The electron app's detached presentation is a separate operating
   system window with always-on-top, click-through, transparent, frameless and skip-taskbar options
   and persisted window bounds. A browser tab cannot express any of them. The WebUI keeps the part
   that a browser can honour — the Mini App alone on screen, and a tab the user can drag to a second
   display — and drops the native window options.
 - **The page-side window handle.** Dropped from the contract rather than emulated, because the
-  reason is stronger than "the browser cannot". The shipped generation adds a third part to the
+  reason is stronger than "the browser cannot". The newer generation adds a third part to the
   bridge namespace — `window.mcode.miniapp.window` with `getState`, `update` and `focus`, a manifest
   `surface.window` whitelist of size, `frame`, `transparent`, `alwaysOnTop`, `clickThrough` and
   `skipTaskbar`, and a Chromium argv surface id — and that block is the page asking for its own
   native window, bounds and visibility. Beyond the browser's inability to express any of it, the
   block grants the page a say in *how it is presented*, and presentation is this client's decision.
   A Mini App appears in its own tab because the client opened one, never because the page asked.
-- **Host-to-page injection.** The desktop client can inject into an embedded page: the agent cursor
+- **Host-to-page injection.** The electron app can inject into an embedded page: the agent cursor
   overlay and the comment bridge. A cross-origin Mini App page cannot be reached that way, so a
   Mini App page does not get them.
-- **Moving one live page between presentations.** The desktop client moves the same
+- **Moving one live page between presentations.** The electron app moves the same
   `WebContents` into a window and back into the File Panel, so the page is one instance with one
   state. A browser tab is a separate document. A Mini App shown in two places is two documents:
   server-side state is shared, in-page state is not. The two presentations are therefore two client
@@ -85,28 +85,28 @@ hold two credentials instead of one.
 ## The contract baseline
 
 The Mini App contract in this repository was one generation behind the Mini App implementation
-shipped in the desktop client: 54 lines here against 1267 there. This record takes the shipped
+the electron app ships: 54 lines here against 1267 there. This record takes the newer
 generation, minus the window block.
 
-The mechanics are cheap, and the borrow is auditable rather than a blanket import of internal code.
-The shipped file's only import is
-`./questionnaire.js`, and this repository's copy of that file is byte-identical, so the borrowing is a
+The mechanics are cheap, and the change is auditable rather than a blanket import of internal code.
+The newer generation's only import is
+`./questionnaire.js`, and this repository's copy of that file is byte-identical, so the update is a
 content edit to one existing file: no new path, no workspace dependency, no inventory regeneration.
 `diff` shows the newer generation to be a strict superset of this repository's file from line 7
-onward, and it is taken as one contiguous copy of the shipped leading part rather than as scattered
-patches — but that part is not line-for-line identical to today's 54 lines. The shipped file opens
-with a six-line type-only import, and it adds `detached` and `presentationRevision` to the tab
+onward, and it is taken as one contiguous block rather than as scattered
+patches — but that block is not line-for-line identical to today's 54 lines. The newer generation
+opens with a six-line type-only import, and it adds `detached` and `presentationRevision` to the tab
 summary and `detach_failed` and `attach_failed` to the error codes, which moves
 `MiniAppOpenResponse` and `MiniAppControlResponse` below the new start and page-open types. Nothing
 here has a consumer for the response types whose shape changes — `MiniAppSurfaceTabSummary`,
 `MiniAppListResponse`, `MiniAppOpenResponse` and `MiniAppControlResponse` are declared and unused —
 so adding required fields and error codes breaks no call site.
 
-What the borrowing brings:
+What the newer generation brings:
 
 - The split between starting a Mini App and opening its page: `MiniAppStartResponse`,
   `MiniAppPageOpenInput`, `MiniAppBackgroundOpenInput` and one `MiniAppOpenApi` with two overloads.
-  This client needs it as soon as it prewarms a Mini App the way the desktop client does, and the
+  This client needs it as soon as it prewarms a Mini App the way the electron app does, and the
   runtime seam below depends on it.
 - `detached` and `presentationRevision` on the tab summary, plus the `detach_failed` and
   `attach_failed` codes. In this client they are not dead fields: `detached` reports whether a
@@ -115,10 +115,10 @@ What the borrowing brings:
 - The composer block: the request, the reply, the bounded text limit and the one validator both ends
   of the bridge share.
 - The agent block: every request and result shape, the nine run events, the failure codes and their
-  mapping from the runtime's own codes, and the allowlist validators the shipped preload and broker
+  mapping from the runtime's own codes, and the allowlist validators the preload and broker
   run on both sides of the boundary.
 
-What the borrowing leaves behind is the window block: the argv surface id, the `surface.window`
+What the newer generation leaves behind is the window block: the argv surface id, the `surface.window`
 manifest whitelist, and the window state and patch contracts that the page's
 `window.mcode.miniapp.window` handle (`getState`, `update`, `focus`, defined in the preload rather than
 here) is built on — `MINIAPP_SURFACE_ID_ARGUMENT_PREFIX`, `MINIAPP_SURFACE_WINDOW_*`,
@@ -126,20 +126,20 @@ here) is built on — `MINIAPP_SURFACE_ID_ARGUMENT_PREFIX`, `MINIAPP_SURFACE_WIN
 region of the file, so a future synchronization reads as one omitted tail rather than as a series of
 local divergences. One private helper has to come out of that tail: `isPlainRecord` is declared
 inside the window block but used nine times by the agent parsers above it, so it is kept at the seam
-between the copied part and the omission, and it is the one local divergence to reconcile against a
-future copy.
+between the kept part and the omission, and it is the one local divergence to reconcile against a
+future update.
 
 Two consequences follow for the layers around the contract. The manifest reader must accept the
 three keys the newer generation declares and this repository's reader does not know: `surface.window`,
 `agentAccess` and `agentConcurrency`. Its field sets are strict, so an unknown key fails the package
-as `MANIFEST_SCHEMA_INVALID` — a package built for the shipped client is rejected before any of this
+as `MANIFEST_SCHEMA_INVALID` — a package built for the electron app is rejected before any of this
 work can matter. Accepting is not supporting: `surface.window` is read and ignored here, because its
 effect was just dropped from the contract, while the two agent fields are validated and preserved here
 so the agent service can enforce them when it lands.
 
 ## The credential guard is carried over
 
-The shipped client guards the Mini App's own HTTP server from inside the Mini App's process: the
+The electron app guards the Mini App's own HTTP server from inside the Mini App's process: the
 runner patches `http.Server.prototype.emit` before the plugin entry is imported, so any server the
 plugin creates is covered. A request event must carry the exact loopback `Host` and a timing-safe
 match of the credential header, or it is answered 401 with no body; `upgrade` and `connect` sockets
@@ -148,7 +148,7 @@ plugin code never observes it. One reserved path is answered 204 by the guard it
 lets the readiness probe prove the guard is in the path rather than merely that a socket accepts:
 readiness becomes "anonymous must be 401, credentialed must be 204" instead of a TCP connect.
 
-This port carries that guard. The previous revision treated it as an option, on the grounds that
+This decision carries that guard. The previous revision treated it as an option, on the grounds that
 having no guard is not worse than having no Mini App service at all. That comparison holds only while
 the service is off. The moment this client's row enables it, the exposure is new, and it is not
 theoretical: the Mini App's port is deterministic — `49152 + sha256(pluginId)` across the range, with
@@ -188,7 +188,7 @@ new domain behaviour; they expose what the runtime already owns.
   `resolveRuntimeMiniAppOptions` keeps that override and takes the cell as its other input. The owner
   policy's own suite pins the wiring key set and the count of cells where this client's row differs
   from `tui`, so both move with the cell.
-- **The control plane enters the harness as a forwarding facade.** The desktop client keeps the
+- **The control plane enters the harness as a forwarding facade.** The electron app keeps the
   Mini App control plane in its Electron main process, behind IPC channels that reach a utility
   broker; there is no Mini App method on `CliService` there or here. The runtime already owns the
   behaviour in
@@ -203,15 +203,15 @@ new domain behaviour; they expose what the runtime already owns.
 
   Two additions to the application follow from the other decisions here. It needs a start that does
   not open a page: this client prewarms a Mini App without showing it, which the contract expresses as
-  `openPage: false` and which the shipped client reaches through a start-if-cold path rather than
+  `openPage: false` and which the electron app reaches through a start-if-cold path rather than
   through `open`. And it needs to hand the credential and origin to the
   server: `launch` is documented as server-only coordinates that must never be forwarded to a
   renderer, and this design honours that literally. The client receives the proxy's own view URL,
   including the runtime-selected surface path needed to load the page, but never the Mini App's
   origin or its credential. Everything that touches a Mini App's real origin stays on the server
   side of the facade.
-- **The presenter stays a host-owned port.** `MiniAppPresenter` is documented as the desktop
-  client's native presenter and is absent outside it. The WebUI supplies the browser
+- **The presenter stays a host-owned port.** `MiniAppPresenter` is documented as the electron
+  app's native presenter and is absent outside it. The WebUI supplies the browser
   implementation: its `open` means the client should show that Mini App, and its `close` means the
   client stops showing it. The port's shape — open and close by session and plugin — is already
   platform-neutral, so the browser implementation fits it without changing the contract.
@@ -239,10 +239,10 @@ new domain behaviour; they expose what the runtime already owns.
 
 ## The agent capability is in scope
 
-A Mini App page's agent calls are part of this port. They are also the largest piece of it, and the
+A Mini App page's agent calls are part of this decision. They are also the largest piece of it, and the
 one place where the work is not a client-side rewrite of something the runtime already does.
 
-The acceptance standard here is parity with the desktop client's page: an installed Mini App must
+The acceptance standard here is the electron app's page: an installed Mini App must
 render and work in this client as it does there. A page that probes the bridge when it loads must not
 find a method missing, because the visible result is a dead panel rather than a graceful degradation.
 That is why the composer alone is not a smaller first version of this decision — it is a different,
@@ -261,27 +261,27 @@ response stream, framed as strict NDJSON. When the connector is disabled, a sing
 aborts the whole Mini App runtime as a protocol violation; when it is enabled, the same byte corrupts
 a frame. The child does already have a parent channel — every Mini App is spawned with a fourth IPC
 file descriptor, and the runner's own comment says what it is for: that channel controls lifecycle,
-while the standard streams are reserved for the connector. The shipped runtime keeps the channel and
+while the standard streams are reserved for the connector. The electron app's runtime keeps the channel and
 changes what rides on it: connector frames are multiplexed onto the same descriptor by message type,
 the child's stdin is dropped entirely, and stdout and stderr become logs. An agent-enabled Mini App
 logs — it runs turns, tools and model calls — so the two protocol families cannot keep sharing one
 stream. Adding a second channel for agent calls alone while leaving tool calls on NDJSON would still
-break the tool channel on the first log line, and it is a shape the shipped client never had, so
+break the tool channel on the first log line, and it is a shape the electron app never had, so
 nothing upstream would ever confirm it works. The connector therefore moves onto the existing
 channel for every Mini App, not only the agent-enabled ones: one channel carries both message
 families, told apart by the message type, the child's stdin stops being used at all, and stdout and
 stderr become logs. That is this record's decision rather than an assumption, and the
 dual-transport alternative stands rejected for the reason just given.
 
-What that costs, measured against the shipped package rather than estimated: roughly 2900 lines of
-runtime service (gateway, session ports, contracts, projection, model selection), a rewrite of the
-host connector from 1700-odd lines across four files into 2900 across six, the transport binding
-itself, and a new application file. It is the single largest forward port in this record, and it
-carries its own review: the connector is shared with tool calls, so a defect there is not confined to
-Mini Apps.
+What that costs, measured against the electron app's package rather than estimated: roughly 2900
+lines of runtime service (gateway, session ports, contracts, projection, model selection), a rewrite
+of the host connector from 1700-odd lines across four files into 2900 across six, the transport
+binding itself, and a new application file. It is the single largest piece of work in this record,
+and it carries its own review: the connector is shared with tool calls, so a defect there is not
+confined to Mini Apps.
 
-One surface inside it has no counterpart that looks like the shipped one: a page's `open` call. It is
-not a cosmetic button. In the shipped runtime the host chat's side panel is what makes a
+One surface inside it has no counterpart that looks like the electron app's: a page's `open` call. It
+is not a cosmetic button. In the electron app's runtime the host chat's side panel is what makes a
 Mini-App-created session's permission asks answerable — the gateway denies an approval for such a
 session unless some host chat is currently showing it. This client has no side panel, and the workspace
 panel cannot be one: it hosts the selected session's own resources, while the client renders one
@@ -292,11 +292,11 @@ The mapping is the session rail plus the standalone presentation. `open` selects
 the client's ordinary selection path; while it is the selected session the service reports the panel as
 showing it, and switching away or closing it reports the panel as closed. `hostSessionId` is the
 session whose workspace panel carries the inline view — or, for a standalone tab, the session its deep
-link carried. The arrangement a person gets is not the shipped client's side-by-side chat and panel:
+link carried. The arrangement a person gets is not the electron app's side-by-side chat and panel:
 selecting the Mini App's session replaces the workspace panel, and with it the inline view. That is why
 the standalone presentation belongs to this decision rather than following it — with the Mini App in its
-own tab, the rail and the page are on screen at once, which is the nearest equivalent of the shipped
-arrangement.
+own tab, the rail and the page are on screen at once, which is the nearest equivalent of the electron
+app's arrangement.
 
 ## Where the inline view lives
 
@@ -305,8 +305,8 @@ record, and the record's kind fixes the renderer. A Mini App becomes one more me
 `{kind: 'miniapp', sessionId, pluginId}` — and the cost is the union's six touch points: the content
 union and its kind table, the command that opens a tab with a payload, the reducer case, the render
 branch, the tab strip's glyph, and the tile on the launcher page. That last one is the entry point:
-this client's "add a tab" surface already is a page of tiles, which is the counterpart of the desktop
-client's File Panel "+", and the tile leads to the plugin's picker.
+this client's "add a tab" surface already is a page of tiles, which is the counterpart of the electron
+app's File Panel "+", and the tile leads to the plugin's picker.
 
 The tile opens a page of its own, `{kind: 'miniapp-picker', sessionId}`, and the choice made in it
 replaces that page with the view. So the tile is an ordinary tool tile — it turns the tab it is on
@@ -335,8 +335,8 @@ per session and refuses to exist without one, so a Mini App tab belongs to a ses
 panel hides the tab without destroying its place in the state. The iframe does unmount, though, and
 with it the page: a tab is a presentation, while the runtime is plugin-scoped. Reopening the panel
 points the tab at the same origin again, so the Mini App's server-side state is intact and its
-in-page state is gone. That is the same consequence as moving a page between presentations on the
-desktop client, and it should be stated in the tab rather than discovered.
+in-page state is gone. That is the same consequence as moving a page between presentations in the
+electron app, and it should be stated in the tab rather than discovered.
 
 ## The client's Mini App is one business
 
@@ -370,7 +370,7 @@ else to 404 — and the session travels in the `#session=` hash. A standalone Mi
 `/miniapp?plugin=&session=`, which the service maps to the same document, so the runtime-configuration
 injection applies unchanged and the tab is an ordinary client. The shell needs one new concept to
 serve it: a presentation mode in which the full client renders only the Mini App view. That is a
-smaller change than the desktop client's, which has to move a native view; here it is which component
+smaller change than the electron app's, which has to move a native view; here it is which component
 the shell mounts.
 
 The link that opens it is produced by the inline tab, which carries the action that moves this Mini App
@@ -397,9 +397,9 @@ which is what lets it show that a Mini App is already open elsewhere and offer t
 opening a second tab.
 
 That record is also what gives `detached` and `presentationRevision` meaning in this client, rather
-than leaving them as fields this port always answers with `false` and `0`. `detached` is "a standalone
+than leaving them as fields this client always answers with `false` and `0`. `detached` is "a standalone
 lease exists for this plugin"; the revision increments each time a lease is acquired, which is the
-same property it has on the desktop client — a fast detach and attach that a poll would otherwise miss.
+same property it has in the electron app — a fast detach and attach that a poll would otherwise miss.
 
 ## The proxy is one listener per Mini App
 
@@ -417,7 +417,7 @@ same reason the runtime's own is deterministic: the page's origin is what keys i
 
 ## One owner per Mini App across clients
 
-The WebUI and the desktop client share a data directory (ADR 0006), and a Mini App's port is derived
+The WebUI and the electron app share a data directory (ADR 0006), and a Mini App's port is derived
 from its plugin id, so without a rule both clients compute the same first port and the second one
 starts a second process over the same plugin data. This record decides ownership rather than
 arbitration: **one client owns a Mini App at a time, and the other refuses to start it.**
@@ -435,7 +435,7 @@ dies, and the record beside it states which client holds it and since when. The 
 unlinked before binding — unlinking first would steal a live owner's endpoint, which is the mistake the
 OAuth lease server is entitled to make with its own path and this record is not.
 
-The shipped desktop client writes no such record, so the record cannot be the only signal. For anything
+The electron app writes no such record, so the record cannot be the only signal. For anything
 already running, including that client, the signal is the Mini App's own port: the client probes the
 derived port before starting, and a listener that answers an unauthenticated request the way the guard
 does means the Mini App is already up somewhere. The client then refuses with the same message instead
@@ -443,7 +443,7 @@ of spawning a process that cannot bind, or worse, one that can.
 
 The user-visible result is a row and a picker entry that say another client is running this Mini App,
 with the open action disabled. The consequence is accepted and stated rather than hidden: a Mini App
-running in the desktop client cannot be shown in the WebUI, because the credential that reaches it
+running in the electron app cannot be shown in the WebUI, because the credential that reaches it
 never leaves the process that minted it. What the rule buys is the opposite guarantee — only one process
 per Mini App ever writes its plugin data.
 
@@ -486,19 +486,19 @@ retry. The shared contract and runtime Agent contract define the accepted failur
 
 ## Research findings
 
-- The desktop client hosts a Mini App in a native view and moves that same view into its own
-  window; returning it to the panel is described in the desktop client's own code as returning it
+- The electron app hosts a Mini App in a native view and moves that same view into its own
+  window; returning it to the panel is described in the electron app's own code as returning it
   to the File Panel host (`app/dist/main/modules/browser/embedded-browser-manager.js`,
   `detachMiniAppTab` and `attachMiniAppTab`).
-- The desktop client injects the loopback credential at the session layer, scoped to the managed
+- The electron app injects the loopback credential at the session layer, scoped to the managed
   tab's own origin (`app/dist/main/modules/browser/miniapp-loopback-auth.js`).
-- The desktop client injects the page bridge with an Electron preload, and the bridge's own
+- The electron app injects the page bridge with an Electron preload, and the bridge's own
   namespace is `window.mcode.miniapp` with a message, an agent and a window part
   (`app/dist/main/modules/browser/miniapp-preload.js`).
-- The shipped client guards the Mini App's HTTP server in the Mini App's own process, before
+- The electron app guards the Mini App's HTTP server in the Mini App's own process, before
   plugin code observes a request
   (`app/node_modules/@mavis/local-runtime-v2/src/service/miniapp/process/node-runtime/host-runner.ts`).
-- The desktop client's Mini App control plane is Electron main-process IPC over a utility broker,
+- The electron app's Mini App control plane is Electron main-process IPC over a utility broker,
   and none of it is on `CliService`
   (`app/dist/main/ipc/miniApp.ipc.js`, `app/dist/main/modules/local-runtime/utility/miniapp-broker.js`).
 - This client injects its runtime configuration into every page it serves, so a tab opened by
@@ -513,23 +513,25 @@ retry. The shared contract and runtime Agent contract define the accepted failur
   (`packages/local-runtime-v2/src/services.ts`,
   `packages/local-runtime-v2/src/service/llm-context-inspector/initialize.ts`,
   `packages/webui/docs/known-gaps.md` §2).
-- The shipped contract is a strict superset of this repository's: `diff` reproduces the 54 lines here
-  as its first 54, its only import is `./questionnaire.js` which is byte-identical here, and its build
-  output carries no `require` at all.
-- The shipped guard patches `http.Server.prototype.emit` before the plugin entry is imported, covers
-  `request`, `checkContinue`, `checkExpectation` and destroys `upgrade` and `connect` sockets, strips
-  its own header from `headers` and `rawHeaders` on success, and answers one reserved health path with
-  204 so readiness proves the guard is in the path. The shipped readiness probe is
-  "anonymous must be 401, credentialed must be 204"; this repository's is a TCP connect
+- The electron app's contract is a strict superset of this repository's: `diff` reproduces the
+  54 lines here as its first 54, its only import is `./questionnaire.js` which is byte-identical
+  here, and its build output carries no `require` at all.
+- The electron app's guard patches `http.Server.prototype.emit` before the plugin entry is
+  imported, covers `request`, `checkContinue`, `checkExpectation` and destroys `upgrade` and
+  `connect` sockets, strips its own header from `headers` and `rawHeaders` on success, and
+  answers one reserved health path with 204 so readiness proves the guard is in the path. The
+  electron app's readiness probe is "anonymous must be 401, credentialed must be 204"; this
+  repository's is a TCP connect
   (`.../service/miniapp/process/node-runtime/node-runtime.ts`, `host-runner.ts`).
 - The credential is minted per process generation and threaded through the runner's init message; the
   supervisor exposes it as a launch credential, and the application's `launch` object is documented as
   server-only: "Never forward this object to a renderer"
   (`packages/local-runtime-v2/src/application/session/process-local-application-contract.ts`).
-- The application exposes only `list`, `open` and `stop` here; the shipped generation adds a
+- The application exposes only `list`, `open` and `stop` here; the newer generation adds a
   read-only `credential` and returns the credential with `open`.
 - The Agent gateway and process-local application now exist here. Their current user-session read
-  surface is `sessions()` and `session(id)`; the shipped `observe()` subscription is still absent.
+  surface is `sessions()` and `session(id)`; the electron app's `observe()` subscription is still
+  absent.
 - Every Mini App is a separate child process: the node runtime spawns one with a fourth IPC file
   descriptor, and at most three run at once. In this repository that descriptor carries lifecycle
   messages only (`miniapp:ready`, `miniapp:error`, `miniapp:stopped`, stop and parent-loss
@@ -537,7 +539,7 @@ retry. The shared contract and runtime Agent contract define the accepted failur
   connector wire; the connector reads the child's stdout and writes its stdin as strict NDJSON, and
   the runtime aborts on any stdout byte while the connector is disabled
   (`packages/local-runtime-v2/src/service/miniapp/process/node-runtime/host-runner.ts`,
-  `node-runtime.ts`). The shipped runtime uses the same descriptor for both, distinguished by
+  `node-runtime.ts`). The electron app's runtime uses the same descriptor for both, distinguished by
   message type, drops the child's stdin, and logs stdout and stderr instead.
 - The manifest reader accepts `agentAccess` (`session.run` and `session.read`),
   `agentConcurrency` and `surface.window`; `surface.window` has no browser implementation. The
@@ -577,5 +579,6 @@ retry. The shared contract and runtime Agent contract define the accepted failur
   `process/node-runtime/node-runtime.ts`, `node-runtime-startup-error.ts`).
 - The Mini App service here carries no tests of its own: `packages/local-runtime-v2/src/service/miniapp`
   holds no `*.test.ts` file and `test/vitest-suites.json` registers no Mini App suite, while the
-  shipped package carries its connector, gateway and session-port suites with it. A forward port
-  therefore arrives with a regression net to adopt and register rather than with a gap to fill.
+  electron app's package carries its connector, gateway and session-port suites with it. The
+  capability therefore arrives with a regression net to adopt and register rather than with a gap
+  to fill.

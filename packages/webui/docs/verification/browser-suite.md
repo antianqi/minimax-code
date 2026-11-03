@@ -101,7 +101,7 @@ cross-origin same-tab links, stream resubscription after navigation, back/forwar
 cross-origin `target="_blank"` page. The two local origins make navigation repeatable without
 depending on a public site's markup, network availability or anti-bot responses. It skips on
 machines without a system Chrome executable. This runtime integration complements the
-`browser-workspace.spec.mjs` client-panel fixture; neither by itself proves a packaged desktop
+`browser-workspace.spec.mjs` client-panel fixture; neither by itself proves a packaged
 application or a user's logged-in Edge/Chrome session.
 
 ## Rendering integrity of a migrated surface

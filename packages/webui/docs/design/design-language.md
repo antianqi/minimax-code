@@ -224,9 +224,9 @@ contract.
   outside the primitive with the reason recorded.
 - **Each adopted control publishes its contract here**: what the primitive owns, what a caller
   states, and which differences are named variants.
-- **Modal dialogs use the `WebuiDialog` shell.** The Desktop MCP reference sets a 640 CSS px
+- **Modal dialogs use the `WebuiDialog` shell.** The MCP reference sets a 640 CSS px
   standard width, 85vh maximum height, 16px surface radius, independently scrolling body, fixed
-  title row and footer. The scrim is the `--webui-modal-scrim` token: the Desktop Ant theme binds
+  title row and footer. The scrim is the `--webui-modal-scrim` token: the Ant theme binds
   `colorBgMask` to its `utility_overlay` token, which the 3.1.3 bundle defines as `#00000040` in the
   light palette and `#0000003d` in the dark one, so the token is black at 25% and 23.9% respectively.
   The frame keeps `100vw - 32px` and `85vh` at every viewport; only the inner padding steps down
@@ -318,9 +318,9 @@ that left the reader unable to tell which row they had actually chosen. A pointe
 takes the hover fill; that is a transient answer, not a state.
 
 Inside a `WebuiDialog` footer, the shared dialog action slot owns action geometry, measured on the
-running Desktop 3.1.3 app: 37px height, a 14px label on a 21px line at weight 500, an 8px radius,
+running 3.1.3 app: 37px height, a 14px label on a 21px line at weight 500, an 8px radius,
 24px horizontal padding and 8px spacing, with no minimum width — the width follows the label, which
-is how Desktop's `取消` lands on 76px. A caller that needs a shorter action row states its own
+is how `取消` lands on 76px. A caller that needs a shorter action row states its own
 padding at the narrow breakpoint rather than re-skinning the control. The screenshot's disabled
 primary keeps the shared disabled state; its disabled fill is `rgb(173,173,173)` with a white label
 and `cursor: not-allowed` — the running 3.1.3 app's own values, taken from

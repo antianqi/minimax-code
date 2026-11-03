@@ -8,10 +8,8 @@
 // | `WebuiUsageSummaryView` | The account's lifetime token usage: the cumulative total, the busiest day and the usage ranking. | Runtime `UsageQuotaClient`. | `client/features/account/contracts/account-port.ts`; `client/features/settings/projection/usage-report.ts`. |
 // | `WebuiAccountProfileView` | The signed-in account's public profile: display name, avatar, contact and registration time. | Runtime `UsageQuotaClient`. | `client/features/account/contracts/account-port.ts`; `client/features/settings/projection/usage-report.ts`. |
 //
-// The Desktop is the behavioural authority for this surface: the
-// `usage_summary` and `user/profile` reads, the ranking thresholds and the
-// calendar model were read out of the Desktop renderer bundle before this
-// contract was written.
+// The `usage_summary` and `user/profile` reads, the ranking thresholds and
+// the calendar model are the ones the account API reports.
 
 /** One day of the account's token usage. */
 export interface WebuiUsageDayView {
@@ -29,8 +27,8 @@ export interface WebuiUsageDayView {
  * The three headline numbers stay in the shape the account API reports them:
  * `totalTokenConsumed` and `mostActiveDayTokenCount` keep their compact
  * strings (`"6.21B"`, `"426.11M"`) and `usageRankingPercent` keeps its raw
- * percentage, because the Desktop formats all three in the view layer and the
- * same formatting belongs there.
+ * percentage, because the view layer formats all three and the formatting
+ * belongs there.
  */
 export interface WebuiUsageSummaryView {
   /** The cumulative token count, e.g. `"6.21B"`. */
@@ -47,7 +45,7 @@ export interface WebuiUsageSummaryView {
  * The signed-in account's public profile.
  *
  * `phone` carries the personal workspace's name, which is the account's
- * phone number; the view layer masks it the way the Desktop does.
+ * phone number; the view layer masks it.
  */
 export interface WebuiAccountProfileView {
   /** The account's display name. */

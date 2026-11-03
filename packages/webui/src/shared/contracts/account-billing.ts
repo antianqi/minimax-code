@@ -12,9 +12,8 @@
 // | `WebuiResetCardOutcome` | The redemption result the account API reports. | Runtime `UsageQuotaClient`. | `client/features/account/contracts/account-port.ts`; `client/features/settings/ui/UsageResetCards.tsx`. |
 // | `WebuiResetCardUseResult` | The redemption answer. | Runtime `UsageQuotaClient`. | `client/features/account/contracts/account-port.ts`; `client/features/settings/ui/UsageResetCards.tsx`. |
 //
-// The Desktop is the behavioural authority for this surface: the account API
-// paths, the `outcome` enum, the card identity key and the phase machine were
-// read out of the Desktop renderer bundle before this contract was written.
+// The account API paths, the `outcome` enum, the card identity key and the
+// phase machine are the ones the account API reports.
 
 /**
  * Whether the account may spend credits (including gifted credits) once the

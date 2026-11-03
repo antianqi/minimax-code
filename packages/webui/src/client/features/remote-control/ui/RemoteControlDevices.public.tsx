@@ -1,15 +1,15 @@
 // The connection settings' remote-control device list.
 //
-// The Desktop keeps the linked devices and the revoke action in the connection settings
+// The linked devices and the revoke action live in the connection settings
 // (设置 > 连接), not on the 远程 page: the page's 设置 entry opens that settings tab, and this
 // module is what the tab shows there.
 //
-// It is the Desktop's "控制这台电脑" half. The other half — the devices this computer controls —
+// It is the "控制这台电脑" half. The other half — the devices this computer controls —
 // belongs to a build that can drive another machine, and this runtime is a host only, so it is
 // not offered here.
 //
 // The rows are real: the runtime owns the link, so the list reads it, the 添加 action starts the
-// pairing and 撤销访问 drops the binding. The pending-unbind confirmation is the Desktop's own:
+// pairing and 撤销访问 drops the binding. The pending-unbind confirmation is the section's own:
 // the phone asked to be let go, and the producer has to confirm it with the server.
 import { useEffect, useState, useSyncExternalStore, type ReactElement } from "react";
 
@@ -18,7 +18,7 @@ import { WebuiIconRemote } from "../../../shell/icons.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 
-/** The Desktop's copy for the device list. */
+/** The copy for the device list. */
 export const WEBUI_REMOTE_CONTROL_DEVICES_ADD_TITLE = "添加设备";
 export const WEBUI_REMOTE_CONTROL_DEVICES_ADD_DESCRIPTION = "添加设备以控制这台电脑";
 export const WEBUI_REMOTE_CONTROL_DEVICES_ADD_ACTION = "添加";

@@ -4,7 +4,7 @@
  * Shapes the payload of a subset of admitted Global Events (field pruning,
  * camelCase→snake_case, JSON carriers) while keeping the frame `type` a
  * verbatim `evt.<event type>` — dots preserved — so the phone receives an
- * event type that maps one-to-one onto the desktop Event接口 bus type
+ * event type that maps one-to-one onto the electron app's Event接口 bus type
  * (`session.start` → `evt.session.start`; the gateway strips the `evt.` prefix
  * on the broadcast path so the phone sees the bare `session.start`).
  *

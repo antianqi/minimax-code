@@ -13,9 +13,8 @@
 // pieces; nothing here knows about the network service, the harness host or
 // the browser.
 //
-// The projection rules are the Desktop's. The Desktop publishes its account
-// into its runtime through one module (`modules/auth/runtime-projection.js` in
-// the installed app) and that module's rules are what this one follows:
+// The projection rules are this module's. The account is published into the
+// runtime through one module, and these are the rules that module follows:
 //
 //   * Projections are serialized. Two mutations — a renewal landing while a
 //     sign-out lands — must not interleave, or the runtime keeps a credential

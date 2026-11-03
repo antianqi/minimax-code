@@ -1,6 +1,6 @@
 // The 接入 IM wire operations.
 //
-// The bot list, the create and bind of one bot, the two mutations Desktop's card performs on it
+// The bot list, the create and bind of one bot, the two mutations the card performs on it
 // (解除连接 / 删除Bot), the per-agent configuration check, and the read and write of one agent's
 // message filter.
 //

@@ -114,8 +114,8 @@ export const GET_PERMISSION_MODE_OPERATION_NAME = "getPermissionMode" as const;
 export const SET_PERMISSION_MODE_OPERATION_NAME = "setPermissionMode" as const;
 export const GET_SESSION_USAGE_OPERATION_NAME = "getSessionUsage" as const;
 export const GET_USAGE_QUOTA_OPERATION_NAME = "getUsageQuota" as const;
-// The account-billing surface the Desktop usage-and-model page shows: the
-// credit fallback switch and the reset cards (list, redeem, history).
+// The account-billing surface the usage-and-model page shows: the credit
+// fallback switch and the reset cards (list, redeem, history).
 export const GET_CREDIT_FALLBACK_OPERATION_NAME = "getCreditFallback" as const;
 export const SET_CREDIT_FALLBACK_OPERATION_NAME = "setCreditFallback" as const;
 export const LIST_RESET_CARDS_OPERATION_NAME = "listResetCards" as const;
@@ -207,10 +207,9 @@ export const LIST_CRON_TASK_RUNS_OPERATION_NAME = "listCronTaskRuns" as const;
  * The 接入 IM surface: the IM clients the runtime has bound, and the mutations that bind and
  * unbind them.
  *
- * Desktop's IM client talks to the runtime's channel-bridge routes; the WebUI projects the same
- * routes (`status`, `connect`, `disconnect`, `config-check`, `message-filter`, and the WeChat
- * authorization pair `wechat/bind/start` + `wechat/bind/status`) as named operations, so the
- * browser never learns a route path.
+ * The runtime's channel-bridge routes are projected (`status`, `connect`, `disconnect`,
+ * `config-check`, `message-filter`, and the WeChat authorization pair `wechat/bind/start` +
+ * `wechat/bind/status`) as named operations, so the browser never learns a route path.
  */
 export const LIST_CHANNEL_CONNECTIONS_OPERATION_NAME = "listChannelConnections" as const;
 export const PREPARE_CHANNEL_CONNECTION_OPERATION_NAME = "prepareChannelConnection" as const;
@@ -227,9 +226,9 @@ export const GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME = "getChannelWechatBi
  * credentials the browser signs and pushes down.
  *
  * `watchRemoteControlStatus` is a stream because the phone link's phase changes on the host: a
- * pairing code expires, a socket drops, the phone asks a permission question. Desktop pushes each
- * of those to the renderer; the WebUI pushes them down one stream so the pairing page shows the
- * live phase without polling.
+ * pairing code expires, a socket drops, the phone asks a permission question. The electron app
+ * pushes each of those to the renderer; the WebUI pushes them down one stream so the pairing page
+ * shows the live phase without polling.
  */
 export const GET_REMOTE_CONTROL_STATUS_OPERATION_NAME = "getRemoteControlStatus" as const;
 export const WATCH_REMOTE_CONTROL_STATUS_OPERATION_NAME = "watchRemoteControlStatus" as const;
@@ -248,8 +247,8 @@ export const PUBLISH_REMOTE_CONTROL_COMPOSER_MODE_OPERATION_NAME =
  * The SSH surface: the hosts this machine can reach, the projects rooted on them, and the remote
  * terminal.
  *
- * Desktop owns these in its Electron main process (`dist/main/modules/ssh-runtime/`); the WebUI
- * owns them in its loopback service, which is the same host-side position.
+ * The electron app owns these in its Electron main process (`dist/main/modules/ssh-runtime/`); the
+ * WebUI owns them in its loopback service, which is the same host-side position.
  */
 export const LIST_SSH_CONNECTIONS_OPERATION_NAME = "listSshConnections" as const;
 export const SAVE_SSH_CONNECTION_OPERATION_NAME = "saveSshConnection" as const;
@@ -1024,8 +1023,8 @@ export interface OperationSpec {
   /**
    * Creating the bot a create flow is adding.
    *
-   * Desktop creates the bot first and authorizes it second, which is why a bot that has never been
-   * authorized still appears in the list.
+   * The electron app creates the bot first and authorizes it second, which is why a bot that has
+   * never been authorized still appears in the list.
    */
   prepareChannelConnection: {
     request: WebuiChannelPrepareRequest;
@@ -1090,7 +1089,7 @@ export interface OperationSpec {
    * The phone link's live state.
    *
    * A stream, because the phase changes on the host: a pairing code expires, a socket drops, the
-   * phone asks a permission question. Desktop pushes each of those to the renderer.
+   * phone asks a permission question. The electron app pushes each of those to the renderer.
    */
   watchRemoteControlStatus: {
     request: undefined;

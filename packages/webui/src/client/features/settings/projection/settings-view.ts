@@ -20,7 +20,7 @@ export const DESKTOP_SETTINGS_TABS: readonly SettingsTabDefinition[] = [
   // the other preferences.
   { key: "browser", group: "preferences", label: "浏览器", icon: "browser" },
   { key: "usage", group: "management", label: "用量与模型", icon: "chart" },
-  // The SSH host management is here on the Desktop too (`设置 > 连接 > SSH`), and the 远程 page's
+  // The SSH host management is here on the electron app too (`设置 > 连接 > SSH`), and the 远程 page's
   // SSH link opens the same surface.
   { key: "connection", group: "management", label: "连接", icon: "link" },
   { key: "account", group: "management", label: "账户", icon: "user" }, { key: "coding", group: "coding", label: "代码审查", icon: "coding" }, { key: "worktree", group: "coding", label: "工作树", icon: "worktree" }, { key: "archived", group: "archived", label: "已归档任务", icon: "archived" },

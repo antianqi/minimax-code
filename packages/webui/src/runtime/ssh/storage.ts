@@ -1,6 +1,6 @@
 // The on-disk shape of the SSH runtime's own records.
 //
-// Two files live under the runtime's data directory, the way Desktop keeps one store per concern:
+// Two files live under the runtime's data directory, one store per concern:
 //
 //   * `connections.json` — the saved hosts.
 //   * `projects.json` — the projects rooted on them.

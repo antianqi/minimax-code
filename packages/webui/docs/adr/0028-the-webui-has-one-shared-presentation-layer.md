@@ -191,13 +191,13 @@ The original rendering-integrity rule remains the default for extracting an
 existing control: callers keep their geometry and content. A user-approved
 cross-client modal redesign is an explicit exception to that default. All
 modal dialogs converge on `client/ui/dialog.tsx` and `styles/dialog.css`, using
-the supplied Desktop MCP dialog as their visual reference: a shared dark
+the supplied MCP dialog as their visual reference: a shared dark
 scrim, a 640 CSS px standard surface (viewport constrained), 16px radius,
 85vh maximum height, independently scrolling body, and fixed header/footer.
 The shell owns modal framing and dismissal registration; feature callers retain
 their title, data, validation, submission state, content layout and commands.
-Desktop source values that are not yet verified at runtime — especially mask
-alpha, shadow and small-screen behavior — remain visual acceptance items rather
+Source values from the electron app that are not yet verified at runtime — especially
+mask alpha, shadow and small-screen behavior — remain visual acceptance items rather
 than being described as source facts. A named business exception must include
 the interaction boundary, the condition under which it is revisited, and remain
 in both inventories.

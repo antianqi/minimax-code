@@ -6,8 +6,8 @@
  * frames are evt.session.message_chunk (403) / evt.session.message (404).
  *
  * Decode is total: malformed input returns a typed error, never throws.
- * Encode enforces the max_message_bytes cap. The desktop-side floor/default is
- * 128MiB; ctrl.hello may raise it further, but does not lower the desktop floor.
+ * Encode enforces the max_message_bytes cap. The electron app's floor/default
+ * is 128MiB; ctrl.hello may raise it further, but does not lower that floor.
  */
 import { randomUUID } from "node:crypto";
 import type { RcDisconnectReason, WsEnvelope } from "./types.js";
@@ -29,11 +29,11 @@ export const FRAME_TYPES = {
   EVT_SESSION_MESSAGE: "evt.session.message",
   EVT_SESSION_TURN_END: "evt.session.turn_end",
   EVT_SESSION_COMPOSER_MODE_CHANGED: "evt.session.composer_mode_changed",
-  // Permission frames use the verbatim Global Event type with an evt. prefix (type
-  // parity: the gateway strips `evt.` on its RC-events outlet so the phone
-  // sees the bare `permission.ask` / `permission.resolved`). The gateway's
-  // isPermissionEventType bypass matches these exact strings — rename in
-  // lockstep or the turn-time authorization relay breaks.
+  // Permission frames use the verbatim Global Event type with an evt. prefix (the
+  // gateway strips `evt.` on its RC-events outlet so the phone sees the bare
+  // `permission.ask` / `permission.resolved`). The gateway's isPermissionEventType
+  // bypass matches these exact strings — rename them together or the turn-time
+  // authorization relay breaks.
   EVT_PERMISSION_ASK: "evt.permission.ask",
   EVT_PERMISSION_RESOLVED: "evt.permission.resolved",
 } as const;
@@ -49,7 +49,7 @@ export const FRAME_NAMESPACES = {
 
 export const PROTOCOL_VERSION = 1;
 
-/** Desktop-side frame size floor/default: 128MiB. */
+/** The electron app's frame size floor/default: 128MiB. */
 export const DEFAULT_MAX_MESSAGE_BYTES = 128 * 1024 * 1024;
 
 export type FrameCodecError =

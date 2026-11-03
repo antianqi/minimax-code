@@ -36,7 +36,7 @@ the server's tag definitions. A tag such as Mini App is both a section and a fil
 installation still goes through the plugin action below. The cloud filters its catalogue by the
 desktop version a client declares, so WebUI declares one: the shared constant
 `MARKETPLACE_VISIBILITY_DESKTOP_VERSION` (`packages/shared/src/marketplace-visibility.ts`),
-which is a copy of the desktop client's current release version. The marketplace requests —
+which is a copy of the electron app's current release version. The marketplace requests —
 listing, detail, installation, package download authorization and official state recovery —
 declare it, and the other cloud calls retain the host's own version.
 The runtime carries that declaration; it never decides the value.

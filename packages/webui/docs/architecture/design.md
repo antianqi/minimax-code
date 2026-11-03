@@ -233,8 +233,8 @@ row in the harness, thirteen cells different from the terminal client's. The row
 and cron capabilities, marks the runtime unrestricted, enables the memory feature and feature bundle,
 and disables terminal control sequences. The WebUI is a scheduler host for those capabilities: the
 `scheduling` business lists, creates, edits and deletes scheduled tasks, runs one on demand and reads
-its run history, and the runtime's Cron service is what arms and fires them. When the Desktop is
-running at the same time, the shared database decides which host acts on a given slot; the panel
+its run history, and the runtime's Cron service is what arms and fires them. When the electron app
+is running at the same time, the shared database decides which host acts on a given slot; the panel
 reports whether this client holds a task rather than naming the other host
 ([ADR 0027](../adr/0027-the-webui-is-a-scheduler-host-for-scheduled-tasks.md)). Identity is not
 access control: enabling memory, cron or Computer Use for a browser client gives an agent in that

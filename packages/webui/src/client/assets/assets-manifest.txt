@@ -1,4 +1,4 @@
-# Desktop source: ../minimax-webui/app/out/assets/img/ (27 files)
+# Asset source: ../minimax-webui/app/out/assets/img/ (27 files)
 ../minimax-webui/app/out/assets/logo/favicon_v2.png -> img/minimax-code-agent-icon.png
 ../minimax-webui/app/out/_next/static/media/light.d3fbb1aa.svg -> img/light.d3fbb1aa.svg
 ../minimax-webui/app/out/_next/static/media/dark.14c569ba.svg -> img/dark.14c569ba.svg

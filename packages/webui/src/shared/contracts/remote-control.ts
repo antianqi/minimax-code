@@ -46,9 +46,9 @@ export interface WebuiRemoteControlStatus {
   readonly lastError?: { readonly code: string; readonly message: string };
   /** Set while a producer-wide unbind is waiting for the user's confirmation. */
   readonly pendingUnbindRequestId?: string;
-  /** This machine's stable device id, as Desktop's pairing page shows it. */
+  /** This machine's stable device id, as the pairing page shows it. */
   readonly deviceId?: string;
-  /** This machine's host name, as Desktop's pairing page shows it. */
+  /** This machine's host name, as the pairing page shows it. */
   readonly deviceName?: string;
 }
 
@@ -56,8 +56,8 @@ export interface WebuiRemoteControlConnectRequest {
   /**
    * Ask for a fresh pairing code even when a link already exists.
    *
-   * Desktop's 连接 button always re-arms the pairing flow, so the pairing page can re-pair a
-   * second phone without an unbind first.
+   * The 连接 button always re-arms the pairing flow, so the pairing page can re-pair a second
+   * phone without an unbind first.
    */
   readonly requestCode?: boolean;
 }
@@ -90,7 +90,7 @@ export interface WebuiRemoteControlPendingUnbind {
 /**
  * The one-shot ticket bundle the browser signed and pushed to the service.
  *
- * Desktop's renderer owns the binding HTTP pipeline (only its axios can sign
+ * The electron app's renderer owns the binding HTTP pipeline (only its axios can sign
  * `GET /desktop/bindings`), then hands the fresh ticket to the main process over
  * `rc:binding-ready`. The WebUI keeps that split: the browser signs, the service holds the socket.
  */
@@ -112,9 +112,9 @@ export interface WebuiRemoteControlComposerMode {
  * One frame of the remote-control stream.
  *
  * The phone link changes on the host, not in the browser: the pairing code expires, the socket
- * drops, the phone asks a permission question. Desktop pushes each change to the renderer; the
- * WebUI pushes them down one stream instead, so the pairing page reflects the live phase without
- * polling.
+ * drops, the phone asks a permission question. The electron app pushes each change to the renderer;
+ * the WebUI pushes them down one stream instead, so the pairing page reflects the live phase
+ * without polling.
  */
 export type WebuiRemoteControlEvent =
   | { readonly type: "status"; readonly status: WebuiRemoteControlStatus }

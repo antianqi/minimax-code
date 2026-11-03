@@ -336,7 +336,7 @@ function projectDeliveredAssets(content: string, messageId: string): { content: 
     cleaned = cleaned.replace(match[0], "");
   }
 
-  // Desktop's transcript projector also accepts standalone `<media />` tags.
+  // The transcript projector also accepts standalone `<media />` tags.
   // Only lift tags outside a recognized container so nested assets are emitted once.
   let standaloneIndex = 0;
   for (const mediaMatch of content.matchAll(/<media\b([^>]*?)\/?\s*>/giu)) {
@@ -358,7 +358,7 @@ function parseMediaAsset(attributes: string): WebuiDeliveredAsset | undefined {
     if (attribute[1] && attribute[3] !== undefined) values[attribute[1].toLowerCase()] = decodeXmlAttribute(attribute[3]);
   }
   let src = values.src?.trim();
-  // Desktop unwraps a filepath payload nested in src before projecting it.
+  // A filepath payload nested in src is unwrapped before projecting it.
   const filepath = src?.match(/^<filepath\b([^>]*)>([\s\S]*?)<\/filepath>$/iu);
   if (filepath) {
     const pathAttribute = filepath[1]?.match(/\b(?:data-path|path)\s*=\s*(["'])(.*?)\1/iu)?.[2];
@@ -458,8 +458,8 @@ export function projectMessageParts(
   }
   // A `runtime.warning` SystemEvent envelope is persisted JSON, but this one
   // is the user's to read. Reached only on the msgContent path: the parts
-  // branch above has already returned, so a message that carries Desktop
-  // parts keeps its tool calls and thinking even if its content also looks
+  // branch above has already returned, so a message that carries parts
+  // keeps its tool calls and thinking even if its content also looks
   // like an envelope.
   const runtimeWarning = parseRuntimeWarningEventMessage(message);
   if (runtimeWarning)

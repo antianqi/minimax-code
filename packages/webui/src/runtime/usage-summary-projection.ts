@@ -4,11 +4,10 @@
 // projection uses: the client owns the request, the credential and the cache;
 // this module owns the arithmetic and the field picking over untrusted JSON.
 //
-// The Desktop renderer is the behavioural authority for these two payloads. The
-// token strings (`"6.21B"`, `"426.11M"`) are kept in the shape the account API
-// reports them, because the Desktop formats them in the view layer and the same
-// formatting belongs there. The per-day totals are already numbers on the
-// wire, so they are normalized here and the view only has to format them.
+// The token strings (`"6.21B"`, `"426.11M"`) are kept in the shape the account API
+// reports them, because the view layer formats them and the same formatting
+// belongs there. The per-day totals are already numbers on the wire, so they
+// are normalized here and the view only has to format them.
 
 import type {
   WebuiAccountProfileView,
@@ -19,8 +18,8 @@ import type {
 /**
  * The account's lifetime token usage.
  *
- * `date_model_usage` carries one entry per day, oldest first; the entries the
- * Desktop skips (a missing date) are dropped here for the same reason.
+ * `date_model_usage` carries one entry per day, oldest first; an entry with a
+ * missing date is dropped.
  */
 export function projectUsageSummary(body: Record<string, unknown>): WebuiUsageSummaryView {
   const root = usageRoot(body);
@@ -96,9 +95,9 @@ function profileRoot(body: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * The cache-hit rate arrives as a percent string (`"84.36%"`). The Desktop
- * parses it with `parseFloat` and clamps it into 0-100; anything unparsable
- * reads as no cache hit.
+ * The cache-hit rate arrives as a percent string (`"84.36%"`). It is parsed
+ * with `parseFloat` and clamped into 0-100; anything unparsable reads as no
+ * cache hit.
  */
 function readCacheHitPercent(value: unknown): number {
   const numeric =
@@ -107,7 +106,7 @@ function readCacheHitPercent(value: unknown): number {
   return Math.max(0, Math.min(100, numeric));
 }
 
-/** A day's token total: the Desktop treats anything below zero as no usage. */
+/** A day's token total: anything below zero reads as no usage. */
 function positiveNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }

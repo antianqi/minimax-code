@@ -1,14 +1,12 @@
 // The account page's usage heat map.
 //
-// A transcription of the Desktop's `t4` component: the same week-column
-// layout, the same cell geometry, the same four usage buckets and the same
-// month labels. The Desktop's calendar model is produced by
+// The week-column layout, the cell geometry, the four usage buckets and the
+// month labels. The calendar model is produced by
 // `projection/usage-report.ts`; this module only draws it.
 //
-// The Desktop renders the cell tooltip through a portal so it is not clipped
-// by the calendar's own scroll container. The WebUI does the same: one tooltip
-// element is rendered into the page's portal target and positioned from the
-// hovered cell's own rectangle.
+// The cell tooltip is rendered through a portal so it is not clipped by the
+// calendar's own scroll container: one tooltip element is rendered into the
+// page's portal target and positioned from the hovered cell's own rectangle.
 
 import { useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
@@ -39,7 +37,7 @@ interface HoveredCell {
   readonly top: number;
 }
 
-/** The four usage buckets, as the Desktop colours them. */
+/** The four usage buckets, as the calendar colours them. */
 function levelClassName(level: WebuiUsageHeatmapCell["level"]): string {
   switch (level) {
     case 1:
@@ -209,7 +207,7 @@ export function UsageHeatmap({
 
 /**
  * The hovered cell and where its tooltip goes. The tooltip is placed above the
- * cell and centred on it, the way the Desktop's top-placed tooltip sits.
+ * cell and centred on it.
  */
 function readHoveredCell(
   cell: WebuiUsageHeatmapCell,

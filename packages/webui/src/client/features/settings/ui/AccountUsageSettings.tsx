@@ -1,17 +1,12 @@
 // The account page.
 //
-// A port of the Desktop's account page (`chunks/69200.*.js`, the `ap`
-// component): the same profile block, the same three headline numbers, the
-// same usage calendar and the same "分享" action. The Desktop's "编辑" action
-// is deliberately not ported — it opens the profile editor, which is a
-// separate surface.
+// The page: the profile block, the three headline numbers, the usage calendar
+// and the "分享" action. The "编辑" action is deliberately left out — it opens
+// the profile editor, which is a separate surface.
 //
-// The page is rendered inside the settings shell's own account tab, because
-// that is where the Desktop keeps it: the Desktop's account page is the
-// account tab of its settings dialog, and its content column is 704px wide —
-// the width this shell's shared settings column already uses. The calendar's
-// 696px grid therefore fills that column exactly, the way it does on the
-// Desktop.
+// The page is rendered inside the settings shell's own account tab, and its
+// content column is 704px wide — the width this shell's shared settings column
+// already uses. The calendar's 696px grid therefore fills that column exactly.
 //
 // The data comes from the account business through its published binding
 // (`useWebuiAccountWorkflowsState`); this business never reaches into the
@@ -55,7 +50,7 @@ const ACCOUNT_USAGE_TRACKING_SINCE =
   "数据自 2025 年 11 月起，统计你在 MiniMax Code 中的 M Plan 文本模型用量（暂不含积分、BYOK 和开放平台用量）";
 const ACCOUNT_USAGE_RANKING_INFO = "仅显示前 50% 的排名";
 
-/** The three headline numbers, with the labels the Desktop gives them. */
+/** The three headline numbers, with the labels the page gives them. */
 const ACCOUNT_USAGE_METRICS = [
   { id: "account-total-token", label: "累计 Token" },
   { id: "account-peak-token", label: "单日峰值" },
@@ -76,8 +71,8 @@ interface AccountUsageView {
 /**
  * The account page's data, in the shape the page draws it.
  *
- * The metrics and the calendar are derived from the same two reads the Desktop
- * makes, and the derivation is the Desktop's own arithmetic
+ * The metrics and the calendar are derived from the same two reads the page
+ * makes, and the derivation is the account's own arithmetic
  * (`projection/usage-report.ts`).
  */
 function useAccountUsageView(): AccountUsageView {
@@ -254,7 +249,7 @@ export function AccountUsageSettings(): ReactElement {
  * The account's avatar, with the initial letter as its fallback.
  *
  * The image IS the circle: it fills the 80px box and is clipped by its own
- * `rounded-full`. The Desktop draws the same avatar the same way — its
+ * `rounded-full`. The electron app draws the same avatar the same way — its
  * container is a white circle, but the picture is a disc that reaches the
  * edges of the square, so the white is never visible and only the picture
  * shows.
@@ -308,9 +303,9 @@ function AccountUsageAvatar({
 /**
  * The "分享" action of the settings header.
  *
- * The Desktop puts it in the account page's own top-right corner; the
- * WebUI's settings shell has a header action slot in the same place, so the
- * button lives there and opens the share preview from here.
+ * The account page's own top-right corner is where it goes; the WebUI's
+ * settings shell has a header action slot in the same place, so the button
+ * sits there and opens the share preview from here.
  */
 export function AccountUsageShareAction(): ReactElement | null {
   const { dom } = useWebuiBrowserCapabilities();

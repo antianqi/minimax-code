@@ -3,7 +3,7 @@
  *
  * Decodes the envelope `type` + `payload` and drives the in-process
  * `handleLocalRuntimeRequest(new Request(...))` entrypoint (injected as
- * `invoke` — zero network, identity inherited from the desktop login via
+ * `invoke` — zero network, identity inherited from the host login via
  * setLocalRuntimeAuthContext; the bridge never mints its own auth).
  *
  * Downstream path map (verified against the generated desktop-service route
@@ -16,15 +16,15 @@
  *                              → AckSessionListPayload projection (IDL)
  *   2  cmd.session.history     GET  /minimax-desktop/api/v1/session/:id/message
  *                              → AckSessionHistoryPayload projection (IDL)
- *   3  cmd.session.send        POST /minimax-desktop/api/v1/session/:id/message (Desktop SSE)
+ *   3  cmd.session.send        POST /minimax-desktop/api/v1/session/:id/message (SSE)
  *                              404 → legacy /mavis/api/session/:id/message;
  *                              busy 409 → POST /minimax-desktop/api/v1/session/:id/queue
  *                              (queue 404 → legacy /mavis/api/session/:id/queue)
  *                              attachments: URL download leg (attachment-fetch)
- *                              → Desktop AttachmentInput wire; any
+ *                              → AttachmentInput wire; any
  *                              failure fails the whole send (no partial sends)
  *   4  cmd.session.new         POST /minimax-desktop/api/v1/agent/:name/session
- *   5  cmd.session.resume      POST /minimax-desktop/api/v1/session/:id/resume (Desktop SSE)
+ *   5  cmd.session.resume      POST /minimax-desktop/api/v1/session/:id/resume (SSE)
  *                              (404 → legacy /mavis/api/session/:id/resume)
  *   6  cmd.session.stop        POST /minimax-desktop/api/v1/session/:id/abort
  *   7  cmd.session.pin         POST /minimax-desktop/api/v1/pin/session
@@ -44,7 +44,7 @@
  *                              完整结构给新版 phone client 消费。
  *  12  cmd.pinned.list         GET  /minimax-desktop/api/v1/preferences/pinned-items-order
  *                              → pin.thrift GetPinnedItemsOrderResp verbatim
- *                              (items:list<PinnedItem>,mirror desktop wire)。独立于 §1
+ *                              (items:list<PinnedItem>)。独立于 §1
  *                              sessionList 里 fetchPinnedSessionIds 的 pin-fact 合并逻辑
  *                              (那里只提取 session-typed id 集合;这里 verbatim 整批含
  *                              agent 混排 + hydrated payload)。上游 remote-control IDL
@@ -58,11 +58,11 @@
  *                              'cmd.pinned.reorder';archon_biz RCPutPinnedItemsOrder。
  *
  * One-shot ack payload = the downstream web-shape response body verbatim
- * (§4 细则), EXCEPT the explicitly projected ones: send (disposition is
- * desktop-computed), workspace.list and model.list (§4-9/§4-10 projections),
+ * (§4 细则), EXCEPT the explicitly projected ones: send (the disposition is
+ * computed downstream), workspace.list and model.list (§4-9/§4-10 projections),
  * and session.list / session.history — the plan §4-L155 verbatim rule for
  * those two contradicts the frozen IDL Ack*Payload shapes the rgw
- * translate.go parses (wire frozen, desktop follows): T6 real-device tests
+ * translate.go parses (wire frozen, the electron app follows): T6 real-device tests
  * showed rgw reading `{id,title,pinned,status,last_msg_at_ms,…}` /
  * `{messages_json,has_more,oldest_msg_id}` out of the web bodies → all-empty
  * sidebar rows and empty history. Both are projected to the IDL shapes here.
@@ -115,8 +115,9 @@ export interface CommandRouterDeps {
   logger: RcLogger;
   nowMs?: () => number;
   /**
-   * Desktop-fetched common_config value. When present, the bridge stamps it
-   * onto generic local-runtime requests as the RC inline file content cap.
+   * common_config value fetched by the electron app. When present, the bridge
+   * stamps it onto generic local-runtime requests as the RC inline file content
+   * cap.
    */
   getRemoteControlFileContentMaxBytes?: () => number | undefined;
   /**
@@ -125,7 +126,7 @@ export interface CommandRouterDeps {
    * err with ATTACHMENT_UNSUPPORTED instead of silently dropping files.
    */
   attachments?: AttachmentFetcher;
-  /** Delivers a phone-owned temporary composer choice to Desktop renderers. */
+  /** Delivers a phone-owned temporary composer choice to the electron app's renderers. */
   onSessionComposerModeChange?: (change: RcSessionComposerModeChange) => void | Promise<void>;
 }
 
@@ -499,7 +500,7 @@ async function sessionList(
  * - Only top-level nodes are projected — `child_sessions` are NOT descended
  *   into (V1 phone sidebar renders a flat list, no session tree).
  * - `visibility !== 'visible'` rows are filtered (missing field defaults to
- *   visible, mirroring toDaemonSession's `?? 'visible'`).
+ *   visible, as `?? 'visible'` in toDaemonSession does).
  * - pinned: pin facts live in PinService only — the desktop-service session
  *   wire carries none (SessionInfoView declares no pin fields, and the raw
  *   tree serializer never emits one; T6 confirmed absence), so pinned =
@@ -656,8 +657,8 @@ async function sessionSend(
   if (!sessionId) return missingField("session_id");
   const content = readString(payload.content);
   if (content === undefined) return missingField("content");
-  // The Desktop and legacy endpoints deliberately receive separately-built
-  // bodies: their attachment contracts are not prefix-compatible.
+  // The desktop-service and legacy endpoints deliberately receive separately-
+  // built bodies: their attachment contracts are not prefix-compatible.
   const desktopBody: Payload = { content, ...modelBody(payload.model) };
   const legacyBody: Payload = { content, ...modelBody(payload.model) };
   const clientIntent = readString(payload.client_intent);
@@ -686,11 +687,12 @@ async function sessionSend(
         },
       };
     }
-    // §4-3 download leg: CDN URL → bytes on disk → Desktop AttachmentInput wire.
+    // §4-3 download leg: CDN URL → bytes on disk → AttachmentInput wire.
     // Any single failure fails the whole send (no partial sends).
     const fetched = await deps.attachments.fetchAll(payload.attachments);
     if (!fetched.ok) return { kind: "err", err: fetched.failure };
-    // Fetch exactly once: a Desktop 404 retry must reuse the downloaded files.
+    // Fetch exactly once: a desktop-service 404 retry must reuse the downloaded
+    // files.
     desktopBody.attachments = fetched.attachments.map((file) => toDesktopAttachment(file));
     legacyBody.attachments = fetched.attachments.map(toLegacyAttachment);
   }
@@ -709,8 +711,8 @@ async function sessionSend(
     deps.logger.info(
       `[rc.router] ${cmd.type} id=${cmd.id} route=${send.route} status=${sendResponse.status} disposition=sent`,
     );
-    // D-8: idle path — the final Desktop or legacy-fallback response accepted
-    // the turn; SSE stream follows the ack.
+    // D-8: idle path — the final desktop-service or legacy-fallback response
+    // accepted the turn; SSE stream follows the ack.
     return {
       kind: "ack",
       payload: { disposition: "sent" },
@@ -719,7 +721,8 @@ async function sessionSend(
   }
   const sendErr = await readErrorBody(sendResponse);
   if (sendResponse.status === 409 && isBusyCode(sendErr.rawCode)) {
-    // D-8: busy path — enqueue instead (Desktop queue keeps turn ordering).
+    // D-8: busy path — enqueue instead (the desktop-service queue keeps turn
+    // ordering).
     const desktopQueuePath = `${DESKTOP_API}/session/${encodeURIComponent(sessionId)}/queue`;
     const legacyQueuePath = `${LEGACY_MAVIS_API}/session/${encodeURIComponent(sessionId)}/queue`;
     const queue = await postDesktopThenLegacyOnNotFound(
@@ -853,7 +856,8 @@ async function sessionResume(
     ...(drainQueued !== undefined ? { drain_queued: drainQueued } : {}),
   };
   // Legacy resume parses the original camelCase + snake_case aliases; keep
-  // them separate from the generated Desktop wire, which is snake_case only.
+  // them separate from the generated desktop-service wire, which is snake_case
+  // only.
   const legacyBody: Payload = {
     ...(afterMsgId ? { afterMsgId, after_msg_id: afterMsgId, after_message_id: afterMsgId } : {}),
     ...(afterCursor ? { afterCursor, after_cursor: afterCursor } : {}),
@@ -900,7 +904,7 @@ async function sessionStop(
       ...(turnId ? { turn_id: turnId } : {}),
       // Explicit stop source. Without it the daemon defaults to `unknown`, which
       // neither pauses the Thread Goal nor cascades into background work, so a
-      // phone stop would behave differently from the desktop Stop button.
+      // phone stop would behave differently from the electron app's Stop button.
       reason: "user_stop",
     }),
     "session",
@@ -1011,8 +1015,8 @@ export function normalizePermissionResponses(payload: Payload): Map<string, stri
 /**
  * IDL PermissionDecision/PermissionRemember → canonical local decision.
  * `allow` / `allow-always` aliases remain accepted for phone compatibility;
- * the Desktop batch route converts them to its numeric enum below.
- * remember=SESSION(2) has no desktop-side equivalent → allowOnce.
+ * the desktop-service batch route converts them to its numeric enum below.
+ * remember=SESSION(2) has no desktop-service equivalent → allowOnce.
  */
 export function mapPermissionDecision(decision: unknown, remember: unknown): string | undefined {
   if (typeof decision === "string") {
@@ -1106,7 +1110,7 @@ async function modelList(
 // 与 §4-9 cmd.workspace.list 共用底层 daemon 端点 GET /minimax-desktop/api/v1/projects
 // (LocalProjectService.listProjects,已在 dev/preview_train 就绪),但**不做投影**:
 // 直接把 daemon 返回的 project.ListProjectsResp(matrix/api_common/project.thrift,
-// web / desktop / RC 三端共用契约)verbatim 塞进 ack.projects.list.payload。
+// web / Electron 端 / RC 三端共用契约)verbatim 塞进 ack.projects.list.payload。
 //
 // 上游链路(全部已合入 main / MR review 中):
 //   phone GET /minimax-cloud/api/v1/remote-control/projects (archon_biz MR !138)
@@ -1247,7 +1251,7 @@ async function sessionGet(
 // ─── 15. cmd.session.update ─────────────────────────────────────────────
 //
 // PATCH /minimax-desktop/api/v1/session/:id
-// title 仍走 Desktop Session PATCH；interaction_mode 仅作为临时 composer
+// title 仍走 Electron 端的 Session PATCH；interaction_mode 仅作为临时 composer
 // intent 投递给 renderer，不得写 Session.interactionMode。
 // (避免向 daemon PATCH 语义里塞 {title: null|undefined},保持 "字段未提供 =
 // 不改" 的 CRUD 契约)。
@@ -1361,7 +1365,7 @@ async function skillList(
 // through the same `invokeLocal` plumbing the switch-driven commands use —
 // without forcing every new route to be added to the dispatch table. The
 // gateway's RGW Apollo config is the authoritative allowlist (by full absolute
-// path prefix, ops-controlled, hot-reload); the desktop only enforces
+// path prefix, ops-controlled, hot-reload); the producer only enforces
 // structural path-traversal guards (no target-based compiled-in allowlist).
 //
 // The generic executor preserves a stable daemon JSON error code when one is
@@ -1617,7 +1621,7 @@ async function oneShot(
 }
 
 /**
- * Fixed RC session POST operations are Desktop-first. Only
+ * Fixed RC session POST operations are desktop-service-first. Only
  * `response.status === 404` retries its matching legacy Mavis endpoint; all
  * other outcomes retain
  * their original status/error semantics.
@@ -2002,7 +2006,7 @@ async function ensureRcContinuationModel(
 }
 
 /**
- * Downloaded attachment → generated Desktop AttachmentInput wire.
+ * Downloaded attachment → generated AttachmentInput wire.
  */
 function toDesktopAttachment(file: RcFetchedAttachment, sourceMeta?: Payload): Payload {
   const attachmentType = sourceMeta?.attachment_type ?? sourceMeta?.attachmentType;
@@ -2100,8 +2104,9 @@ async function toErrShape(response: Response, domain: ErrDomain): Promise<ErrSha
 
 /**
  * Downstream failure → err payload. Codes are UPPER_SNAKE domain codes:
- * a Desktop `key` (or legacy string `code`) wins (local_session_busy → SESSION_BUSY), otherwise
- * the HTTP status maps per the IDL err.* convention list.
+ * a desktop-service `key` (or legacy string `code`) wins (local_session_busy →
+ * SESSION_BUSY), otherwise the HTTP status maps per the IDL err.* convention
+ * list.
  */
 export function errShapeFrom(
   status: number,

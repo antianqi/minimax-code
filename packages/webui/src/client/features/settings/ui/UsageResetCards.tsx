@@ -6,9 +6,8 @@
 // component renders that state and submits its commands; it holds no store
 // writer and calls no transport method of its own.
 //
-// The wording, the phase names and the empty states are the Desktop's, read
-// out of its renderer bundle. The Desktop hides the whole section for an
-// account that has no plan, and so does this one.
+// The wording, the phase names and the empty states are the section's own.
+// The whole section is hidden for an account that has no plan.
 //
 // The section renders the shared settings skeleton — the same section title,
 // the same card, the same row and the same hairline the neighbouring sections
@@ -41,7 +40,7 @@ import { FeedbackEmpty } from "../../../ui/feedback.js";
 type WebuiResetCardState = ReturnType<typeof useWebuiAccountWorkflowsState>["resetCards"];
 type WebuiResetCardPhase = WebuiResetCardState["phase"];
 
-/** The copy the Desktop shows, word for word. */
+/** The copy this section shows, word for word. */
 export const WEBUI_RESET_CARD_COPY = {
   title: "限额重置",
   cardFallbackName: "完全重置",
@@ -65,8 +64,8 @@ export const WEBUI_RESET_CARD_COPY = {
 } as const;
 
 /**
- * The status line the phase produces. The Desktop shows one line per phase;
- * a phase with no line (the idle one) shows nothing.
+ * The status line the phase produces. One line per phase; a phase with no
+ * line (the idle one) shows nothing.
  */
 export function formatResetCardStatus(
   phase: WebuiResetCardPhase,
@@ -96,7 +95,7 @@ export function formatResetCardStatus(
   }
 }
 
-/** The card's display name, with the Desktop's fallback. */
+/** The card's display name, with the fallback. */
 export function formatResetCardName(card: WebuiResetCardView): string {
   return card.name?.trim() || WEBUI_RESET_CARD_COPY.cardFallbackName;
 }
@@ -117,7 +116,7 @@ export function formatResetCardFlowLabel(
   return `${verb} ${name}`;
 }
 
-/** The redemption outcome a phase reports, for the toast the Desktop shows. */
+/** The redemption outcome a phase reports, for the toast the section shows. */
 export function formatResetCardOutcome(outcome: WebuiResetCardOutcome): string {
   switch (outcome) {
     case "SUCCESS":
@@ -146,9 +145,8 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
   const status = formatResetCardStatus(phase);
   const enabled = account?.canUseResetCards === true;
 
-  // The list is read when the section appears, the way the Desktop reads it
-  // when the usage page becomes active. The read is guarded by the same gate
-  // as the render, so an account without a plan never asks for cards.
+  // The list is read when the section appears. The read is guarded by the same
+  // gate as the render, so an account without a plan never asks for cards.
   useEffect(() => {
     if (!enabled) return;
     if (cards.page === 0 && !cards.loading) void account?.loadResetCards();
@@ -156,8 +154,8 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, enabled, cards.page, cards.loading]);
 
-  // The reset cards are a plan feature: the Desktop only offers them to a
-  // subscribed account, so an account without a plan gets no section at all.
+  // The reset cards are a plan feature: only a subscribed account gets them,
+  // so an account without a plan gets no section at all.
   if (!enabled) return null;
 
   return (

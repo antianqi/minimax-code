@@ -148,7 +148,7 @@ export const WEBUI_OUTSIDE_CLOSE_POLICIES: {
     usesContainerContains: true,
     onEscape: true,
     notes:
-      "The context menu is a WebuiDropdown in its triggerless shape: the anchor is the point the menu opens at, not a trigger. The shared skeleton listens to pointerdown and to keydown; Escape closes it. It used to listen to `mousedown` for desktop parity — the skeleton reads `pointerdown`, which fires for mouse, touch and pen alike and always before the click does.",
+      "The context menu is a WebuiDropdown in its triggerless shape: the anchor is the point the menu opens at, not a trigger. The shared skeleton listens to pointerdown and to keydown; Escape closes it. It used to listen to `mousedown` — the skeleton reads `pointerdown`, which fires for mouse, touch and pen alike and always before the click does.",
   },
 } as const;
 

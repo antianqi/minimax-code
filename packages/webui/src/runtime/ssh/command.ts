@@ -1,8 +1,8 @@
 // How one SSH invocation is put together.
 //
-// The transport is the system `ssh` binary, exactly as in Desktop: there is no npm SSH client here,
-// and there is no local shell either — the argument vector is passed to `spawn` as a vector, so a
-// host name is never a word of a shell command line.
+// The transport is the system `ssh` binary: there is no npm SSH client here, and there is no local
+// shell either — the argument vector is passed to `spawn` as a vector, so a host name is never a
+// word of a shell command line.
 //
 // Two rules shape this file:
 //
@@ -30,7 +30,7 @@ export function quoteRemoteShellArg(value: string): string {
  *
  * `ControlMaster=no` matters: OpenSSH would otherwise join a multiplexed connection the user owns,
  * and this process would then be talking to a channel it does not control. The batch and
- * keep-alive options are Desktop's own.
+ * keep-alive options are fixed here as well.
  */
 const SSH_BASE_OPTIONS: readonly string[] = [
   "-o",

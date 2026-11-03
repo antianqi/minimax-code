@@ -13,7 +13,7 @@
 //   * **Bound is the runtime's answer.** The list is the runtime's bot list, and each bot carries
 //     its own state; a bot whose QR scan has not finished is listed and is *not* bound. Deriving
 //     "bound" from the bot's presence in a list is how a pending scan came to read as 已绑定.
-//   * **Creating a bot is two steps.** Desktop prepares the bot, then authorizes it, so the card
+//   * **Creating a bot is two steps.** The bot is prepared, then authorized, so the card
 //     that shows the QR belongs to a bot that already exists in the list under its own id.
 import type {
   WebuiChannelConfigCheckResult,
@@ -30,7 +30,7 @@ export type WebuiChannelLoadStatus = "idle" | "loading" | "ready" | "error";
 /**
  * The platform the create flow is adding.
  *
- * Desktop's create menu offers one entry per platform, and the platform decides what the card
+ * The create menu offers one entry per platform, and the platform decides what the card
  * shows: a QR for WeChat, and — where the runtime has no onboarding route — the platform's own
  * credential form for Feishu.
  */
@@ -101,7 +101,7 @@ export interface WebuiChannelOwner {
   /**
    * Creates the bot a create flow is adding, then authorizes it.
    *
-   * Desktop prepares the bot first, which is why a bot that has never been authorized appears in
+   * The bot is prepared first, which is why a bot that has never been authorized appears in
    * the list: WeChat's authorization answers with a QR, and Feishu's card asks for the app id and
    * secret through this runtime's credential bind.
    */
@@ -116,7 +116,7 @@ export interface WebuiChannelOwner {
   ) => Promise<WebuiChannelMutation>;
   /** Reads the authorization the selected bot's card is showing. */
   readonly readAuthorization: () => Promise<WebuiChannelAuthorization | undefined>;
-  /** Starts the authorization over — the Desktop's 刷新二维码. */
+  /** Starts the authorization over — the 刷新二维码 action. */
   readonly refreshAuthorization: (connectionId: string) => Promise<WebuiChannelMutation>;
 }
 
@@ -276,7 +276,7 @@ export function createWebuiChannelOwner(
   /**
    * Starts (or restarts) one bot's WeChat authorization.
    *
-   * The bot already exists — Desktop prepares it before authorizing it — so the authorization is
+   * The bot already exists — it is prepared before it is authorized — so the authorization is
    * filed under that bot's own connection rather than under the agent's default client. That is
    * what makes 刷新二维码 refresh *this* bot's QR instead of issuing one for another.
    */
@@ -355,7 +355,7 @@ export function createWebuiChannelOwner(
     const connection = snapshot.connections.find(
       (entry) => entry.connectionId === connectionId,
     );
-    // Desktop shows an unbound WeChat bot's QR as soon as its card is on screen, and leaves a
+    // The pane shows an unbound WeChat bot's QR as soon as its card is on screen, and leaves a
     // bound bot alone. An authorization already in flight is not restarted.
     if (!connection || connection.state === "bound" || connection.channel !== "wechat") return;
     const current = snapshot.authorization;
@@ -371,7 +371,7 @@ export function createWebuiChannelOwner(
   /**
    * Creates the bot a create flow is adding, then opens its card.
    *
-   * Desktop's two steps, in order: the bot exists first, so it is in the list under its own id
+   * The two steps, in order: the bot exists first, so it is in the list under its own id
    * even before anyone scans anything.
    */
   const addBot = async (

@@ -1,13 +1,13 @@
 // The scheduled-task panel's projection: wire DTOs in, display rows out.
 //
-// Pure functions, so the wording of every row is testable without a DOM. The panel renders what this
-// module returns and decides nothing itself.
+// Pure functions, so the wording of every row is testable without a DOM. The panel renders
+// what this module returns and decides nothing itself.
 //
 // Two honesty rules live here:
 //
-//   * **The hold label never names a host.** The task's row records no owner and an unmodified
-//     Desktop publishes none, so the panel can say whether *this* client holds the task and that
-//     another runtime instance may be running — naming one would be a promise nobody can keep.
+//   * **The hold label never names a host.** The task's row records no owner and the electron app
+//     publishes none, so the panel can say whether *this* client holds the task and that another
+//     runtime instance may be running — naming one would be a promise nobody can keep.
 //   * **An unknown schedule is shown as it is.** A cron expression this module cannot humanize is
 //     printed verbatim rather than guessed at, because a wrong "every day at 09:00" is worse than
 //     the expression the person actually typed.
@@ -130,8 +130,8 @@ export function webuiSchedulingRows(
 // The editor's draft, and the schedule a draft stands for.
 //
 // The presets exist so a person never has to type cron for the four schedules they actually want.
-// What they choose is converted here, once, into the schedule the task stores — so the panel and the
-// runtime never disagree about what "每天 09:00" means.
+// What they choose is converted here, once, into the schedule the task stores — so the panel
+// and the runtime never disagree about what "每天 09:00" means.
 // ---------------------------------------------------------------------------------------------
 
 export type WebuiCronSchedulePreset = "daily" | "weekly" | "hourly" | "once" | "custom";

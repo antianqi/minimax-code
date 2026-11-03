@@ -1,10 +1,9 @@
 // The value checks every SSH input passes before it reaches a command line.
 //
-// These are Desktop's own checks (`ssh-runtime/config.js`): a host name, a user name, a port, a
-// local path and a remote path each have a shape, and a value outside that shape is rejected
-// instead of quoted. Nothing here builds a shell string — the remote side is quoted by
-// `quoteRemoteShellArg` in `command.ts` — but a value that is not a host name has no business
-// becoming an argument either.
+// A host name, a user name, a port, a local path and a remote path each have a shape, and a
+// value outside that shape is rejected instead of quoted. Nothing here builds a shell string —
+// the remote side is quoted by `quoteRemoteShellArg` in `command.ts` — but a value that is not
+// a host name has no business becoming an argument either.
 import path from "node:path";
 
 import { SshRuntimeError } from "./errors.js";
@@ -58,8 +57,7 @@ export function isSafeAbsoluteLocalPath(value: string): boolean {
  * directory is known, so the expansion happens here, at the gate a save request passes through,
  * and the stored path is the expanded one.
  *
- * This is Desktop's own rule (`ssh-runtime/connection-service.js`, `parseIdentityFile`): a
- * leading `~` is expanded, everything else has to be an absolute path already.
+ * The rule: a leading `~` is expanded, everything else has to be an absolute path already.
  *
  * `undefined` means the value is not a path this runtime will use.
  */

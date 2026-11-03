@@ -181,7 +181,7 @@ request invalidation → rendered diff count, a forced `watchEvents` disconnect/
 model failure → visible error → same-session Retry recovery. While the fork carries the error, the
 test switches to the source session to check error isolation, returns to the fork, retries and confirms
 the persisted answer. These are named local integration journeys; they do not establish every
-workspace mutation type, every reconnect race, packaged desktop behavior or an already-open user
+workspace mutation type, every reconnect race, packaged application behavior or an already-open user
 session. The fixture-backed browser specs prove their named built-client interactions separately;
 they do not upgrade those flows to runtime integration evidence.
 The fixture-backed browser specs prove

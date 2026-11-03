@@ -8,13 +8,13 @@
 //   * **A platform is named, never guessed.** The runtime reports the platform of every bot it
 //     knows; a platform this module does not know is printed as it came, because a wrong "微信"
 //     would send the reader to the wrong app.
-//   * **Bound is a state, not an assumption.** Desktop draws two card shapes from the bot's own
+//   * **Bound is a state, not an assumption.** The panel draws two card shapes from the bot's own
 //     state: a bound bot carries the association's bound copy and 解除连接, and a bot whose
 //     authorization has not finished carries the unbound copy and the QR. A row is `bound` only
 //     when the runtime says so, because a bot that is waiting for its QR scan is not bound.
-//   * **A section with no route behind it says so.** The Desktop's 接入 IM pane has sections the
+//   * **A section with no route behind it says so.** The 接入 IM pane has sections the
 //     runtime's routes do not cover — the Agent and working-directory binding writes — and they
-//     carry the Desktop's own copy and are marked as not wired, rather than shown as if they
+//     carry their own copy and are marked as not wired, rather than shown as if they
 //     worked.
 import type {
   WebuiChannelConfigCheckResult,
@@ -23,7 +23,7 @@ import type {
   WebuiChannelMessageFilterMode,
 } from "../../../../shared/contracts/channel.js";
 
-/** The platform labels Desktop's 接入 IM pane shows. */
+/** The platform labels the 接入 IM pane shows. */
 export const WEBUI_CHANNEL_PLATFORM_LABELS: Readonly<Record<string, string>> = {
   wechat: "微信",
   feishu: "飞书",
@@ -37,7 +37,7 @@ export const WEBUI_CHANNEL_EMPTY_TEXT = "还没有接入任何 IM 客户端。";
 export const WEBUI_CHANNEL_LOADING_TEXT = "正在读取 IM 接入列表…";
 export const WEBUI_CHANNEL_DEFAULT_AGENT_LABEL = "默认";
 
-/** The Desktop's copy for the sections the 接入 IM pane shows. */
+/** The copy for the sections the 接入 IM pane shows. */
 export const WEBUI_CHANNEL_SECTION_BIND = "绑定机器人";
 export const WEBUI_CHANNEL_STATE_BOUND = "已绑定";
 export const WEBUI_CHANNEL_STATE_UNBOUND = "未绑定";
@@ -63,17 +63,18 @@ export const WEBUI_CHANNEL_SECTION_DELETE_CONFIRM_DESCRIPTION =
 /**
  * The button that starts a new IM bot.
  *
- * The Desktop's `im_connect.create_im_bot`: the list's own action, under the rows. It opens the
- * platform menu (Desktop's `im_connect` dropdown), one entry per platform.
+ * The list's own action, under the rows. It opens the platform menu, one entry
+ * per platform.
  */
 export const WEBUI_CHANNEL_CREATE_BOT_LABEL = "创建 IM Bot";
 
 /**
  * The platforms the create menu offers.
  *
- * Desktop 3.1.6 builds the menu from its platform catalogue: one entry per platform, each with the
- * platform's own icon and label (`channel-<id>`). The live Desktop offers 微信 and 飞书, which is
- * the pair this repository's runtime binds.
+ * The electron app at 3.1.6 builds the menu from its platform catalogue: one
+ * entry per platform, each with the platform's own icon and label
+ * (`channel-<id>`). The electron app offers 微信 and 飞书, which is the pair this
+ * repository's runtime binds.
  */
 export interface WebuiChannelAddOption {
   readonly key: "wechat" | "feishu";
@@ -100,20 +101,20 @@ export const WEBUI_CHANNEL_ADD_OPTIONS: readonly WebuiChannelAddOption[] = [
   },
 ];
 
-/** The Desktop's copy while the authorization is being created. */
+/** The copy while the authorization is being created. */
 export const WEBUI_CHANNEL_AUTHORIZATION_STARTING = "正在创建授权…";
-/** The Desktop's copy for the pairing code the QR carries. */
+/** The copy for the pairing code the QR carries. */
 export const WEBUI_CHANNEL_AUTHORIZATION_ACTIVE = "请完成授权，完成后将自动绑定。";
-/** The Desktop's action that starts the authorization over. */
+/** The action that starts the authorization over. */
 export const WEBUI_CHANNEL_RENEW_AUTHORIZATION = "刷新";
-/** The name the Desktop gives the WeChat bot. */
+/** The name the pane gives the WeChat bot. */
 export const WEBUI_CHANNEL_WECHAT_BOT_NAME = "ClawBot";
 /** The name a bot that carries no binding name gets. */
 export const WEBUI_CHANNEL_NEW_BOT_NAME = "新 Bot";
 export const WEBUI_CHANNEL_SECTION_FILTER = "附带工具调用";
 export const WEBUI_CHANNEL_SECTION_FILTER_DESCRIPTION = "在每条消息末尾附上工具调用列表。";
 
-/** The two message-filter modes, as the Desktop names them. */
+/** The two message-filter modes, as the pane names them. */
 export const WEBUI_CHANNEL_FILTER_MODE_RESULT = "仅输出结果";
 export const WEBUI_CHANNEL_FILTER_MODE_FULL = "完整输出";
 
@@ -131,7 +132,7 @@ export interface WebuiChannelRow {
   /**
    * Whether the bot is already bound to its platform.
    *
-   * Desktop draws two card shapes from this: a bound bot carries the association's bound copy and
+   * The panel draws two card shapes from this: a bound bot carries the association's bound copy and
    * the 解除连接 action and shows no QR; a bot that is still waiting for its authorization carries
    * the unbound copy, the 刷新二维码 action and the QR itself.
    */
@@ -141,7 +142,7 @@ export interface WebuiChannelRow {
   /**
    * The name the list and the detail header show.
    *
-   * Desktop names a WeChat bot `ClawBot`, a bound bot by its binding's label (then its transport
+   * A WeChat bot is named `ClawBot`, a bound bot by its binding's label (then its transport
    * identity), and a bot with neither `新 Bot`.
    */
   readonly botName: string;
@@ -155,9 +156,9 @@ export function webuiChannelPlatformLabel(platform: string): string {
 }
 
 /**
- * The order Desktop's platform catalogue lists bots in.
+ * The order the platform catalogue lists bots in.
  *
- * Desktop groups the list by platform rather than by creation time, so the first row — the one the
+ * The list is grouped by platform rather than by creation time, so the first row — the one the
  * card opens on — is the most familiar platform. The runtime's own order stays inside a platform.
  */
 export const WEBUI_CHANNEL_PLATFORM_ORDER: readonly string[] = ["wechat", "feishu", "telegram"];
@@ -167,7 +168,7 @@ function platformRank(platform: string): number {
   return index === -1 ? WEBUI_CHANNEL_PLATFORM_ORDER.length : index;
 }
 
-/** One row per bot, grouped by platform in Desktop's catalogue order. */
+/** One row per bot, grouped by platform in the catalogue's order. */
 export function webuiChannelRows(
   connections: readonly WebuiChannelConnection[],
   selectedId?: string,
@@ -193,13 +194,13 @@ export function webuiChannelRows(
   }));
 }
 
-/** The state the card's header shows. Desktop has one word for every unbound shape. */
+/** The state the card's header shows. There is one word for every unbound shape. */
 export function webuiChannelStateLabel(state: WebuiChannelConnectionState): string {
   return state === "bound" ? WEBUI_CHANNEL_STATE_BOUND : WEBUI_CHANNEL_STATE_UNBOUND;
 }
 
 /**
- * The bot's name, as the Desktop names it.
+ * The bot's name, as the list names it.
  *
  * A WeChat bot is always `ClawBot`; every other bot carries its binding's label, then the
  * transport identity the platform knows it by, and a bot with neither is `新 Bot`.
@@ -234,7 +235,7 @@ export function webuiChannelFilterKey(connection: WebuiChannelConnection): strin
 /**
  * The association's description for a bot that is already bound to a platform.
  *
- * The Desktop says which platform is associated, so a reader knows what 解除连接 will undo.
+ * The association says which platform is bound, so a reader knows what 解除连接 will undo.
  */
 export function webuiChannelAssociationLabel(platform: string): string {
   if (platform === "wechat") return WEBUI_CHANNEL_SECTION_BIND_BOUND_WECHAT;

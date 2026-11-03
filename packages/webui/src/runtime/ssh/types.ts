@@ -4,9 +4,8 @@
 // `src/shared/contracts/ssh.ts`, and the harness adapter converts field by field, so a field added
 // here can never reach the wire by accident.
 //
-// The status vocabulary is Desktop's own (`ssh-runtime/connection-service.js`): `idle` before the
-// first probe, `connected` when the host answered, `probe_failed` when it did not, `disabled` for a
-// host the user switched off.
+// The status vocabulary: `idle` before the first probe, `connected` when the host answered,
+// `probe_failed` when it did not, `disabled` for a host the user switched off.
 export type SshStatus =
   | "idle"
   | "connecting"

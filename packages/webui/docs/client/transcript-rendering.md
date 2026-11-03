@@ -32,7 +32,7 @@ Pinned by `test/unit/markdown-codeblock-c2-line-numbers.test.tsx`.
 - File references are recognized in explicit Markdown links and inline-code spans; ordinary prose is
   not scanned for path-shaped substrings.
 - An inline-code span renders as a file reference when it contains a path with a filename extension,
-  or a bare filename with a Desktop-supported extension. A bare code identifier such as
+  or a bare filename with a supported extension. A bare code identifier such as
   `UserTypeEnum` or `schema.table_name` remains code.
 - A reference of the form `` `path/to/file.ts:120` `` renders as a clickable anchor carrying the
   line number, not as literal text.

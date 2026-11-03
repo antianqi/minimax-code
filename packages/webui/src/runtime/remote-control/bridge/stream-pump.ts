@@ -1,7 +1,7 @@
 /**
  * T3 — stream pump: DesktopService SSE → evt.* frames (M3 opaque pass-through).
  *
- * Input: the raw SSE Response from the final Desktop
+ * Input: the raw SSE Response from the final desktop-service
  * /minimax-desktop/api/v1/session/:id/{message,resume} POST or its 404-only
  * /mavis/api/session/:id/{message,resume} fallback (handed over by
  * command-router AFTER the ack, §6 rule 1). Frames are parsed with the exact
@@ -490,9 +490,9 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  * Minimal SSE reader with `streamSessionFrames` semantics (the module-private
  * parser in packages/local-runtime desktop-session-stream.ts): fields data /
  * event / id, multi `data:` lines joined with '\n' VERBATIM, frame flushed on
- * a blank line (+ tail flush). The Electron Global Events adapter uses the
- * generated DesktopService client instead; this parser remains for the session
- * message stream.
+ * a blank line (+ tail flush). The electron app's Global Events adapter uses
+ * the generated DesktopService client instead; this parser remains for the
+ * session message stream.
  */
 function unwrapSessionStreamFrame(frame: SseFrame): SseFrame {
   let parsed: unknown;

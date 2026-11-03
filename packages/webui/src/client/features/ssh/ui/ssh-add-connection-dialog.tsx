@@ -1,6 +1,6 @@
-// The Desktop's 「添加 SSH 连接」 dialog.
+// The 「添加 SSH 连接」 dialog.
 //
-// The Desktop does not open a form when the person asks to add a host: it opens a picker. The
+// Asking to add a host does not open a form: it opens a picker. The
 // dialog lists the hosts it found in `~/.ssh/config`, lets one of them be chosen, and keeps
 // 「手动添加」 in the footer for the host that is not in the config file. Both paths end in the same
 // saved connection, so the picker is where the choice is made and the form is what the manual
@@ -23,7 +23,7 @@ import { SshConnectionPicker } from "./ssh-connection-picker.js";
 
 export interface SshAddConnectionDialogProps {
   readonly open: boolean;
-  /** The dialog's title: the Desktop names the picker and the editor differently. */
+  /** The dialog's title: the picker and the editor are named differently. */
   readonly title?: string;
   /** The hosts found in `~/.ssh/config`, when the read has answered. */
   readonly discovery?: WebuiSshDiscovery;

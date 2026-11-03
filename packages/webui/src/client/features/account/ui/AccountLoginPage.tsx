@@ -1,26 +1,26 @@
 // AccountLoginPage — the browser's sign-in page.
 //
-// The Desktop opens a dedicated window for this: a page, not a dialog, with the
-// product mark at the top, one call to action, and the legal notice at the
+// The electron app opens a dedicated window for this: a page, not a dialog, with
+// the product mark at the top, one call to action, and the legal notice at the
 // bottom. The browser's equivalent is a full-viewport surface that takes the
 // viewport while it is open, because the flow it drives — a device
-// authorization the user completes in another tab — is the one the Desktop's
-// window drives.
+// authorization the user completes in another tab — is the one the electron
+// app's window drives.
 //
-// The page is transcribed from the Desktop's own login page: the same order
-// (mark, wordmark, subtitle, call to action, the "the browser did not open"
-// assist, the error, the legal notice), the same geometry and the same copy.
+// The page's own order: the mark, the wordmark, the subtitle, the call to
+// action, the "the browser did not open" assist, the error, the legal notice.
+// The geometry and the copy are the page's own.
 // Two things are the browser's own, and both are declared here rather than
 // hidden:
 //
-//   * The Desktop asks the operating system to open the authorization page.
+//   * The electron app asks the operating system to open the authorization page.
 //     A browser may only open a tab from a user gesture, so the call to action
 //     reserves the tab in the click itself and sends it to the authorization
 //     page once the device code has travelled to the server and back. The
-//     Desktop's assist — the copy-the-link row that appears while the code is
+//     assist — the copy-the-link row that appears while the code is
 //     waiting — is what covers a browser that refuses to open the tab at all.
-//   * The Desktop's wordmark is an image; this client draws its own. The
-//     mark above it is the same mascot the Desktop shows.
+//   * The electron app's wordmark is an image; this client draws its own. The
+//     mark above it is the same mascot the electron app shows.
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
@@ -38,7 +38,7 @@ import { WebuiButton } from "../../../ui/button.js";
 import { FeedbackAnnouncement, FeedbackError } from "../../../ui/feedback.js";
 import { useDialogLayer } from "../../../ui/overlay-listeners.js";
 
-/** The Desktop's own copy for this page. */
+/** The copy this page shows. */
 const COPY = {
   subtitle: "登录后即可开始使用",
   waitingSubtitle: "请继续在浏览器中登录",

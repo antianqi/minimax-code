@@ -1,11 +1,9 @@
-// The account page's icons, transcribed from the Desktop icon set.
+// The account page's icons.
 //
-// The Desktop draws the account page with five glyphs — share, info, refresh,
-// download and close. Their path data is copied here rather than approximated,
-// because the account page is meant to look like the Desktop's.
-//
-// The Desktop's own icon components live in a private renderer bundle, so the
-// paths were read out of it; nothing else was taken.
+// The account page is drawn with five glyphs — share, info, refresh, download
+// and close. Their path data is the icon set's own rather than an
+// approximation, because the account page is meant to look like the product's
+// own account page.
 
 import { IconDownload, IconInfoCircle, IconRefresh, IconShare3 } from "@tabler/icons-react";
 import type { ReactElement } from "react";

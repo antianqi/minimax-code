@@ -210,9 +210,9 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const planSourceLabel = formatPlanSourceLabel(planFacts?.subscriptionType);
   const sourceLabel = source === "minimax_api_key" ? "MiniMax API" : planSourceLabel;
   const sourceBadge = getActiveSourceBadge(sourceLoaded, activeSource, quotaView?.hasTokenPlan === true);
-  // The credit fallback is the account's own flag. The Desktop shows the row
-  // only once the account has produced a verdict, and a signed-out or
-  // unanswered account gets no row rather than a switch that says "off".
+  // The credit fallback is the account's own flag. The row is shown only once
+  // the account has produced a verdict, and a signed-out or unanswered account
+  // gets no row rather than a switch that says "off".
   const creditFallback = accountState.creditFallback;
   const creditResolved = creditFallback.enabled !== undefined;
   const creditLoading = creditFallback.status === "loading" && !creditResolved;

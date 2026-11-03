@@ -152,8 +152,8 @@ export const getAccountStatusOperation: WebuiOperation<
 };
 
 // The account-billing surface of the usage-and-model page: the credit
-// fallback switch and the reset cards. The Desktop renderer owns the same
-// endpoints; the shapes below are the ones its client used.
+// fallback switch and the reset cards. The shapes below are the ones the
+// account API reports.
 
 export const getCreditFallbackOperation: WebuiOperation<
   Record<string, never>,

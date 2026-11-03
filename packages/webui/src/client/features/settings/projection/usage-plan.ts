@@ -4,11 +4,11 @@
 // answer carries the subscription kind, the tier and the plan name. What is
 // here is only the wording the page derives from them.
 //
-// The rules are the Desktop's, read out of its settings bundle:
+// The rules:
 //
 // - a subscribed account shows its tier, and a tier that is a bare number (a
-//   combo id the Desktop resolves through the subscription catalogue) falls
-//   back to the generic plan name;
+//   combo id the electron app resolves through the subscription catalogue)
+//   falls back to the generic plan name;
 // - an unsubscribed account shows the plan name the membership answer carries;
 // - the model-source label depends on the subscription kind: the legacy
 //   `token_plan` kind still reads "Token Plan", every other kind reads
@@ -35,8 +35,8 @@ export interface WebuiPlanFacts {
 
 /**
  * The tier as a display name. A tier that is a bare number is a combo id: the
- * Desktop resolves it through the subscription catalogue and falls back to the
- * generic plan name when it cannot, so this does the same.
+ * electron app resolves it through the subscription catalogue and falls back to
+ * the generic plan name when it cannot, so this does the same.
  */
 export function formatPlanTier(tier: string | undefined): string | undefined {
   const trimmed = tier?.trim();
@@ -45,7 +45,7 @@ export function formatPlanTier(tier: string | undefined): string | undefined {
   return trimmed;
 }
 
-/** Whether the account counts as subscribed, the way the Desktop counts it. */
+/** Whether the account counts as subscribed. */
 export function hasWebuiPlan(facts: WebuiPlanFacts): boolean {
   return facts.hasTokenPlan === true || Boolean(facts.tokenPlanTier);
 }

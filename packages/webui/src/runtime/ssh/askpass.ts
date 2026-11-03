@@ -1,9 +1,8 @@
 // The askpass helper: how a staged password reaches OpenSSH without ever being on disk.
 //
 // OpenSSH asks for a password by running the program named in `SSH_ASKPASS`. That program has to
-// answer with the password, so the password has to reach it somehow. Desktop solves this with a
-// socket and a helper process; this port does the same, and for the same reason: the password
-// stays in this process's memory.
+// answer with the password, so the password has to reach it somehow. This port uses a socket
+// and a helper process, so the password stays in this process's memory.
 //
 // The pieces:
 //

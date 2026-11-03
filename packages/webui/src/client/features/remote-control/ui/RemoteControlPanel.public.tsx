@@ -1,41 +1,40 @@
 // The 远程控制 tab body.
 //
-// The markup is transcribed from the Desktop 3.1.6 远程控制 tab, measured on the live Desktop
-// (its computed styles and rendered markup): the hero, the subtitle, the rounded card with its
-// three icon rows and their 1px dividers, the full-width 连接 button, the 设置 entry beneath
-// it, and the two app-store marks over the minimum-version line.
+// The page: the hero, the subtitle, the rounded card with its three icon rows and their 1px
+// dividers, the full-width 连接 button, the 设置 entry beneath it, and the two app-store marks
+// over the minimum-version line.
 //
 // ## The three states
 //
-// The Desktop shows one of three pages, and only the title and the card's action differ:
+// The panel shows one of three pages, and only the title and the card's action differ:
 //
 //   unbound      用手机连接你的 MiniMax Code — the card carries 连接 and 设置
 //   bound        已连接 / 未连接 / 已绑定 — the card carries 设置 alone
 //   unavailable  one title, and no card at all
 //
-// The bound page carries no device line and no disconnect action: the Desktop keeps the linked
-// devices and the revoke action in the connection settings, which 设置 opens.
+// The bound page carries no device line and no disconnect action: the linked devices and the
+// revoke action live in the connection settings, which 设置 opens.
 //
 // ## What changed and why
 //
-//   * The Desktop's `desktop-text-*` typography classes do not exist in the WebUI. Each one is
-//     replaced by the size and weight utilities the Desktop's own markup already carries
+//   * The `desktop-text-*` typography classes do not exist in the WebUI. Each one is
+//     replaced by the size and weight utilities the markup already carries
 //     (`text-4xl font-medium leading-[1.2]`, `text-base`, `text-sm`, `text-xs`), so the measured
-//     sizes are reproduced with the WebUI's type scale rather than a copy of the Desktop's.
+//     sizes are reproduced with the WebUI's type scale.
 //   * The card's `ring-[0.5px] ring-inset ring-border_default` becomes
 //     `border-[0.5px] border-border_default`: the WebUI's Tailwind theme has no `ringColor`
 //     entry for the token, and a half-pixel border is the same line.
 //   * The three row icons are the WebUI's own glyphs — the phone (`WebuiIconRemote`), the chat
-//     bubble (`WebuiIconSession`) and the globe (`WebuiIconGlobe`) — not the Desktop's SVG paths.
-//   * The phone mockup column keeps the Desktop's geometry and uses the WebUI's own copy of the
+//     bubble (`WebuiIconSession`) and the globe (`WebuiIconGlobe`).
+//   * The phone mockup column keeps its geometry and uses the WebUI's own copy of the
 //     same asset (`/assets/img/remote_control_phone_zh.png`, already in `client/assets/img`).
-//   * The vertical rhythm is one step that scales with the window's height instead of the
-//     Desktop's fixed gaps. The Desktop draws this page in an application window of a fixed
-//     height, and its gaps stop fitting in a short browser window: the column then scrolls and
-//     the page no longer fits on one screen. At the Desktop's own height every gap is exactly
-//     the Desktop's value; below it the gaps close in and the page keeps its shape.
+//   * The vertical rhythm is one step that scales with the window's height instead of fixed
+//     gaps. An application window has a fixed height, and fixed gaps stop fitting in a short
+//     browser window: the column then scrolls and the page no longer fits on one screen. At the
+//     application window's own height every gap is exactly its measured value; below it the gaps
+//     close in and the page keeps its shape.
 //     `remote-control.css` holds that step.
-//   * The phone mockup stretches to the height of the blue frame, as it does on the Desktop, so
+//   * The phone mockup stretches to the height of the blue frame, so
 //     the frame letterboxes the picture instead of cutting it through.
 //
 // ## The two pieces
@@ -43,9 +42,8 @@
 // `RemoteControlPanelView` is a pure render of a snapshot: it takes the model and the callbacks
 // and nothing else, so a test can assert the page's wording with `renderToStaticMarkup` (this
 // package has no jsdom). `RemoteControlPanel` is the thin wrapper that subscribes to the owner
-// with `useSyncExternalStore` and hands the view a snapshot. The pairing code is a modal, as it
-// is on the Desktop, so it lives in the wrapper: a portal is not something a static markup
-// render can carry.
+// with `useSyncExternalStore` and hands the view a snapshot. The pairing code is a modal, so it
+// lives in the wrapper: a portal is not something a static markup render can carry.
 import { Fragment, useEffect, useState, useSyncExternalStore, type ReactElement } from "react";
 import { IconBrandAndroid, IconBrandApple } from "@tabler/icons-react";
 
@@ -70,18 +68,18 @@ export interface RemoteControlPanelViewProps {
   readonly nowMs: number;
   readonly busy?: boolean;
   readonly onConnect: () => void;
-  /** Opens the connection settings, the way the Desktop's 设置 entry does. */
+  /** Opens the connection settings, the way the 设置 entry does. */
   readonly onOpenSettings?: () => void;
 }
 
-/** The icon each feature row carries, in the Desktop's order. */
+/** The icon each feature row carries, in the order the panel shows them. */
 function featureIcon(key: string): ReactElement {
   if (key === "continuous") return <WebuiIconSession className="h-5 w-5" />;
   if (key === "anywhere") return <WebuiIconGlobe className="h-5 w-5" />;
   return <WebuiIconRemote className="h-5 w-5" />;
 }
 
-/** The platform mark's glyph, in the Desktop's order. */
+/** The platform mark's glyph, in the order the panel shows them. */
 function platformGlyph(key: string): ReactElement {
   if (key === "ios") return <IconBrandApple aria-hidden="true" size={14} stroke={1.6} />;
   return <IconBrandAndroid aria-hidden="true" size={14} stroke={1.6} />;
@@ -229,10 +227,9 @@ export function RemoteControlPanelView(props: RemoteControlPanelViewProps): Reac
 export interface RemoteControlPanelProps {
   readonly owner: ReturnType<typeof createWebuiRemoteControlOwner>;
   /**
-   * The page's 设置 entry raises this; the shell opens the connection settings, the way the
-   * Desktop's own entry opens its settings app. Without it the entry renders in the Desktop's
-   * markup but disabled — a visible, announced "not yet wired" rather than a button that does
-   * nothing.
+   * The page's 设置 entry raises this; the shell opens the connection settings from it.
+   * Without it the entry renders in the page's markup but disabled — a visible, announced
+   * "not yet wired" rather than a button that does nothing.
    */
   readonly onOpenSettings?: () => void;
 }

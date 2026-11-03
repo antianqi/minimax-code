@@ -31,8 +31,8 @@ export interface ProjectedMembership {
   readonly purchasedCredits?: string;
   readonly freeCredits?: string;
   /**
-   * The personal workspace's name. The Desktop reads the account's phone
-   * number from this field, so the account page masks it the same way.
+   * The personal workspace's name. The account's phone number comes from this
+   * field, so the account page masks it the same way.
    */
   readonly workspaceName?: string;
 }
@@ -47,10 +47,10 @@ export function projectMembership(body: Record<string, unknown>): ProjectedMembe
     readString(creditSummary, undefined, "total_remaining_amount") ??
     readNumberishString(body, data, "opcredit_balance");
   const tokenPlanTier = readString(body, data, "token_plan_tier");
-  // The Desktop reads the plan name from two places: `token_plan_tier` when the
-  // account is subscribed and `plan_name` when it is not. `subscription_type`
-  // tells the two subscription kinds apart — the legacy `token_plan` one still
-  // reads "Token Plan", every other kind reads "M Plan".
+  // The plan name comes from two places: `token_plan_tier` when the account is
+  // subscribed and `plan_name` when it is not. `subscription_type` tells the two
+  // subscription kinds apart — the legacy `token_plan` one still reads "Token Plan",
+  // every other kind reads "M Plan".
   const subscriptionType = readString(body, data, "subscription_type");
   const planName = readString(body, data, "plan_name");
   const tokenPlanExpiresAt = finiteNumber(body.token_plan_expires_at ?? data?.token_plan_expires_at);

@@ -1,6 +1,6 @@
 // The SSH cell of the harness port.
 //
-// The runtime owns the SSH capability on the host side, exactly as Desktop's Electron main process
+// The runtime owns the SSH capability on the host side, as the electron app's main process
 // owns it (`dist/main/modules/ssh-runtime/`). This adapter forwards and converts, and it decides
 // nothing:
 //

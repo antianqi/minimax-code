@@ -4,12 +4,12 @@
 //
 // 桥自带一整套命令路由（`bridge/command-router.ts`）：17 条具名命令加一条通用 `cmd.route`
 // 通道。每条命令都被翻译成一条 `/minimax-desktop/api/v1/...` 的 `Request`，再等一个 `Response`
-// 回来。Desktop 里这个入口叫 `handleLocalRuntimeRequest`，住在 Electron 主进程里；本仓库没有
-// 对应物 —— WebUI 的运行时是通过 `cliService` 调的，不是通过一个 fetch 形态的路由。
+// 回来。Electron 端里这个入口叫 `handleLocalRuntimeRequest`，住在 Electron 端的主进程里；本仓库
+// 没有对应物 —— WebUI 的运行时是通过 `cliService` 调的，不是通过一个 fetch 形态的路由。
 //
-// 所以这里补上这个入口：把 Desktop 路由映射到 WebUI 运行时。`RcDataPlaneOptions.localRuntimeInvoke`
-// 一旦存在，桥就自己装配 `StreamPump` 与 `createCommandRouter`（`bridge/data-plane.ts`），
-// 不再需要外部传入 `commandRouter`。
+// 所以这里补上这个入口：把 Electron 端路由映射到 WebUI 运行时。
+// `RcDataPlaneOptions.localRuntimeInvoke` 一旦存在，桥就自己装配 `StreamPump` 与
+// `createCommandRouter`（`bridge/data-plane.ts`），不再需要外部传入 `commandRouter`。
 //
 // ## 边界
 //
@@ -22,9 +22,9 @@
 //
 // ## 会话的帧
 //
-// Desktop 把这一轮的输出以 daemon SSE 的形式泵进 `evt.*` 帧；WebUI 运行时交出来的是已解码的
+// Electron 端把这一轮的输出以 daemon SSE 的形式泵进 `evt.*` 帧；WebUI 运行时交出来的是已解码的
 // 帧，其 `dataJson` 本身就是 SSE 的 `data:` 载荷，所以桥自己的 `StreamPump` 可以直接复用：
-// 帧被重新写成 SSE 文本，泵按读 Desktop 的方式读它。
+// 帧被重新写成 SSE 文本，泵按读 Electron 端的方式读它。
 import { mapPermissionDecision, normalizePermissionResponses } from "./bridge/command-router.js";
 import type { RcLogger } from "./bridge/types.js";
 import type {
@@ -33,9 +33,9 @@ import type {
   WebuiRuntimeCliService,
 } from "../harness/host-contract.js";
 
-/** Desktop 生成的 API 前缀。 */
+/** Electron 端生成的 API 前缀。 */
 const DESKTOP_API_PREFIX = "/minimax-desktop/api/v1";
-/** 旧版 Mavis API 前缀：桥在 Desktop 路由 404 时会回退到这里，同一套运行时能力。 */
+/** 旧版 Mavis API 前缀：桥在 Electron 端路由 404 时会回退到这里，同一套运行时能力。 */
 const LEGACY_API_PREFIX = "/mavis/api";
 
 /** 运行时没有的能力的 code。 */
@@ -44,11 +44,11 @@ const NOT_IMPLEMENTED = "NOT_IMPLEMENTED";
 /** 本机唯一的 agent 名。 */
 const DEFAULT_AGENT_NAME = "main";
 
-/** 桥盖在本地请求上的来源标记与内联文件内容上限头（同 Desktop `files/api.ts`）。 */
+/** 桥盖在本地请求上的来源标记与内联文件内容上限头（同 Electron 端 `files/api.ts`）。 */
 const RC_REQUEST_SOURCE_HEADER = "x-mcode-request-source";
 const RC_REQUEST_SOURCE_VALUE = "remote-control";
 const RC_FILE_CONTENT_MAX_BYTES_HEADER = "x-mcode-remote-control-file-content-max-bytes";
-/** Desktop 的默认内联上限：10 MiB。 */
+/** Electron 端的默认内联上限：10 MiB。 */
 const DEFAULT_RC_FILE_CONTENT_MAX_BYTES = 10 * 1024 * 1024;
 
 /** 运行时的权限回复编号。 */
@@ -59,7 +59,7 @@ type RuntimePermissionReply = Parameters<
 /**
  * 权限决策 → 运行时编号。
  *
- * 桥的 Desktop 批量回复编号（`toDesktopBatchPermissionDecision`）恰好与运行时一致：
+ * 桥的 Electron 端批量回复编号（`toDesktopBatchPermissionDecision`）恰好与运行时一致：
  * allowOnce=0 / allowAlways=1 / deny=2。所以桥发过来的数字编号可以直接用，手机侧的原始
  * 形状（字符串决策）则先经桥自己的 `normalizePermissionResponses` / `mapPermissionDecision`
  * 归一化，再落到这张表上。
@@ -120,7 +120,7 @@ interface RouteEntry {
  * 桥的命令路由所调用的本地运行时入口。
  *
  * 入参是桥拼出来的 `Request`，出参是桥读得懂的 `Response`：命令词汇与手机侧形状由 bridge
- * 拥有，这里只负责把 Desktop 路由映射到 WebUI 运行时。
+ * 拥有，这里只负责把 Electron 端路由映射到 WebUI 运行时。
  */
 export function createRemoteControlLocalRuntimeInvoke(
   options: RemoteControlLocalRuntimeInvokeOptions,
@@ -138,7 +138,7 @@ export function createRemoteControlLocalRuntimeInvoke(
       ...(limit !== undefined ? { limit } : {}),
       ...(cursor !== undefined ? { cursor } : {}),
     });
-    // Desktop 的 typed HTTP 响应使用 snake_case。
+    // Electron 端的 typed HTTP 响应使用 snake_case。
     return desktopViewResponse({
       sessions: page.sessions,
       ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
@@ -259,7 +259,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     });
   };
 
-  /** Desktop 的队列读取与删除使用同一运行时队列。 */
+  /** Electron 端的队列读取与删除使用同一运行时队列。 */
   const sessionQueueList = async (
     _ctx: RouteContext,
     match: RegExpExecArray,
@@ -579,10 +579,10 @@ export function createRemoteControlLocalRuntimeInvoke(
   /**
    * `GET /projects` —— 项目分组，每个项目内嵌它自己的会话。
    *
-   * 这是 Desktop 的 `ListProjectsResp`：手机侧的「最近」就是从每个 project 的
+   * 这是 Electron 端的 `ListProjectsResp`：手机侧的「最近」就是从每个 project 的
    * sessions 渲染出来的，所以只回 project 而不带 sessions，手机既看不到最近
    * 的会话，也找不到自己刚建的那个会话。运行时的分组投影（project + 会话树）
-   * 就是 Desktop daemon 那份形状，直接透传。
+   * 就是 Electron 端 daemon 那份形状，直接透传。
    */
   const projectsList = async (ctx: RouteContext): Promise<Response> => {
     const listProjectGroups = cliService.listProjectGroups;
@@ -593,10 +593,10 @@ export function createRemoteControlLocalRuntimeInvoke(
         "this runtime cannot list projects with their sessions",
       );
     }
-    // Desktop 的 `ListProjectsReq.agentName` 是可选过滤：给了就只算这个 owner，没给
+    // Electron 端的 `ListProjectsReq.agentName` 是可选过滤：给了就只算这个 owner，没给
     // 就是跨 agent 的全量（`project/service.ts` 的 `resolveOwnerFilter`）。所以这里
     // 不能拿默认 agent 兜底 —— 那会把子 agent（verifier/worker/explore）的会话从手机
-    // 的「最近」里剔掉，而 Desktop 会带上。运行时的 `ProjectListInput.agentName` 同样是
+    // 的「最近」里剔掉，而 Electron 端会带上。运行时的 `ProjectListInput.agentName` 同样是
     // 可选，未给即不过滤。
     const requestedAgent = readString(
       ctx.url.searchParams.get("agent_name") ?? ctx.url.searchParams.get("agentName"),
@@ -616,7 +616,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     const includeArchived = readQueryBoolean(ctx.url.searchParams.get("include_archived"));
     const result = await listProjectGroups.call(cliService, {
       ...(requestedAgent === undefined ? {} : { agentName: requestedAgent }),
-      // Desktop 的项目列表口径：会话含隐藏项、排除内部树会话、归档只在请求
+      // Electron 端的项目列表口径：会话含隐藏项、排除内部树会话、归档只在请求
       // 显式要求时带上；隐藏的项目本身不返回。
       sessionFilter: {
         archived: includeArchived ? undefined : false,
@@ -913,15 +913,15 @@ export function createRemoteControlLocalRuntimeInvoke(
   /**
    * `GET /file/content` —— 一个文件的内容（手机打开文件时走这条）。
    *
-   * Desktop 的 `ReadWorkspaceFile` 与旧版 `/mavis/api/file/content` 回同一个体的
+   * Electron 端的 `ReadWorkspaceFile` 与旧版 `/mavis/api/file/content` 回同一个体的
    * JSON：`{type, content, encoding?, mimeType?, sizeBytes?, error?, code?}`，图片把
    * base64 放进 `content` 并带 `encoding: "base64"`。运行时回的是
    * `{type, content, mimeType?, previewDataUrl?, error?}` —— 图片走 data URL 而不是
    * base64 正文，所以这里把 data URL 拆回 `content` + `encoding`。
    *
    * 手机这条读还受内联上限约束：桥在请求上盖 `X-MCode-Request-Source` 与
-   * `X-MCode-Remote-Control-File-Content-Max-Bytes`，Desktop 的旧路径据此回 413。
-   * 运行时的读入本身不带上限，因此这里读完之后按内容字节数复核一次，413 体与 Desktop
+   * `X-MCode-Remote-Control-File-Content-Max-Bytes`，Electron 端的旧路径据此回 413。
+   * 运行时的读入本身不带上限，因此这里读完之后按内容字节数复核一次，413 体与 Electron 端
    * 逐字段一致（`error` / `code` / `sizeBytes` / `maxBytes`）。
    */
   const workspaceFileContent = async (ctx: RouteContext): Promise<Response> => {
@@ -930,7 +930,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     if (!workspaceDir || !filePath) {
       return errorResponse(400, "INVALID_ARGUMENT", "workspace and path are required");
     }
-    // Desktop 的旧路径不支持字节区间（`offset`/`length`/`maxBytes`/`raw` 只在
+    // Electron 端的旧路径不支持字节区间（`offset`/`length`/`maxBytes`/`raw` 只在
     // Runtime V2 的 typed 路由上存在），这里如实拒绝而不是悄悄忽略。
     if (["offset", "length", "maxBytes", "raw"].some((key) => ctx.url.searchParams.has(key))) {
       return errorResponse(501, NOT_IMPLEMENTED, "workspace file byte ranges are not supported");
@@ -1091,7 +1091,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-/** Desktop 的 typed session/project 视图在 HTTP 上使用 snake_case 字段。 */
+/** Electron 端的 typed session/project 视图在 HTTP 上使用 snake_case 字段。 */
 function desktopViewResponse(body: unknown): Response {
   return jsonResponse(200, desktopViewWire(body));
 }
@@ -1172,7 +1172,7 @@ type RuntimeFileContent = Awaited<
   ReturnType<NonNullable<WebuiRuntimeCliService["readWorkspaceFile"]>>
 >;
 
-/** Desktop 旧版 `/mavis/api/file/content` 的响应体字段。 */
+/** Electron 端旧版 `/mavis/api/file/content` 的响应体字段。 */
 interface DesktopFileContentBody {
   readonly type: "text" | "binary";
   readonly content: string;
@@ -1183,11 +1183,11 @@ interface DesktopFileContentBody {
 }
 
 /**
- * 运行时的文件内容 → Desktop 的文件内容体。
+ * 运行时的文件内容 → Electron 端的文件内容体。
  *
  * 两边的差别只有一处：图片在运行时里是 `previewDataUrl`（`data:image/png;base64,...`），
- * 在 Desktop 里是 `content` + `encoding: "base64"` + `mimeType`。文本两边一致。错误
- * 也照 Desktop 放在 200 的响应体里（`Path traversal denied` 之类），不升级成 HTTP 错误。
+ * 在 Electron 端里是 `content` + `encoding: "base64"` + `mimeType`。文本两边一致。错误
+ * 也照 Electron 端放在 200 的响应体里（`Path traversal denied` 之类），不升级成 HTTP 错误。
  */
 function toDesktopFileContent(value: RuntimeFileContent): DesktopFileContentBody {
   const inline =
@@ -1236,7 +1236,7 @@ function utf8ByteLength(text: string): number {
  * 这条读是不是手机发来的，以及它的内联上限。
  *
  * 只有桥盖了 `X-MCode-Request-Source: remote-control` 的请求才受限；上限取请求头，
- * 没有头时用 Desktop 的 10 MiB 默认值。非手机来源（或没有上限头也没有来源头）返回
+ * 没有头时用 Electron 端的 10 MiB 默认值。非手机来源（或没有上限头也没有来源头）返回
  * `undefined`，即不限流。
  */
 function remoteControlFileContentMaxBytes(headers: Headers): number | undefined {
@@ -1286,7 +1286,7 @@ function errorMessage(error: unknown): string {
 /**
  * 权限批量回复的分组：运行时编号 → 请求号列表。
  *
- * 桥发过来的是 Desktop 编号（0/1/2），与运行时一致，直接用；手机侧的原始形状（字符串决策）
+ * 桥发过来的是 Electron 端编号（0/1/2），与运行时一致，直接用；手机侧的原始形状（字符串决策）
  * 则交给桥自己的两个映射函数归一化，这里只负责把 canonical decision 落到同一张编号表上。
  */
 function resolvePermissionGroups(
@@ -1340,7 +1340,7 @@ function isRuntimePermissionReply(value: number): value is RuntimePermissionRepl
 /**
  * 桥的模型形状 → 运行时的模型选择。
  *
- * 桥发的是 Desktop 的 snake_case（`provider_id` / `model_id` / `context_limit`），运行时要的是
+ * 桥发的是 Electron 端的 snake_case（`provider_id` / `model_id` / `context_limit`），运行时要的是
  * camelCase。provider 与 model 缺一不可，否则半截的模型选择没有意义。
  */
 function toRuntimeModel(value: unknown) {
@@ -1366,7 +1366,7 @@ function toRuntimeModel(value: unknown) {
 /**
  * 桥的附件形状 → 运行时的附件形状。
  *
- * 桥的 Desktop 线是 snake_case（`meta.attachment_type` / `local.file_path`），运行时是
+ * 桥的 Electron 端线是 snake_case（`meta.attachment_type` / `local.file_path`），运行时是
  * camelCase；旧版 Mavis 线是平铺的（`filePath` / `fileName` / `mimeType`），一并吃下。
  */
 function toRuntimeAttachments(
@@ -1423,8 +1423,8 @@ interface RuntimeStreamFrame {
  *
  * The runtime's `dataJson` *is* the SSE `data:` payload — the runtime's own session delivery
  * writes the agent-core frame verbatim — so the bridge's pump reads it exactly as it reads the
- * Desktop's daemon stream. The cursor rides as the SSE `id:` line, which the pump keeps
- * pump-internal and never puts on the wire.
+ * The electron app's daemon stream. The cursor rides as the SSE `id:` line, which the pump
+ * keeps pump-internal and never puts on the wire.
  */
 function sseResponseFromFrames(
   frames: AsyncIterable<RuntimeStreamFrame> | Iterable<RuntimeStreamFrame>,

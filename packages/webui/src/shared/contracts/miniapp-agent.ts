@@ -1,6 +1,6 @@
 // The Mini App page's agent bridge, as a wire contract.
 //
-// A Mini App page calls `window.mcode.miniapp.agent.*`. On the desktop client that
+// A Mini App page calls `window.mcode.miniapp.agent.*`. On the electron app that
 // namespace is an Electron preload and its calls ride IPC. Here the page is a
 // browser iframe on the proxy's own origin, so every call crosses `postMessage`
 // to the client that framed it, and the client relays it to the service. Three
@@ -8,7 +8,7 @@
 // bodies, and the stream frames — and all three are declared here rather than in
 // the modules that happen to produce them.
 //
-// Everything below the identity line is copied from `@mavis/shared/miniapp-surface`
+// Everything below the identity line is taken from `@mavis/shared/miniapp-surface`
 // only by *reference*: the validators and DTOs that contract already publishes are
 // imported, not restated. That module is both sides' authority for what a page may
 // ask and what a controller may answer, so a second copy here would be a second

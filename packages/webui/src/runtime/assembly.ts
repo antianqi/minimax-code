@@ -202,7 +202,7 @@ export interface CreateWebuiRuntimeHostOptions {
   /**
    * The Mini App presenter, when this client supplies one.
    *
-   * The runtime's `MiniAppPresenter` is a host-owned port: on the desktop client it
+   * The runtime's `MiniAppPresenter` is a host-owned port: on the electron app it
    * moves a native view, and here it is the browser implementation
    * (`server/miniapp/presenter.ts`). It is an option rather than something the
    * assembly builds because the two sides may not import each other — the server
@@ -312,9 +312,8 @@ export async function createWebuiRuntimeHost(
       ? { appVersion: options.appVersion }
       : {}),
     // The cloud filters the marketplace by the desktop version a client
-    // declares. The WebUI is not the desktop, so it declares the desktop
-    // version the shared constant names — and the runtime only carries the
-    // declaration.
+    // declares. This client declares the desktop version the shared constant
+    // names — and the runtime only carries the declaration.
     marketplaceVisibilityVersion: MARKETPLACE_VISIBILITY_DESKTOP_VERSION,
     runtimeOwnerKind: "webui",
     runtimeMode: "clean",
@@ -340,12 +339,12 @@ export async function createWebuiRuntimeHost(
         ...currentConfig,
         beta: {
           ...currentConfig.beta,
-          // The capability switch stays the configured value. The Desktop client
-          // keeps `beta.mcodeTools` as the resolved config value too, so the
-          // `mcode-tools-master` skill stays in the catalog even when this
-          // client's host integration is not ready. Overriding it with the
-          // readiness dropped that skill from the catalog, and the Agent then
-          // had no entry point for multimodal generation at all.
+          // The capability switch stays the configured value. `beta.mcodeTools`
+          // keeps the resolved config value, so the `mcode-tools-master` skill
+          // stays in the catalog even when this client's host integration is not
+          // ready. Overriding it with the readiness dropped that skill from the
+          // catalog, and the Agent then had no entry point for multimodal
+          // generation at all.
           // `browserUseTooling` is still readiness-gated: the browser tool is
           // only usable when this client actually adopted a browser provider.
           browserUseTooling: browser.browserUseTooling,

@@ -1,7 +1,6 @@
 /**
  * pairing-client — HTTP client for the archon_biz RemoteControl endpoints
- * (plan §3.1, contract = the `RemoteControlService` IDL, 3 desktop
- * endpoints only).
+ * (plan §3.1, contract = the `RemoteControlService` IDL, 3 endpoints only).
  *
  *   POST /pairing/code  {platform, app_version?, device_name?, rc_protocol_version} → {pairing_code, expires_in_s}
  *   GET  /desktop/bindings?rc_protocol_version=3               → RCBindingInfo
@@ -44,7 +43,7 @@ export interface PairingClientOpts {
   getJwt: () => string;
   /**
    * Current user id for the `user_id` query common-param (matrix Auth
-   * cross-check: must equal the token's auth_uid). Desktop semantics =
+   * cross-check: must equal the token's auth_uid). The rule is
    * resolveCurrentUserId(getUserInfo()) — realUserID preferred. When absent
    * the param is omitted (server will 401 on protected endpoints).
    */
@@ -55,8 +54,8 @@ export interface PairingClientOpts {
   /**
    * The producer's platform label.
    *
-   * `linux` was added when the bridge was vendored into the WebUI: the WebUI's service runs on
-   * Linux as well as on macOS and Windows, and the label is a plain string on the wire. The
+   * `linux` was added for the WebUI's service: it runs on Linux as well as on
+   * macOS and Windows, and the label is a plain string on the wire. The
    * bridge itself never interprets it.
    */
   getPlatform: () => "darwin" | "win32" | "linux";
@@ -191,7 +190,7 @@ export class PairingClient {
       token: jwt,
       Authorization: `Bearer ${jwt}`,
       "X-Device-Id": this.opts.getDeviceId(),
-      // 方案 §4.5.11：producer 侧统一声明类型，Desktop 明确为 desktop。
+      // 方案 §4.5.11：producer 侧统一声明类型，Electron 端明确为 desktop。
       // 服务端按 producer identity（type + device id）区分同一 raw id 的不同端类型。
       "X-Producer-Type": this.opts.getProducerType?.() ?? "desktop",
       Accept: "application/json",

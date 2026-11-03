@@ -772,10 +772,10 @@ export interface WebuiHarnessPort {
   /**
    * The 接入 IM surface.
    *
-   * Not a harness capability: Desktop's IM client talks to the runtime's channel-bridge routes,
-   * and the route table lives inside the runtime host. The assembly supplies the client (see
-   * `runtime/channel-bridge.ts`), so the member is unconditionally present on the port the service
-   * binds to.
+   * Not a harness capability: the electron app's IM client talks to the runtime's
+   * channel-bridge routes, and the route table lives inside the runtime host. The
+   * assembly supplies the client (see `runtime/channel-bridge.ts`), so the member is
+   * unconditionally present on the port the service binds to.
    */
   listChannelConnections(): Promise<WebuiChannelConnectionList>;
   prepareChannelConnection(
@@ -839,7 +839,7 @@ export interface WebuiHarnessPort {
   /**
    * The SSH surface.
    *
-   * Not a harness capability: SSH is a host-side capability in Desktop too, owned by the Electron
+   * Not a harness capability: SSH is a host-side capability in the electron app too, owned by its
    * main process (`dist/main/modules/ssh-runtime/`). The assembly supplies the client (see
    * `runtime/ssh/`), so the member is unconditionally present on the port the service binds to.
    */

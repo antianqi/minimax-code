@@ -5,8 +5,8 @@
 // turn. Cancellation is therefore an explicit call naming the request, and this
 // registry is what makes that call reach the controller the turn is running under.
 //
-// Two rules come straight from the desktop client's broker, because a page written
-// against it must see the same outcomes here:
+// Two rules a page's cancellation depends on, so that every cancellation has a
+// documented outcome:
 //
 //   * **Cancelling is not the same as detaching.** A client that goes away aborts
 //     its own turn silently; a page that asks for a cancellation is waiting for an

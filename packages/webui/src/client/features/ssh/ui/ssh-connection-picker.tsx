@@ -1,6 +1,6 @@
 // The hosts the picker offers.
 //
-// The Desktop's add dialog is a picker before it is a form: it lists the hosts it found in
+// The add dialog is a picker before it is a form: it lists the hosts it found in
 // `~/.ssh/config` and lets one of them be chosen. This module is that list, without the dialog
 // around it, so what it says can be tested on its own.
 import type { ReactElement } from "react";

@@ -13,7 +13,7 @@
  */
 
 :root {
-  /* The Desktop Ant theme's modal mask is its `utility_overlay` token, which
+  /* The Ant theme's modal mask is its `utility_overlay` token, which
    * is #00000040 — black at 25%, not a gray-tinted black. */
   --webui-modal-scrim: rgb(0 0 0 / 25%);
   --bg_default_scrim: #fafafa;

@@ -15,7 +15,7 @@ import type { CliService } from "@mavis/local-runtime-v2/cli-service";
 /**
  * The request one host member takes, as the host itself declares it.
  *
- * Written as a parameter read rather than a transcribed interface: the runtime owns these
+ * Written as a parameter read rather than a hand-written copy: the runtime owns these
  * shapes, and a copy of them here is a copy that drifts. The four provider mutations all
  * use it, on the declaration the adapter forwards to.
  */
@@ -148,7 +148,7 @@ export interface WebuiRuntimeCliService {
    * `listVisibleProjects` answers "which projects exist" and therefore leaves
    * the sessions out. A client that renders a project's conversations needs
    * both halves in one read, and the runtime already owns that projection: the
-   * Desktop's project list, with each project carrying its own session tree.
+   * project list, with each project carrying its own session tree.
    */
   listProjectGroups?(
     request: WebuiHostRequest<"listProjectGroups">,

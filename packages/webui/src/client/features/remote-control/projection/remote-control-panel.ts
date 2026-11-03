@@ -1,12 +1,11 @@
 // The 远程控制 projection.
 //
-// A pure function of the owner's snapshot and the clock: the copy the Desktop shows, in the
-// Desktop's order, plus the live state (the pairing code and its countdown, the linked device,
-// the pending unbind).
+// A pure function of the owner's snapshot and the clock: the copy this page shows, in the
+// order this page shows it, plus the live state (the pairing code and its countdown, the linked
+// device, the pending unbind).
 //
-// The copy is transcribed from the Desktop's 远程控制 tab, measured on the live Desktop
-// (its computed styles and rendered markup). It is kept here rather than in the
-// component so a test can assert the page's wording without rendering it.
+// The copy is kept here rather than in the component so a test can assert the page's wording
+// without rendering it.
 //
 // ## The countdown
 //
@@ -49,7 +48,7 @@ export interface WebuiRemoteControlSnapshot {
 export const WEBUI_REMOTE_CONTROL_TITLE = "用手机连接你的 MiniMax Code";
 /** The line under the title. */
 export const WEBUI_REMOTE_CONTROL_SUBTITLE = "通过 MiniMax App 访问此电脑，随时随地继续桌面端的任务";
-/** The three feature rows, in the Desktop's order. */
+/** The three feature rows, in the order this panel shows them. */
 export const WEBUI_REMOTE_CONTROL_FEATURES: readonly {
   readonly key: "takeover" | "continuous" | "anywhere";
   readonly text: string;
@@ -65,7 +64,7 @@ export const WEBUI_REMOTE_CONTROL_CONNECTING_LABEL = "连接中…";
 /**
  * The entry under the card's action.
  *
- * The Desktop 3.1.6 page links to its connection settings, not to SSH: the entry is
+ * The page links to its connection settings, not to SSH: the entry is
  * `remote_control.settings_link` and it opens the settings app's 连接 tab, which carries the
  * remote-control device list and the SSH hosts together.
  */
@@ -81,9 +80,9 @@ export const WEBUI_REMOTE_CONTROL_BOUND_TITLE = "已绑定";
 /**
  * The title for a host that cannot host a phone link.
  *
- * The Desktop's own wording for this state names a desktop version that is too old, which is
+ * The wording for this state names an app version that is too old, which is
  * not this host's reason: the WebUI's runtime either owns the remote-control bridge or it does
- * not. The state keeps the Desktop's shape (one title, no card) and this host's reason.
+ * not. The state keeps that shape (one title, no card) and this host's reason.
  */
 export const WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE =
   "这个运行时无法托管手机远程控制（宿主没有远程控制能力）。";
@@ -94,22 +93,22 @@ export const WEBUI_REMOTE_CONTROL_PLATFORM_MARKS: readonly {
   /**
    * Whether the host publishes a download QR code for this platform.
    *
-   * The Desktop reads it from its native download config and shows the mark as a link that
-   * opens the QR code on hover. This host publishes no such config, so the mark carries the
-   * Desktop's disabled treatment rather than pretending a code is one hover away.
+   * The electron app reads it from its native download config and shows the mark as a link
+   * that opens the QR code on hover. This host publishes no such config, so the mark carries the
+   * disabled treatment rather than pretending a code is one hover away.
    */
   readonly enabled: boolean;
 }[] = [
   { key: "android", label: "安卓", enabled: false },
   { key: "ios", label: "iOS", enabled: false },
 ];
-/** The minimum app version, said twice on the Desktop: as the group's name and as the line. */
+/** The minimum app version, said twice: as the group's name and as the line. */
 export const WEBUI_REMOTE_CONTROL_MINIMUM_VERSION = "支持移动端 App 4.15.0 及以上版本";
 
 /**
- * Which page the Desktop shows.
+ * Which page this panel shows.
  *
- * `unavailable` — this host cannot host a phone link at all, so the Desktop's lone title
+ * `unavailable` — this host cannot host a phone link at all, so the lone title
  * appears with no card. `unbound` — no phone is linked: the hero title and the 连接 button.
  * `bound` — a phone is linked: the state title and the settings entry alone.
  */
@@ -173,7 +172,7 @@ export function webuiRemoteControlPanelModel(
   const pairingCode =
     phase === "pairing" && !pairingExpired && link?.pairingCode ? link.pairingCode : undefined;
 
-  // The Desktop shows one of three titles once a phone is linked: 已连接 when the phone is on
+  // The panel shows one of three titles once a phone is linked: 已连接 when the phone is on
   // the line, 未连接 when it is not, and 已绑定 when its presence is not known. Its
   // mobileOnline flag carries that fact; the bridge's phase carries the same one.
   const state: WebuiRemoteControlPageState =

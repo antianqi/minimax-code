@@ -1,10 +1,10 @@
 // The legal documents the sign-in page links to.
 //
-// The Desktop's login page closes with "登录即表示你同意 [服务条款] 和 [隐私政策]",
+// The sign-in page closes with "登录即表示你同意 [服务条款] 和 [隐私政策]",
 // and both links point at the account's own site: the origin the account
-// belongs to, plus the `/doc/<language>/` tree that site publishes. The
-// Desktop derives that origin from the account scope it already holds, and so
-// does this — the region decides the site, and the scope decides the language.
+// belongs to, plus the `/doc/<language>/` tree that site publishes. That
+// origin comes from the account scope this service already holds — the region
+// decides the site, and the scope decides the language.
 //
 // The table is the WebUI's own account origins — the site the account's
 // documents are published on, not the service origin the WebUI calls. It is
@@ -32,11 +32,11 @@ const ACCOUNT_SITE_ORIGINS: Readonly<
     dev: "https://matrix-test.example.invalid",
     test: "https://matrix-test.example.invalid",
     staging: "https://matrix-pre.example.invalid",
-    // The account's *site*, not its API: the Desktop's login page takes the
-    // host of its legal documents from the site origin its own build is
-    // served from, and the port has to name the same documents the Desktop
-    // names. The service origins the WebUI calls (check-in, quota, pairing)
-    // are a different table and a different question.
+    // The account's *site*, not its API: the login page takes the host of its
+    // legal documents from the site origin this build is served from, and the
+    // port has to name the documents those links point at. The service origins
+    // the WebUI calls (check-in, quota, pairing) are a different table and a
+    // different question.
     prod: "https://agent.minimax.cn",
   },
   en: {
@@ -50,7 +50,7 @@ const ACCOUNT_SITE_ORIGINS: Readonly<
 /**
  * The language the account's site publishes its documents in.
  *
- * The account region decides it, the same way the Desktop's page decides the
+ * The account region decides it, the same way the sign-in page decides the
  * `zh` / `en` segment of its links. It is not the browser's language: the
  * document has to be the one that governs the account.
  */

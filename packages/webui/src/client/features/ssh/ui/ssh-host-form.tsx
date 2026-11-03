@@ -24,7 +24,7 @@ export interface SshHostFormProps {
   /**
    * The host being edited, when the form edits one.
    *
-   * A saved host's alias is its name: Desktop's editor shows the alias as text and does not
+   * A saved host's alias is its name: the editor shows the alias as text and does not
    * offer to change it, and a changed alias here would save a second host and leave the first
    * one behind. The values here are the ones the host is reached with, so the form opens on
    * them.
@@ -41,9 +41,8 @@ export interface SshHostFormProps {
    * carries.
    *
    * A field the person leaves alone keeps the override it has; a field they set back to the
-   * config's own value drops the override and follows the config again. This is Desktop's rule
-   * for a host named in `~/.ssh/config` (`ssh-runtime/connection-service.js`,
-   * `updatedEndpoint`).
+   * config's own value drops the override and follows the config again. This is the rule
+   * for a host named in `~/.ssh/config`.
    */
   readonly override?: {
     readonly config?: WebuiSshEndpointValues;

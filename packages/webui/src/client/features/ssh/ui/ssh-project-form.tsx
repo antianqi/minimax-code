@@ -62,7 +62,7 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
     }
   }, [alias, props.onBrowse]);
 
-  // Desktop opens the picker with the host's root directory visible.
+  // The picker opens with the host's root directory visible.
   useEffect(() => {
     setPath("/");
     setListing(undefined);

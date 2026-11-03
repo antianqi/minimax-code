@@ -207,8 +207,8 @@ export const initialWebuiAccountProfileState: WebuiAccountProfileState = {
 };
 
 /**
- * The redemption phase. The names and the order are the Desktop's: the phase
- * decides which status line the card panel shows and which actions it offers,
+ * The redemption phase. The names and the order are the account business's own: the
+ * phase decides which status line the card panel shows and which actions it offers,
  * so a phase that is not listed here has no meaning to copy.
  */
 export type WebuiResetCardPhase =
@@ -273,12 +273,12 @@ export const initialWebuiResetCardState: WebuiResetCardState = {
 };
 
 /**
- * The history window the Desktop asks for: the last 30 days. The account API
+ * The history window the account asks for: the last 30 days. The account API
  * takes the lower bound as a timestamp, so the window is computed per read.
  */
 export const WEBUI_RESET_CARD_HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 
-/** The page size the Desktop uses for both the card list and the history. */
+/** The page size used for both the card list and the history. */
 const RESET_CARD_PAGE_SIZE = 20;
 
 export const initialWebuiAccountWorkflowsState: WebuiAccountWorkflowsState = {
@@ -363,14 +363,13 @@ export interface WebuiAccountWorkflows {
   readonly loadCreditFallback: () => Promise<void>;
   /**
    * Turn the credit fallback on or off. The state the switch ends up in is
-   * the account API's own verdict, not the requested value — the Desktop
-   * re-reads the flag from the response for the same reason.
+   * the account API's own verdict, not the requested value — the flag is
+   * re-read from the response for the same reason.
    */
   readonly setCreditFallback: (enabled: boolean) => Promise<void>;
 
   /**
-   * The reset cards are a plan feature: the Desktop only offers them to a
-   * subscribed account, and so does this owner.
+   * The reset cards are a plan feature: only a subscribed account gets them.
    */
   readonly canUseResetCards: boolean;
   /** Read the first page of the account's redeemable reset cards. */
@@ -908,7 +907,7 @@ export function createWebuiAccountWorkflows(deps: {
   /**
    * Redeems the chosen card.
    *
-   * The order of the checks is the Desktop's: the card has to still be on the
+   * The order of the checks: the card has to still be on the
    * list and unexpired, the account has to be online, and only then is the
    * request sent. The answer is mapped to a phase rather than to a boolean, so
    * "could not tell" stays a phase the user can retry from instead of becoming
@@ -975,8 +974,8 @@ export function createWebuiAccountWorkflows(deps: {
 
   /**
    * After a redemption the account's quota, its cards and its history have all
-   * moved. The Desktop reads all three again and restores the redemption's own
-   * phase when the refresh succeeded, so a successful reset does not leave the
+   * moved. All three are read again and the redemption's own phase is restored
+   * when the refresh succeeded, so a successful reset does not leave the
    * panel saying "refreshing" forever.
    */
   const refreshAfterRedemption = async (
@@ -989,7 +988,7 @@ export function createWebuiAccountWorkflows(deps: {
     const results = await Promise.all([
       loadUsage(true),
       loadResetCards(),
-      // The Desktop re-reads the history only when the history panel is open;
+      // The history is re-read only when the history panel is open;
       // a closed panel has nothing to show and no reason to ask.
       state.resetCards.historyOpen ? loadResetCardPage("history", 1) : Promise.resolve(true),
     ]);
@@ -1258,8 +1257,8 @@ export function createWebuiAccountWorkflows(deps: {
     canSignOut: port.signOut !== undefined,
     canReadApiKeyStatus: port.getMiniMaxApiKeyStatus !== undefined,
     canReadCodexOAuth: port.getCodexOAuthStatus !== undefined,
-    // The reset cards are a plan feature: the Desktop only offers them to a
-    // subscribed account. The answer follows the usage read, so it is a getter
+    // The reset cards are a plan feature: only a subscribed account gets them.
+    // The answer follows the usage read, so it is a getter
     // rather than a value captured when the owner was built.
     get canUseResetCards(): boolean {
       const result = state.usage.result;
@@ -1311,9 +1310,9 @@ export function createWebuiAccountWorkflows(deps: {
 }
 
 /**
- * Whether the browser believes it is online. The Desktop reads the same
- * `navigator.onLine` flag and refuses to redeem a card while it is false, so
- * the failure is reported as "offline" rather than as a request error. A host
+ * Whether the browser believes it is online. The `navigator.onLine` flag is
+ * read and a card is not redeemed while it is false, so the failure is reported
+ * as "offline" rather than as a request error. A host
  * without a `navigator` (a server render, a unit test) is treated as online:
  * the request itself is the real check.
  */

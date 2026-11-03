@@ -99,7 +99,7 @@ const USER_EXTRA_INFO_PATH = "/matrix/api/v1/user/get_user_extra_info";
 const MEMBERSHIP_INFO_PATH = "/matrix/api/v1/commerce/get_membership_info";
 const USER_INFO_PATH = "/v1/api/user/info";
 // The account page's profile read: the display name, the avatar and the
-// registration time the Desktop's account page renders.
+// registration time it renders.
 const USER_PROFILE_PATH = "/matrix/api/v1/user/profile";
 // The panel's own quota endpoint: returns used/total percent per
 // window (`"96%"` / `"100%"`) plus count-based video rows. The sibling
@@ -107,9 +107,7 @@ const USER_PROFILE_PATH = "/matrix/api/v1/user/profile";
 // feeds the terminal client's "% left" display — not this panel's copy.
 const TOKEN_PLAN_REMAINS_PATH = "/backend/account/token_plan/remains_percent";
 // The credit pool and the reset cards live on the same open-platform origin as
-// the quota endpoint above; the paths and the request/response shapes were read
-// out of the Desktop renderer bundle, which is the behavioural authority for
-// this surface.
+// the quota endpoint above.
 const TOKEN_PLAN_CREDIT_PATH = "/backend/account/token_plan_credit";
 const TOKEN_PLAN_CREDIT_FALLBACK_PATH = "/backend/account/token_plan_credit/fallback";
 const RESET_CARD_LIST_PATH = "/backend/account/reset_card/list";
@@ -117,13 +115,12 @@ const RESET_CARD_USE_PATH = "/backend/account/reset_card/use";
 const RESET_CARD_FLOWS_PATH = "/backend/account/reset_card/flows";
 // The account page's calendar: the cumulative token total, the busiest day and
 // one entry per day for the last 365 days. It lives on the same open-platform
-// origin as the quota endpoint above; the path and the query were read out of
-// the Desktop renderer bundle.
+// origin as the quota endpoint above.
 const USAGE_SUMMARY_PATH = "/backend/account/token_plan/usage_summary";
-/** The Desktop asks for the text models of the last 365 days. */
+/** The account page asks for the text models of the last 365 days. */
 const USAGE_SUMMARY_HEATMAP_DAYS = 365;
 const USAGE_SUMMARY_TOKEN_TYPE = 5;
-/** The Desktop pages the reset-card list and the history 20 rows at a time. */
+/** The account page pages the reset-card list and the history 20 rows at a time. */
 const RESET_CARD_PAGE_SIZE = 20;
 const DEFAULT_TIMEOUT_MS = 3_000;
 const DEFAULT_MEMBERSHIP_CACHE_TTL_MS = 30_000;
@@ -193,11 +190,9 @@ interface CacheEntry<V> {
  * split would have been meant to remove. What left is the pure projection in
  * `usage-quota-projection.ts` and `reset-card-projection.ts`.
  *
- * The surface it owns is the account-billing one the Desktop settings page
- * shows: the plan quota (`token_plan/remains_percent`), the credit fallback
- * switch (`token_plan_credit`) and the reset cards (`reset_card/*`). The
- * Desktop renderer calls the same endpoints from the same origin, so this is
- * the same seam rather than a new one.
+ * The surface it owns is the account-billing one the settings page shows: the
+ * plan quota (`token_plan/remains_percent`), the credit fallback switch
+ * (`token_plan_credit`) and the reset cards (`reset_card/*`).
  */
 export class UsageQuotaClient {
   private readonly fetchImpl: typeof fetch;
@@ -302,8 +297,8 @@ export class UsageQuotaClient {
 
   /**
    * Turns the credit fallback on or off. The answer is the account API's own
-   * verdict, not the requested value: the Desktop re-reads the flag from the
-   * response so the switch cannot drift from the server.
+   * verdict, not the requested value: the flag is re-read from the response so
+   * the switch cannot drift from the server.
    */
   async setCreditFallback(request: {
     readonly enabled: boolean;
@@ -361,8 +356,8 @@ export class UsageQuotaClient {
   }
 
   /**
-   * One page of the reset-card history. `createTimeMs` is the lower bound the
-   * Desktop asks for: the history window is the last 30 days.
+   * One page of the reset-card history. `createTimeMs` is the lower bound asked for: the
+   * history window is the last 30 days.
    */
   async queryResetCardFlows(request?: {
     readonly page?: number;
@@ -386,8 +381,7 @@ export class UsageQuotaClient {
 
   /**
    * The account page's calendar: the lifetime token total, the busiest day and
-   * one entry per day. The Desktop asks the same endpoint for the same window,
-   * so this is the same seam rather than a new one.
+   * one entry per day.
    */
   async getUsageSummary(): Promise<WebuiUsageSummaryView> {
     const token = await this.requireBillingToken();
@@ -639,8 +633,8 @@ export class UsageQuotaClient {
 
   /**
    * The one request shape the open-platform account endpoints share: a bearer
-   * lease, the group header when the account has a group, and the same
-   * `base_resp` / `statusInfo` verdict the Desktop's interceptor applies.
+   * lease, the group header when the account has a group, and the
+   * `base_resp` / `statusInfo` verdict the interceptor applies.
    */
   private async openPlatformRequest(
     pathname: string,
@@ -684,10 +678,10 @@ export class UsageQuotaClient {
       throw new Error(`Usage quota ${pathname} returned an invalid response`);
     }
     // The open-platform account endpoints carry their verdict in
-    // `base_resp.status_code` — the same field the Desktop's client reads. The
-    // matrix convention (`statusInfo.code`) belongs to the matrix endpoints and
-    // is not consulted here, so the quota endpoint keeps the behaviour it had
-    // before this request shape was shared.
+    // `base_resp.status_code` — the same field the client reads. The matrix
+    // convention (`statusInfo.code`) belongs to the matrix endpoints and is not
+    // consulted here, so the quota endpoint keeps the behaviour it had before
+    // this request shape was shared.
     const baseResponse = asRecord(responseBody.base_resp);
     if (
       typeof baseResponse?.status_code === "number" &&

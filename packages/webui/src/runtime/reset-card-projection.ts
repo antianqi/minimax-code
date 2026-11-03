@@ -4,8 +4,7 @@
 // was: field picking over untrusted JSON is the part that can be reasoned
 // about without a clock, a fetch or a credential.
 //
-// The field names come from the Desktop renderer bundle, which is the
-// behavioural authority for this surface:
+// The field names are the ones the account API reports:
 //
 // - card: `card_id`, `source_type`, `out_biz_no`, `create_time`, `expire_time`
 // - card name: `card_name` | `name` | `title`, or the same keys inside a JSON
@@ -23,7 +22,7 @@ import type {
 } from "../shared/contracts/account-billing.js";
 import { asRecord, finiteNumber, readString } from "./usage-quota-projection.js";
 
-/** The name keys a card (or a flow) may carry, in the Desktop's order. */
+/** The name keys a card (or a flow) may carry, in the order this projection reads them. */
 const NAME_KEYS = ["card_name", "name", "title"] as const;
 
 /** Reads the card list body: `{ cards, total }`. */
@@ -40,7 +39,7 @@ export function projectResetCardList(
   };
 }
 
-/** Reads one card. Cards without an identity are dropped, like the Desktop's. */
+/** Reads one card. Cards without an identity are dropped. */
 export function projectResetCard(
   raw: Record<string, unknown> | undefined,
 ): WebuiResetCardView | undefined {
@@ -98,8 +97,8 @@ export function projectResetCardFlow(
 }
 
 /**
- * Reads the credit-fallback flag. The Desktop keeps `null` for "not resolved"
- * and a boolean for a verdict, so the view carries both.
+ * Reads the credit-fallback flag. `null` means "not resolved" and a boolean is
+ * a verdict, so the view carries both.
  */
 export function projectCreditFallback(
   body: Record<string, unknown>,
@@ -122,8 +121,8 @@ export function projectResetCardUse(
 
 /**
  * The redemption outcome enum. An unrecognised value is `UNKNOWN` rather than
- * a failure: the Desktop treats "cannot tell" as its own phase and offers the
- * user a retry instead of declaring the card spent.
+ * a failure: "cannot tell" gets its own phase and the user a retry instead of
+ * a card declared spent.
  */
 export function toOutcome(value: string | undefined): WebuiResetCardOutcome {
   switch (value) {
@@ -140,7 +139,7 @@ export function toOutcome(value: string | undefined): WebuiResetCardOutcome {
 }
 
 /**
- * The card identity the Desktop uses to tell two cards apart: the
+ * The card identity this projection uses to tell two cards apart: the
  * `(source_type, out_biz_no)` pair, not the card id — the same grant can be
  * re-issued under a new card id.
  */
@@ -151,7 +150,7 @@ export function resetCardIdentity(card: {
   return JSON.stringify([card.sourceType ?? "", card.outBizNo ?? ""]);
 }
 
-/** The flow identity the Desktop uses to merge pages without duplicates. */
+/** The flow identity this projection uses to merge pages without duplicates. */
 export function resetCardFlowIdentity(flow: {
   readonly cardId: string;
   readonly eventType: string;

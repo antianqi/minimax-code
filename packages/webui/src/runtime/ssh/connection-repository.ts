@@ -1,8 +1,8 @@
 // The saved SSH hosts.
 //
-// Desktop keeps one store per concern and reports an identity revision when the record under an
-// alias changes; this port keeps the same two facts, because the WebUI's host list and its
-// project list have to agree about which host a project is rooted on.
+// This port keeps one store per concern and reports an identity revision when the record under
+// an alias changes, because the WebUI's host list and its project list have to agree about
+// which host a project is rooted on.
 //
 // The store holds no credential. A password is staged in memory for the first handshake and is
 // never written here.

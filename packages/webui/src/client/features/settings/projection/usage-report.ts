@@ -1,33 +1,28 @@
-// The account page's arithmetic, ported from the Desktop renderer.
+// The account page's arithmetic.
 //
-// The Desktop's account page is the behavioural authority for this surface: the
-// token parsing, the compact formatting, the ranking thresholds, the calendar
-// model and the month labels were read out of the Desktop renderer bundle
-// (`chunks/69200.*.js`, helpers `t0`/`t1`/`t2`/`t3`/`tJ`/`tQ`/`tG`/`tX`/`tY`
-// and the account page's `useMemo`) before this module was written. The rules
-// below are transcriptions, not reinterpretations — a different threshold
-// table or a different quantile would show a different calendar.
+// The rules below are the account API's own: the token parsing, the compact
+// formatting, the ranking thresholds, the calendar model and the month labels.
+// A different threshold table or a different quantile would show a different
+// calendar.
 //
-// The one thing that is not a transcription is where the numbers come from: the
-// Desktop reads the raw account-API payload in the renderer, while the WebUI
-// reads a projected payload (see `shared/contracts/account-usage.ts`) and does
-// the same arithmetic here.
+// Where the numbers come from: the WebUI reads a projected payload (see
+// `shared/contracts/account-usage.ts`) and does the arithmetic here.
 
 import type {
   WebuiUsageDayView,
   WebuiUsageSummaryView,
 } from "../../../../shared/contracts/account-usage.js";
 
-/** The ranking percentiles the Desktop shows. A ranking above the last one has no bucket. */
+/** The ranking percentiles the page shows. A ranking above the last one has no bucket. */
 export const WEBUI_USAGE_RANKING_THRESHOLDS: readonly number[] = [1, 5, 10, 25, 50];
 
-/** The day the Desktop's usage tracking starts; the calendar's own origin. */
+/** The day the usage tracking starts; the calendar's own origin. */
 export const WEBUI_USAGE_TRACKING_START_DATE = "2025-11-01";
 
-/** The timezone the Desktop's calendar is drawn in. */
+/** The timezone the calendar is drawn in. */
 export const WEBUI_USAGE_TIME_ZONE = "Asia/Shanghai";
 
-/** The number of week columns the Desktop's calendar shows. */
+/** The number of week columns the calendar shows. */
 export const WEBUI_USAGE_CALENDAR_COLUMNS = 50;
 
 const TOKEN_AMOUNT_PATTERN = /^(\d+(?:\.\d+)?|\.\d+)\s*([KMB]?)$/iu;
@@ -82,7 +77,7 @@ export interface WebuiUsageMetrics {
  *
  * The peak day is the busiest day the account API reports, or — when it
  * reports none — the busiest day in the daily series. The ranking is the
- * percentile bucket the account falls into; above the last bucket the Desktop
+ * percentile bucket the account falls into; above the last bucket the page
  * shows an em dash rather than a made-up percentile.
  */
 export function projectUsageMetrics(summary: WebuiUsageSummaryView): WebuiUsageMetrics {
@@ -109,7 +104,7 @@ export function formatUsageRanking(percent: number | undefined): string {
 }
 
 /**
- * The quantile the Desktop's calendar thresholds are cut at. The input is
+ * The quantile the calendar thresholds are cut at. The input is
  * expected to be sorted ascending.
  */
 export function quantile(sorted: readonly number[], q: number): number {
@@ -120,7 +115,7 @@ export function quantile(sorted: readonly number[], q: number): number {
 
 /**
  * Parses a `YYYY-MM-DD` day into its UTC midnight. A day that does not exist
- * (`2026-02-30`) is rejected the way the Desktop rejects it.
+ * (`2026-02-30`) is rejected.
  */
 export function parseRegionalDate(value: string): number | null {
   if (!REGIONAL_DATE_PATTERN.test(value)) return null;
@@ -165,7 +160,7 @@ export function formatUsageCellDate(date: string): string {
 }
 
 /**
- * The account's phone number, masked the way the Desktop masks it: the first
+ * The account's phone number, masked: the first
  * three digits and the last four stay, the middle four become `****`.
  */
 export function maskAccountPhone(phone: string): string {
@@ -212,11 +207,11 @@ export interface WebuiUsageHeatmapModel {
 /**
  * Builds the calendar.
  *
- * The shape is the Desktop's: 50 week columns ending with the current week,
- * seven days per column, Monday first. The four usage buckets are cut at the
- * 25th, 50th and 75th percentile of the days that actually had usage inside
- * the shown range — the same rule the Desktop applies, so the same account
- * produces the same picture.
+ * The shape: 50 week columns ending with the current week, seven days per
+ * column, Monday first. The four usage buckets are cut at the 25th, 50th and
+ * 75th percentile of the days that actually had usage inside the shown range —
+ * the same rule the electron app applies, so the same account produces the
+ * same picture.
  */
 export function buildUsageHeatmapModel(
   days: readonly WebuiUsageDayView[] | undefined,

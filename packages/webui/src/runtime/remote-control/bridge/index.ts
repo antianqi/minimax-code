@@ -29,7 +29,7 @@ import type {
 
 export { DEFAULT_PAIRING_POLL_INTERVAL_MS } from "./pairing-session.js";
 
-/** Desktop 作为 producer 的固定类型标识（方案 §4.5.11：Desktop 明确为 desktop）。 */
+/** Electron 端作为 producer 的固定类型标识（方案 §4.5.11：Electron 端明确为 desktop）。 */
 export const DESKTOP_PRODUCER_TYPE = "desktop";
 
 /**
@@ -73,11 +73,12 @@ export interface RemoteControlProxyOpts {
   /**
    * Ask the renderer to re-sign the binding (main → renderer
    * `rc:refresh-binding`). Invoked when the WS needs a fresh one-shot ticket
-   * but the main process cannot sign `GET /desktop/bindings` itself. ipc.ts wires this
-   * to a broadcast over every BrowserWindow (self-heal design §4.2/§4.3).
+   * but the electron app's main process cannot sign `GET /desktop/bindings` itself.
+   * ipc.ts wires this to a broadcast over every BrowserWindow (self-heal design
+   * §4.2/§4.3).
    */
   requestRendererRefresh?: () => void;
-  /** Deliver phone-owned temporary composer choices to Desktop renderers. */
+  /** Deliver phone-owned temporary composer choices to the electron app's renderers. */
   onSessionComposerModeChange?: (change: RcSessionComposerModeChange) => void | Promise<void>;
   /**
    * In-process localRuntime entrypoint (handleLocalRuntimeRequest). When
@@ -92,7 +93,7 @@ export interface RemoteControlProxyOpts {
    * frontend Global Event catalog. Transport details must not cross this seam.
    */
   globalEventSource?: RcGlobalEventSource;
-  /** Desktop-fetched common_config value used by generic file content routes. */
+  /** common_config value fetched by the electron app, used by generic file content routes. */
   getRemoteControlFileContentMaxBytes?: () => number | undefined;
   /** §4-3 attachments download leg for cmd.session.send (attachment-fetch). */
   attachmentFetcher?: AttachmentFetcher;
@@ -194,7 +195,7 @@ export class RemoteControlProxy {
     };
   }
 
-  /** Broadcast a Desktop-owned temporary composer choice to the bound phone. */
+  /** Broadcast a temporary composer choice owned by this producer to the bound phone. */
   publishSessionComposerMode(change: RcSessionComposerModeChange): boolean {
     return this.dataPlane.publishSessionComposerMode(change);
   }
@@ -385,7 +386,7 @@ export class RemoteControlProxy {
 
   /**
    * The renderer's `GET /desktop/bindings` reported state=none — no consumer binding
-   * owns this desktop. This is the ONLY disconnect trigger in the self-heal
+   * owns this host. This is the ONLY disconnect trigger in the self-heal
    * design (§2): stop the WS, clear local binding, turn `unbound`. Every
    * other error keeps retrying forever.
    */

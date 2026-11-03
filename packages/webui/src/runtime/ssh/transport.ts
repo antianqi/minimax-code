@@ -1,8 +1,8 @@
 // The SSH transport: the system `ssh` binary, and nothing else.
 //
-// Desktop spawns `ssh` the same way (`ssh-runtime/ssh-process.js`), and this port keeps that: the
-// argument vector goes straight to `spawn`, the process owns its own group so it can be stopped
-// without touching anything else, and there is no npm SSH client anywhere in this path.
+// The argument vector goes straight to `spawn`, the process owns its own group so it can be
+// stopped without touching anything else, and there is no npm SSH client anywhere in this
+// path.
 //
 // Two surfaces:
 //

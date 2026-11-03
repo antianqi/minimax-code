@@ -4,8 +4,8 @@
 // business that fills it. Keeping the mapping here means the shell does not import either
 // business, and each business stays a published surface that can also be mounted on its own.
 //
-// The Desktop's page has exactly these two bodies. The SSH hosts are not one of them: the
-// Desktop keeps them in the connection settings, which the 远程控制 tab's 设置 entry opens.
+// The page has exactly these two bodies. The SSH hosts are not one of them: they
+// live in the connection settings, which the 远程控制 tab's 设置 entry opens.
 //
 // The owners arrive as props. This module is a view, and a view may not reach the composition
 // root for them: the shell that owns the page passes the owners it already holds.
@@ -18,7 +18,7 @@ import type { WebuiRemoteSnapshot } from "../application/remote-owner.js";
 export interface RemoteBodiesProps {
   readonly channelOwner: React.ComponentProps<typeof ChannelConnectPanel>["owner"];
   readonly remoteControlOwner: React.ComponentProps<typeof RemoteControlPanel>["owner"];
-  /** Opens the connection settings, the way the Desktop's 设置 entry does. */
+  /** Opens the connection settings, the way the 设置 entry does. */
   readonly onOpenSettings?: () => void;
 }
 

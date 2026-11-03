@@ -1,7 +1,7 @@
 /*
  * The 远程控制 tab's own layout.
  *
- * The Desktop draws this page inside an application window of a fixed height, so
+ * An application window has a fixed height, so
  * its vertical rhythm is a fixed set of steps: 32px around the column, 12px
  * under the title, 40px before the card and 40px between the card's parts, 32px
  * before the app-store marks. A browser window has no such height, and those
@@ -9,8 +9,8 @@
  * phone mockup beside it is cut through at both ends.
  *
  * So the rhythm is one step — `--webui-remote-control-space` — that every gap
- * on the page is a multiple of. At the Desktop's own height the step is its
- * measured 16px, so every gap is exactly the Desktop's value; below it the step
+ * on the page is a multiple of. At the application window's own height the step is the
+ * measured 16px, so every gap is exactly that value; below it the step
  * closes in, and the page keeps its shape and its content on one screen instead
  * of scrolling.
  *

@@ -5,7 +5,7 @@
  *   { desktop_device_id, binding_id?, bound_user_id? }
  *
  * - desktop_device_id: stable UUID v4, generated on first start and reused
- *   forever after (survives unbind — identifies this desktop install).
+ *   forever after (survives unbind — identifies this install).
  * - binding_id / bound_user_id: written when pairing completes, cleared on
  *   unbind. NEVER stores tickets or JWTs (plan §10 hard constraint).
  *

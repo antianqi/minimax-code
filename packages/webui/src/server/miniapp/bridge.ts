@@ -1,13 +1,11 @@
 // The page half of the Mini App bridge, served by the proxy.
 //
 // A Mini App page reaches its host through `window.mcode.miniapp.*`. On the
-// desktop client that namespace comes from an Electron preload; a browser tab
+// electron app that namespace comes from an Electron preload; a browser tab
 // cannot install one, so the proxy injects a script and this module is it. The
-// namespace mirrors the shipped preload's composer method
-// (`app/dist/main/modules/browser/miniapp-preload.js`): `message.append(text)`
-// resolves on a confirmed append and rejects with the failure code — the same
-// codes, because a page written against the desktop client must not see a
-// different vocabulary here.
+// namespace's composer method is `message.append(text)`: it resolves on a
+// confirmed append and rejects with the failure code — the same codes, because a
+// page written against the electron app must not see a different vocabulary here.
 //
 // The page half knows no identity. It cannot name a session or a plugin: the
 // host supplies both from the view it framed, so the most a page can ask for is
@@ -99,11 +97,11 @@ const SCRIPT = `(function () {
   // ---------------------------------------------------------------------
   // The agent block: window.mcode.miniapp.agent.
   //
-  // Same namespace as the shipped preload, so a page written against the
-  // desktop client finds every method here. What changes is the transport: a
-  // browser page cannot call a preload, so each call is one postMessage and the
-  // client that framed the page answers it. Identity never travels from here —
-  // the page names content and a correlation id, nothing else.
+  // The same namespace as the electron app's preload, so a page written against
+  // it finds every method here. What changes is the transport: a browser page
+  // cannot call a preload, so each call is one postMessage and the client that
+  // framed the page answers it. Identity never travels from here — the page
+  // names content and a correlation id, nothing else.
   //
   // cancel names a live request instead of dropping a promise: an abort signal
   // cannot cross postMessage, so the page asks the host to stop that request and

@@ -107,10 +107,10 @@
    * from are the same surface. The z-index sits above the settings shell's
    * own 100, because a dialog inside the settings modal must float above the
    * modal, not inside it. */
-  /* The share preview's card: the Desktop's own 10px halo in the theme's
+  /* The share preview's card: the 10px halo in the theme's
    * shadow token. */
   .webui-account-usage-share-card { box-shadow: 0 0 10px 0 var(--shadow_default); }
-  /* The calendar cell's tooltip. The Desktop draws it above the cell, in the
+  /* The calendar cell's tooltip. It is drawn above the cell, in the
    * shell's tooltip colours: the day in the assist type, the day's tokens
    * under it in the small type with tabular figures.
    *

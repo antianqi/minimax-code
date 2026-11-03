@@ -3,8 +3,7 @@
 // The WebUI owns what it serves. The lease comes from the one OAuth core the
 // WebUI's auth session owns (`runtime/auth-session.ts`), and the account
 // identity comes from the WebUI's own account identity request
-// (`runtime/usage-quota.ts`) — the same request the Desktop's account identity
-// source makes against `/v1/api/user/info`.
+// (`runtime/usage-quota.ts`) against `/v1/api/user/info`.
 //
 // It used to read the terminal client's private projection
 // (`<dataDir>/cli-auth/**`) as the credential of record: the access token, the

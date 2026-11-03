@@ -18,11 +18,11 @@ export interface WebuiSegmentedControlProps<Value extends string = string> {
   /**
    * The track's size recipe.
    *
-   * `default` is the compact strip. `page-header` is the strip the Desktop puts in a page
-   * header, measured on the live Desktop's `ant-segmented mavis-segmented-page-header`: a 30px
-   * track with 2px padding and 2px gaps, and 26px items at 14px/21px. The two recipes differ in
-   * geometry only — they share the same track fill and the same selected fill, which are the
-   * `--bg_grouped_primary` and `--bg_grouped_secondary` roles.
+   * `default` is the compact strip. `page-header` is the strip a page header puts in, measured
+   * on the live `ant-segmented mavis-segmented-page-header`: a 30px track with 2px padding and
+   * 2px gaps, and 26px items at 14px/21px. The two recipes differ in geometry only — they share
+   * the same track fill and the same selected fill, which are the `--bg_grouped_primary` and
+   * `--bg_grouped_secondary` roles.
    */
   readonly variant?: "default" | "page-header";
   readonly className?: string;

@@ -1,5 +1,5 @@
 /**
- * Remote Control Desktop bridge — shared types.
+ * Remote Control bridge — shared types.
  *
  * Contract sources (in priority order, see plan §12 / drift list):
  *   1. the remote_gateway_base IDL (WsEnvelope + ctrl payloads — wire authority)
@@ -14,10 +14,10 @@
  * through the generic executor instead. `path` is a concrete, complete
  * absolute path (including the API prefix like `/mavis/api` or
  * `/minimax-desktop/api/v1`, already URL-encoded, with any GET query
- * appended) produced by archon_biz — the desktop side does no template
- * filling and no base prefixing. Route allowlisting is the sole
- * responsibility of RGW Apollo (ops-controlled, hot-reload); the desktop
- * only enforces structural path-traversal guards.
+ * appended) produced by archon_biz — the producer side does no template filling
+ * and no base prefixing. Route allowlisting is the sole responsibility of RGW
+ * Apollo (ops-controlled, hot-reload); the producer only enforces structural
+ * path-traversal guards.
  */
 export interface WsRoute {
   kind: "http" | "http_stream";
@@ -25,8 +25,8 @@ export interface WsRoute {
   path: string;
   /**
    * Optional daemon-local headers stamped by the gateway from server-side
-   * policy, for example common_config-backed file size caps. The desktop
-   * router only forwards the small allowlist it understands.
+   * policy, for example common_config-backed file size caps. The router only
+   * forwards the small allowlist it understands.
    */
   headers?: Record<string, string | number | boolean>;
 }
@@ -77,7 +77,7 @@ export type RCPhase =
  * 新判据 = `user + producer identity + producer_generation`。
  */
 export interface RcProducerIdentity {
-  /** Desktop 端固定 'desktop'；预留给未来 cli 等 producer 类型（方案 §4.5.11）。 */
+  /** Electron 端固定 'desktop'；预留给未来 cli 等 producer 类型（方案 §4.5.11）。 */
   producer_type: string;
   /** 本机稳定 device id（= desktop_device_id），不随解绑重置。 */
   producer_device_id: string;
@@ -124,7 +124,7 @@ export interface RCStatus {
   request_epoch?: number;
   /** 当前连接身份中的 producer 代次，随状态推送给 renderer 便于对账。 */
   producer_generation?: number;
-  /** 当前连接身份中的 producer 类型（Desktop 固定 'desktop'）。 */
+  /** 当前连接身份中的 producer 类型（Electron 端固定 'desktop'）。 */
   producer_type?: string;
   /**
    * 存在未确认的 producer 全删解绑请求时携带其 request_id（方案 §4.5.4）。
@@ -157,7 +157,7 @@ export interface RcPersistedState {
    * 凭据推送能和重启前的代次比较 —— 否则每次冷启动都会被判成「代次变了」而重建连接。
    */
   producer_generation?: number;
-  /** producer 类型，Desktop 固定 'desktop'；持久化用于跨重启的身份比较。 */
+  /** producer 类型，Electron 端固定 'desktop'；持久化用于跨重启的身份比较。 */
   producer_type?: string;
   /**
    * 未确认的 producer 全删解绑（方案 §4.5.4 / ADR-011 D12：request_id 持久化放 main
@@ -247,7 +247,7 @@ export interface RcLogger {
  *
  * The host adapter owns Thrift transport, frame decoding, and admission
  * against the shared frontend catalog. The bridge intentionally accepts a
- * structural event here so it does not depend on desktop contract packages.
+ * structural event here so it does not depend on the contract packages.
  */
 export interface RcGlobalEvent {
   type: string;

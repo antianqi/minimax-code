@@ -187,7 +187,7 @@ export function createWebuiRemoteControlOwner(
         return { ok: false, message: WEBUI_REMOTE_CONTROL_UNAVAILABLE_TITLE };
       }
       try {
-        // The Desktop's 连接 button always re-arms the pairing flow, so a second phone can be
+        // The 连接 button always re-arms the pairing flow, so a second phone can be
         // paired without an unbind first.
         const result = await connect({ requestCode: true });
         if (result.phase === "error") {

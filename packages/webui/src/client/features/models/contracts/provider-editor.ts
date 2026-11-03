@@ -35,9 +35,9 @@ export interface ProviderHeaderDraft {
 }
 
 /**
- * The API formats the runtime accepts, in the order Desktop's form offers them.
+ * The API formats the runtime accepts, in the order the form offers them.
  *
- * A mirror of `MODEL_PROVIDER_APIS` in `local-runtime-v2`'s model-system
+ * The same list as `MODEL_PROVIDER_APIS` in `local-runtime-v2`'s model-system
  * identity module. The runtime validates the field on write and refuses an
  * unknown value, so the form offers exactly the values it will accept; a saved
  * provider carrying a format this build does not know keeps its value (the form
@@ -51,18 +51,17 @@ export const WEBUI_MODEL_PROVIDER_APIS = [
 ] as const;
 
 /**
- * The attachment modalities the form offers, in Desktop's own order.
+ * The attachment modalities the form offers, in the order the form lists them.
  *
  * `text` is deliberately absent: every model takes text, so the runtime adds it
- * back (Desktop does the same in its own normalization) and the user only picks
- * what is on top of text.
+ * back in its own normalization and the user only picks what is on top of text.
  */
 export const WEBUI_MODEL_ATTACHMENT_MODALITIES = ["image", "pdf", "video", "audio"] as const;
 
 /**
  * One editable model row.
  *
- * Desktop's form is a list of model cards, not one textarea of ids: every model
+ * The form is a list of model cards, not one textarea of ids: every model
  * carries its own context window, output budget, reasoning levels and supported
  * attachments, and the write sends one entry per card. The two limits stay as
  * typed text (the inputs are free-typed) and the levels as the list the user
@@ -71,7 +70,7 @@ export const WEBUI_MODEL_ATTACHMENT_MODALITIES = ["image", "pdf", "video", "audi
 export interface ProviderModelDraft {
   readonly id: string;
   readonly modelId: string;
-  /** The name the model is shown under; Desktop keeps the saved one and falls back to the id. */
+  /** The name the model is shown under; the saved one is kept and the id is the fallback. */
   readonly displayName: string;
   /** The context window, as typed. Digits only; empty means "the runtime decides". */
   readonly contextLimit: string;
@@ -190,8 +189,8 @@ export interface WebuiProviderEditor {
   readonly removeHeader: (id: string) => void;
   readonly setSkipConnectionTest: (skip: boolean) => void;
   /**
-   * Test every model row that carries an id, one call per row — the shape
-   * Desktop's form has when each card owns its own connectivity probe.
+   * Test every model row that carries an id, one call per row — one probe per
+   * card, each card owning its own connectivity probe.
    */
   readonly test: () => Promise<void>;
   /** Test one model row and report the answer on that row. */

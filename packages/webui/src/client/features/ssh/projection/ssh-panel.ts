@@ -6,7 +6,7 @@
 // Three honesty rules live here:
 //
 //   * **The two empty states stay apart.** "No host was found in `~/.ssh/config`" and "no host has
-//     been added and enabled yet" are different answers, and they are the two Desktop states
+//     been added and enabled yet" are different answers, and they are the two states
 //     `no_hosts` and `no_connections`. One of them asks for a config file, the other asks for a
 //     host in the settings.
 //   * **A host that could not be reached says so.** The status word is printed as it is; a host
@@ -22,7 +22,7 @@ import type {
   WebuiSshStatus,
 } from "../../../../shared/contracts/ssh.js";
 
-/** The config file holds no host. Desktop's `no_hosts`. */
+/** The config file holds no host. The `no_hosts` state. */
 export const WEBUI_SSH_NO_HOSTS_TEXT =
   "没有找到主机。请先在 ~/.ssh/config 中添加 SSH 主机。";
 /** There is no config file at all. */
@@ -93,7 +93,7 @@ export function webuiSshStatusLabel(status: WebuiSshStatus): string {
 /**
  * The status dot's colour.
  *
- * The Desktop's own rule, read off a live row: a host that is switched off, idle or still
+ * The rule, read off a live row: a host that is switched off, idle or still
  * connecting wears the neutral tertiary glyph, a host that answered wears the success glyph, and
  * anything else wears the error glyph. The dot is the row's only colour signal, so a host in
  * `probe_failed` must never look like a host that is up.
@@ -107,11 +107,11 @@ export function webuiSshStatusDotClass(status: WebuiSshStatus, enabled: boolean)
 }
 
 /*
- * The Desktop's copy for the connection page's SSH half.
+ * The copy for the connection page's SSH half.
  *
- * The wording is the Desktop's own (`ssh.connection.*` in its locale catalogue), so the two
- * clients say the same thing about the same host. The Desktop builds a few of these from a
- * template, so the templated ones are functions rather than constants.
+ * The wording is the locale catalogue's own (`ssh.connection.*`), so the two clients say the
+ * same thing about the same host. A few of these are built from a template, so the templated
+ * ones are functions rather than constants.
  */
 export const WEBUI_SSH_ADD = "添加";
 export const WEBUI_SSH_ADD_CONNECTION_TITLE = "添加 SSH 连接";
@@ -238,8 +238,7 @@ export interface WebuiSshEndpointValues {
  * the override it has. A field set back to the config's own value drops the override, so the host
  * follows the config again. Anything else is an override the person asked for.
  *
- * This is Desktop's own rule for a host named in the config file
- * (`ssh-runtime/connection-service.js`, `updatedEndpoint`): a value that is `null` in the
+ * This is the rule for a host named in the config file: a value that is `null` in the
  * update request means "no override".
  */
 export function webuiSshOverrideValue(
@@ -274,8 +273,7 @@ export function webuiSshOverridePort(
  *
  * An empty field means "no port". A field that cannot be read is refused rather than dropped:
  * a port that is silently ignored is a connection that lands on a different port than the one
- * the person named, and Desktop refuses the same value outright
- * (`ssh-runtime/connection-service.js`, `parseCreateInput`).
+ * the person named, and the same value is refused outright.
  */
 export function webuiSshPortInputError(typed: string): string | undefined {
   const text = typed.trim();

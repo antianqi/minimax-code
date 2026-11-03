@@ -1,8 +1,9 @@
 // The SSH runtime's own failure vocabulary.
 //
-// Desktop's codes are kept (`invalid_input`, `operation_in_progress`, `credential_unavailable`) and
-// the ones this port needs are added (`connection_not_found`, `project_not_found`,
-// `terminal_not_found`, `ssh_not_found`, `storage_unavailable`).
+// The vocabulary is `invalid_input`, `operation_in_progress` and
+// `credential_unavailable`, plus the ones this port needs (`connection_not_found`,
+// `project_not_found`, `terminal_not_found`, `ssh_not_found`,
+// `storage_unavailable`).
 //
 // The code is what reaches the browser as the operation's `error` field. It never carries the
 // password, a credential or a raw stderr dump: the detail that reaches the browser is a short,

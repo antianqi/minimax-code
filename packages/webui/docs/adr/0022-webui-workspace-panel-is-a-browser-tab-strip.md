@@ -85,7 +85,7 @@ two meanings in the same sentence.
 | A web tab's host — binds a tab to a target, shows the picture and the toolbar, forwards input | `BrowserPanelHost.public.tsx` | browser | bindings, published |
 | A web tab's content | `BrowserPanel.public.tsx` | browser | bindings, published |
 
-The two published browser components **keep their names**. A rename would break the Desktop fork's
+The two published browser components **keep their names**. A rename would break the upstream fork's
 imports and would show up as a conflict at the next source synchronisation, and the rule in this
 repository is to change content rather than layout. What they now *are* is recorded here and in
 the browser-use documents: a web tab's host and its content.

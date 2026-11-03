@@ -86,7 +86,7 @@ logic against a shared harness-event corpus. ADR 0019 records the accepted Brows
 the decisions and remaining design questions for Browser Use. ADR 0022 records the workspace panel as
 a browser tab strip and the two selections it separates, and amends ADR 0019 with **A8**; between
 them they are the decision record for that feature. ADR 0020 records the accepted Mini App view, the runtime seams it needs, the
-desktop capabilities it deliberately drops, and the contract-baseline question it leaves open; it
+native-window capabilities it deliberately drops, and the contract-baseline question it leaves open; it
 is the sole decision record for Mini App hosting. ADR 0021 records the model picker as one popup
 with two states, and the cascade it replaces. ADR 0024 records the client-side workspace boundary
 for a diff body: a diff entry outside the workspace keeps its name and its counts and loses its
@@ -99,9 +99,9 @@ composer's keyboard bindings as the settings page stores them: one canonical not
 settings page owns the change, the composer reads the stored binding when a key is pressed, and only
 the actions that already have keyboard meaning are bindable. ADR 0027 records the WebUI's
 scheduled-task surface: the WebUI is a scheduler host. It reaches the v2 runtime's Cron
-service, arms the persisted scheduled tasks and fires them, and when the Desktop runs at the
-same time the shared database decides which host acts on a given slot — the Desktop needs no
-change. [ADR 0028](adr/0028-the-webui-has-one-shared-presentation-layer.md) establishes the
+service, arms the persisted scheduled tasks and fires them, and when the electron app runs at
+the same time the shared database decides which host acts on a given slot — the electron app
+needs no change. [ADR 0028](adr/0028-the-webui-has-one-shared-presentation-layer.md) establishes the
 shared presentation layer and its motion foundations; [ADR 0029](adr/0029-page-surfaces-share-layout-skeleton-and-motion-contracts.md)
 defines the page, skeleton and shared motion contracts for route pages, dialogs, drawers and
 repeated semantic elements. A new decision takes the next free number.

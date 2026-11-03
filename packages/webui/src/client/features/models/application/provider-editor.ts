@@ -61,15 +61,14 @@ const EMPTY_DRAFT = {
  *
  * The runtime refuses a limit that is not a positive safe integer
  * (`normalizeModelLimit`), so a half-typed number never reaches the wire: an
- * unparsable field means "leave the limit to the runtime", exactly as Desktop's
- * own `n8` does.
+ * unparsable field means "leave the limit to the runtime".
  */
 function positiveInteger(value: string): number | undefined {
   const parsed = Number(value.trim());
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-/** Trimmed, non-empty, without duplicates — Desktop's `n4`. */
+/** Trimmed, non-empty, without duplicates. */
 function trimmedUnique(values: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -83,9 +82,9 @@ function trimmedUnique(values: readonly string[]): string[] {
 }
 
 /**
- * A blank row, with the limits Desktop's form starts a new model with.
+ * A blank row, with the limits a new model starts with.
  *
- * Desktop seeds a new model with a 256k context window and a 64k output budget
+ * A new model is seeded with a 256k context window and a 64k output budget
  * so the user sees a number to correct rather than an empty field.
  */
 function blankModelDraft(id: string): ProviderModelDraft {
@@ -107,7 +106,7 @@ function blankModelDraft(id: string): ProviderModelDraft {
  * The limits, the reasoning levels and the attachments come from what that
  * model was stored with, so an edit round-trips them instead of dropping them.
  * A model that was stored without a limit starts with an **empty** field rather
- * than Desktop's default number: writing a limit the user never chose would
+ * than the default number: writing a limit the user never chose would
  * narrow a model that the runtime had left open.
  */
 function modelDraftFromEntry(
@@ -249,7 +248,7 @@ export function createWebuiProviderEditor(
   /**
    * One model row as the write carries it.
    *
-   * Desktop's own `n3`: the id is required, the name falls back to it, the two
+   * The rules: the id is required, the name falls back to it, the two
    * limits ride along only when they are real positive numbers, the reasoning
    * levels are trimmed and deduplicated, and the attachments are declared with
    * the implicit `text`. `enabled` is deliberately **not** sent — the runtime
@@ -511,8 +510,8 @@ export function createWebuiProviderEditor(
     test: async () => {
       const rows = models.filter((row) => row.modelId.trim().length > 0);
       if (!rows.length) return;
-      // Every row that carries an id is probed, one call per row — the shape
-      // Desktop's form has when each card owns its own connectivity probe.
+      // Every row that carries an id is probed, one call per row, so each card
+      // owns its own connectivity probe.
       for (const row of rows) {
         await probeModel(row.id);
       }
@@ -531,7 +530,7 @@ export function createWebuiProviderEditor(
       }
       // The runtime's two branches: a saved provider is asked with its identity
       // and revision, a new one with the endpoint, the name and the key it would
-      // be created with. Desktop offers discovery in both.
+      // be created with. Discovery is offered in both.
       const savedProviderId = editingProviderId;
       const savedRevision = configRevision;
       const saved = savedProviderId !== undefined && savedRevision !== undefined;

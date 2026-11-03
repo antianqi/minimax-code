@@ -1,4 +1,4 @@
-/* Shared modal contract: the Desktop MCP frame with an independently
+/* Shared modal contract: the MCP frame with an independently
  * scrollable body and a footer that remains available at constrained heights. */
 @layer components {
   .webui-dialog-mask {
@@ -34,7 +34,7 @@
     border-radius: var(--radius_16);
     background: var(--bg_grouped_secondary);
     color: var(--text_default_primary);
-    /* The Desktop 3.1.3 MCP editor's own computed shadow, read from the running
+    /* The 3.1.3 MCP editor's own computed shadow, read from the running
      * app: three layers rather than one. */
     box-shadow:
       0 6px 16px 0 rgb(0 0 0 / 8%),
@@ -62,7 +62,7 @@
   .webui-dialog-heading h2 {
     margin: 0;
     color: var(--text_default_primary);
-    /* Measured on the Desktop MCP editor at 3.1.3: 20px / 28px / 600. */
+    /* Measured on the MCP editor at 3.1.3: 20px / 28px / 600. */
     font-size: 20px;
     font-weight: 600;
     line-height: 28px;
@@ -77,7 +77,7 @@
   /* The close control is the shell's chrome, sized by the shell: the icon
    * button's base geometry is 26px and its stylesheet is imported after this
    * one, so the shell scopes the rule to its own surface rather than relying on
-   * import order. Desktop measures 32×32 at inset 18px. */
+   * import order. The close control measures 32×32 at inset 18px. */
   .webui-dialog-header > .webui-dialog-close {
     position: absolute;
     top: 18px;
@@ -122,10 +122,10 @@
     padding: var(--spacing_16) var(--spacing_24) var(--spacing_20);
   }
 
-  /* The footer's action geometry is the Desktop MCP editor's, measured at
-   * 3.1.3: 37px tall, 8px radius, 24px side padding, a 14px label on a 21px
-   * line. The width follows the label instead of a minimum, which is how the
-   * Desktop `取消` lands on 76px and `添加服务器` on 118px. */
+  /* The footer's action geometry, measured at 3.1.3: 37px tall, 8px radius,
+   * 24px side padding, a 14px label on a 21px line. The width follows the label
+   * instead of a minimum, which is how `取消` lands on 76px and `添加服务器` on
+   * 118px. */
   .webui-dialog-actions > .webui-mavis-button,
   .webui-dialog-footer > .webui-mavis-button,
   /* A surface may wrap its actions in a row of its own (the memory manager's
@@ -142,10 +142,10 @@
   .webui-dialog-footer:empty { display: none; }
   .webui-dialog-actions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--spacing_8); }
 
-  /* The modal baseline's field density, measured on the Desktop 3.1.3 MCP
-   * editor: a 36px control with an 8px radius and a 14px label on a 21px line in
-   * the secondary text colour. The field contract's own scale stays as it is for
-   * page-level forms; inside a modal the density is the reference's. */
+  /* The modal baseline's field density, measured on the 3.1.3 MCP editor: a 36px
+   * control with an 8px radius and a 14px label on a 21px line in the secondary
+   * text colour. The field contract's own scale stays as it is for page-level
+   * forms; inside a modal the density is the modal baseline's. */
   .webui-dialog-surface .webui-control {
     font-size: var(--size_14);
   }
@@ -170,9 +170,8 @@
     line-height: 21px;
   }
 
-  /* A narrow viewport keeps the same frame rules the Desktop reference states:
-   * the surface stays inside `100vw - 32px` and `85vh`, and only the inner
-   * padding steps down. */
+  /* A narrow viewport keeps the same frame rules: the surface stays inside
+   * `100vw - 32px` and `85vh`, and only the inner padding steps down. */
   @media (max-width: 560px) {
     .webui-dialog-header { padding-inline: var(--spacing_16) 56px; }
     .webui-dialog-body { padding: var(--spacing_16); }

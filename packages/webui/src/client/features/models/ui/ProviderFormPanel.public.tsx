@@ -54,7 +54,7 @@ import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import { WebuiMotion } from "../../../ui/page.js";
-/** The attachment modalities, in Desktop's own words. */
+/** The attachment modalities, in the form's own words. */
 const ATTACHMENT_LABELS: Readonly<
   Record<(typeof WEBUI_MODEL_ATTACHMENT_MODALITIES)[number], string>
 > = {
@@ -127,7 +127,7 @@ function providerModels(provider?: WebuiModelProviderView): readonly WebuiModelP
 /**
  * The provider picker.
  *
- * Desktop's own shape: one field that is both the selection and the search —
+ * The picker's shape: one field that is both the selection and the search —
  * it shows the chosen provider, and typing in it filters the list. The suffix
  * icon says which of the two it is doing (a magnifier while the list is open,
  * a chevron while it is closed), and `其他` is pinned to the bottom of the list
@@ -383,8 +383,8 @@ export function ProviderFormPanel({
  * One model card: the model name, the limits, the reasoning levels and the
  * attachments it takes.
  *
- * Desktop's own card, transcribed: a header carrying the model's number and its
- * own connectivity probe, and a bordered body holding one field per row.
+ * The card: a header carrying the model's number and its own connectivity probe,
+ * and a bordered body holding one field per row.
  */
 function ProviderModelCard({ model, index, busy, onChange, onTest, onRemove }: { readonly model: ProviderModelDraft; readonly index: number; readonly busy: boolean; readonly onChange: (patch: ProviderModelPatch) => void; readonly onTest: () => void; readonly onRemove: () => void }): ReactElement {
   return <WebuiStack gap="small" className="webui-provider-form-model">
@@ -419,8 +419,8 @@ function ProviderModelCard({ model, index, busy, onChange, onTest, onRemove }: {
 }
 
 /**
- * The reasoning levels of one model, as Desktop's tag input: a level is
- * committed with Enter and appears as a chip that can be taken away again.
+ * The reasoning levels of one model, as a tag input: a level is committed with
+ * Enter and appears as a chip that can be taken away again.
  */
 function EffortOptionsField({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: readonly string[]) => void }): ReactElement {
   const [text, setText] = useState("");
@@ -439,7 +439,7 @@ function EffortOptionsField({ value, onChange }: { readonly value: readonly stri
   </div>;
 }
 
-/** The attachment modalities one model takes, as Desktop's multiple selection. */
+/** The attachment modalities one model takes, as a multiple selection. */
 function AttachmentField({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: readonly string[]) => void }): ReactElement {
   return <div className="webui-provider-form-attachments">
     {WEBUI_MODEL_ATTACHMENT_MODALITIES.map((modality) => <WebuiInline as="label" key={modality} className="webui-provider-form-attachment"><WebuiCheckbox checked={value.includes(modality)} onChange={(event) => onChange(event.target.checked ? [...value, modality] : value.filter((item) => item !== modality))} />{ATTACHMENT_LABELS[modality]}</WebuiInline>)}

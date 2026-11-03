@@ -1,8 +1,8 @@
-// The Desktop's 「查看连接详情」 dialog.
+// The 「查看连接详情」 dialog.
 //
-// The Desktop opens a host's details from the host's name, and the dialog is where the host's
+// A host's details open from the host's name, and the dialog is where the host's
 // own facts are shown: what it is called, where it lives, what state it is in. It is read-only
-// apart from the two commands the Desktop offers there, and this client offers the same two.
+// apart from the two commands the dialog offers.
 import type { ReactElement } from "react";
 
 import type { WebuiSshConnection } from "../../../../shared/contracts/ssh.js";

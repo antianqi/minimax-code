@@ -18,7 +18,7 @@
 // access.
 //
 // Validators are the shared contract's readers, not a second copy of them:
-// `@mavis/shared/miniapp-surface` is what the desktop preload and its Main process
+// `@mavis/shared/miniapp-surface` is what the electron app's preload and its Main process
 // already validate against, so a page that validates there validates here.
 import type {
   WebuiMiniAppAgentCallRequest,

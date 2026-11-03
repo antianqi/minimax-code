@@ -13,19 +13,25 @@
 // to the browser suite.
 
 import { readFileSync } from "node:fs";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createWebuiToastEntry,
   reduceWebuiToasts,
   webuiToastDurationMs,
   webuiToastIdentity,
+  WEBUI_TOAST_DURATION_MS,
   WEBUI_TOAST_MAX_VISIBLE,
   type WebuiToastState,
 } from "../../src/client/ui/toast-store.js";
-import { WebuiToast, WEBUI_TOAST_EXIT_MS } from "../../src/client/ui/toast.js";
+import {
+  useWebuiToast,
+  WebuiToast,
+  WEBUI_TOAST_EXIT_MS,
+  type WebuiToastController,
+} from "../../src/client/ui/toast.js";
 
 const clientRoot = new URL("../../src/client/", import.meta.url);
 const toastCss = readFileSync(new URL("styles/toast.css", clientRoot), "utf8");
@@ -64,6 +70,18 @@ describe("how long a notice lives", () => {
   it("a notice without one is given the time its tone is worth", () => {
     expect(webuiToastDurationMs("success", false)).toBe(3000);
     expect(webuiToastDurationMs("error", false)).toBe(6000);
+    expect(webuiToastDurationMs("info", false)).toBe(4000);
+    expect(webuiToastDurationMs("warning", false)).toBe(5000);
+  });
+
+  it("the family's lifetimes are the ones ADR 0030 records", () => {
+    // The numbers are the family's, not a caller's, and ADR 0030 states them.
+    expect(WEBUI_TOAST_DURATION_MS).toEqual({
+      info: 4000,
+      success: 3000,
+      warning: 5000,
+      error: 6000,
+    });
   });
 
   it("the caller may say otherwise", () => {
@@ -179,5 +197,30 @@ describe("a notice takes no room from the page", () => {
     // The card is unmounted when the animation that fades it out has finished,
     // so the two numbers have to be the same one.
     expect(WEBUI_TOAST_EXIT_MS).toBe(120);
+  });
+});
+
+describe("a surface rendered on its own", () => {
+  it("says its notice anyway, and tells the client once that there was nowhere to draw it", () => {
+    let controller: WebuiToastController | undefined;
+    const Probe = (): ReactElement | null => {
+      controller = useWebuiToast();
+      return null;
+    };
+    // No queue is mounted here, and that must not be the reason the surface
+    // fails to render: a server render of one surface is a normal thing to do.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(() => render(createElement(Probe))).not.toThrow();
+      expect(controller?.show({ tone: "error", message: "读取失败" })).toBeTruthy();
+      // The client is told once, not once per notice: the mistake is one, and
+      // every notice after it would only say the same thing again.
+      controller?.success("已保存");
+      controller?.info("提示");
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("toast");
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

@@ -35,6 +35,8 @@ export function compareMotion(
   inventory: MotionInventory,
 ): string[];
 export function sourceMotionOwnershipProblems(file: string, text: string): string[];
+export function sharedFeedbackControlProblems(file: string, text: string): string[];
+export function disabledTransitionOwnershipProblems(file: string, text: string): string[];
 export function featureRotationOwnershipProblems(file: string, text: string): string[];
 export function featureSmoothScrollOwnershipProblems(file: string, text: string): string[];
 export function featureInteractionTransformOwnershipProblems(file: string, text: string): string[];

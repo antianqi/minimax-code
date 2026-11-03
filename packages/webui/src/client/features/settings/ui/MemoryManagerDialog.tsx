@@ -471,7 +471,7 @@ export function MemoryManagerDialog({
         </>
       }
     >
-      <></>
+      {null}
     </WebuiDialog>
   );
   return <>{dialog}{confirm}</>;

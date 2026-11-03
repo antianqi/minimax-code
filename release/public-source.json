@@ -4560,6 +4560,7 @@
     "packages/webui/test/browser/connection-status.spec.mjs",
     "packages/webui/test/browser/content-page.spec.mjs",
     "packages/webui/test/browser/context-usage-ring.spec.mjs",
+    "packages/webui/test/browser/dropdown-dismissal.spec.mjs",
     "packages/webui/test/browser/feedback.spec.mjs",
     "packages/webui/test/browser/field-contract.spec.mjs",
     "packages/webui/test/browser/fixture.mjs",

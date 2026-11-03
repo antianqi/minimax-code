@@ -2,7 +2,7 @@
 // dismissal policy and commands; this module owns the common modal geometry.
 
 import { IconX } from "@tabler/icons-react";
-import { createContext, useContext, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useDialogLayer } from "./overlay-listeners.js";
@@ -10,6 +10,9 @@ import { ManagedOverlayBoundary } from "./overlay-listeners.js";
 import { useOverlayCoordinator } from "./overlay-coordinator.js";
 import { WebuiIconButton } from "./button.js";
 import { WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
+
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export type WebuiDialogWidth = "compact" | "standard" | "wide";
 
@@ -39,6 +42,24 @@ export interface WebuiDialogProps {
   readonly showClose?: boolean;
   readonly initialFocusRef?: { readonly current: HTMLElement | null };
   readonly dialogRef?: (element: HTMLElement | null) => void;
+}
+
+interface DialogPresentationSnapshot {
+  readonly loading: boolean;
+  readonly title: ReactNode;
+  readonly description: ReactNode | undefined;
+  readonly headerActions: ReactNode;
+  readonly children: ReactNode;
+  readonly footer: ReactNode;
+  readonly bodyClassName: string | undefined;
+  readonly footerClassName: string | undefined;
+  readonly width: WebuiDialogWidth;
+  readonly testId: string | undefined;
+  readonly dataAttributes: Readonly<Record<string, string>> | undefined;
+  readonly role: "dialog" | "alertdialog";
+  readonly showClose: boolean;
+  readonly closeLabel: string;
+  readonly closeTestId: string | undefined;
 }
 
 const DialogFooterContext = createContext<HTMLElement | null>(null);
@@ -85,7 +106,30 @@ export function WebuiDialog({
   const generatedId = useId();
   const id = requestedId ?? `webui-dialog-${generatedId}`;
   const titleId = `${id}-title`;
-  const descriptionId = description === undefined ? undefined : `${id}-description`;
+  const currentPresentation: DialogPresentationSnapshot = {
+    loading,
+    title,
+    description,
+    headerActions,
+    children,
+    footer,
+    bodyClassName,
+    footerClassName,
+    width,
+    testId,
+    dataAttributes,
+    role,
+    showClose,
+    closeLabel,
+    closeTestId,
+  };
+  const presentationRef = useRef(currentPresentation);
+  useIsomorphicLayoutEffect(() => {
+    if (open) presentationRef.current = currentPresentation;
+  });
+  const presentation = open ? currentPresentation : presentationRef.current;
+  const descriptionId = presentation.description === undefined ? undefined : `${id}-description`;
+  const hasBody = presentation.children !== null && presentation.children !== undefined && presentation.children !== false;
   const surfaceRef = useRef<HTMLElement | null>(null);
   const maskRef = useRef<HTMLDivElement | null>(null);
   const { dom } = useWebuiBrowserCapabilities();
@@ -142,7 +186,7 @@ export function WebuiDialog({
   if (!present || !portalTarget) return null;
 
   const finishExit = (event: React.AnimationEvent<HTMLDivElement>) => {
-    if (event.currentTarget !== event.target || motionState !== "exit") return;
+    if (event.currentTarget !== event.target || motionState !== "exit" || open) return;
     setPresent(false);
     onExitComplete?.();
   };
@@ -162,7 +206,7 @@ export function WebuiDialog({
         as="section"
         kind="dialog"
         motion={{ kind: "surface", state: motionState, direction: "up" }}
-        loading={loading}
+        loading={presentation.loading}
         ref={(element) => {
           surfaceRef.current = element;
           element?.toggleAttribute("inert", !open);
@@ -170,10 +214,11 @@ export function WebuiDialog({
         }}
         data-webui-dialog-shell="true"
         data-overlay-layer={layerId}
-        data-testid={testId}
-        {...(dataAttributes ?? {})}
-        className={`webui-dialog-surface webui-dialog-surface--${width}`}
-        role={role}
+        data-testid={presentation.testId}
+        {...(presentation.dataAttributes ?? {})}
+        data-webui-dialog-has-body={hasBody ? "true" : "false"}
+        className={`webui-dialog-surface webui-dialog-surface--${presentation.width}`}
+        role={presentation.role}
         aria-modal="true"
         aria-hidden={!open || undefined}
         aria-labelledby={titleId}
@@ -183,14 +228,14 @@ export function WebuiDialog({
         <ManagedOverlayBoundary layerId={layerId}>
         <header className="webui-dialog-header">
           <div className="webui-dialog-heading">
-            <h2 id={titleId}><WebuiSkeletonProjection>{title}</WebuiSkeletonProjection></h2>
-            {descriptionId ? <p id={descriptionId}><WebuiSkeletonProjection>{description}</WebuiSkeletonProjection></p> : null}
+            <h2 id={titleId}><WebuiSkeletonProjection>{presentation.title}</WebuiSkeletonProjection></h2>
+            {descriptionId ? <p id={descriptionId}><WebuiSkeletonProjection>{presentation.description}</WebuiSkeletonProjection></p> : null}
           </div>
-          <WebuiSkeletonProjection>{headerActions}</WebuiSkeletonProjection>
-          {showClose ? (
+          <WebuiSkeletonProjection>{presentation.headerActions}</WebuiSkeletonProjection>
+          {presentation.showClose ? (
             <WebuiIconButton
-              label={closeLabel}
-              data-testid={closeTestId}
+              label={presentation.closeLabel}
+              data-testid={presentation.closeTestId}
               className="webui-dialog-close"
               onClick={onClose}
             >
@@ -199,12 +244,12 @@ export function WebuiDialog({
           ) : null}
         </header>
         <DialogFooterContext.Provider value={footerTarget}>
-          <div className={`webui-dialog-body${bodyClassName ? ` ${bodyClassName}` : ""}`}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
+          {hasBody ? <div className={`webui-dialog-body${presentation.bodyClassName ? ` ${presentation.bodyClassName}` : ""}`}><WebuiSkeletonProjection>{presentation.children}</WebuiSkeletonProjection></div> : null}
           <footer
             ref={setFooterTarget}
-            className={`webui-dialog-footer${footerClassName ? ` ${footerClassName}` : ""}`}
+            className={`webui-dialog-footer${presentation.footerClassName ? ` ${presentation.footerClassName}` : ""}`}
           >
-            <WebuiSkeletonProjection>{footer}</WebuiSkeletonProjection>
+            <WebuiSkeletonProjection>{presentation.footer}</WebuiSkeletonProjection>
           </footer>
         </DialogFooterContext.Provider>
         </ManagedOverlayBoundary>

@@ -27,7 +27,9 @@
 // three things either way.
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -286,6 +288,32 @@ export interface WebuiDropdownProps {
 }
 
 /**
+ * The region a control owns around its trigger.
+ *
+ * A dropdown's trigger is part of the dropdown's own layer, so a press on the
+ * trigger is the layer's business and not a dismissal: the trigger's own
+ * activation opens and closes the popup.
+ *
+ * A `<label for>` above the trigger is part of the trigger too — clicking it
+ * focuses the control and fires a click on it. So the label has to be part of
+ * the layer as well. When it is not, a press on the label is read as a press
+ * outside: the popup is dismissed on `pointerdown`, and the click the label
+ * forwards to the trigger then finds the popup closed and opens it again. The
+ * popup that cannot be closed.
+ *
+ * The field owns the label and the control, so the field provides the region
+ * and the control claims it: the claim names the layer the label belongs to,
+ * and the field marks the label with it.
+ */
+export interface WebuiTriggerRegion {
+  /** The layer the region belongs to. */
+  readonly claim: (layerId: string) => void;
+}
+
+/** The region the control in a field's control slot may claim. */
+export const WebuiTriggerRegionContext = createContext<WebuiTriggerRegion | null>(null);
+
+/**
  * The dropdown.
  *
  * Dismissal is uniform across the client: a pointer press outside the trigger
@@ -293,6 +321,10 @@ export interface WebuiDropdownProps {
  * `pointerdown` rather than at `click`, so the popup is gone before the click
  * reaches whatever the user aimed at — a click that lands on another control
  * must not also hit a popup that was on its way out.
+ *
+ * The trigger is not "outside": it and the popup are one layer, so a press on
+ * the trigger is the layer's own business and the trigger's activation decides
+ * whether the popup opens or closes.
  */
 export function WebuiDropdown({
   open,
@@ -403,6 +435,16 @@ export function WebuiDropdown({
       triggerRef.current?.focus?.();
     },
   }, { enabled: managed });
+
+  // The trigger's region: the field's label, when the dropdown is the control
+  // of a field, belongs to this layer. The claim is made once per layer, and
+  // the field marks its label with the id it is given.
+  const triggerRegion = useContext(WebuiTriggerRegionContext);
+  const hasTrigger = trigger !== undefined;
+  useEffect(() => {
+    if (!managed || !hasTrigger) return;
+    triggerRegion?.claim(layerId);
+  }, [hasTrigger, layerId, managed, triggerRegion]);
 
   // The compatibility path is gone (ADR 0028 § Overlay coordination, #290): every
   // popup answers through the coordinator, which owns the single document
@@ -559,6 +601,7 @@ export function WebuiDropdown({
       className={`webui-dropdown${trigger ? "" : " webui-dropdown--detached"}${wrapperClassName ? ` ${wrapperClassName}` : ""}`}
       ref={wrapperRef}
       data-webui-dropdown={open ? "open" : "closed"}
+      {...(managed && hasTrigger ? { "data-overlay-layer": layerId } : {})}
       {...(testId === undefined ? {} : { "data-testid": testId })}
     >
       {trigger ? trigger(triggerProps) : null}

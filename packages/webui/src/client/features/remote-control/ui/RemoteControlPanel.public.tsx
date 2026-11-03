@@ -42,8 +42,8 @@
 // `RemoteControlPanelView` is a pure render of a snapshot: it takes the model and the callbacks
 // and nothing else, so a test can assert the page's wording with `renderToStaticMarkup` (this
 // package has no jsdom). `RemoteControlPanel` is the thin wrapper that subscribes to the owner
-// with `useSyncExternalStore` and hands the view a snapshot. The pairing code is a modal, so it
-// lives in the wrapper: a portal is not something a static markup render can carry.
+// with `useSyncExternalStore` and hands the view a snapshot. The pairing code is hosted beside
+// the application shell so both this panel and connection settings can start pairing.
 import { Fragment, useEffect, useState, useSyncExternalStore, type ReactElement } from "react";
 import { IconBrandAndroid, IconBrandApple } from "@tabler/icons-react";
 
@@ -244,12 +244,6 @@ export function RemoteControlPanel(props: RemoteControlPanelProps): ReactElement
   const { owner } = props;
   const snapshot = useSyncExternalStore(owner.subscribe, owner.getSnapshot, owner.getSnapshot);
   const [busy, setBusy] = useState(false);
-  const model = webuiRemoteControlPanelModel(snapshot, Date.now());
-  const { dom } = useWebuiBrowserCapabilities();
-  const portalTarget = dom.portalTarget();
-  // The countdown is the one thing on this page that moves without the host saying anything, so
-  // the clock ticks only while a code is actually on screen.
-  const nowMs = useTickingNow(model.pairingCode !== undefined);
 
   useEffect(() => {
     void owner.load();
@@ -263,74 +257,95 @@ export function RemoteControlPanel(props: RemoteControlPanelProps): ReactElement
     });
   };
 
-  const showPairingCode = model.phase === "pairing" && model.pairingCode !== undefined;
-
   return (
-    <>
-      <RemoteControlPanelView
-        snapshot={snapshot}
-        nowMs={nowMs}
-        busy={busy}
-        onConnect={() => {
-          run(() => owner.connect());
-        }}
-        {...(props.onOpenSettings === undefined ? {} : { onOpenSettings: props.onOpenSettings })}
-      />
-      {showPairingCode && portalTarget ? (
-        <WebuiDialog
-          id="remote-control-pairing"
-          open
-          title="配对码"
-          description="在 MiniMax App 的侧边栏中打开 MiniMax Code，输入配对码。"
-          width="standard"
-          portalTarget={portalTarget}
-          testId="rc-pairing-dialog"
-          onClose={() => {
-            run(() => owner.disconnect());
-          }}
-          footer={
-            <>
-              <WebuiButton
-                variant="secondary"
-                size="regular"
-                data-testid="rc-pairing-cancel"
-                onClick={() => {
-                  run(() => owner.disconnect());
-                }}
-              >
-                取消
-              </WebuiButton>
-              <WebuiButton
-                variant="primary"
-                size="regular"
-                data-testid="rc-pairing-refresh"
-                disabled={busy}
-                onClick={() => {
-                  run(() => owner.connect());
-                }}
-              >
-                重新获取
-              </WebuiButton>
-            </>
-          }
-        >
-          <div className="mb-6 px-5 md:px-0">
-            <span
-              data-testid="rc-pairing-code"
-              className={`font-mono text-[26px] font-semibold tracking-tight leading-[1.23] ${
-                model.pairingExpired ? "text-text_default_tertiary" : "text-text_default_primary"
-              }`}
-            >
-              {model.pairingCode ?? "----"}
-            </span>
-            {model.pairingExpired ? (
-              <p className="mt-2.5 text-sm leading-5 text-text_status_error">配对码已过期，请重新获取</p>
-            ) : null}
-          </div>
-        </WebuiDialog>
-      ) : null}
-    </>
+    <RemoteControlPanelView
+      snapshot={snapshot}
+      nowMs={Date.now()}
+      busy={busy}
+      onConnect={() => {
+        run(() => owner.connect());
+      }}
+      {...(props.onOpenSettings === undefined ? {} : { onOpenSettings: props.onOpenSettings })}
+    />
   );
+}
+
+/** One dialog host serves pairing requests from both the remote page and connection settings. */
+export function RemoteControlPairingDialogHost(props: {
+  readonly owner: ReturnType<typeof createWebuiRemoteControlOwner>;
+}): ReactElement | null {
+  const { owner } = props;
+  const snapshot = useSyncExternalStore(owner.subscribe, owner.getSnapshot, owner.getSnapshot);
+  const [busy, setBusy] = useState(false);
+  const { dom } = useWebuiBrowserCapabilities();
+  const portalTarget = dom.portalTarget();
+  const model = webuiRemoteControlPanelModel(snapshot, Date.now());
+  // The expiry changes without a host event; keep the dialog's code state current once active.
+  const nowMs = useTickingNow(model.pairingCode !== undefined);
+  const dialogModel = webuiRemoteControlPanelModel(snapshot, nowMs);
+  const showPairingCode = dialogModel.phase === "pairing" && dialogModel.pairingCode !== undefined;
+
+  const run = (action: () => Promise<unknown>): void => {
+    setBusy(true);
+    void action().finally(() => {
+      setBusy(false);
+    });
+  };
+
+  return showPairingCode && portalTarget ? (
+    <WebuiDialog
+      id="remote-control-pairing"
+      parentLayerId="settings-modal"
+      open
+      title="配对码"
+      description="在 MiniMax App 的侧边栏中打开 MiniMax Code，输入配对码。"
+      width="standard"
+      portalTarget={portalTarget}
+      testId="rc-pairing-dialog"
+      onClose={() => {
+        run(() => owner.disconnect());
+      }}
+      footer={
+        <>
+          <WebuiButton
+            variant="secondary"
+            size="regular"
+            data-testid="rc-pairing-cancel"
+            onClick={() => {
+              run(() => owner.disconnect());
+            }}
+          >
+            取消
+          </WebuiButton>
+          <WebuiButton
+            variant="primary"
+            size="regular"
+            data-testid="rc-pairing-refresh"
+            disabled={busy}
+            onClick={() => {
+              run(() => owner.connect());
+            }}
+          >
+            重新获取
+          </WebuiButton>
+        </>
+      }
+    >
+      <div className="mb-6 px-5 md:px-0">
+        <span
+          data-testid="rc-pairing-code"
+          className={`font-mono text-[26px] font-semibold tracking-tight leading-[1.23] ${
+            dialogModel.pairingExpired ? "text-text_default_tertiary" : "text-text_default_primary"
+          }`}
+        >
+          {dialogModel.pairingCode ?? "----"}
+        </span>
+        {dialogModel.pairingExpired ? (
+          <p className="mt-2.5 text-sm leading-5 text-text_status_error">配对码已过期，请重新获取</p>
+        ) : null}
+      </div>
+    </WebuiDialog>
+  ) : null;
 }
 
 /** A clock that ticks while `active`, and stands still otherwise. */

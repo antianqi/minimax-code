@@ -14,6 +14,7 @@
 import {
   forwardRef,
   useCallback,
+  useMemo,
   useState,
   useId,
   type InputHTMLAttributes,
@@ -23,7 +24,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { WebuiDropdown } from "./Dropdown.js";
+import { WebuiDropdown, WebuiTriggerRegionContext } from "./Dropdown.js";
 import { useWebuiPageLoading, WebuiSkeleton, WebuiSkeletonProjection } from "./page.js";
 
 /** The shared single-line text control. Appearance belongs to the field family. */
@@ -351,12 +352,24 @@ export function WebuiField({
   const errorId = error ? `${base}-error` : undefined;
   const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
 
+  /**
+   * The region the control may claim.
+   *
+   * A dropdown that is this field's control owns the label as well: the label
+   * names the trigger, and a press on it has to reach the trigger rather than
+   * dismiss the popup the trigger opened. The control claims the region and
+   * the field marks the label with the layer the control registered under.
+   */
+  const [regionLayerId, setRegionLayerId] = useState<string | null>(null);
+  const claimRegion = useCallback((layerId: string) => setRegionLayerId(layerId), []);
+  const region = useMemo(() => ({ claim: claimRegion }), [claimRegion]);
+
   // A `<label for>` associates natively (clicking it focuses the control, and the
   // control takes its name from it); the id on the label is what a control that
   // cannot be named by `for` — a button that opens a listbox — points at through
   // `aria-labelledby`.
   const labelText = (
-    <label className="webui-field-label" id={labelId} htmlFor={controlId}>
+    <label className="webui-field-label" id={labelId} htmlFor={controlId} data-overlay-layer={regionLayerId ?? undefined}>
       {label}
       {required ? (
         <span aria-hidden="true" className="webui-field-required">
@@ -387,6 +400,12 @@ export function WebuiField({
   };
   const field: FieldContext = { labelId };
 
+  const controlSlot = (
+    <WebuiTriggerRegionContext.Provider value={region}>
+      <div className="webui-field-control">{control(props, field)}</div>
+    </WebuiTriggerRegionContext.Provider>
+  );
+
   if (arrangement === "row") {
     return (
       <WebuiSkeletonProjection>
@@ -396,7 +415,7 @@ export function WebuiField({
           {descriptionText}
           {errorText}
         </div>
-        <div className="webui-field-control">{control(props, field)}</div>
+        {controlSlot}
       </div>
       </WebuiSkeletonProjection>
     );
@@ -407,7 +426,7 @@ export function WebuiField({
     <div className={`webui-field webui-field--gap-${gap}${className ? ` ${className}` : ""}`}>
       {labelText}
       {descriptionText}
-      <div className="webui-field-control">{control(props, field)}</div>
+      {controlSlot}
       {errorText}
     </div>
     </WebuiSkeletonProjection>

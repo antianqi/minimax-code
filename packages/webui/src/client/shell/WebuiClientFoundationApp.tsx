@@ -79,6 +79,7 @@ import { WebuiSshOwnerProvider } from "../bindings/ssh-owner-context.js";
 import { WebuiRemoteControlOwnerProvider } from "../bindings/remote-control-owner-context.js";
 import { createPortal } from "react-dom";
 import { SettingsModal } from "../features/settings/ui/SettingsModal.public.js";
+import { RemoteControlPairingDialogHost } from "../features/remote-control/ui/RemoteControlPanel.public.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useWebuiApplicationOptional } from "../bindings/application-context.js";
@@ -996,6 +997,7 @@ export function WebuiClientFoundationApp(
         and the settings page in the modal are different trees: only a provider
         above both of them gives them one answer. */}
     <WebuiBrowserAuthorizationProvider>
+    <RemoteControlPairingDialogHost owner={application.remoteControlOwner} />
     <WebuiWorkspaceQueriesProvider queries={workspaceQueries}>
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
     <WebuiModelsWorkflowsProvider workflows={modelsWorkflows}>

@@ -289,6 +289,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
       </WebuiInline> : null}
     </WebuiInline>
 
+    <div className="webui-usage-model-scroll">
     {sourceTab === "token-plan" ? <WebuiStack as="section" gap="roomy" className="w-full" data-testid="settings-usage-token-plan">
       {quotaLoading ? <p>加载中…</p> : quotaError ? <FeedbackError message="加载失败" layout="inline" action={<WebuiButton variant="quiet-highlight" size="inline" onClick={() => void loadQuota()}>重试</WebuiButton>} /> : !quotaView ? <p>登录后查看用量</p> : <>
         <SettingsSection title="当前套餐" testId="settings-usage-plan">
@@ -327,6 +328,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
         {oauthError ? <FeedbackError message={oauthError} /> : null}
       </>}
     </WebuiStack> : null}
+    </div>
   </SettingsPage>;
 }
 

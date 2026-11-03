@@ -28,7 +28,8 @@
   .webui-settings-icon { width: 18px; height: 18px; flex: 0 0 18px; }
   .webui-settings-content { min-width: 0; flex: 1; overflow: auto; }
   .webui-settings-content-header { display: flex; align-items: flex-start; justify-content: space-between; }
-  .webui-usage-model-toolbar { position: sticky; top: 0; z-index: 2; background: var(--bg_grouped_secondary); padding-block: 4px; margin-block: -4px; }
+  .webui-usage-model-toolbar { position: relative; z-index: 2; background: var(--bg_grouped_secondary); padding-block: 4px; margin-block: -4px; }
+  .webui-usage-model-scroll { display: flex; min-height: 0; flex: 1 1 0%; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 
   .webui-settings-content h2 { margin: 0; font-size: var(--size_16); font-weight: var(--weight_medium); line-height: 26px; }
 
@@ -397,7 +398,9 @@
    * through above the title. */
   .webui-settings-content { padding: 0; background: var(--bg_grouped_secondary); }
   .webui-settings-content-header { position: sticky; top: 0; z-index: 2; margin: 0 0 var(--spacing_48); padding: var(--spacing_8) var(--spacing_20); background: var(--bg_grouped_secondary); }
-  .webui-settings-content:has(.webui-usage-model-toolbar) > .webui-settings-content-header { position: static; }
+  .webui-settings-content:has(.webui-usage-model-toolbar) { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
+  .webui-settings-content:has(.webui-usage-model-toolbar) > .webui-settings-content-header { position: relative; z-index: 3; flex: 0 0 auto; }
+  .webui-settings-content:has(.webui-usage-model-toolbar) > .webui-settings-page { min-height: 0; flex: 1 1 0%; margin-block: 0; overflow: hidden; }
   .webui-settings-sidebar, .webui-settings-content { scrollbar-width: none; }
   .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar { display: none; }
   @media (max-height: 680px) {

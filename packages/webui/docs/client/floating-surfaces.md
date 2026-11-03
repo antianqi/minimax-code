@@ -21,6 +21,11 @@ client:
   which also returns the focus to the control that opened it. The press is read
   at `pointerdown`, not at `click`, so the popup is on its way out before the
   click reaches whatever the user aimed at.
+
+The trigger is not "outside": the trigger and the popup are one layer, and the
+trigger's activation opens and closes the popup. The label that names the
+trigger is part of that layer too — see
+[The trigger's region](#the-triggers-region).
 - **The placement.** The popup is rendered into the portal and positioned in
   viewport coordinates, measured against its anchor.
 
@@ -28,6 +33,25 @@ The last one is not decoration. A popup that positions itself with `absolute`
 is clipped by every scrolling ancestor between it and its trigger, and it moves
 with the page while the trigger does not. Measuring the trigger and placing the
 popup in viewport coordinates is what makes one placement rule work everywhere.
+
+## The trigger's region
+
+The trigger and the popup are two halves of one dropdown, and they are one
+layer: the trigger's wrapper carries the layer id, so a press on the trigger
+is answered by that layer and not by a dismissal. The trigger's own activation
+then opens or closes the popup.
+
+A `<label for>` above the trigger belongs to the trigger — clicking it focuses
+the control and fires a click on it. So the label is inside the same layer. A
+label outside it is read as a press outside: the popup is dismissed at
+`pointerdown`, and the click the label forwards to the trigger then finds the
+popup closed and opens it again. The popup that cannot be closed.
+
+The field owns the label and the control, so the field provides the region and
+the control claims it: the claim names the layer the control registered under,
+and the field marks its label with it. A dropdown that is a field's control
+claims the region on its own, so the label and the dropdown are one layer
+without the caller saying so.
 
 ## What a caller states
 

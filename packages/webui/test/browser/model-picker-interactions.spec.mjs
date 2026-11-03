@@ -111,6 +111,18 @@ test("opening and closing the panel leaves the chip where it was", async ({ page
   expect(closed?.y).toBe(before?.y);
 });
 
+test("the chip closes the panel it opened", async ({ page }) => {
+  // The chip is the panel's trigger, so a press on it is the panel's own
+  // business: the chip's activation closes the panel it opened. Read as a
+  // press outside, the panel would be dismissed on the press and opened again
+  // by the click that follows — a panel that cannot be closed.
+  await openApp(page, "#session=A");
+  await chip(page).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await chip(page).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 test("the slider sets the level, and the chip names it", async ({ page }) => {
   await openApp(page, "#session=A");
   await chip(page).click();

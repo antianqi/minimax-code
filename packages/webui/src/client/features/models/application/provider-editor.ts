@@ -345,9 +345,14 @@ export function createWebuiProviderEditor(
       models = models.map((row) =>
         row.id === id ? { ...row, error: undefined, tested: current } : row,
       );
-      tested = current && models.every((row) => row.modelId.trim().length === 0 || row.tested);
+      // Saving validates the first configured model, so that is the model whose
+      // successful probe unlocks the save. Other rows have their own probes.
+      const saveModel = models.find((row) => row.modelId.trim().length > 0);
+      if (!current) tested = false;
+      else if (saveModel?.id === id) tested = true;
       settle(generation);
     } catch (reason) {
+      if (generation !== operationGeneration || disposed) return;
       const message = formatWebuiError(reason);
       models = models.map((row) =>
         row.id === id ? { ...row, error: message, tested: false } : row,
@@ -508,17 +513,21 @@ export function createWebuiProviderEditor(
     },
 
     test: async () => {
-      const rows = models.filter((row) => row.modelId.trim().length > 0);
-      if (!rows.length) return;
-      // Every row that carries an id is probed, one call per row, so each card
-      // owns its own connectivity probe.
-      for (const row of rows) {
-        await probeModel(row.id);
-      }
+      const firstRow = models.find((row) => row.modelId.trim().length > 0);
+      if (!firstRow) return;
+      await probeModel(firstRow.id);
     },
 
     testModel: async (id) => {
       await probeModel(id);
+    },
+
+    cancelTest: () => {
+      if (pending !== "test") return;
+      operationGeneration += 1;
+      pending = undefined;
+      setError(undefined);
+      publish();
     },
 
     discover: async () => {

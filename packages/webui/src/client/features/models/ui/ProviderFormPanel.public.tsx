@@ -346,7 +346,7 @@ export function ProviderFormPanel({
         <WebuiInline as="label" className="webui-provider-form-footer-leading"><WebuiCheckbox checked={skipTest} onChange={(event) => editor.setSkipConnectionTest(event.target.checked)} />跳过连通检测</WebuiInline>
         <WebuiDialogActions>
           <WebuiButton variant="secondary" disabled={formBusy || !hasModelId} onClick={() => void editor.test()}>连通检测</WebuiButton>
-          <WebuiButton variant="secondary" disabled={formBusy} onClick={() => editor.close()}>取消</WebuiButton>
+          <WebuiButton variant="secondary" disabled={formBusy && snapshot.pending !== "test"} onClick={() => snapshot.pending === "test" ? editor.cancelTest() : editor.close()}>{snapshot.pending === "test" ? "停止检测" : "取消"}</WebuiButton>
           <WebuiButton variant="primary" type="submit" form="provider-form-content" disabled={formBusy || (!draftTested && !skipTest)}>{formBusy ? "加载中…" : "保存"}</WebuiButton>
         </WebuiDialogActions>
       </>}>

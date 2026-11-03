@@ -169,7 +169,7 @@ export function decodeWebuiProviderDiscoveryOutcome(
   if (isRevisionConflict(value)) {
     return { ...source, outcome: "conflict", message: refusalMessage(value, "提供商已被其他操作更新，请重新打开后再试。") };
   }
-  if (source.ok === false || Array.isArray(value)) {
+  if (source.ok === false) {
     return { ...source, outcome: "refusal", code: refusalCode(value), message: refusalMessage(value, REFUSALS.discover) };
   }
   return { ...source, outcome: "success", models: modelRefs(value) };

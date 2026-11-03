@@ -515,6 +515,30 @@ test("the Git import dialog completes its shared exit before unmounting", async 
   await expect(dialog).toHaveCount(0);
 });
 
+test("closing an Agent form keeps Agent content throughout the exit animation", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listAgents", { agents: [] });
+    });
+  });
+  await openManagement(page);
+  const createMenu = page.getByRole("menu", { name: "创建" });
+  const createAgent = createMenu.getByRole("menuitem", { name: "创建 Agent" });
+  await expect(createAgent).toBeVisible();
+  await createAgent.click();
+
+  const dialog = page.locator('[data-webui-dialog-shell="true"][data-overlay-layer="plugin-item-dialog"]');
+  await expect(dialog.locator("h2")).toHaveText("添加Agent");
+  await page.locator('[data-webui-dialog-scrim="true"]').click({ position: { x: 5, y: 5 } });
+  await expect(dialog).toHaveAttribute("aria-hidden", "true");
+  await expect(dialog.locator("h2")).toHaveText("添加Agent");
+  await expect(dialog.locator(".webui-agent-form")).toHaveCount(1);
+  await expect(dialog.locator(".webui-mcp-form")).toHaveCount(0);
+  await expect(dialog).toHaveCount(0);
+});
+
 test("Agent add form is centered, fields are aligned and backdrop dismissal works", async ({ page }) => {
   await page.addInitScript(() => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];

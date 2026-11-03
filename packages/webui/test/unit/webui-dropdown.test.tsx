@@ -83,6 +83,16 @@ describe("the shared dropdown surface", () => {
     expect(render({})).toContain('data-webui-dropdown="open"');
     expect(render({ open: false })).toContain('data-webui-dropdown="closed"');
   });
+
+  it("puts the trigger and the popup in one layer, so a press on the trigger is not a dismissal", () => {
+    // The trigger and the popup are two halves of one dropdown. A press on
+    // the trigger has to reach the dropdown's own layer: read as a press
+    // outside, it would dismiss the popup at `pointerdown`, and the click
+    // that follows would find the popup closed and open it again.
+    const layerIds = [...render({}).matchAll(/data-overlay-layer="([^"]+)"/gu)].map((match) => match[1]);
+    expect(layerIds.length, "the wrapper and the popup both name the layer").toBe(2);
+    expect(new Set(layerIds).size, "the trigger and the popup are one layer").toBe(1);
+  });
 });
 
 describe("a popup with no trigger", () => {
@@ -121,6 +131,14 @@ describe("a popup with no trigger", () => {
     const markup = renderDetached();
     expect(markup).not.toContain("aria-expanded");
     expect(markup).not.toContain("aria-controls");
+  });
+
+  it("claims no trigger region, because it has no trigger to own one", () => {
+    // A popup without a trigger hangs off an anchor rather than off a
+    // control, so it marks no wrapper: the region it belongs to is named by
+    // its caller.
+    const layerIds = [...renderDetached().matchAll(/data-overlay-layer="([^"]+)"/gu)].map((match) => match[1]);
+    expect(layerIds.length, "only the popup names a layer").toBe(1);
   });
 });
 

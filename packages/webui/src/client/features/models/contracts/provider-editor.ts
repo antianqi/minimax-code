@@ -188,13 +188,12 @@ export interface WebuiProviderEditor {
   readonly addHeader: () => void;
   readonly removeHeader: (id: string) => void;
   readonly setSkipConnectionTest: (skip: boolean) => void;
-  /**
-   * Test every model row that carries an id, one call per row — one probe per
-   * card, each card owning its own connectivity probe.
-   */
+  /** Probe the first model with an id as the provider connectivity check. */
   readonly test: () => Promise<void>;
   /** Test one model row and report the answer on that row. */
   readonly testModel: (id: string) => Promise<void>;
+  /** End a pending probe and fence its late result while keeping the draft open. */
+  readonly cancelTest: () => void;
   readonly discover: () => Promise<void>;
   readonly save: () => Promise<void>;
   readonly remove: () => Promise<void>;

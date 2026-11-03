@@ -58,6 +58,12 @@
     padding: 20px 64px var(--spacing_16) var(--spacing_24);
   }
 
+  /* Bodyless confirmation dialogs keep the footer divider as the single
+   * boundary between the heading and actions. */
+  .webui-dialog-surface[data-webui-dialog-has-body="false"] .webui-dialog-header {
+    border-bottom: 0;
+  }
+
   .webui-dialog-heading { min-width: 0; }
   .webui-dialog-heading h2 {
     margin: 0;

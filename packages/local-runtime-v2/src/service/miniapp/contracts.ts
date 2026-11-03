@@ -32,8 +32,13 @@ export type MiniAppAgentPolicy =
 /** Every Mini App HTTP server answers this path from the guard, never from plugin code. */
 export const MINIAPP_LOOPBACK_HEALTH_PATH = '/__mavis/health';
 
-/** Request header carrying the Host-issued loopback credential. */
-export const MINIAPP_LOOPBACK_TOKEN_HEADER = 'x-mavis-miniapp-token';
+/**
+ * Request header carrying the Host-issued loopback credential.
+ *
+ * The guard reads one name and the Host's own MCP client presents it, so the
+ * shared contract is the only authority on it.
+ */
+export { MINIAPP_LOOPBACK_TOKEN_HEADER } from '@mavis/shared/miniapp-surface';
 
 export type MiniAppHostConnectorPolicy =
   | { readonly kind: 'deny-all' }

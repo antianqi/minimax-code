@@ -64,7 +64,10 @@ export interface AgentHostTurnCapabilityPreparation {
 
 export interface AgentHostTurnCapabilityProvider {
   waitUntilReady(options?: { readonly allowPendingPublication: boolean }): Promise<void>;
-  prepareTurnCapabilities?(signal?: AbortSignal): Promise<AgentHostTurnCapabilityPreparation>;
+  prepareTurnCapabilities?(input: {
+    readonly userText?: string;
+    readonly signal?: AbortSignal;
+  }): Promise<AgentHostTurnCapabilityPreparation>;
   captureTurnCapabilities(
     preparation?: AgentHostTurnCapabilityPreparation,
   ): AgentHostTurnCapabilityView;
@@ -122,6 +125,8 @@ export class AgentHostTurnCapabilityLifecycle {
     readonly turnId: string;
     readonly captureCapabilities?: boolean;
     readonly signal?: AbortSignal;
+    /** The turn's own text, so preparation can act on what the turn named. */
+    readonly userText?: string;
   }): Promise<AgentHostTurnCapabilityLease> {
     const provider = this.provider;
     const allowPendingPublication = [...this.inFlight.values()].some(
@@ -130,7 +135,10 @@ export class AgentHostTurnCapabilityLifecycle {
     if (provider) await provider.waitUntilReady({ allowPendingPublication });
     const preparation =
       provider && input.captureCapabilities !== false
-        ? await provider.prepareTurnCapabilities?.(input.signal)
+        ? await provider.prepareTurnCapabilities?.({
+            userText: input.userText,
+            signal: input.signal,
+          })
         : undefined;
     await this.waitForPublication();
 

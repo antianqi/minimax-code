@@ -187,6 +187,7 @@ export class LocalAgentHost<
                   sessionId: acceptedInput.lease.sessionId,
                   turnId: acceptedInput.lease.turnId,
                   signal: acceptedInput.lease.signal,
+                  userText: acceptedInput.request.input.text,
                 }),
             )
           : undefined;

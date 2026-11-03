@@ -7,6 +7,7 @@ import {
   pluginMcpNameKey,
   McpConnectionPool,
   type McpConnectionPoolOptions,
+  type McpConnectionTokenOverrides,
   type McpPoolMetrics,
   type McpRuntimeLogger,
   type McpToolCallResult,
@@ -25,12 +26,15 @@ const MAX_TOOLS_PER_SERVER = 128;
 const MAX_TOOLS_PER_SNAPSHOT = 256;
 
 export interface PluginMcpPool {
-  listTools(serverName: string): Promise<McpToolInfo[]>;
+  listTools(
+    serverName: string,
+    tokenOverrides?: McpConnectionTokenOverrides,
+  ): Promise<McpToolInfo[]>;
   callTool(
     serverName: string,
     toolName: string,
     args: Record<string, unknown>,
-    tokenOverrides?: undefined,
+    tokenOverrides?: McpConnectionTokenOverrides,
     options?: { signal?: AbortSignal },
   ): Promise<McpToolCallResult>;
   disconnect(serverName: string): Promise<void>;
@@ -73,6 +77,15 @@ export interface PluginMcpRuntimeOptions {
   readonly logger?: McpRuntimeLogger;
   readonly metrics?: McpPoolMetrics;
   readonly poolOptions?: Pick<McpConnectionPoolOptions, 'idleTimeoutMs' | 'maxConcurrency'>;
+  /**
+   * Per-connection overrides for a server the Host published as a Mini App
+   * managed endpoint. The credential belongs to the Host that issued it, so the
+   * runtime asks for it only for a managed server and never for an ordinary
+   * plugin server.
+   */
+  readonly resolveMiniAppTokenOverrides?: (
+    server: PluginSnapshotMcpServer,
+  ) => McpConnectionTokenOverrides | undefined;
   readonly listToolsTimeoutMs?: number;
   readonly disconnectTimeoutMs?: number;
   readonly shutdownTimeoutMs?: number;
@@ -107,9 +120,13 @@ export class PluginMcpRuntime implements PluginMcpRuntimePort {
   private readonly shutdownTimeoutMs: number;
   private closed = false;
   private readonly names: McpNameRegistry;
+  private readonly resolveMiniAppTokenOverrides:
+    | ((server: PluginSnapshotMcpServer) => McpConnectionTokenOverrides | undefined)
+    | undefined;
 
   constructor(options: PluginMcpRuntimeOptions = {}) {
     this.names = options.names ?? new McpNameRegistry();
+    this.resolveMiniAppTokenOverrides = options.resolveMiniAppTokenOverrides;
     this.logger = options.logger ?? NOOP_LOGGER;
     this.metrics = options.metrics;
     this.listToolsTimeoutMs = options.listToolsTimeoutMs ?? 15_000;
@@ -330,7 +347,7 @@ export class PluginMcpRuntime implements PluginMcpRuntimePort {
 
     try {
       const tools = await withTimeout(
-        this.pool.listTools(poolName(entry)),
+        this.pool.listTools(poolName(entry), this.miniAppTokenOverrides(entry)),
         this.listToolsTimeoutMs,
         `Plugin MCP tools/list timed out for ${entry.server.name}`,
       );
@@ -360,6 +377,17 @@ export class PluginMcpRuntime implements PluginMcpRuntimePort {
       this.inventories.set(poolName(entry), inventory);
       return inventory;
     }
+  }
+
+  /**
+   * The overrides a managed server's connection must carry. A server the Host
+   * did not publish as managed never receives a Mini App credential.
+   */
+  private miniAppTokenOverrides(
+    entry: PluginSnapshotMcpServer,
+  ): McpConnectionTokenOverrides | undefined {
+    if (!entry.managedIdentity) return undefined;
+    return this.resolveMiniAppTokenOverrides?.(entry);
   }
 
   private async rejectInventory(
@@ -453,7 +481,7 @@ export class PluginMcpRuntime implements PluginMcpRuntimePort {
             poolName(entry),
             tool.name,
             toRecord(input),
-            undefined,
+            this.miniAppTokenOverrides(entry),
             signal ? { signal } : undefined,
           );
           const text = mcpContentToText(result);

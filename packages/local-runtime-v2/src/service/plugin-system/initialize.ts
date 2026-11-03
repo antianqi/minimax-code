@@ -3,7 +3,12 @@ import path from "node:path";
 import { getRuntimeBuildEnv, getRuntimeRegion } from "@mavis/config";
 import type { AgentHostTurnCapabilityLifecycle } from "../turn-system/index.js";
 
-import type { MiniAppPluginPublicationCapability } from "../miniapp/index.js";
+import { MINIAPP_LOOPBACK_TOKEN_HEADER } from "@mavis/shared/miniapp-surface";
+
+import type {
+  MiniAppPluginPublicationCapability,
+  MiniAppSupervisor,
+} from "../miniapp/index.js";
 import { initializeHostConnectorSystem } from "../host-connector-system/index.js";
 import { ConnectorCloudClient } from "./app/cloud-client.js";
 import { DesktopConnectorRuntime } from "./app/runtime.js";
@@ -23,6 +28,26 @@ import { OfficialPluginReconciler } from "./plugin/runtime/official-reconciler.j
 import { PluginRegistryClient } from "./plugin/runtime/registry-client.js";
 import { SqlitePluginRepository } from "./plugin/runtime/repository.js";
 import { PluginSystem } from "./plugin-system.js";
+
+/**
+ * The credential the Host presents to a Mini App it published as a managed MCP endpoint.
+ *
+ * The credential belongs to the running generation, so it is offered only for the
+ * generation the endpoint was published for: a credential never reaches a port
+ * that now belongs to another process.
+ */
+function miniAppTokenOverrides(
+  supervisor: MiniAppSupervisor | undefined,
+  pluginId: string,
+  managedIdentity: { readonly processGeneration: string } | undefined,
+): { readonly headers: Record<string, string> } | undefined {
+  if (!supervisor || !managedIdentity) return undefined;
+  const active = supervisor.inspect(pluginId)[0]?.active;
+  if (active?.processGeneration !== managedIdentity.processGeneration) return undefined;
+  const credential = supervisor.launchCredential(pluginId);
+  if (!credential) return undefined;
+  return { headers: { [MINIAPP_LOOPBACK_TOKEN_HEADER]: credential } };
+}
 
 /** Assembles the Desktop Plugin service over narrow v1 compatibility ports. */
 export function initializePluginService(
@@ -52,9 +77,12 @@ export function initializePluginService(
     metrics: metricTags,
     ...(onPluginDeactivated ? { onPluginDeactivated } : {}),
   });
+  let miniAppSupervisor: MiniAppSupervisor | undefined;
   const createPluginMcpRuntime = () =>
     new PluginMcpRuntime({
       names: compatibility.mcp.getRuntimeNameRegistry(),
+      resolveMiniAppTokenOverrides: (server) =>
+        miniAppTokenOverrides(miniAppSupervisor, server.pluginName, server.managedIdentity),
       logger: {
         info: (message, fields) =>
           compatibility.logger.info(fields ?? {}, message),
@@ -163,8 +191,10 @@ export function initializePluginService(
     mcp: compatibility.mcp,
     skill: compatibility.skill,
     hostConnectorGateway: hostConnectorSystem.gateway,
-    attachMiniAppPublication: (input) =>
-      system.miniAppPublication.attach(input),
+    attachMiniAppPublication: (input) => {
+      miniAppSupervisor = input.supervisor;
+      system.miniAppPublication.attach(input);
+    },
     listAcceptedMiniApps: () =>
       system.miniAppPublication.listAcceptedMiniApps(),
     isAcceptedMiniAppRunning: (pluginId) =>

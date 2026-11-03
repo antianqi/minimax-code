@@ -19,6 +19,7 @@ import { PluginSystemMetrics } from './metrics.js';
 import { PluginCapabilityGenerationRegistry } from './mcp/generation-registry.js';
 import { PluginMcpRuntime, type PluginMcpRuntimePort } from './mcp/runtime.js';
 import { PluginMiniAppPublicationController } from './plugin/runtime/miniapp/controller.js';
+import { activateReferencedMiniApps } from './plugin/runtime/miniapp/referenced-activation.js';
 import {
   deferred,
   assertPluginSystemPublicationAttached,
@@ -272,9 +273,36 @@ export class PluginSystem implements AgentHostTurnCapabilityProvider {
     this.assertUsable();
   }
 
-  async prepareTurnCapabilities(signal?: AbortSignal): Promise<AgentHostTurnCapabilityPreparation> {
+  async prepareTurnCapabilities(input: {
+    readonly userText?: string;
+    readonly signal?: AbortSignal;
+  }): Promise<AgentHostTurnCapabilityPreparation> {
     this.assertUsable();
-    return preparePluginSystemTurnCapabilities(this.connectorRuntime, signal);
+    await this.startReferencedMiniApps(input);
+    return preparePluginSystemTurnCapabilities(this.connectorRuntime, input.signal);
+  }
+
+  /**
+   * Starts the Mini Apps the turn named.
+   *
+   * A Mini App publishes its own MCP tools only while its runtime runs, so the
+   * turn that names one starts it before its capabilities are captured.
+   */
+  private async startReferencedMiniApps(input: {
+    readonly userText?: string;
+    readonly signal?: AbortSignal;
+  }): Promise<void> {
+    await activateReferencedMiniApps({
+      userText: input.userText,
+      availableMiniApps: await this.miniAppPublication.listAvailableMiniApps(),
+      activate: async (pluginId) => {
+        await this.miniAppPublication.activate({
+          pluginId,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+      },
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
   }
 
   captureTurnCapabilities(

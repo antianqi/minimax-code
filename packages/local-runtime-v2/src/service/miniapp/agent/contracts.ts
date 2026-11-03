@@ -230,6 +230,27 @@ export interface MiniAppAgentRunOptions {
   readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
 }
 
+/** What an `observe` call watches: every conversation, or exactly one. */
+export interface MiniAppAgentObserveInput {
+  readonly requestId: string;
+  readonly all?: boolean;
+  readonly sessionId?: string;
+}
+
+/** One settled turn, in the shape a page's own observer code reads. */
+export interface MiniAppAgentObserveEvent {
+  readonly type: 'turn.finished';
+  readonly sessionId: string;
+  readonly turnId: string;
+  readonly title: string;
+  readonly outcome: string;
+}
+
+export interface MiniAppAgentObserveOptions {
+  readonly signal?: AbortSignal;
+  readonly onEvent: (event: MiniAppAgentObserveEvent) => void;
+}
+
 export const MINIAPP_AGENT_ERROR_CODES = [
   'NOT_PERMITTED',
   'BUSY',
@@ -340,6 +361,20 @@ export interface MiniAppAgentGateway {
     input: MiniAppAgentAnswerInput,
     options?: MiniAppAgentRunOptions,
   ): Promise<MiniAppAgentRunResult>;
+  /**
+   * Watch turns as they settle, until the page cancels or the frame goes away.
+   *
+   * Long-lived by contract: the promise has no result, it settles when the watch ends.
+   * Needs `session.read`; throws `BUSY` when `requestId` is already watching, because the
+   * id is the only handle the page cancels with.
+   */
+  observe(
+    caller: MiniAppAgentCaller,
+    input: MiniAppAgentObserveInput,
+    options: MiniAppAgentObserveOptions,
+  ): Promise<void>;
+  /** Ends the watch this plugin opened under this id. False when there is none. */
+  cancelObserve(caller: MiniAppAgentCaller, requestId: string): boolean;
   /**
    * Confirms that `sessionId` may be shown in the side panel of the chat the Mini App
    * is open in now: the session belongs to the caller's plugin (whichever chat created

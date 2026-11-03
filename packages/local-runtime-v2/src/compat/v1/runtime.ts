@@ -60,7 +60,11 @@ import {
   type V1ChannelProductCapabilities,
   type V1GeneratedAssetInfrastructure,
 } from "./agent-host.js";
-import { createV1CronAgentCleanupBridge } from "./cron.js";
+import {
+  createV1CronAgentCleanupBridge,
+  createV1MavisCronAdapterBridge,
+  type V1CronAgentToolService,
+} from "./cron.js";
 import {
   createV1SessionCompatibility,
   type V1SessionCompatibility,
@@ -310,6 +314,8 @@ export interface V1ServiceCompatibility extends V1ProcessLocalSupport {
     bindAgentCleanup(
       service: Pick<CronService, "deleteDefinitionsByAgent">,
     ): void;
+    /** Binds the Cron owner the Mavis tool's `cron` commands forward to. */
+    bindAgentToolService(service: V1CronAgentToolService): void;
     deleteAgentTasks(agentName: string): Promise<void>;
   };
   readonly modelProvider?: {
@@ -433,6 +439,7 @@ export function createV1RuntimeCompatibility(
   },
 ): V1RuntimeCompatibility {
   const agentCleanup = createV1CronAgentCleanupBridge();
+  const cronAdapterBridge = createV1MavisCronAdapterBridge();
   const globalEvents = createDeferredGlobalEventPublisher();
   const mcp = createDeferredMcpRuntimeCapability();
   return {
@@ -445,6 +452,7 @@ export function createV1RuntimeCompatibility(
       deferQuestionnaireRecovery: true,
       runtimeConversation: conversation,
       globalEventPublisher: globalEvents.publish,
+      mavisCronAdapterProvider: () => cronAdapterBridge.adapter,
       deleteAgentCronTasks: (agentName) =>
         agentCleanup.deleteAgentCronTasks(agentName),
       skillEnabledState: ports.skillEnabledState,
@@ -475,6 +483,7 @@ export function createV1RuntimeCompatibility(
         }),
         cron: {
           bindAgentCleanup: (service) => agentCleanup.bind(service),
+          bindAgentToolService: (service) => cronAdapterBridge.bindService(service),
           deleteAgentTasks: (agentName) => api.deleteAgentCronTasks(agentName),
         },
         modelProvider: {

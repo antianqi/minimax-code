@@ -64,6 +64,18 @@ export const WEBUI_MINIAPP_BRIDGE_AGENT_RESULT = "mcode:miniapp:agent-result" as
 
 /** One progress event of a turn the page is observing, host -> page. */
 export const WEBUI_MINIAPP_BRIDGE_AGENT_EVENT = "mcode:miniapp:agent-event" as const;
+/**
+ * A watch, on the page's side of the bridge.
+ *
+ * Three messages rather than one because a watch is not a request: `OBSERVE` opens it,
+ * `OBSERVE_EVENT` carries each settled turn, and `OBSERVE_END` closes it — either because
+ * the page cancelled or because the runtime stopped watching. A page that closed the
+ * frame gets no `END`, and has nothing to wait for.
+ */
+export const WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE = "mcode:miniapp:agent-observe" as const;
+export const WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_EVENT =
+  "mcode:miniapp:agent-observe-event" as const;
+export const WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END = "mcode:miniapp:agent-observe-end" as const;
 
 /**
  * The methods a page may call.
@@ -408,6 +420,61 @@ export function readWebuiMiniAppAgentCallRequest(
     default:
       return undefined;
   }
+}
+
+/**
+ * Watching turns as they settle: every conversation, or exactly one.
+ *
+ * The watch has no result — it ends when the frame goes away, which is what closing the
+ * stream means. `requestId` names the watch in the runtime, so one frame cannot take over
+ * another's.
+ */
+export interface WebuiMiniAppAgentObserveRequest extends WebuiMiniAppAgentCaller {
+  readonly requestId: string;
+  readonly all?: boolean;
+  readonly sessionId?: string;
+}
+
+/** What a watch sends: a settled turn, or why the watch could not open. */
+export type WebuiMiniAppAgentObserveFrame =
+  | {
+      readonly kind: "event";
+      readonly event: {
+        readonly type: string;
+        readonly sessionId: string;
+        readonly turnId: string;
+        readonly title: string;
+        readonly outcome: string;
+      };
+    }
+  | { readonly kind: "failure"; readonly code: string };
+
+export function readWebuiMiniAppAgentObserveRequest(
+  value: unknown,
+): { readonly ok: true; readonly request: WebuiMiniAppAgentObserveRequest } | { readonly ok: false } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false };
+  const record = value as Record<string, unknown>;
+  if (!isBoundedId(record.pluginId)) return { ok: false };
+  if (!isBoundedId(record.hostSessionId)) return { ok: false };
+  if (!isGeneration(record.connection)) return { ok: false };
+  if (!isMiniAppAgentRequestId(record.requestId)) return { ok: false };
+
+  const all = record.all === true;
+  const sessionId = typeof record.sessionId === "string" ? record.sessionId : undefined;
+  // Every conversation, or one: neither is a watch of nothing.
+  if (!all && !isBoundedId(sessionId)) return { ok: false };
+
+  return {
+    ok: true,
+    request: {
+      pluginId: record.pluginId as string,
+      hostSessionId: record.hostSessionId as string,
+      connection: record.connection as WebuiMiniAppAgentObserveRequest["connection"],
+      requestId: record.requestId as string,
+      ...(all ? { all: true } : {}),
+      ...(sessionId !== undefined && !all ? { sessionId } : {}),
+    },
+  };
 }
 
 /** Re-exported so one module states the page's bounds as well as its shapes. */

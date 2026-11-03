@@ -298,7 +298,7 @@ export interface WebuiMotionProps extends HTMLAttributes<HTMLElement> {
   readonly direction?: WebuiMotionDirection;
   readonly hoverable?: boolean;
   /** A reusable semantic role within a motion family, such as a range thumb. */
-  readonly motionRole?: "thumb" | "track";
+  readonly motionRole?: "icon" | "thumb" | "track";
 }
 
 /** Apply a shared motion family to an existing semantic surface. */

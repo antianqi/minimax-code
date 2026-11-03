@@ -21,6 +21,8 @@ import type {
 } from "../../shared/contracts/miniapp.js";
 import type {
   WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentObserveFrame,
+  WebuiMiniAppAgentObserveRequest,
   WebuiMiniAppAgentTurnRequest,
 } from "../../shared/contracts/miniapp-agent.js";
 import type { WebuiMiniAppToolApprovalFrame } from "../../shared/contracts/miniapp-tools.js";
@@ -221,6 +223,12 @@ export interface WebuiWire {
    * closing: `settled` carries the turn's result and `failure` its code, so a page
    * always learns how the call ended instead of inferring it from a drop.
    */
+  watchMiniAppAgentObservations(
+    operation: string,
+    requestBody: WebuiMiniAppAgentObserveRequest,
+    onFrame: (frame: WebuiMiniAppAgentObserveFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
   watchMiniAppAgentTurn(
     operation: string,
     requestBody: WebuiMiniAppAgentTurnRequest,
@@ -694,6 +702,72 @@ export function createWebuiWire({
     };
   }
 
+  /**
+   * A watch: frames until the stream ends.
+   *
+   * Unlike a turn there is no settlement frame — the end of the stream *is* the end of
+   * the watch, and a failure frame is what the page's promise rejects with. Kept separate
+   * from the turn reader because the two frame families differ: a turn reports how it
+   * settled, a watch only reports events and then stops.
+   */
+  function watchMiniAppAgentObservations(
+    operation: string,
+    requestBody: WebuiMiniAppAgentObserveRequest,
+    onFrame: (frame: WebuiMiniAppAgentObserveFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    /**
+     * A watch ending is not a failure the page has to handle: the stream closing is how
+     * a watch ends when the frame goes away. It is reported through `onFailure` because
+     * that is the only channel this contract has, with a code the host half treats as a
+     * normal end rather than an error.
+     */
+    const session = openWireSession(operation, requestBody, {
+      frame: (session, frame) => {
+        if (stopped) return;
+        if (frame.kind === "error") {
+          stopped = true;
+          session.close();
+          onFailure?.(
+            new WebuiWireError(
+              frame.code,
+              frame.message ?? `${operation} refused`,
+              frame.requestId,
+            ),
+          );
+          return;
+        }
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        const decoded = frame.body as WebuiMiniAppAgentObserveFrame;
+        // A failure frame is the watch's last word; the runtime sends nothing after it.
+        if (decoded.kind === "failure") stopped = true;
+        onFrame(decoded);
+      },
+      invalidFrame: (session) => {
+        if (stopped) return;
+        stopped = true;
+        session.close();
+        onFailure?.(new WebuiWireError("result_unknown", `${operation} returned an invalid frame`));
+      },
+      closed: () => {
+        if (stopped) return;
+        stopped = true;
+        onFailure?.(new WebuiWireError("stream_closed", `${operation} ended`));
+      },
+      failed: (session) => {
+        if (stopped) return;
+        stopped = true;
+        session.close();
+        onFailure?.(new WebuiWireError("result_unknown", `${operation} connection failed`));
+      },
+    });
+    return () => {
+      stopped = true;
+      session.close();
+    };
+  }
+
   function watchMiniAppAgentTurn(
     operation: string,
     requestBody: WebuiMiniAppAgentTurnRequest,
@@ -865,6 +939,7 @@ export function createWebuiWire({
     watchMiniAppPresenter,
     watchMiniAppToolApprovals,
     watchMiniAppAgentTurn,
+    watchMiniAppAgentObservations,
     workspaceFileUrl,
     miniappStandaloneUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),

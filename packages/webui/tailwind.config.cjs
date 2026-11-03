@@ -484,6 +484,10 @@ const tailwindConfig = {
   // stylesheet even when a state-specific branch is not visible to Tailwind's
   // static class scan.
   safelist: [
+    // Mini App iframe classes are selected by a runtime layout projection;
+    // Tailwind cannot see the class names returned by that helper.
+    "webui-miniapp-view-frame",
+    "webui-miniapp-window-frame",
     // Component classes the shell composes from runtime state. Tailwind only
     // sees the literal template head (`webui-tool-icon--${category}`), so every
     // variant it can produce has to be named here or it is purged and the

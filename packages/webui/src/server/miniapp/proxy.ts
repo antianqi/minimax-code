@@ -122,6 +122,15 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
           // the proxy's origin, so forwarding that value makes every request fail
           // the guard even though the credential is correct.
           host: upstream.host,
+          // Pages that serve their own API also compare `origin` against `host` on
+          // writes (their reads usually skip the check), so a rewritten host with the
+          // proxy's origin left in place reads fine and refuses every write — the
+          // "read works, save does not" shape. Rewritten with the host, and left
+          // absent when the browser sent none: a synthesized origin would be this
+          // proxy claiming a request it did not make.
+          ...(request.headers.origin !== undefined
+            ? { origin: `http://${upstream.host}` }
+            : {}),
           [input.target.credentialHeader]: input.target.credential,
         },
         agent: false,

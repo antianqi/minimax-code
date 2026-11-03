@@ -64,6 +64,16 @@ import {
 } from "../../../../shared/contracts/miniapp-tools.js";
 import { MiniAppToolApprovals } from "./MiniAppToolApprovals.public.js";
 import { webuiMiniAppToolRequest } from "../application/miniapp-tool-bridge.js";
+import { answerMiniAppWindowRequest, webuiMiniAppWindowRequest } from "../application/miniapp-window-bridge.js";
+import {
+  MINIAPP_WINDOW_MIN_SIZE,
+  WEBUI_MINIAPP_BRIDGE_WINDOW_STATE,
+  applyMiniAppWindowPatch,
+  initialMiniAppWindowState,
+  miniAppWindowFrameLayout,
+  type MiniAppWindowBox,
+  type WebuiMiniAppWindowBounds,
+} from "../../../../shared/contracts/miniapp-window.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiIconButton } from "../../../ui/button.js";
@@ -87,6 +97,21 @@ const PRESENTATION_SYNC_MS = 2_000;
 
 /** Which of ADR 0020's two presentations is mounting this view. */
 export type WebuiMiniAppSurface = "inline" | "standalone";
+
+/**
+ * The area a floating box may occupy.
+ *
+ * The host page's viewport, not the screen: a browser tab cannot place anything outside
+ * itself, so a page's window coordinates are this client's page coordinates. The
+ * fallback is what a server render sees — a box that is never drawn needs no better.
+ */
+function pageBounds(): WebuiMiniAppWindowBounds {
+  if (typeof window === "undefined") return { width: 1200, height: 800 };
+  return {
+    width: Math.max(MINIAPP_WINDOW_MIN_SIZE, window.innerWidth),
+    height: Math.max(MINIAPP_WINDOW_MIN_SIZE, window.innerHeight),
+  };
+}
 
 export interface MiniAppViewProps {
   readonly pluginId: string;
@@ -143,6 +168,27 @@ export function MiniAppView({
       (item) => item.id === "device:microphone" && item.enabled,
     ) ?? false;
   const frameRef = useRef<HTMLIFrameElement>(null);
+  /**
+   * The box this view draws the page in.
+   *
+   * `inline` is the panel's own frame; `window` is the same frame floating over the page
+   * the person is looking at, because a browser tab has no window to hand a Mini App.
+   * Only the geometry changes: the `key` on the frame does not, so a page that asks for
+   * a window keeps its document and its state instead of reloading into one.
+   */
+  const [windowBox, setWindowBox] = useState<MiniAppWindowBox>(() =>
+    initialMiniAppWindowState(pageBounds()),
+  );
+  /**
+   * The box the message handler applies a patch to.
+   *
+   * Read through a ref so the listener is not torn down and rebuilt on every pointer
+   * move the page asks for: dragging sends a patch per frame, and re-subscribing per
+   * frame would make a fast drag drop messages.
+   */
+  const windowBoxRef = useRef(windowBox);
+  windowBoxRef.current = windowBox;
+  const frameLayout = miniAppWindowFrameLayout(windowBox);
   /**
    * The bridge this view currently answers through, and how many documents it has
    * framed.
@@ -372,6 +418,59 @@ export function MiniAppView({
   }, [detached, pluginId, presentation?.kind, workflows]);
 
   /**
+   * The page's window channel.
+   *
+   * The page script asks where its box is, moves it, and subscribes to changes. This
+   * answers with the box it actually has, on the origin the request came from and only
+   * for the frame this view is showing — a page cannot move another Mini App's box.
+   */
+  useEffect(() => {
+    if (presentation?.kind !== "open" || detached) return;
+    const onMessage = (event: MessageEvent): void => {
+      const frame = frameRef.current;
+      if (!frame || event.source !== frame.contentWindow) return;
+      const request = webuiMiniAppWindowRequest(event.data);
+      if (!request) return;
+
+      const outcome = answerMiniAppWindowRequest({
+        box: windowBoxRef.current,
+        bounds: pageBounds(),
+        message: request,
+      });
+
+      if (request.method === "update") setWindowBox(outcome.box);
+      // The page asks for focus from a click handler, which is the only place a tab
+      // lets a document take keyboard input.
+      if (request.method === "focus") frame.focus();
+      frame.contentWindow?.postMessage(
+        {
+          type: WEBUI_MINIAPP_BRIDGE_WINDOW_STATE,
+          requestId: request.requestId,
+          state: outcome.state,
+        },
+        event.origin,
+      );
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [detached, presentation?.kind]);
+
+  /**
+   * Pulls a floating box back when the page it floats over shrinks.
+   *
+   * An empty patch clamps: the box that hung off the edge of a wider viewport is moved
+   * inside the narrower one, with its size kept.
+   */
+  useEffect(() => {
+    const onResize = (): void =>
+      setWindowBox((current) => applyMiniAppWindowPatch(current, {}, pageBounds()).state);
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  /**
    * The page's tool channel.
    *
    * The same sender rules as the composer and agent channels: only the frame this view
@@ -479,6 +578,8 @@ export function MiniAppView({
         },
         watchTurn: (request, onFrame, onFailure) =>
           workflows.watchAgentTurn(request, onFrame, onFailure),
+        watchObservations: (request, onFrame, onFailure) =>
+          workflows.watchAgentObservations(request, onFrame, onFailure),
       },
     });
     agentHostRef.current = agentHost;
@@ -600,8 +701,12 @@ export function MiniAppView({
               grantsMicrophone ? "device" : "no-device"
             }`}
             ref={frameRef}
-            className="webui-miniapp-view-frame"
+            className={frameLayout.className}
             data-testid="miniapp-view-frame"
+            // A floating box is the same frame in a different place. The key above is
+            // untouched, so the page keeps its document and its state across the move —
+            // which is the whole reason this is a layout and not a second presentation.
+            style={frameLayout.style}
             allow={grantsMicrophone ? "microphone" : undefined}
             title={title ?? name}
             src={presentation.viewUrl}

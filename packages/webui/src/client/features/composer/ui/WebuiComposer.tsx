@@ -1052,6 +1052,15 @@ export function WebuiComposer({
         >
           <WebuiStack gap="compact" align="center" className="message-input-home-container rounded-[20px] bg-bg_default_scrim pb-2">
             <div className="w-full rounded-[20px] border border-border_default bg-bg_grouped_secondary_elevated p-3 webui-composer-card">
+              {sessionLayout && sessionId ? (
+                <img
+                  className="webui-composer-mascot"
+                  src="/assets/img/minimax-octopus-composer.png"
+                  alt=""
+                  aria-hidden="true"
+                  draggable="false"
+                />
+              ) : null}
               <WebuiMotionSlot kind="feedback">
               <div ref={composerInputContainerRef} className="message-input-container relative">
                 <WebuiTextarea

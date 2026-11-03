@@ -502,6 +502,21 @@
     gap: var(--spacing_8);
     justify-content: flex-end;
   }
+  /**
+   * The same frame, floating over the page.
+   *
+   * Position and size come from the page's own request, so this rule draws only what
+   * those numbers describe: an edge, a shadow, and a stacking level above the panel's
+   * content. No transition — a page moves itself once per pointer move, and an eased box
+   * would trail the pointer that is dragging it.
+   */
+  .webui-miniapp-window-frame {
+    z-index: 60;
+    border: 1px solid var(--border_heavy);
+    border-radius: var(--radius_12);
+    background: var(--bg_default_primary);
+    box-shadow: var(--shadow_default);
+  }
   .webui-miniapp-view-state {
     display: flex;
     flex: 1 1 auto;

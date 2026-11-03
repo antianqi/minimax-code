@@ -212,20 +212,34 @@
   .webui-workspace-miniapp-tab .webui-miniapp-picker-status { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
   .webui-workspace-miniapp-tab .webui-miniapp-picker .webui-plugin-actions { display: flex; flex: 0 0 auto; grid-area: auto; align-items: center; gap: var(--spacing_8); }
   .webui-workspace-miniapp-tab .webui-miniapp-picker-create { width: 100%; margin-top: var(--spacing_8); }
-  .webui-miniapp-launcher-body { padding: var(--spacing_20); }
-  .webui-miniapp-launcher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--spacing_16); }
-  .webui-miniapp-launcher-card { position: relative; display: flex; min-width: 0; min-height: 164px; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing_8); border: 1px solid var(--border_light); border-radius: var(--radius_16); background: var(--bg_default_primary); padding: var(--spacing_16) var(--spacing_12); text-align: center; }
-  .webui-miniapp-launcher-open, .webui-miniapp-launcher-face { display: flex; width: 100%; flex-direction: column; align-items: center; gap: var(--spacing_8); border: 0; background: transparent; color: var(--text_default_primary); }
-  .webui-miniapp-launcher-open { align-self: stretch; flex: 1 1 auto; width: auto; margin: calc(-1 * var(--spacing_16)) calc(-1 * var(--spacing_12)); cursor: pointer; padding: var(--spacing_16) var(--spacing_12); }
-  .webui-miniapp-launcher-open:focus-visible { outline: 2px solid var(--border_interaction_focus); outline-offset: 3px; }
-  .webui-miniapp-launcher-open > img, .webui-miniapp-launcher-face > img { width: 76px; height: 76px; border-radius: var(--radius_16); object-fit: cover; }
-  .webui-miniapp-launcher-open > svg, .webui-miniapp-launcher-face > svg { width: 76px; height: 76px; border-radius: var(--radius_16); background: var(--bg_default_secondary); padding: 18px; color: var(--icon_default_secondary); }
-  .webui-miniapp-launcher-name { display: block; width: 100%; overflow: hidden; font-size: var(--size_14); text-overflow: ellipsis; white-space: nowrap; }
-  .webui-miniapp-launcher-status { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
-  .webui-miniapp-launcher-stop { position: absolute; right: var(--spacing_8); bottom: var(--spacing_8); opacity: 0; pointer-events: none; }
+  .webui-miniapp-launcher-trigger { display: block; min-width: 0; }
+  .webui-miniapp-launcher-popover { position: fixed; z-index: 150; display: flex; width: min(700px, calc(100vw - 32px)); max-height: min(57.4vh, 574px); flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, var(--border_light) 68%, transparent); border-radius: 26px; background: color-mix(in srgb, var(--bg_default_secondary) 62%, transparent); box-shadow: 0 24px 72px color-mix(in srgb, #000 24%, transparent), inset 0 1px color-mix(in srgb, #fff 64%, transparent); -webkit-backdrop-filter: blur(48px) saturate(1.5); backdrop-filter: blur(48px) saturate(1.5); color: var(--text_default_primary); }
+  .webui-miniapp-launcher-heading { display: flex; min-height: 56px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--spacing_16); border-bottom: 1px solid color-mix(in srgb, var(--border_light) 68%, transparent); padding: 12px 16px; }
+  .webui-miniapp-launcher-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+  .webui-miniapp-launcher-heading h2 { margin: 0; font-size: var(--size_18); font-weight: var(--weight_medium); line-height: var(--line_height_24); }
+  .webui-miniapp-launcher-heading > div > span { color: var(--text_default_tertiary); font-size: var(--size_12); }
+  .webui-miniapp-launcher-grid { display: grid; overflow: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; }
+  .webui-miniapp-launcher-card { position: relative; display: flex; width: 80%; min-width: 0; justify-self: center; flex-direction: column; border: 1px solid color-mix(in srgb, var(--border_light) 62%, transparent); border-radius: 20px; background: color-mix(in srgb, var(--bg_default_primary) 52%, transparent); padding: 12px; text-align: left; }
+  .webui-miniapp-launcher-loading-card { display: flex; width: 80%; min-width: 0; justify-self: center; flex-direction: column; align-items: flex-start; gap: 12px; border: 1px solid color-mix(in srgb, var(--border_light) 62%, transparent); border-radius: 20px; background: color-mix(in srgb, var(--bg_default_primary) 52%, transparent); padding: 12px; }
+  .webui-miniapp-launcher-loading-icon { width: 80%; height: auto; aspect-ratio: 1; align-self: center; border-radius: 16px; }
+  .webui-miniapp-launcher-open, .webui-miniapp-launcher-face { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: stretch; gap: 12px; border: 0; background: transparent; color: var(--text_default_primary); text-align: left; }
+  .webui-miniapp-launcher-open { cursor: pointer; padding: 0; }
+  .webui-miniapp-launcher-open:focus-visible { outline: 2px solid var(--border_interaction_focus); outline-offset: 4px; border-radius: 12px; }
+  .webui-miniapp-launcher-card-heading { display: flex; min-width: 0; align-items: center; }
+  .webui-miniapp-launcher-name { display: block; min-width: 0; overflow: hidden; font-size: var(--size_14); font-weight: var(--weight_medium); text-overflow: ellipsis; white-space: nowrap; }
+  .webui-miniapp-launcher-preview { position: relative; display: grid; width: 80%; aspect-ratio: 1; place-items: center; align-self: center; overflow: visible; border-radius: 14px; background: transparent; }
+  .webui-miniapp-launcher-preview-motion { position: absolute; inset: 0; overflow: visible; border-radius: inherit; }
+  .webui-miniapp-launcher-preview-mark { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; opacity: 1; filter: none; }
+  .webui-miniapp-launcher-preview > svg { width: 40%; height: 40%; color: var(--icon_default_secondary); }
+  .webui-miniapp-launcher-preview-copy { display: -webkit-box; overflow: hidden; min-height: 2.5em; color: var(--text_default_secondary); font-size: var(--size_12); line-height: var(--line_height_16); text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .webui-miniapp-launcher-status { display: flex; min-height: 18px; align-items: center; gap: 7px; padding: 0 2px; color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
+  .webui-miniapp-launcher-status-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--icon_default_secondary); }
+  .webui-miniapp-launcher-card.is-running .webui-miniapp-launcher-status-dot { background: var(--text_interaction_success, #28a76a); }
+  .webui-miniapp-launcher-stop { position: absolute; z-index: 2; bottom: -21px; left: 50%; width: 44px; height: 44px; transform: translateX(-50%); border: 1px solid color-mix(in srgb, var(--border_light) 70%, transparent); border-radius: 50%; background: color-mix(in srgb, var(--bg_default_primary) 78%, transparent); box-shadow: 0 6px 18px color-mix(in srgb, #000 18%, transparent); opacity: 0; pointer-events: none; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
   .webui-miniapp-launcher-card.is-running:hover .webui-miniapp-launcher-stop,
   .webui-miniapp-launcher-card.is-running:focus-within .webui-miniapp-launcher-stop { opacity: 1; pointer-events: auto; }
-  .webui-miniapp-launcher-hint { margin: var(--spacing_16) 0 0; color: var(--text_default_tertiary); font-size: var(--size_12); text-align: center; }
+  .webui-miniapp-launcher-hint { margin: 0; padding: 0 20px 18px; color: var(--text_default_tertiary); font-size: var(--size_12); text-align: center; }
+  @media (max-width: 680px) { .webui-miniapp-launcher-popover { width: min(336px, calc(100vw - 24px)); max-height: 58.8vh; } .webui-miniapp-launcher-grid { grid-template-columns: 1fr; gap: 8px; padding: 12px; } }
   .webui-workspace-image-preview { display: block; max-width: 100%; max-height: calc(100vh - 180px); margin: 24px auto; object-fit: contain; }
   .webui-file-code { min-width: max-content; min-height: 100%; margin: 0; overflow: auto; background: var(--bg_default_primary); padding: 20px 0; color: var(--text_default_primary); font-family: Hack, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.65; tab-size: 2; white-space: pre; }
   .webui-file-code code { display: block; min-width: 100%; }

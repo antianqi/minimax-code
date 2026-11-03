@@ -212,11 +212,14 @@
     background: var(--bg_interaction_tertiary_hover);
     color: var(--icon_default_primary);
   }
-  .webui-icon-button--panel[aria-expanded="true"],
-  .webui-icon-button--panel[aria-pressed="true"] {
-    background: var(--bg_interaction_tertiary_selected);
-    color: var(--icon_default_primary);
-  }
+  /* A pressed or expanded panel control states no fill of its own.
+   *
+   * It used to paint `--bg_interaction_tertiary_selected`, which is the same
+   * step as `--bg_interaction_tertiary_hover` in both themes: a click left the
+   * glyph looking hovered for as long as `aria-pressed` / `aria-expanded`
+   * stayed true, so the pointer's own feedback never ended. The control answers
+   * the pointer and nothing else. A surface that needs to show a state it owns
+   * says so with its own mark, not with the contract's hover fill. */
   .webui-icon-button--panel[aria-disabled="true"] {
     cursor: default;
     opacity: 0.72;

@@ -43,11 +43,16 @@ import {
   WEBUI_MINIAPP_AGENT_MAX_ID_LENGTH,
   WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST,
   WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
+  WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE,
+  WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END,
+  WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_EVENT,
   WEBUI_MINIAPP_BRIDGE_AGENT_RESULT,
   type WebuiMiniAppAgentBridgeRequest,
   type WebuiMiniAppAgentBridgeResult,
   type WebuiMiniAppAgentCallRequest,
   type WebuiMiniAppAgentCallResponse,
+  type WebuiMiniAppAgentObserveFrame,
+  type WebuiMiniAppAgentObserveRequest,
   type WebuiMiniAppAgentTurnFrame,
   type WebuiMiniAppAgentTurnRequest,
 } from "../../../../shared/contracts/miniapp-agent.js";
@@ -64,6 +69,16 @@ export interface WebuiMiniAppAgentBridgeCommands {
   readonly watchTurn: (
     request: WebuiMiniAppAgentTurnRequest,
     onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure: (error: Error) => void,
+  ) => () => void;
+  /**
+   * Turns as they settle. The detach is the cancel: closing the stream is what ends the
+   * watch in the runtime too. Optional because a host that never wired the stream should
+   * answer `capability_unavailable` rather than fail to build the bridge.
+   */
+  readonly watchObservations?: (
+    request: WebuiMiniAppAgentObserveRequest,
+    onFrame: (frame: WebuiMiniAppAgentObserveFrame) => void,
     onFailure: (error: Error) => void,
   ) => () => void;
 }
@@ -135,6 +150,8 @@ export function createWebuiMiniAppAgentBridge(
 ): WebuiMiniAppAgentBridgeHost {
   /** One detach per in-flight turn, so a teardown can end exactly those. */
   const turns = new Map<string, () => void>();
+  /** One detach per open watch, keyed by the id the page cancels with. */
+  const watches = new Map<string, () => void>();
   /** Request ids are shared across short calls and streamed turns. */
   const inFlightIds = new Set<string>();
   let closed = false;
@@ -166,6 +183,83 @@ export function createWebuiMiniAppAgentBridge(
    * A stream that fails at the transport level (the service went away, the socket
    * dropped) is `result_unknown`, because the turn may already have been accepted.
    */
+  /**
+   * One watch, followed until it ends.
+   *
+   * The page's promise settles on the end message, so every way a watch can stop — the
+   * page cancelling, the runtime failing, the stream closing — goes through `finish`
+   * exactly once. A host without the port answers `capability_unavailable` instead of
+   * leaving the page waiting on a watch nobody opened.
+   */
+  function startWatch(data: Record<string, unknown>): void {
+    const requestId = typeof data.requestId === "string" ? data.requestId : "";
+    if (!requestId || watches.has(requestId) || inFlightIds.has(requestId)) return;
+
+    const all = data.all === true;
+    const sessionId = typeof data.sessionId === "string" ? data.sessionId : undefined;
+    if (!all && !sessionId) {
+      postToPage({
+        type: WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END,
+        requestId,
+        ok: false,
+        code: "invalid_request",
+      });
+      return;
+    }
+
+    const open = input.commands.watchObservations;
+    if (!open) {
+      postToPage({
+        type: WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END,
+        requestId,
+        ok: false,
+        code: "capability_unavailable",
+      });
+      return;
+    }
+
+    let ended = false;
+    const finish = (ok: boolean, code?: string): void => {
+      if (ended) return;
+      ended = true;
+      watches.delete(requestId);
+      postToPage({
+        type: WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END,
+        requestId,
+        ok,
+        ...(code !== undefined ? { code } : {}),
+      });
+    };
+
+    const detach = open(
+      {
+        ...base(requestId),
+        ...(all ? { all: true } : { sessionId: sessionId as string }),
+      },
+      (frame) => {
+        if (ended) return;
+        if (frame.kind === "event") {
+          postToPage({
+            type: WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_EVENT,
+            requestId,
+            event: frame.event,
+          });
+          return;
+        }
+        finish(false, frame.code);
+      },
+      (error) => {
+        // A closed stream is how a watch ends when the frame goes away; it is not a code
+        // the page has to handle.
+        const code = (error as { code?: string }).code;
+        finish(false, code === "stream_closed" ? undefined : code);
+      },
+    );
+
+    watches.set(requestId, detach);
+    if (ended) detach();
+  }
+
   function startTurn(
     request: WebuiMiniAppAgentBridgeRequest,
     body: WebuiMiniAppAgentTurnRequest,
@@ -385,6 +479,26 @@ export function createWebuiMiniAppAgentBridge(
       ) {
         return;
       }
+      const data = event.data;
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const record = data as Record<string, unknown>;
+        if (record.type === WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE) {
+          startWatch(record);
+          return;
+        }
+        if (
+          record.type === WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END &&
+          record.cancel === true &&
+          typeof record.requestId === "string"
+        ) {
+          // The page stopped watching: close the stream, which is what ends the watch in
+          // the runtime too.
+          const detach = watches.get(record.requestId);
+          watches.delete(record.requestId);
+          detach?.();
+          return;
+        }
+      }
       const request = readWebuiMiniAppAgentBridgeRequest(event.data);
       if (request) {
         dispatch(request);
@@ -425,6 +539,10 @@ export function createWebuiMiniAppAgentBridge(
       closed = true;
       for (const detach of turns.values()) detach();
       turns.clear();
+      // A watch belongs to this frame: the frame is going away, so the streams it opened
+      // go with it rather than outliving the document nobody can cancel from anymore.
+      for (const detach of watches.values()) detach();
+      watches.clear();
       inFlightIds.clear();
     },
     inFlight: () => [...turns.keys()],

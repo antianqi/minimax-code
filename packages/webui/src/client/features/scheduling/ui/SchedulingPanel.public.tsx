@@ -236,9 +236,9 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
               </div>
               <WebuiInline gap="small" className="webui-scheduling-detail-actions">
                 <WebuiButton variant="secondary" size="compact" data-webui-scheduling-edit={selectedTask.cronId} onClick={() => props.onEdit(selectedTask)}>编辑任务</WebuiButton>
-                <WebuiButton variant="plain" size="compact" data-webui-scheduling-toggle={selectedTask.cronId} onClick={() => props.onToggle(selectedTask)}>{selectedTask.enabled ? "停用" : "启用"}</WebuiButton>
-                <WebuiButton variant="plain" size="compact" data-webui-scheduling-run={selectedTask.cronId} onClick={() => props.onRunNow(selectedTask)}>立即执行</WebuiButton>
-                <WebuiButton variant="plain" size="compact" data-webui-scheduling-history={selectedTask.cronId}
+                <WebuiButton variant="secondary" size="compact" data-webui-scheduling-toggle={selectedTask.cronId} onClick={() => props.onToggle(selectedTask)}>{selectedTask.enabled ? "停用" : "启用"}</WebuiButton>
+                <WebuiButton variant="secondary" size="compact" data-webui-scheduling-run={selectedTask.cronId} onClick={() => props.onRunNow(selectedTask)}>立即执行</WebuiButton>
+                <WebuiButton variant="secondary" size="compact" data-webui-scheduling-history={selectedTask.cronId}
                   aria-expanded={props.expandedRuns === selectedTask.cronId}
                   aria-controls={`webui-scheduling-runs-${encodeURIComponent(selectedTask.cronId)}`}
                   onClick={() => props.onToggleRuns(selectedTask)}
@@ -246,9 +246,9 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
                 {props.confirmingDelete === selectedTask.cronId
                   ? <>
                     <WebuiButton variant="danger-soft" size="compact" data-webui-scheduling-delete-confirm={selectedTask.cronId} onClick={() => props.onDelete(selectedTask)}>确认删除</WebuiButton>
-                    <WebuiButton variant="quiet-secondary" size="compact" data-webui-scheduling-delete-cancel={selectedTask.cronId} onClick={props.onCancelDelete}>取消</WebuiButton>
+                    <WebuiButton variant="secondary" size="compact" data-webui-scheduling-delete-cancel={selectedTask.cronId} onClick={props.onCancelDelete}>取消</WebuiButton>
                   </>
-                  : <WebuiButton variant="quiet-secondary" size="compact" data-webui-scheduling-delete={selectedTask.cronId} onClick={() => props.onRequestDelete(selectedTask)}>删除</WebuiButton>}
+                  : <WebuiButton variant="danger-soft" size="compact" data-webui-scheduling-delete={selectedTask.cronId} onClick={() => props.onRequestDelete(selectedTask)}>删除</WebuiButton>}
               </WebuiInline>
               <div className="webui-scheduling-detail-grid">
                 <WebuiCard className="webui-scheduling-info-card">

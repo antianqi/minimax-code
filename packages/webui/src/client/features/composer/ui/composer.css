@@ -8,9 +8,21 @@
    * The card is a size container: the toolbar's own form follows the width of
    * the card it is in, not the width of the window (ADR 0025). */
   .webui-composer-card {
+    position: relative;
     min-width: 0;
     box-shadow: 0 0 10px 0 var(--shadow_default);
     container: webui-composer / inline-size;
+  }
+
+  .webui-composer-mascot {
+    position: absolute;
+    z-index: 1;
+    top: -50px;
+    right: 8px;
+    width: 60px;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
   }
 
   /*

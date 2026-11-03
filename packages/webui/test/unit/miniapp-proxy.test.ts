@@ -118,6 +118,31 @@ function get(port: number, path: string): Promise<Result> {
   });
 }
 
+function send(
+  port: number,
+  method: string,
+  path: string,
+  headers: Record<string, string>,
+): Promise<Result> {
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      { host: '127.0.0.1', port, method, path, headers, agent: false },
+      (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk: string) => {
+          body += chunk;
+        });
+        response.on('end', () =>
+          resolve({ status: response.statusCode ?? 0, body, headers: response.headers }),
+        );
+      },
+    );
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 describe('Mini App proxy', () => {
   it('returns the runtime-selected surface path as the framed URL', () => {
     expect(proxy.viewUrl).toBe(`http://127.0.0.1:${proxy.port}/page?mode=dashboard`);
@@ -144,6 +169,20 @@ describe('Mini App proxy', () => {
     expect(seen.at(-1)?.headers[CREDENTIAL_HEADER]).toBe(CREDENTIAL);
     expect(seen.at(-1)?.headers.host).toBe(`127.0.0.1:${upstreamPort}`);
     expect(result.headers).not.toHaveProperty(CREDENTIAL_HEADER);
+  });
+
+  it('rewrites origin with host, so a same-origin check upstream can pass', async () => {
+    // Pages that serve their own API compare the request's `origin` against its
+    // `host` on writes (and skip the check on reads), so a proxy that rewrites
+    // only `host` reads fine and refuses every write.
+    const result = await send(proxy.port, 'PATCH', '/echo', {
+      origin: `http://127.0.0.1:${proxy.port}`,
+    });
+
+    expect(result.status).toBe(200);
+    const forwarded = seen.at(-1);
+    expect(forwarded?.headers.host).toBe(`127.0.0.1:${upstreamPort}`);
+    expect(forwarded?.headers.origin).toBe(`http://127.0.0.1:${upstreamPort}`);
   });
 
   it('rewrites a compressed HTML document after decoding it', async () => {

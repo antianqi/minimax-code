@@ -23,12 +23,18 @@
 import type {
   WebuiMiniAppAgentCallRequest,
   WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentObserveRequest,
   WebuiMiniAppAgentTurnRequest,
 } from "../../shared/contracts/miniapp-agent.js";
-import { readWebuiMiniAppAgentCallRequest, readWebuiMiniAppAgentTurnRequest } from "../../shared/contracts/miniapp-agent.js";
+import {
+  readWebuiMiniAppAgentCallRequest,
+  readWebuiMiniAppAgentObserveRequest,
+  readWebuiMiniAppAgentTurnRequest,
+} from "../../shared/contracts/miniapp-agent.js";
 import { WebuiErrorCode } from "../../shared/envelope.js";
 import {
   MINI_APP_AGENT_CALL_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME,
   WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import type { WebuiOperation } from "./operation-contract.js";
@@ -58,6 +64,28 @@ export const watchMiniAppAgentTurnOperation: WebuiOperation<WebuiMiniAppAgentTur
   // the first event or the settlement.
   acknowledgesStream: false,
 };
+
+/**
+ * Following turns as they settle.
+ *
+ * The stream is the watch, so its end is the end of the watch: nothing here needs a
+ * cancel call, and `acknowledgesStream` stays false because a page can act on the first
+ * event it receives.
+ */
+export const watchMiniAppAgentObservationsOperation: WebuiOperation<WebuiMiniAppAgentObserveRequest> =
+  {
+    name: WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME,
+    validate: (body) => {
+      const read = readWebuiMiniAppAgentObserveRequest(body);
+      if (read.ok) return { ok: true, body: read.request };
+      return {
+        ok: false,
+        code: WebuiErrorCode.invalidBody,
+        message: `${WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME} body is not a Mini App observation request`,
+      };
+    },
+    acknowledgesStream: false,
+  };
 
 /** One short call. Its refusal is the body's `ok: false`, not a wire error. */
 export const miniAppAgentCallOperation: WebuiOperation<

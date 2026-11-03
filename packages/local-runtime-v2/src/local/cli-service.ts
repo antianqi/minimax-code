@@ -335,6 +335,16 @@ export class CliService {
     return this.miniAppAgent().run(input);
   }
 
+  /** Watch turns as they settle; resolves when the page cancels or the frame goes away. */
+  observeMiniAppAgent(input: Parameters<MiniAppAgentCapability["observe"]>[0]) {
+    return this.miniAppAgent().observe(input);
+  }
+
+  /** Ends a watch by id; false when this plugin holds no such watch. */
+  cancelMiniAppAgentObserve(input: Parameters<MiniAppAgentCapability["cancelObserve"]>[0]) {
+    return this.miniAppAgent().cancelObserve(input);
+  }
+
   /** The continuation turn a questionnaire answer starts; followed like `run`. */
   answerMiniAppAgentQuestion(input: Parameters<MiniAppAgentCapability["answer"]>[0]) {
     return this.miniAppAgent().answer(input);

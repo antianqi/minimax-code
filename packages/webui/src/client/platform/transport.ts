@@ -186,6 +186,7 @@ import {
   REPLY_MINI_APP_TOOL_APPROVAL_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME,
   WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
   MINI_APP_AGENT_CALL_OPERATION_NAME,
 } from "../../shared/operation-names.js";
@@ -215,6 +216,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchMiniAppPresenter,
     watchMiniAppToolApprovals,
     watchMiniAppAgentTurn,
+    watchMiniAppAgentObservations,
     workspaceFileUrl,
     miniappStandaloneUrl,
     watchEvents,
@@ -332,6 +334,13 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
       watchMiniAppPresenter(WATCH_MINI_APP_PRESENTER_OPERATION_NAME, onFrame, onFailure),
     watchMiniAppAgentTurn: (body, onFrame, onFailure) =>
       watchMiniAppAgentTurn(WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME, body, onFrame, onFailure),
+    watchMiniAppAgentObservations: (body, onFrame, onFailure) =>
+      watchMiniAppAgentObservations(
+        WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME,
+        body,
+        onFrame,
+        onFailure,
+      ),
     miniAppAgentCall: (body) => request(MINI_APP_AGENT_CALL_OPERATION_NAME, body),
     miniAppToolCall: (body) => request(CALL_MINI_APP_TOOL_OPERATION_NAME, body),
     watchMiniAppToolApprovals: (_body, onFrame, onFailure) =>

@@ -28,6 +28,8 @@ export function createProcessLocalMiniAppAgentApplication(
     | 'sessions'
     | 'session'
     | 'create'
+    | 'observe'
+    | 'cancelObserve'
   >,
 ): ProcessLocalMiniAppAgentApplication {
   return {
@@ -61,5 +63,17 @@ export function createProcessLocalMiniAppAgentApplication(
       gateway.panelOpened({ sessionId, hostSessionId }),
     panelClosed: async ({ sessionId, hostSessionId }) =>
       gateway.panelClosed({ sessionId, hostSessionId }),
+    observe: ({ caller, requestId, all, sessionId, signal, onEvent }) =>
+      gateway.observe(
+        toGatewayCaller(caller),
+        {
+          requestId,
+          ...(all === true ? { all: true } : {}),
+          ...(sessionId !== undefined ? { sessionId } : {}),
+        },
+        { ...(signal ? { signal } : {}), onEvent },
+      ),
+    cancelObserve: ({ caller, requestId }) =>
+      gateway.cancelObserve(toGatewayCaller(caller), requestId),
   };
 }

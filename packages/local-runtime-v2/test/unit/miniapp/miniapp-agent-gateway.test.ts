@@ -1845,6 +1845,43 @@ describe('createMiniAppAgentGateway chosen agent and failing lookups', () => {
   );
 });
 
+describe('watching turns', () => {
+  const READER = { ...ARENA, policy: { ...ARENA.policy, capabilities: ['session.run', 'session.read'] as const } };
+
+  it('tells a watching page that a turn settled', async () => {
+    const { gateway } = setup();
+    gateway.registerArena(READER);
+
+    const seen: Array<{ type: string; sessionId: string; outcome: string }> = [];
+    const done = gateway.observe(CALLER, { requestId: 'w1', all: true }, {
+      onEvent: (event) => seen.push(event),
+    });
+
+    await gateway.run(CALLER, { text: 'hi' });
+
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toMatchObject({ type: 'turn.finished', outcome: 'finished' });
+
+    expect(gateway.cancelObserve(CALLER, 'w1')).toBe(true);
+    await done;
+  });
+
+  it('refuses an id another watch already holds', async () => {
+    const { gateway } = setup();
+    gateway.registerArena(READER);
+    const done = gateway.observe(CALLER, { requestId: 'w2', all: true }, { onEvent: () => undefined });
+
+    await expect(
+      gateway.observe({ ...CALLER, pluginId: 'other' }, { requestId: 'w2', all: true }, {
+        onEvent: () => undefined,
+      }),
+    ).rejects.toMatchObject({ code: 'busy' });
+
+    expect(gateway.cancelObserve(CALLER, 'w2')).toBe(true);
+    await done;
+  });
+});
+
 function setup(options: { readonly bind?: boolean } = {}) {
   const logger = { info: vi.fn(), warn: vi.fn() };
   const gateway = createMiniAppAgentGateway({ dataDir: '/data', logger, nowMs: () => 0 });

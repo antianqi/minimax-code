@@ -33,6 +33,8 @@ import type {
 import type {
   WebuiMiniAppAgentCallRequest,
   WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentObserveFrame,
+  WebuiMiniAppAgentObserveRequest,
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../../../shared/contracts/miniapp-agent.js";
@@ -63,6 +65,7 @@ export type WebuiMiniAppPortSlice = Pick<
   | "watchMiniAppPresentation"
   | "miniappStandaloneUrl"
   | "watchMiniAppAgentTurn"
+  | "watchMiniAppAgentObservations"
   | "miniAppAgentCall"
   | "miniAppToolCall"
   | "watchMiniAppToolApprovals"
@@ -330,6 +333,15 @@ export interface WebuiMiniAppWorkflows {
    * One followed turn for a page: the transport is the stream, `observe` is the
    * page's own claim and travels inside the body.
    */
+  /**
+   * Turns as they settle. The detach is the cancel: closing the stream ends the watch in
+   * the runtime too, so there is no separate cancel call to keep in step.
+   */
+  readonly watchAgentObservations: (
+    request: WebuiMiniAppAgentObserveRequest,
+    onFrame: (frame: WebuiMiniAppAgentObserveFrame) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
   readonly watchAgentTurn: (
     request: WebuiMiniAppAgentTurnRequest,
     onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
@@ -818,6 +830,23 @@ export function createWebuiMiniAppWorkflows(deps: {
    * settles. The refusal is delivered through `onFailure` so both paths settle the
    * page's call the same way.
    */
+  const watchAgentObservations: WebuiMiniAppWorkflows["watchAgentObservations"] = (
+    request,
+    onFrame,
+    onFailure,
+  ) => {
+    const watch = port.watchMiniAppAgentObservations;
+    if (!watch) {
+      // A host that never wired the stream: the page is told, rather than left waiting on
+      // a watch nobody opened.
+      onFailure?.(
+        Object.assign(new Error("capability_unavailable"), { code: "capability_unavailable" }),
+      );
+      return () => undefined;
+    }
+    return watch(request, onFrame, onFailure);
+  };
+
   const watchAgentTurn: WebuiMiniAppWorkflows["watchAgentTurn"] = (request, onFrame, onFailure) => {
     if (!request.hostSessionId) {
       onFailure(Object.assign(new Error("not_permitted"), { code: "not_permitted" }));
@@ -1145,6 +1174,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     presentInline,
     standaloneUrl,
     claimStandalone,
+    watchAgentObservations,
     watchAgentTurn,
     agentCall,
     toolCall,

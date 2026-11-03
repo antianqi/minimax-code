@@ -23,7 +23,55 @@ import { expect } from "@playwright/test";
 
 import { configureFixture, openApp, openLauncherTile, test } from "./harness.mjs";
 
-test("the left rail 应用 entry shows every installed Mini App as icon cards", async ({ page }) => {
+test("the launcher uses shared animated skeleton cards while the app list loads", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.delayEvery("listMiniApps", {});
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.miniapp",
+        displayName: "演示应用",
+        runtime: { kind: "process", status: "stopped" },
+      }] });
+      window.__fixture.setResponse("openMiniApp", {
+        pluginId: "demo.miniapp",
+        viewUrl: `${window.location.origin}/__miniapp-stub`,
+      });
+    });
+  });
+  await page.route("**/__miniapp-stub", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html; charset=utf-8",
+    body: "<!doctype html><html><body><p>Mini App stub</p></body></html>",
+  }));
+  await openApp(page);
+  await page.getByRole("button", { name: "应用" }).click();
+
+  const launcher = page.getByTestId("miniapp-launcher");
+  const skeletons = launcher.getByTestId("miniapp-launcher-loading-skeleton");
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.filter((request) => request.operation === "listMiniApps").length)).toBeGreaterThan(0);
+  const loadingStatus = launcher.getByTestId("miniapp-launcher-loading-status");
+  await expect(loadingStatus).toHaveClass(/webui-feedback-sr/u);
+  await expect(loadingStatus).toHaveCSS("clip-path", "inset(50%)");
+  await expect(skeletons).toHaveCount(6);
+  await expect(skeletons.first()).toHaveClass(/webui-motion-loading/u);
+  await expect(skeletons.first()).toHaveCSS("animation-name", "webui-skeleton-pulse");
+
+  await page.evaluate(() => window.__fixture.resolveAllPending("listMiniApps", {}, { miniApps: [{
+    pluginId: "demo.miniapp",
+    displayName: "演示应用",
+    runtime: { kind: "process", status: "stopped" },
+  }] }));
+  await expect(launcher.getByTestId("miniapp-launcher-card-demo.miniapp")).toBeVisible();
+  await expect(skeletons).toHaveCount(0);
+});
+
+test("the left rail 应用 entry opens a frosted task-card panel with loaded icons", async ({ page }) => {
+  await page.route("**/workspace-file?*", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/svg+xml",
+    body: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"red\"/></svg>",
+  }));
   await configureFixture(page, () => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
     window.__WEBUI_FIXTURE_SETUP__.push(() => {
@@ -32,7 +80,7 @@ test("the left rail 应用 entry shows every installed Mini App as icon cards", 
           pluginId: "demo.miniapp",
           displayName: "演示应用",
           description: "可启动的应用",
-          iconUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='red'/%3E%3C/svg%3E",
+          iconUrl: "/mavis/api/file/preview?path=%2Fplugins%2Fdemo%2Ficon.svg",
           runtime: { kind: "process", status: "stopped" },
         },
         {
@@ -47,16 +95,75 @@ test("the left rail 应用 entry shows every installed Mini App as icon cards", 
   });
   await openApp(page);
 
-  await page.getByRole("button", { name: "应用" }).click();
+  const appEntry = page.getByRole("button", { name: "应用", exact: true });
+  const appGlyph = appEntry.locator("svg");
+  const pluginsGlyph = page.getByRole("button", { name: "插件", exact: true }).locator("svg");
+  await expect(appGlyph).toHaveAttribute("width", "18");
+  await expect(appGlyph).toHaveAttribute("height", "18");
+  await expect(appGlyph).toHaveAttribute("stroke-width", "1.7");
+  await expect(appGlyph).toHaveAttribute("width", await pluginsGlyph.getAttribute("width"));
+  await expect(appGlyph).toHaveAttribute("stroke-width", await pluginsGlyph.getAttribute("stroke-width"));
+  await appEntry.click();
 
   const launcher = page.getByTestId("miniapp-launcher");
   await expect(launcher).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(launcher).toHaveAttribute("aria-label", "应用");
+  await expect(launcher).toHaveAttribute("data-webui-page", "panel");
+  await expect(launcher).toHaveAttribute("data-webui-motion", "surface");
+  await expect(launcher).toHaveCSS("backdrop-filter", /blur/u);
+  const blurAmount = await launcher.evaluate((element) => Number(element.ownerDocument.defaultView.getComputedStyle(element).backdropFilter.match(/blur\(([\d.]+)px\)/u)?.[1]));
+  expect(blurAmount).toBeGreaterThan(30);
+  const panelBox = await launcher.boundingBox();
+  const triggerBox = await page.getByRole("button", { name: "应用", exact: true }).boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(triggerBox).not.toBeNull();
+  expect(panelBox.width).toBeLessThanOrEqual(701);
+  expect(panelBox.x).toBeGreaterThan(triggerBox.x);
+  expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(1440);
   await expect(launcher.getByTestId("miniapp-launcher-card-demo.miniapp")).toBeVisible();
   await expect(launcher.getByTestId("miniapp-launcher-card-disabled.miniapp")).toBeVisible();
   await expect(launcher).toContainText("演示应用");
   await expect(launcher).toContainText("停用应用");
-  await expect(launcher.getByTestId("miniapp-launcher-icon-demo.miniapp")).toHaveAttribute("src", /^data:image\/svg\+xml/u);
-  await expect(launcher.getByTestId("miniapp-launcher-icon-demo.miniapp")).toHaveCSS("width", "76px");
+  await expect(launcher.locator(".webui-miniapp-launcher-icon")).toHaveCount(0);
+  const icon = launcher.getByTestId("miniapp-launcher-icon-demo.miniapp");
+  const grid = launcher.locator(".webui-miniapp-launcher-grid");
+  await expect(grid).toHaveCSS("display", "grid");
+  const columns = await grid.evaluate((element) => element.ownerDocument.defaultView.getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/u));
+  expect(columns).toHaveLength(3);
+  await expect(icon).toHaveAttribute("src", /\/workspace-file\?token=synthetic-token&dir=%2Fplugins%2Fdemo&path=icon\.svg/u);
+  await expect.poll(() => icon.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+  const preview = launcher.getByTestId("miniapp-launcher-preview-demo.miniapp");
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveCSS("overflow", "visible");
+  await expect(preview.locator(".webui-miniapp-launcher-preview-motion")).toHaveCSS("overflow", "visible");
+  const card = launcher.getByTestId("miniapp-launcher-card-demo.miniapp");
+  const cardBox = await card.boundingBox();
+  const previewBox = await preview.boundingBox();
+  expect(cardBox).not.toBeNull();
+  expect(previewBox).not.toBeNull();
+  expect(Math.abs(previewBox.width - previewBox.height)).toBeLessThan(1.5);
+  expect(cardBox.width / Number.parseFloat(columns[0])).toBeGreaterThan(0.77);
+  expect(cardBox.width / Number.parseFloat(columns[0])).toBeLessThan(0.83);
+  await expect(preview).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  const iconSize = await icon.evaluate((image) => ({
+    width: Number.parseFloat(image.ownerDocument.defaultView.getComputedStyle(image).width),
+    height: Number.parseFloat(image.ownerDocument.defaultView.getComputedStyle(image).height),
+  }));
+  expect(Math.abs(iconSize.width - previewBox.width)).toBeLessThan(8);
+  expect(Math.abs(iconSize.height - previewBox.height)).toBeLessThan(8);
+  await expect(icon).toHaveCSS("opacity", "1");
+  await expect(icon).toHaveCSS("filter", "none");
+  await expect(icon).toHaveCSS("object-fit", "cover");
+  const iconWidthBeforeHover = (await icon.boundingBox()).width;
+  await icon.hover();
+  await expect.poll(() => icon.evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(iconWidthBeforeHover * 1.05);
+  expect(previewBox.width).toBeGreaterThan(105);
+  expect(previewBox.width).toBeLessThan(130);
+  await launcher.getByRole("button", { name: "关闭应用面板" }).click();
+  await expect(launcher).toHaveAttribute("data-webui-motion-state", "exit");
+  await expect(launcher).toHaveCSS("animation-name", "webui-motion-surface-exit");
+  await expect(launcher).toHaveCount(0);
 });
 
 test("a stopped app card opens its standalone tab directly", async ({ page }) => {
@@ -80,6 +187,14 @@ test("a stopped app card opens its standalone tab directly", async ({ page }) =>
   const popup = await popupPromise;
   await expect(popup).toHaveURL(/\/miniapp\?token=synthetic-token&plugin=demo\.miniapp&session=A/u);
   await expect(popup.getByTestId("miniapp-standalone")).toBeVisible();
+  await expect(popup.getByTestId("miniapp-view-frame")).toBeVisible();
+  const standaloneGeometry = await popup.evaluate(() => {
+    const view = document.querySelector('[data-testid="miniapp-view"]');
+    const frame = document.querySelector('[data-testid="miniapp-view-frame"]');
+    const move = document.querySelector(".webui-miniapp-view-move");
+    return { viewport: innerHeight, view: view.getBoundingClientRect().height, frame: frame.getBoundingClientRect().height, move: move.getBoundingClientRect().height };
+  });
+  expect(standaloneGeometry.frame).toBeGreaterThan(standaloneGeometry.viewport - standaloneGeometry.move - 48);
 });
 
 test("a running app card cannot reopen and only exposes stop on hover", async ({ page }) => {
@@ -231,10 +346,13 @@ test("the launcher's 应用 tile turns the tab into the Mini App tool page, and 
       frame: bounds('[data-testid="miniapp-view-frame"]').height,
       panelBottom: bounds(".webui-workspace-panel-body").bottom,
       moveBottom: bounds(".webui-miniapp-view-move").bottom,
+      toolbar: bounds(".webui-workspace-file-toolbar--miniapp").toJSON(),
+      frameTop: bounds('[data-testid="miniapp-view-frame"]').top,
     };
   });
   expect(viewGeometry.frame).toBeGreaterThan(viewGeometry.body - 48);
-  expect(viewGeometry.moveBottom).toBeGreaterThan(viewGeometry.panelBottom - 2);
+  expect(viewGeometry.moveBottom).toBeLessThanOrEqual(viewGeometry.toolbar.bottom);
+  expect(viewGeometry.frameTop).toBeGreaterThanOrEqual(viewGeometry.toolbar.bottom);
   // The launcher tab became the Mini App tab; a second tab was not added.
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "miniapp");
 });

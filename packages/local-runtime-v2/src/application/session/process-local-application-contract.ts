@@ -31,6 +31,7 @@ import type {
   MiniAppAgentModels,
   MiniAppAgentModelSelection,
   MiniAppAgentPermissionDecision,
+  MiniAppAgentObserveEvent,
   MiniAppAgentRunEvent,
   MiniAppAgentRunResult,
   MiniAppAgentSessionContext,
@@ -278,6 +279,25 @@ export interface LocalRuntimeApplication {
       readonly caller: ProcessLocalMiniAppAgentCaller;
       readonly agent?: string;
     }): Promise<{ readonly sessionId: string }>;
+    /**
+     * Watch turns as they settle, for every conversation or one.
+     *
+     * Long-lived: the promise has no result, it settles when the watch ends. `requestId`
+     * is the handle the page cancels with, so it must be unique across watches.
+     */
+    observe(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly requestId: string;
+      readonly all?: boolean;
+      readonly sessionId?: string;
+      readonly signal?: AbortSignal;
+      readonly onEvent: (event: MiniAppAgentObserveEvent) => void;
+    }): Promise<void>;
+    /** Ends the watch this plugin opened under this id. */
+    cancelObserve(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly requestId: string;
+    }): boolean;
     reply(input: {
       readonly caller: ProcessLocalMiniAppAgentCaller;
       readonly sessionId: string;

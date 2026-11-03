@@ -2,7 +2,7 @@
 
 import type { ReactElement } from "react";
 import {
-  IconAlertTriangle, IconArchive, IconArrowUp, IconBell, IconBug, IconCirclePlus,
+  IconAlertTriangle, IconApps, IconArchive, IconArrowUp, IconBell, IconBug, IconCirclePlus,
   IconCalendarEvent, IconCaretRightFilled, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
   IconChevronRight, IconClipboard, IconCode, IconCopy, IconDeviceMobile, IconDots,
   IconDownload, IconEdit, IconFile, IconFileCode, IconFileImport, IconFolder, IconFolderPlus,
@@ -50,6 +50,7 @@ export function WebuiIconAgent({ className }: WebuiIconProps): ReactElement {
   return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;
 }
 export function WebuiIconNewTask({ className }: WebuiIconProps): ReactElement { return glyph(IconCirclePlus, className); }
+export function WebuiIconApps({ className }: WebuiIconProps): ReactElement { return glyph(IconApps, className); }
 export function WebuiIconPlugins({ className }: WebuiIconProps): ReactElement { return glyph(IconPuzzle, className); }
 export function WebuiIconSchedule({ className }: WebuiIconProps): ReactElement { return glyph(IconCalendarEvent, className); }
 export function WebuiIconSites({ className }: WebuiIconProps): ReactElement { return glyph(IconLayoutDashboard, className); }

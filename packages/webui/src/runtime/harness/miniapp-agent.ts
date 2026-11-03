@@ -20,7 +20,8 @@
 import type {
   MiniAppAgentAgents,
   MiniAppAgentModels,
-  MiniAppAgentRunEvent,
+  type MiniAppAgentObserveEvent,
+  type MiniAppAgentRunEvent,
   MiniAppAgentRunResult,
 } from "@mavis/shared/miniapp-surface";
 
@@ -48,6 +49,7 @@ type AgentMembers = Required<
     | "listMiniAppAgentSessions"
     | "readMiniAppAgentSession"
     | "createMiniAppAgentSession"
+    | "observeMiniAppAgent"
   >
 >;
 
@@ -66,6 +68,15 @@ const AGENT_MEMBER_NAMES = [
 ] as const;
 
 /**
+ * Members that arrived after the host contract was written.
+ *
+ * A host without them still serves turns: an `observe` call then answers
+ * `capability_unavailable`, which is what the page already handles for a channel it never
+ * had. Making it required would turn every agent method on such a host into an error.
+ */
+const OPTIONAL_AGENT_MEMBER_NAMES = ["observeMiniAppAgent"] as const;
+
+/**
  * The nine members, bound to the service they came from.
  *
  * The runtime's facade methods read `this.options`, so the receiver has to be the
@@ -81,8 +92,9 @@ function requireMiniAppAgent(host: WebuiRuntimeHostHandle): AgentMembers {
       throw new WebuiCapabilityUnavailableError(MINIAPP_CAPABILITY_ABSENT);
   }
   const bound = {} as Record<string, (...args: unknown[]) => unknown>;
-  for (const name of AGENT_MEMBER_NAMES) {
-    const member = record[name] as (...args: unknown[]) => unknown;
+  for (const name of [...AGENT_MEMBER_NAMES, ...OPTIONAL_AGENT_MEMBER_NAMES]) {
+    const member = record[name] as ((...args: unknown[]) => unknown) | undefined;
+    if (typeof member !== "function") continue;
     bound[name] = (...args) => member.apply(cliService, args);
   }
   return bound as unknown as AgentMembers;
@@ -120,6 +132,24 @@ export function createMiniAppAgentAdapter(host: WebuiRuntimeHostHandle): Pick<
         ...(input.model !== undefined ? { model: input.model } : {}),
         ...(input.signal ? { signal: input.signal } : {}),
         ...(input.onEvent ? { onEvent: input.onEvent } : {}),
+      });
+    },
+
+    async observeMiniAppAgent(input: {
+      readonly caller: WebuiMiniAppAgentCaller;
+      readonly requestId: string;
+      readonly all?: boolean;
+      readonly sessionId?: string;
+      readonly signal?: AbortSignal;
+      readonly onEvent: (event: MiniAppAgentObserveEvent) => void;
+    }): Promise<void> {
+      return requireMiniAppAgent(host).observeMiniAppAgent({
+        caller: input.caller,
+        requestId: input.requestId,
+        ...(input.all ? { all: true } : {}),
+        ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
+        ...(input.signal ? { signal: input.signal } : {}),
+        onEvent: input.onEvent,
       });
     },
 

@@ -578,8 +578,10 @@ export async function createRuntimeServices(
       favorites: new ModelFavoritesPreference(options.db),
     },
   });
-  if (owners.cron)
+  if (owners.cron) {
     options.compatibility.cron.bindAgentCleanup(owners.cron.service);
+    options.compatibility.cron.bindAgentToolService(owners.cron.service);
+  }
   const cronDelivery = createOptionalCronDelivery(
     owners.cron,
     options,

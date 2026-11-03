@@ -58,8 +58,7 @@ vi.mock("@mavis/local-runtime", async () => {
 vi.mock("../../../../src/compat/v1/cron.js", () => ({
   createV1MavisCronAdapterBridge: () => ({
     adapter: mocked.adapter,
-    bindHandleRequest: (handleRequest: unknown) =>
-      mocked.bindCalls.push(handleRequest),
+    bindService: (service: unknown) => mocked.bindCalls.push(service),
   }),
   createV1CronAgentCleanupBridge: () => ({
     deleteAgentCronTasks: mocked.deleteAgentCronTasks,
@@ -448,6 +447,24 @@ describe("v1 runtime compatibility host composition", () => {
 
     expect(mocked.cleanupBindCalls).toEqual([cron]);
     expect(mocked.deleteAgentCronTasks).toHaveBeenCalledWith("coder");
+  });
+
+  it("hands the Mavis Cron adapter to v1 and binds the V2 Cron owner", () => {
+    const compatibility = createCompatibility();
+    const configured = compatibility.configureHostOptions(
+      { dataDir: "/tmp/runtime" } as CreateLocalRuntimeHostOptions,
+      mocked.agentResolver,
+      preparedPorts(),
+    );
+    const services = compatibility.createServiceCompatibility(createdHost({}), {
+      dataDir: "/tmp/runtime",
+    } as CreateLocalRuntimeHostOptions);
+    const cronOwner = { listDefinitions: vi.fn() };
+
+    expect(configured.mavisCronAdapterProvider?.()).toBe(mocked.adapter);
+
+    services.cron.bindAgentToolService(cronOwner as never);
+    expect(mocked.bindCalls).toEqual([cronOwner]);
   });
 });
 

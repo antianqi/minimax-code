@@ -31,6 +31,10 @@ import {
   type MiniAppSessionLineage,
 } from './contracts.js';
 import { readMiniAppAgentModelSelection } from './model-selection.js';
+import {
+  createMiniAppAgentObservations,
+  type MiniAppAgentObservations,
+} from './observations.js';
 
 export interface MiniAppAgentGatewayOptions {
   readonly dataDir: string;
@@ -79,6 +83,8 @@ interface SessionListener {
 interface GatewayState {
   readonly options: MiniAppAgentGatewayOptions;
   readonly arenas: Map<string, ArenaEntry>;
+  /** Watches a page opened with `agent.observe`, fed by every settled turn. */
+  readonly observations: MiniAppAgentObservations;
   /** Sessions whose in-flight run registered `onEvent`, i.e. someone can answer an ask. */
   readonly listeners: Map<string, SessionListener>;
   /** Session -> host chats whose side panel shows it; any one is a place a user can answer an ask. */
@@ -141,6 +147,7 @@ export function createMiniAppAgentGateway(
     arenas: new Map(),
     listeners: new Map(),
     panels: new Map(),
+    observations: createMiniAppAgentObservations(),
   };
   // A revoked run capability stops what it authorized: the page is told the runs ended, instead of
   // the switch applying only to the next request while a turn keeps spending tokens.
@@ -208,6 +215,18 @@ export function createMiniAppAgentGateway(
       assertMiniAppPermission(state, caller, MINIAPP_AGENT_READ_PERMISSION);
       return createBoundSession(state, caller, input.agent);
     },
+    observe: async (caller, input, options) => {
+      assertMiniAppPermission(state, caller, MINIAPP_AGENT_READ_PERMISSION);
+      return state.observations.subscribe(
+        {
+          pluginId: caller.pluginId,
+          requestId: input.requestId,
+          ...(input.all === true ? { all: true } : { sessionId: input.sessionId }),
+        },
+        options,
+      );
+    },
+    cancelObserve: (caller, requestId) => state.observations.cancel(caller.pluginId, requestId),
     reply: (caller, input) => replyPermission(state, caller, input),
     open: (caller, input) => openSession(state, caller, input),
     panelOpened({ sessionId, hostSessionId }) {
@@ -485,7 +504,48 @@ async function startTurn(
     arena.inflight.size < arena.maxConcurrent && arena.queue.length === 0
       ? occupy(arena, call.sessionId)
       : await enqueue(state, arena, call);
-  return execute(state, admitted, call, slot);
+  try {
+    const result = await execute(state, admitted, call, slot);
+    publishSettlement(state, call, result);
+    return result;
+  } catch (error) {
+    // A call that never produced a result still ended. A page watching every
+    // conversation counts a started turn that failed as a settled one; without this a
+    // row for it would stay "running" forever.
+    if (call.sessionId) {
+      state.observations.publish({
+        sessionId: call.sessionId,
+        turnId: '',
+        title: '',
+        outcome: 'error',
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Tells the watchers that a turn ended.
+ *
+ * The title is read here, once, because it is what a page puts in its list: leaving every
+ * watching page to look it up would be one read per page per turn. A read that fails
+ * publishes the settlement anyway — the turn did end, and an empty title reads as an
+ * unnamed conversation on the page rather than as a turn that never finished.
+ */
+function publishSettlement(
+  state: GatewayState,
+  call: TurnCall,
+  result: MiniAppAgentRunResult,
+): void {
+  const { sessionId } = result;
+  const turnId = result.turnId ?? '';
+  const outcome = String(result.status);
+
+  void readHostSession(state, call.caller, { sessionId })
+    .then((context) =>
+      state.observations.publish({ sessionId, turnId, title: context?.title ?? '', outcome }),
+    )
+    .catch(() => state.observations.publish({ sessionId, turnId, title: '', outcome }));
 }
 
 function occupy(arena: ArenaEntry, sessionId: string | undefined, queuedAt?: number): Slot {

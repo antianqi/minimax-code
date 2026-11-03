@@ -28,6 +28,8 @@ import type {
   WebuiMiniAppAgentCallRequest,
   WebuiMiniAppAgentCallResponse,
   WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentObserveFrame,
+  WebuiMiniAppAgentObserveRequest,
   WebuiMiniAppAgentTurnRequest,
 } from "../../../../shared/contracts/miniapp-agent.js";
 import type {
@@ -122,6 +124,17 @@ export interface MiniAppPort {
   readonly watchMiniAppAgentTurn?: (
     request: WebuiMiniAppAgentTurnRequest,
     onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
+  /**
+   * Turns as they settle, every conversation or one.
+   *
+   * The detach is the cancel: a watch nobody is reading anymore is a watch nobody
+   * wants, so closing the stream is what ends it in the runtime too.
+   */
+  readonly watchMiniAppAgentObservations?: (
+    request: WebuiMiniAppAgentObserveRequest,
+    onFrame: (frame: WebuiMiniAppAgentObserveFrame) => void,
     onFailure?: (error: Error) => void,
   ) => () => void;
   /**

@@ -1,4 +1,4 @@
-// The Mini App picker the workspace panel's launcher opens.
+// The Mini App launcher and picker opened from the primary navigation rail.
 //
 // Same listing as the plugin catalogue's apps area — one owner, one read — so a
 // row here and a row there cannot disagree about what is running. The picker's own
@@ -9,8 +9,9 @@
 // workspace which tab to open. That direction is ADR 0020's: the business issues
 // the workspace panel's own command, it never reaches into the panel's state.
 
-import { useEffect, useState, type ReactElement } from "react";
-import { IconApps, IconX } from "@tabler/icons-react";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
+import { IconX } from "@tabler/icons-react";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -23,8 +24,9 @@ import {
   webuiMiniAppRefusalText,
   webuiMiniAppRunningRows,
 } from "../projection/miniapp-view.js";
-import { WebuiIconChevronRight, WebuiIconSites } from "../../../shell/icons.js";
+import { WebuiIconApps, WebuiIconChevronRight, WebuiIconSites } from "../../../shell/icons.js";
 import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { WebuiMotion, WebuiPage, WebuiSkeleton } from "../../../ui/page.js";
 import { WebuiButton } from "../../../ui/button.js";
 import {
   PluginRow,
@@ -35,52 +37,142 @@ import {
 } from "../../plugins/ui/PluginRow.public.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
-import { WebuiDialog } from "../../../ui/dialog.js";
 import { WebuiIconButton } from "../../../ui/button.js";
 import { webuiMiniAppWindowName } from "../projection/miniapp-view.js";
 
 /** Icon-card launcher opened from the primary navigation rail. */
 export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }): ReactElement | null {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<CSSProperties>({ left: 16, top: 16 });
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const surfaceRef = useRef<HTMLElement | null>(null);
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const { dom } = useWebuiBrowserCapabilities();
   const rows = state.listing.rows;
+  const portalTarget = dom.portalTarget();
+
+  const placeSurface = useCallback(() => {
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    const surface = surfaceRef.current;
+    if (!trigger || !surface) return;
+    const width = surface.offsetWidth;
+    const height = surface.offsetHeight;
+    const gap = 14;
+    const margin = 16;
+    const rightSide = trigger.right + gap;
+    const left = rightSide + width <= window.innerWidth - margin
+      ? rightSide
+      : Math.max(margin, trigger.left - gap - width);
+    const top = Math.max(margin, Math.min(trigger.top, window.innerHeight - height - margin));
+    setPosition({ left, top });
+  }, []);
+
+  const setSurfaceRef = useCallback((surface: HTMLElement | null) => {
+    surfaceRef.current = surface;
+    if (surface) window.requestAnimationFrame(placeSurface);
+  }, [placeSurface]);
 
   useEffect(() => {
     if (!open) return;
     void workflows?.loadListing();
   }, [open, workflows]);
 
-  return <>
-    <WebuiButton
-      variant="selectable-row"
-      size="regular"
-      className="webui-nav-item h-8 w-full pl-2 pr-2.5 text-sm font-normal"
-      data-webui-nav-item="应用"
-      data-webui-nav-active={open ? "true" : "false"}
-      aria-current={open ? "page" : undefined}
-      onClick={() => setOpen(true)}
+  useLayoutEffect(() => {
+    if (!open) return;
+    placeSurface();
+    window.addEventListener("resize", placeSurface);
+    window.addEventListener("scroll", placeSurface, true);
+    return () => {
+      window.removeEventListener("resize", placeSurface);
+      window.removeEventListener("scroll", placeSurface, true);
+    };
+  }, [open, placeSurface, rows.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (triggerRef.current?.contains(target) || surfaceRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.querySelector("button")?.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const iconSource = (iconUrl: string | undefined): string | undefined => {
+    if (!iconUrl) return undefined;
+    try {
+      const url = new URL(iconUrl, window.location.origin);
+      if (url.pathname !== "/mavis/api/file/preview") return iconUrl;
+      const token = (window as Window & { __WEBUI_CONFIG__?: { token?: string } }).__WEBUI_CONFIG__?.token;
+      if (!token) return undefined;
+      const iconPath = url.searchParams.get("path");
+      if (!iconPath) return undefined;
+      const separator = Math.max(iconPath.lastIndexOf("/"), iconPath.lastIndexOf("\\"));
+      const filename = iconPath.slice(separator + 1);
+      if (separator < 0 || !filename) return undefined;
+      const directory = separator === 0
+        ? iconPath.slice(0, 1)
+        : separator === 2 && iconPath[1] === ":"
+          ? iconPath.slice(0, separator + 1)
+          : iconPath.slice(0, separator);
+      const icon = new URL("/workspace-file", window.location.origin);
+      icon.searchParams.set("token", token);
+      icon.searchParams.set("dir", directory);
+      icon.searchParams.set("path", filename);
+      return `${icon.pathname}${icon.search}`;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const launcher = portalTarget ? createPortal(
+    <WebuiPage
+      as="section"
+      kind="panel"
+      present={open}
+      motion={{ kind: "surface", state: "enter", direction: "none" }}
+      ref={setSurfaceRef}
+      className="webui-miniapp-launcher-popover"
+      id="miniapp-launcher-popover"
+      aria-label="应用"
+      data-testid="miniapp-launcher"
+      style={position}
     >
-      <span className="flex flex-shrink-0 items-center justify-center"><IconApps /></span>
-      <span className="min-w-0 flex-1 truncate whitespace-nowrap">应用</span>
-    </WebuiButton>
-    <WebuiDialog
-      id="miniapp-launcher-dialog"
-      open={open}
-      title="应用"
-      onClose={() => setOpen(false)}
-      dismissOnEscape
-      dismissOnBackdrop
-      portalTarget={dom.portalTarget()}
-      testId="miniapp-launcher"
-      width="wide"
-      bodyClassName="webui-miniapp-launcher-body"
-    >
+      <header className="webui-miniapp-launcher-heading">
+        <div>
+          <h2>应用</h2>
+          <span>全部应用</span>
+        </div>
+        <WebuiIconButton
+          tone="bare"
+          size="compact"
+          label="关闭应用面板"
+          title="关闭"
+          onClick={() => setOpen(false)}
+        ><IconX /></WebuiIconButton>
+      </header>
       {state.unavailable ? <FeedbackEmpty title={state.unavailable} /> : null}
-      {!state.unavailable && state.listing.loading && rows.length === 0 ? <FeedbackLiveRegion>正在加载应用…</FeedbackLiveRegion> : null}
+      {!state.unavailable && state.listing.loading && rows.length === 0 ? <FeedbackLiveRegion screenReaderOnly testId="miniapp-launcher-loading-status">正在加载应用…</FeedbackLiveRegion> : null}
       {!state.unavailable && !state.listing.loading && rows.length === 0 ? <FeedbackEmpty title="暂无已安装的 Mini App" /> : null}
       <div className="webui-miniapp-launcher-grid">
+        {state.listing.loading && rows.length === 0 ? Array.from({ length: 6 }, (_, index) => <div className="webui-miniapp-launcher-loading-card" key={`loading-${index}`} aria-hidden="true">
+          <WebuiSkeleton variant="text" width="56%" />
+          <WebuiSkeleton variant="shape" className="webui-miniapp-launcher-loading-icon" testId="miniapp-launcher-loading-skeleton" />
+          <WebuiSkeleton variant="text" width="82%" />
+          <WebuiSkeleton variant="text" width="44%" />
+        </div>) : null}
         {rows.map((row) => {
           const running = row.enabled && row.status === "running";
           const launchable = row.enabled && !running && row.status !== "starting" && row.status !== "stopping" && Boolean(sessionId);
@@ -89,6 +181,21 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
             const href = workflows?.standaloneUrl({ pluginId: row.pluginId, sessionId });
             if (href) window.open(href, webuiMiniAppWindowName(row.pluginId));
           };
+          const src = iconSource(row.iconUrl);
+          const content = <>
+            <span className="webui-miniapp-launcher-card-heading">
+              <span className="webui-miniapp-launcher-name">{row.name}</span>
+            </span>
+            <span className="webui-miniapp-launcher-preview" data-testid={`miniapp-launcher-preview-${row.pluginId}`} aria-label={`${row.name}图标`}>
+              {src ? <WebuiMotion as="div" kind="card" hoverable motionRole="icon" className="webui-miniapp-launcher-preview-motion">
+                <img className="webui-miniapp-launcher-preview-mark" data-testid={`miniapp-launcher-icon-${row.pluginId}`} src={src} alt="" aria-hidden="true" onError={(event) => { event.currentTarget.hidden = true; }} />
+              </WebuiMotion> : <WebuiIconApps />}
+            </span>
+            <span className="webui-miniapp-launcher-preview-copy">{row.description || row.pluginId}</span>
+            <span className="webui-miniapp-launcher-status" data-status={row.status}>
+              <span className="webui-miniapp-launcher-status-dot" aria-hidden="true" />{row.statusLabel}
+            </span>
+          </>;
           return <div
             className={`webui-miniapp-launcher-card${running ? " is-running" : ""}`}
             key={row.pluginId}
@@ -97,14 +204,10 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
             aria-disabled={!launchable && !running ? "true" : undefined}
           >
             {launchable ? <button className="webui-miniapp-launcher-open" type="button" onClick={launch} aria-label={`打开${row.name}`}>
-              {row.iconUrl ? <img data-testid={`miniapp-launcher-icon-${row.pluginId}`} src={row.iconUrl} alt="" /> : <IconApps />}
-              <span className="webui-miniapp-launcher-name">{row.name}</span>
-              <span className="webui-miniapp-launcher-status">{row.statusLabel}</span>
+              {content}
             </button> : <div className="webui-miniapp-launcher-face" aria-label={`${row.name}，${row.statusLabel}`}>
-              {row.iconUrl ? <img data-testid={`miniapp-launcher-icon-${row.pluginId}`} src={row.iconUrl} alt="" /> : <IconApps />}
-              <span className="webui-miniapp-launcher-name">{row.name}</span>
+              {content}
             </div>}
-            {!launchable ? <span className="webui-miniapp-launcher-status">{row.statusLabel}</span> : null}
             {running ? <WebuiIconButton
               className="webui-miniapp-launcher-stop"
               tone="bare"
@@ -118,7 +221,28 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
         })}
       </div>
       {!sessionId && rows.length > 0 ? <p className="webui-miniapp-launcher-hint">选择一个任务后即可打开应用</p> : null}
-    </WebuiDialog>
+    </WebuiPage>,
+    portalTarget,
+  ) : null;
+
+  return <>
+    <span className="webui-miniapp-launcher-trigger" ref={triggerRef}>
+    <WebuiButton
+      variant="selectable-row"
+      size="regular"
+      className="webui-nav-item h-8 w-full pl-2 pr-2.5 text-sm font-normal"
+      data-webui-nav-item="应用"
+      data-webui-nav-active={open ? "true" : "false"}
+      aria-current={open ? "page" : undefined}
+      aria-expanded={open}
+      aria-controls="miniapp-launcher-popover"
+      onClick={() => setOpen((value) => !value)}
+    >
+      <span className="flex flex-shrink-0 items-center justify-center"><WebuiIconApps /></span>
+      <span className="min-w-0 flex-1 truncate whitespace-nowrap">应用</span>
+    </WebuiButton>
+    </span>
+    {launcher}
   </>;
 }
 export interface MiniAppPickerProps {

@@ -173,6 +173,13 @@
       opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard),
       box-shadow var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard);
   }
+  .webui-motion[data-webui-motion="card"][data-webui-motion-role="icon"][data-webui-motion-hoverable="true"] img {
+    transition: scale var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard);
+  }
+  .webui-motion[data-webui-motion="card"][data-webui-motion-role="icon"][data-webui-motion-hoverable="true"]:hover img,
+  .webui-motion[data-webui-motion="card"][data-webui-motion-role="icon"][data-webui-motion-hoverable="true"]:focus-within img {
+    scale: 1.08;
+  }
   .webui-motion[data-webui-motion="sortable"] {
     transition: transform var(--webui-motion-duration-disclosure) var(--webui-motion-ease-standard),
       opacity var(--webui-motion-duration-feedback) var(--webui-motion-ease-standard);

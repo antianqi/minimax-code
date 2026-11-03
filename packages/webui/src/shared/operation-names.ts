@@ -203,6 +203,8 @@ export const WATCH_MINI_APP_PRESENTER_OPERATION_NAME = "watchMiniAppPresenter" a
  * `shared/contracts/miniapp-agent.ts`).
  */
 export const WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME = "watchMiniAppAgentTurn" as const;
+export const WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME =
+  "watchMiniAppAgentObservations" as const;
 /**
  * One short Mini App agent call: `models`, `agents`, `create`, `reply`, `open`, the
  * two panel reports, and `cancel`.
@@ -479,6 +481,8 @@ import type {
   WebuiMiniAppAgentCallRequest,
   WebuiMiniAppAgentCallResponse,
   WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentObserveFrame,
+  WebuiMiniAppAgentObserveRequest,
   WebuiMiniAppAgentTurnRequest,
 } from "./contracts/miniapp-agent.js";
 import type {
@@ -1056,6 +1060,16 @@ export interface OperationSpec {
     request: WebuiMiniAppAgentTurnRequest;
     response: WebuiMiniAppAgentTurnStreamEnvelope;
   };
+  /**
+   * Following turns as they settle, for every conversation or one.
+   *
+   * The stream is the watch: it ends when the frame goes away, so there is no separate
+   * cancel call and no acknowledgement frame — the first frame is an event or a failure.
+   */
+  watchMiniAppAgentObservations: {
+    request: WebuiMiniAppAgentObserveRequest;
+    response: WebuiMiniAppAgentObserveFrame;
+  };
   /** One short Mini App agent call, refusal included in the body. */
   miniAppAgentCall: {
     request: WebuiMiniAppAgentCallRequest;
@@ -1294,6 +1308,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
   WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_OBSERVATIONS_OPERATION_NAME,
   WATCH_REMOTE_CONTROL_STATUS_OPERATION_NAME,
   WATCH_SSH_TERMINAL_OPERATION_NAME,
 ] as const;

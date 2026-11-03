@@ -23,12 +23,15 @@ import {
 
 function page() {
   const posted: unknown[] = [];
-  let listener: ((event: unknown) => void) | undefined;
+  // The script registers one listener per channel it serves, so the harness has to keep
+  // them all: keeping only the last one silently disables every channel registered before
+  // it, which turns a passing test into a five-second timeout.
+  const listeners: Array<(event: unknown) => void> = [];
   const window = {
     mcode: {},
     parent: { postMessage: (data: unknown) => posted.push(data) },
     addEventListener: (name: string, handler: (event: unknown) => void) => {
-      if (name === "message") listener = handler;
+      if (name === "message") listeners.push(handler);
     },
   };
   runInNewContext(miniAppPageBridge().script, {
@@ -53,7 +56,9 @@ function page() {
   return {
     posted,
     tools,
-    answer: (data: unknown) => listener?.({ source: window.parent, data }),
+    answer: (data: unknown) => {
+      for (const listener of listeners) listener({ source: window.parent, data });
+    },
   };
 }
 

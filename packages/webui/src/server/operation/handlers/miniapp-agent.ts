@@ -44,6 +44,7 @@ import type {
 } from "../operation-contract.js";
 import {
   miniAppAgentCallOperation,
+  watchMiniAppAgentObservationsOperation,
   watchMiniAppAgentTurnOperation,
 } from "../miniapp-agent.js";
 import type { MiniAppAgentConnections } from "../../miniapp/agent-connections.js";
@@ -82,6 +83,7 @@ type MiniAppAgentFacade = Required<
     | "listMiniAppAgentSessions"
     | "readMiniAppAgentSession"
     | "createMiniAppAgentSession"
+    | "observeMiniAppAgent"
   >
 >;
 
@@ -188,6 +190,74 @@ export interface MiniAppAgentHandlerOptions {
 }
 
 /** One followed turn, as a stream of progress events and one settlement. */
+/**
+ * A watch is the stream: it ends when the client detaches, and detaching aborts the
+ * runtime's watch. Nothing here is time-limited — a settled turn can be minutes away, and
+ * a watchdog would end a watch that is doing exactly what it was opened for.
+ */
+async function* observeSource(input: {
+  readonly context: WebuiOperationContext;
+  readonly body: WebuiMiniAppAgentObserveRequest;
+  readonly port: WebuiOperationPort;
+  readonly options: MiniAppAgentHandlerOptions;
+}): AsyncGenerator<WebuiMiniAppAgentObserveFrame> {
+  const { body, context, options, port } = input;
+  const caller = options.connections.callerFor({
+    pluginId: body.pluginId,
+    hostSessionId: body.hostSessionId,
+    connection: body.connection,
+  });
+  if (!caller) {
+    yield { kind: "failure", code: "runtime_unavailable" };
+    return;
+  }
+
+  let facade: MiniAppAgentFacade;
+  try {
+    facade = requireMiniAppAgent(port);
+  } catch (error) {
+    yield { kind: "failure", ...failureOf(error, "observe") };
+    return;
+  }
+
+  const queue = createFrameQueue<WebuiMiniAppAgentObserveFrame>();
+  const controller = new AbortController();
+
+  void facade
+    .observeMiniAppAgent({
+      caller,
+      requestId: body.requestId,
+      ...(body.all === true ? { all: true } : {}),
+      ...(body.sessionId !== undefined ? { sessionId: body.sessionId } : {}),
+      signal: controller.signal,
+      onEvent: (event) => queue.push({ kind: "event", event }),
+    })
+    .then(
+      () => queue.close(),
+      (error) => {
+        queue.push({ kind: "failure", ...failureOf(error, "observe") });
+        queue.close();
+      },
+    );
+
+  const onDetach = (): void => {
+    controller.abort();
+    queue.close();
+  };
+  context.signal?.addEventListener("abort", onDetach, { once: true });
+
+  try {
+    for (;;) {
+      const frame = await queue.next();
+      if (frame === undefined) return;
+      yield frame;
+    }
+  } finally {
+    context.signal?.removeEventListener("abort", onDetach);
+    controller.abort();
+  }
+}
+
 async function* turnSource(
   input: {
     readonly context: WebuiOperationContext;
@@ -419,7 +489,25 @@ export function createMiniAppAgentHandlerEntries(
     }
   };
 
+  const watchMiniAppAgentObservations: DedicatedHandler<
+    typeof watchMiniAppAgentObservationsOperation
+  > = async (context, body) => ({
+    stream: {
+      ok: true,
+      source: observeSource({ context, body, port, options }) as unknown as AsyncIterable<
+        Record<string, unknown>
+      >,
+    },
+  });
+
   return new Map([
+    [
+      watchMiniAppAgentObservationsOperation.name,
+      {
+        operation: watchMiniAppAgentObservationsOperation,
+        handle: watchMiniAppAgentObservations as WebuiOperationHandler<unknown>,
+      },
+    ],
     [
       watchMiniAppAgentTurnOperation.name,
       {

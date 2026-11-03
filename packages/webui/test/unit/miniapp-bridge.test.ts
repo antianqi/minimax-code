@@ -53,9 +53,13 @@ describe("the injected page capability list", () => {
     expect(has("message.append")).toBe(true);
     expect(has("agent.sessions")).toBe(true);
     expect(has("agent.session")).toBe(true);
-    expect(has("agent.observe")).toBe(false);
+    // Honoured as a watch over the runtime's settled turns, so a page stops treating
+    // its task list as unsupported.
+    expect(has("agent.observe")).toBe(true);
     expect(has("speech.transcribe")).toBe(false);
-    expect(has("window")).toBe(false);
+    // Honoured as a floating box inside this page, so the page stops treating its
+    // window features as unsupported.
+    expect(has("window")).toBe(true);
   });
 });
 

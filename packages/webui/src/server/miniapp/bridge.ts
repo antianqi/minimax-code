@@ -24,6 +24,9 @@ import {
 } from "../../shared/contracts/miniapp.js";
 import {
   WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
+  WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE,
+  WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END,
+  WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_EVENT,
   WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST,
   WEBUI_MINIAPP_BRIDGE_AGENT_RESULT,
 } from "../../shared/contracts/miniapp-agent.js";
@@ -32,6 +35,10 @@ import {
   WEBUI_MINIAPP_BRIDGE_TOOL_RESULT,
   WEBUI_MINIAPP_TOOL_MAX_NAMES,
 } from "../../shared/contracts/miniapp-tools.js";
+import {
+  WEBUI_MINIAPP_BRIDGE_WINDOW_REQUEST,
+  WEBUI_MINIAPP_BRIDGE_WINDOW_STATE,
+} from "../../shared/contracts/miniapp-window.js";
 import type { MiniAppPageBridge } from "./proxy.js";
 
 /**
@@ -94,7 +101,9 @@ const SCRIPT = `(function () {
     "agent.agents",
     "agent.create",
     "agent.sessions",
-    "agent.session"
+    "agent.session",
+    "agent.observe",
+    "window"
   ];
   mcode.miniapp.capabilities = mcode.miniapp.capabilities || {};
   mcode.miniapp.capabilities.has = function (name) {
@@ -190,6 +199,41 @@ const SCRIPT = `(function () {
       }
     });
   }
+  // ---------------------------------------------------------------------
+  // Watches: a page asks to be told about turns as they settle.
+  //
+  // A watch has no result, so it is not an agentRequest: OBSERVE opens it,
+  // OBSERVE_EVENT carries each settled turn, OBSERVE_END closes it. The page's
+  // promise settles at the end — with nothing on success, because there is nothing to
+  // return, and with the runtime's code when the watch could not open.
+  // ---------------------------------------------------------------------
+  var AGENT_OBSERVE = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE)};
+  var AGENT_OBSERVE_EVENT = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_EVENT)};
+  var AGENT_OBSERVE_END = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_AGENT_OBSERVE_END)};
+  var agentWatches = new Map();
+  var agentWatchSequence = 0;
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent) return;
+    var data = event.data;
+    if (!data || typeof data !== "object") return;
+    if (data.type === AGENT_OBSERVE_EVENT) {
+      var watch = agentWatches.get(data.requestId);
+      if (!watch) return;
+      try {
+        watch.onEvent(data.event);
+      } catch (error) {
+        // A page's own handler failing is the page's problem.
+      }
+      return;
+    }
+    if (data.type === AGENT_OBSERVE_END) {
+      var ended = agentWatches.get(data.requestId);
+      if (!ended) return;
+      agentWatches.delete(data.requestId);
+      if (data.ok === true) ended.resolve();
+      else ended.reject(new Error(typeof data.code === "string" ? data.code : "result_unknown"));
+    }
+  });
   mcode.miniapp.agent = {
     run: function (input, options) {
       return agentRequest("run", input, options);
@@ -218,8 +262,48 @@ const SCRIPT = `(function () {
     create: function (input) {
       return agentRequest("create", input);
     },
+    observe: function (input, options) {
+      var request = input && typeof input === "object" ? input : {};
+      var listener = options && typeof options.onEvent === "function" ? options.onEvent : null;
+      if (!listener) return Promise.reject(new Error("invalid_request"));
+      var all = request.all === true;
+      if (!all && (typeof request.sessionId !== "string" || request.sessionId.length === 0)) {
+        return Promise.reject(new Error("invalid_request"));
+      }
+      agentWatchSequence += 1;
+      var requestId = "watch-" + Date.now().toString(36) + "-" + agentWatchSequence;
+      return new Promise(function (resolve, reject) {
+        agentWatches.set(requestId, { onEvent: listener, resolve: resolve, reject: reject });
+        var message = { type: AGENT_OBSERVE, requestId: requestId };
+        if (all) message.all = true;
+        else message.sessionId = request.sessionId;
+        try {
+          window.parent.postMessage(message, "*");
+        } catch (error) {
+          agentWatches.delete(requestId);
+          reject(error);
+        }
+      });
+    },
     cancel: function (requestId) {
-      if (typeof requestId !== "string" || !agentPending.has(requestId)) return;
+      if (typeof requestId !== "string") return;
+      var watch = agentWatches.get(requestId);
+      if (watch) {
+        // Closing a watch is the page's own decision: its promise settles here, and the
+        // host is told so it closes the stream behind it.
+        agentWatches.delete(requestId);
+        watch.resolve();
+        try {
+          window.parent.postMessage(
+            { type: AGENT_OBSERVE_END, requestId: requestId, cancel: true },
+            "*"
+          );
+        } catch (ignored) {
+          // The document is going away; the stream dies with it.
+        }
+        return;
+      }
+      if (!agentPending.has(requestId)) return;
       try {
         window.parent.postMessage(
           { type: AGENT_REQUEST, requestId: requestId, method: "cancel", payload: {}, observe: false },
@@ -293,6 +377,88 @@ const SCRIPT = `(function () {
     call: function (name, input) {
       if (typeof name !== "string" || name.length === 0) return rejectInvalid();
       return toolRequest("call", { name: name, arguments: input });
+    }
+  };
+  // ---------------------------------------------------------------------
+  // The box this page is shown in.
+  //
+  // A page that asks for a window wants to move and resize itself. This client
+  // has no window to give it, so the host draws a floating box inside the page
+  // the person is already looking at — the same view, the same document, a
+  // different layout. The patch is forwarded unexamined: the host owns the
+  // bounds and is the only side that can say what it honours.
+  // ---------------------------------------------------------------------
+  var WINDOW_REQUEST = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_WINDOW_REQUEST)};
+  var WINDOW_STATE = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_WINDOW_STATE)};
+  var windowSequence = 0;
+  var windowPending = new Map();
+  var windowListeners = [];
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent) return;
+    var data = event.data;
+    if (!data || typeof data !== "object" || data.type !== WINDOW_STATE) return;
+    if (typeof data.requestId === "string") {
+      var settle = windowPending.get(data.requestId);
+      if (settle) {
+        windowPending.delete(data.requestId);
+        settle(data.state);
+      }
+    }
+    for (var index = 0; index < windowListeners.length; index += 1) {
+      try {
+        windowListeners[index](data.state);
+      } catch (error) {
+        // One listener throwing is that listener's problem, not the page's.
+      }
+    }
+  });
+  /**
+   * How long a page waits for the box it asked about.
+   *
+   * A page that asks and never hears back does not degrade: it keeps the promise in its
+   * initialisation path, so nothing after it runs and the page renders half of itself.
+   * The page this channel serves treats a rejected getState as "no window here" and
+   * falls back to the panel, so answering nothing is the one outcome it cannot handle.
+   */
+  var WINDOW_TIMEOUT_MS = 800;
+  function windowRequest(method, patch) {
+    return new Promise(function (resolve, reject) {
+      windowSequence += 1;
+      var requestId = "window-" + Date.now().toString(36) + "-" + windowSequence;
+      var timer = setTimeout(function () {
+        if (!windowPending.has(requestId)) return;
+        windowPending.delete(requestId);
+        reject(new Error("result_unknown"));
+      }, WINDOW_TIMEOUT_MS);
+      windowPending.set(requestId, function (state) {
+        clearTimeout(timer);
+        resolve(state);
+      });
+      var message = { type: WINDOW_REQUEST, requestId: requestId, method: method };
+      if (patch && typeof patch === "object") message.patch = patch;
+      window.parent.postMessage(message, "*");
+    });
+  }
+  mcode.miniapp.window = {
+    getState: function () {
+      return windowRequest("get");
+    },
+    update: function (patch) {
+      if (!patch || typeof patch !== "object") return Promise.reject(new Error("invalid_request"));
+      return windowRequest("update", patch);
+    },
+    focus: function () {
+      return windowRequest("focus");
+    },
+    onDidChangeState: function (listener) {
+      if (typeof listener !== "function") return { dispose: function () {} };
+      windowListeners.push(listener);
+      return {
+        dispose: function () {
+          var at = windowListeners.indexOf(listener);
+          if (at !== -1) windowListeners.splice(at, 1);
+        }
+      };
     }
   };
 })();

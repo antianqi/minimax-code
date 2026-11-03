@@ -82,7 +82,7 @@ export interface CreateWebuiSchedulingOwnerOptions {
   readonly clearIntervalFn?: (handle: unknown) => void;
 }
 
-const DEFAULT_REFRESH_MS = 5_000;
+const DEFAULT_REFRESH_MS = 60_000;
 
 export function createWebuiSchedulingOwner(
   options: CreateWebuiSchedulingOwnerOptions,
@@ -119,6 +119,7 @@ export function createWebuiSchedulingOwner(
           status: "error",
           tasks: snapshot.tasks,
           error: error instanceof Error && error.message ? error.message : WEBUI_SCHEDULING_READ_FAILED,
+          ...(snapshot.loadedAtMs === undefined ? {} : { loadedAtMs: snapshot.loadedAtMs }),
         });
       } finally {
         inFlight = undefined;

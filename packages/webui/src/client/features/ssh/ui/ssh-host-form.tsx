@@ -17,6 +17,7 @@ import {
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiField, WebuiRadio, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 export interface SshHostFormProps {
   readonly onSubmit: (request: WebuiSshSaveConnectionRequest) => void;
@@ -65,6 +66,11 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
   /** What the form itself refuses, next to what the runtime answered. */
   const [formError, setFormError] = useState<string | undefined>(undefined);
   const { errors, validateRequired, setFieldError, clearFieldError, clearErrors } = useWebuiFormValidation();
+  // The failure is said once: what the form refuses and what the runtime
+  // answered are one answer, and it does not belong in the form's layout.
+  useWebuiToastError(formError ?? props.error, {
+    dataAttributes: { "data-webui-ssh-form-error": "true" },
+  });
 
   // The editor opens before the config file has been read, so the values it shows arrive
   // afterwards. The fields follow them.
@@ -288,11 +294,6 @@ export function SshHostForm(props: SshHostFormProps): ReactElement {
           )}
         />
       </div>
-      {formError ?? props.error
-        ? <p data-webui-ssh-form-error="true" className="mt-2 text-xs text-text_default_secondary">
-          {formError ?? props.error}
-        </p>
-        : null}
       <WebuiInline gap="small" className="mt-2">
         <WebuiButton variant="outline" size="inline-dense" type="submit"
           data-webui-ssh-form-submit="true"

@@ -237,15 +237,29 @@ describe("the Browser panel", () => {
     expect(markup).not.toContain('data-testid="browser-panel-frame"');
   });
 
-  it("reports the stable error code alongside the message", () => {
+  it("says the failure through the toast, with the stable error code beside it", () => {
     const state = reduceWebuiBrowserPanelState(initialWebuiBrowserPanelState, {
       type: "failed",
       error: { code: "browser_provider_unavailable", message: "浏览器提供方不可用。", retryable: true },
     });
     const markup = renderToStaticMarkup(<BrowserPanel port={wiredPort} state={state} />);
 
-    expect(markup).toContain('data-error-code="browser_provider_unavailable"');
-    expect(markup).toContain("浏览器提供方不可用。");
+    // The failed read is an event, not a state: it is said once, through the
+    // shared toast, which is drawn over the page and takes no room from it
+    // (ADR 0030). A server render never sees it.
+    expect(markup).not.toContain('data-error-code="browser_provider_unavailable"');
+    expect(markup).not.toContain("浏览器提供方不可用。");
+    // The panel still renders what it can show.
+    expect(markup).toContain('data-testid="browser-panel"');
+    expect(markup).toContain('data-testid="browser-panel-frame-empty"');
+
+    // The toast still carries the stable code beside the message.
+    const source = readFileSync(
+      new URL("../../src/client/features/browser/ui/BrowserPanel.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain('"data-error-code"');
   });
 
   it("does not carry a surface switcher any more", () => {

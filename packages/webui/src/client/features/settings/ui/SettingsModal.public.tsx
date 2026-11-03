@@ -44,7 +44,7 @@ import { WebuiZoneBoundary } from "../../../shell/WebuiZoneBoundary.js";
 import { WebuiWorktreePanel } from "./SettingsModal.js";
 import { ManagedOverlayBoundary, useDialogLayer } from "../../../ui/overlay-listeners.js";
 import { useOverlayCoordinator } from "../../../ui/overlay-coordinator.js";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiMotion, WebuiPage } from "../../../ui/page.js";
 
@@ -494,7 +494,7 @@ function ArchivedSessionsPage({ sessions, canDelete, canUnarchive, onDelete, onU
   }
   return (
     <SettingsPage testId="settings-archived-page">
-      {actionError ? <FeedbackError message={actionError} className="webui-archived-error" /> : null}
+      {actionError ? <SettingsErrorNotice message={actionError} /> : null}
       <div className="webui-archived-filters">
         <WebuiSearchField icon={<SearchIcon />} label="搜索已归档聊天" placeholder="搜索已归档聊天" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
@@ -555,4 +555,24 @@ function formatArchivedDate(timestamp: number): string {
 }
 function TrashIcon(): ReactElement {
   return <IconTrash aria-hidden="true" size={16} stroke={1.4} />;
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  useWebuiToastError(message, { testId });
+  return null;
 }

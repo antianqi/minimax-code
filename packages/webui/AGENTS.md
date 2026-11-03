@@ -94,6 +94,15 @@ component records the reason at the call site and in the presentation inventory.
 stylesheet selector to a named class so the stylesheet stops addressing raw elements is a separate
 job: it makes the ratchet possible, and it does not count as adopting the component.
 
+**A failure and a confirmation are a toast.** Something that has already happened — an action that
+failed, a write that landed, a read that did not come back — is said through `useWebuiToastError`,
+`useWebuiToastSuccess` or `useWebuiToast().show` (`client/ui/toast.tsx`), never written into the page:
+the toast is drawn over the client and takes no room from it. Two things stay where they are: a
+field's own validation error, which `WebuiField` binds to its control with `aria-describedby`, and a
+state that stays true until the fact changes. The notice crosses a modal: the host carries
+`data-webui-live-surface`, so a modal never makes it inert, silences its announcement, or closes
+when the reader answers it. ADR 0030 states the rule and the reasons.
+
 **A command that is still running is the control's state.** Pass `loading` (and `loadingLabel`) to
 `WebuiButton`, `WebuiIconButton` or `ToggleSwitch`, or give the control a promise-returning `onClick`
 and let `useFeedbackActionLoading` follow it; do not disable the control by hand or draw a local

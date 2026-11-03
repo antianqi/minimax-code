@@ -554,6 +554,7 @@
       "packages/webui/test/unit/miniapp-client-state.test.ts",
       "packages/webui/test/unit/miniapp-bridge.test.ts",
       "packages/webui/test/unit/miniapp-agent-observe.test.ts",
+      "packages/webui/test/unit/miniapp-port-slices.test.ts",
       "packages/webui/test/unit/miniapp-window.test.ts",
       "packages/webui/test/unit/miniapp-window-bridge.test.ts",
       "packages/webui/test/unit/miniapp-tool-bridge.test.ts",
@@ -591,7 +592,8 @@
       "packages/webui/test/gates/webui-feedback.test.ts",
       "packages/webui/test/unit/webui-button-contract.test.tsx",
       "packages/webui/test/unit/ssh-connection-picker.test.tsx",
-      "packages/webui/test/unit/connection-settings-page.test.tsx"
+      "packages/webui/test/unit/connection-settings-page.test.tsx",
+      "packages/webui/test/unit/webui-toast.test.tsx"
     ]
   }
 }

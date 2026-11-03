@@ -9,7 +9,8 @@
 //
 // The launcher is the other half of the same issue: four tiles and a URL box,
 // both of which replace the tab's content in place, and the URL box reaches
-// the runtime through the browser business's port.
+// the runtime through the browser business's port. A refusal from the runtime
+// is said through the toast, not drawn in the launcher's own layout.
 //
 // Rendered with `renderToStaticMarkup`, which runs no effects — so the
 // subscription to `watchBrowserWebTabs` is exercised by the exported
@@ -17,6 +18,7 @@
 // drives when a DOM is present, and a tile's dispatch by the exported
 // `webuiWorkspaceLauncherTileCommand`.
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -43,6 +45,18 @@ import {
   type WorkspacePanelState,
   type WorkspacePanelTab,
 } from "../../src/client/features/workspace/projection/workspace-panel-state.js";
+
+/**
+ * The strip's own source.
+ *
+ * A refusal is said through the toast, which is raised in an effect and drawn
+ * into `document.body`, so a server render never carries it. Reading the
+ * source is how the refusal is pinned as *reported* rather than merely hidden.
+ */
+const tabStripSource = readFileSync(
+  new URL("../../src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx", import.meta.url),
+  "utf8",
+);
 
 function target(overrides: Partial<WebuiBrowserTargetId> = {}): WebuiBrowserTargetId {
   return {
@@ -427,10 +441,11 @@ describe("the new tab page", () => {
     expect(webuiWorkspaceLauncherUrl("   ")).toBe("");
   });
 
-  it("keeps the url box while the runtime is asked, and says why when it refuses", () => {
+  it("keeps the url box while the runtime is asked, and says the refusal through the toast", () => {
     // A refusal is not a closed tab: the launcher is still a launcher, the
     // person can type something else, and the reason comes from the runtime —
-    // the same refusal the Agent's `open_tab` gets.
+    // the same refusal the Agent's `open_tab` gets. The state keeps the
+    // reason, because the state is what a retry needs.
     const refused = reduceWorkspacePanelState(stateWithTabs([launcherTab()], "tab-9"), {
       type: "request-web-page",
       tabId: "tab-9",
@@ -446,9 +461,17 @@ describe("the new tab page", () => {
     });
 
     const markup = renderLauncher(refused.tabs[0]!);
+    // The launcher survives the refusal: the url box is still there, and so is
+    // the rest of the new tab page.
     expect(markup).toContain('data-testid="workspace-launcher-url"');
-    expect(markup).toContain('data-testid="workspace-launcher-error"');
-    expect(markup).toContain("is not authorized");
+    expect(markup).toContain('data-testid="workspace-launcher-tiles"');
+    // The refusal is said once, as a toast: the layout carries no notice, and
+    // the marker moved onto the toast's card.
+    expect(markup).not.toContain('data-testid="workspace-launcher-error"');
+    expect(markup).not.toContain("is not authorized");
+    // And the refusal is reported, not merely hidden.
+    expect(tabStripSource).toContain("useWebuiToastError(request?.error");
+    expect(tabStripSource).toContain("workspace-launcher-error");
   });
 });
 

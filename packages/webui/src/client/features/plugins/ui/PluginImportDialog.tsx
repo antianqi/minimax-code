@@ -12,7 +12,8 @@ import { readWebuiPluginRow as read, type WebuiPluginRow as Row } from "../contr
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiField, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 export interface PluginImportDialogProps {
   readonly open: boolean;
@@ -31,6 +32,9 @@ export function PluginImportDialog({ open, url, onUrlChange, preview, error, bus
   const { dom } = useWebuiBrowserCapabilities();
   const portalTarget = dom.portalTarget();
   const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
+  /* The import failure is an event, not a state: it is said once and the
+   * dialog keeps what the person typed. */
+  useWebuiToastError(error);
   const previewIfValid = (): void => {
     if (validateRequired([{ name: "url", label: "仓库 URL", value: url }])) onPreview();
   };
@@ -136,9 +140,6 @@ export function PluginImportDialog({ open, url, onUrlChange, preview, error, bus
             </div>
           ) : null}
         </div>
-        {error ? (
-          <FeedbackError message=<>error</> className="webui-plugin-error" />
-        ) : null}
       </WebuiDialog>
   );
 }

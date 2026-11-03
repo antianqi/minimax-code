@@ -321,6 +321,16 @@ const MINIAPP_KEYS = [
   "watchMiniAppPresentation",
   "miniappStandaloneUrl",
   "pluginManagement",
+  // The page channels. They belong to this slice because the business that frames the
+  // page is the one that answers it: a slice that names them in its type but not here
+  // builds a port whose methods are `undefined` at runtime, and every page call then
+  // answers `capability_unavailable` while the capability list says the channel exists.
+  "watchMiniAppAgentTurn",
+  "watchMiniAppAgentObservations",
+  "miniAppAgentCall",
+  "watchMiniAppToolApprovals",
+  "replyMiniAppToolApproval",
+  "miniAppToolCall",
 ] as const satisfies readonly (keyof MiniAppPort | keyof PluginPort)[];
 
 export type WebuiSessionsSlice = Pick<SessionPort, (typeof SESSIONS_KEYS)[number]>;

@@ -120,6 +120,7 @@ import { OutputError } from "../../../features/transcript/ui/OutputError.public.
 import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiIconButton } from "../../../ui/button.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import {
 } from "../../../features/sessions/projection/action-requests.public.js";
 import { buildWebuiModelSelectionRequest } from "../../../features/models/contracts/model-selection.js";
@@ -143,7 +144,6 @@ import {
   sectionWebuiSlashPalette,
 } from "../contracts/slash-command.js";
 import { planWebuiRetryResend } from "../application/turn-retry.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 
 const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
   const { resolveWebuiSlashSkills } = await import("./slash-palette.js");
@@ -875,6 +875,13 @@ export function WebuiComposer({
       : sessionId && accountStatus && accountStatus.available === false
         ? "No usable credentials are available for the selected model."
         : undefined;
+  // The credentials are missing: the composer says it once and the input row
+  // keeps the room it needs.
+  useWebuiToastError(
+    credentialMessage === undefined
+      ? undefined
+      : `Model credentials unavailable: ${credentialMessage}`,
+  );
   // Typing is always available: composing a message does not need a target yet.
   // The first send creates the target session silently, using the selected project.
   const canCompose = controllerSnapshot.canCompose;
@@ -1304,9 +1311,6 @@ export function WebuiComposer({
         </form>
         ) : null}
         </div>
-          {credentialMessage ? (
-          <FeedbackError message=<>Model credentials unavailable: {credentialMessage}</> className="mt-2 text-text_default_secondary text-size_12" />
-        ) : null}
       </div>
     </section>
   );

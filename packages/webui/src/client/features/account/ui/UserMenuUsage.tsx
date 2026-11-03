@@ -16,6 +16,7 @@ import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiSkeleton } from "../../../ui/page.js";
 import { WebuiFlyoutSurface } from "../../../ui/Dropdown.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 export interface UsageState {
   readonly status: "idle" | "loading" | "ready" | "error";
@@ -211,6 +212,16 @@ export function UsagePanel({
   /** Opens the account login dialog from the signed-out usage block. */
   readonly onLogin?: () => void;
 }): ReactElement {
+  // The load failure is said once, and the toast waits for the answer: the
+  // retry the panel used to hold must not disappear under the reader.
+  useWebuiToastError(
+    state.status === "error"
+      ? state.errorMessage && AUTH_ERROR_PATTERN.test(state.errorMessage)
+        ? "请重新登录"
+        : "加载失败"
+      : undefined,
+    { action: { label: "重试", onClick: onRetry } },
+  );
   return (
     // The shared surface, not the shared skeleton: this panel opens on hover,
     // focus or click and cannot be dismissed from inside itself, so it needs no
@@ -218,18 +229,6 @@ export function UsagePanel({
     <WebuiFlyoutSurface present={present} kind="dialog" className="webui-user-menu-usage-panel" role="dialog" aria-label="用量" data-testid="usage-popover">
       {state.status === "loading" ? <UsageSkeleton loading /> : null}
       {state.status === "idle" ? <UsageSkeleton /> : null}
-      {state.status === "error" ? (
-        <WebuiStack gap="micro" className="webui-user-menu-usage-error" data-testid="usage-popover-error">
-          <span className="webui-user-menu-usage-error-title">
-            {state.errorMessage && AUTH_ERROR_PATTERN.test(state.errorMessage)
-              ? "请重新登录"
-              : "加载失败"}
-          </span>
-          <WebuiButton variant="quiet-highlight" size="content" className="webui-user-menu-usage-retry" onClick={onRetry}>
-            重试
-          </WebuiButton>
-        </WebuiStack>
-      ) : null}
       {state.status === "ready" ? <UsageReady result={state.result} onLogin={onLogin} /> : null}
     </WebuiFlyoutSurface>
   );

@@ -17,7 +17,7 @@ import {
 } from "../../src/shared/contracts/miniapp-window.js";
 
 interface PageApi {
-  getState(): Promise<{ mode: string; window?: Record<string, number> }>;
+  getState(): Promise<{ mode: string; window?: Record<string, number | boolean> }>;
   update(patch: unknown): Promise<{ mode: string }>;
   focus(): Promise<unknown>;
   onDidChangeState(listener: (state: unknown) => void): { dispose?(): void } | undefined;
@@ -35,6 +35,27 @@ function page() {
       if (name === "message") listeners.push(handler);
     },
   };
+  const surface = (backgroundColor: string) => {
+    const declarations = new Map<string, { value: string; priority: string }>([
+      ["background-color", { value: backgroundColor, priority: "" }],
+    ]);
+    return {
+      style: {
+        getPropertyValue: (name: string) => declarations.get(name)?.value ?? "",
+        getPropertyPriority: (name: string) => declarations.get(name)?.priority ?? "",
+        setProperty: (name: string, value: string, priority = "") => declarations.set(name, { value, priority }),
+        removeProperty: (name: string) => declarations.delete(name),
+      },
+    };
+  };
+  const document = {
+    documentElement: surface("rgb(1, 2, 3)"),
+    body: surface("rgb(4, 5, 6)"),
+  };
+  class MutationObserverStub {
+    observe() {}
+    disconnect() {}
+  }
   // The script's window channel times out an unanswered request, so the context it runs
   // in needs its own timers: collecting them is what lets a test answer "the host never
   // replied" without waiting.
@@ -51,6 +72,9 @@ function page() {
       return timers.length;
     },
     clearTimeout: () => undefined,
+    document,
+    MutationObserver: MutationObserverStub,
+    WeakMap,
   });
 
   const api = (window.mcode as { miniapp: { window: PageApi } }).miniapp.window;
@@ -58,6 +82,7 @@ function page() {
   return {
     api,
     posted,
+    document,
     fireTimers() {
       for (const timer of timers.splice(0)) timer();
     },
@@ -102,13 +127,13 @@ describe("the page-side window API", () => {
     expect(typeof request?.requestId).toBe("string");
 
     harness.answer(
-      { mode: "window", window: { x: 10, y: 20, width: 280, height: 340, clickThrough: false } },
+      { mode: "window", window: { x: 10, y: 20, width: 280, height: 340, clickThrough: false, transparent: false } },
       request?.requestId as string,
     );
 
     await expect(pending).resolves.toEqual({
       mode: "window",
-      window: { x: 10, y: 20, width: 280, height: 340, clickThrough: false },
+      window: { x: 10, y: 20, width: 280, height: 340, clickThrough: false, transparent: false },
     });
   });
 
@@ -146,12 +171,27 @@ describe("the page-side window API", () => {
     const seen: unknown[] = [];
     const subscription = harness.api.onDidChangeState((state) => seen.push(state));
 
-    harness.push({ mode: "window", window: { x: 0, y: 0, width: 280, height: 340, clickThrough: false } });
+    harness.push({ mode: "window", window: { x: 0, y: 0, width: 280, height: 340, clickThrough: false, transparent: false } });
     expect(seen).toHaveLength(1);
 
     subscription?.dispose?.();
     harness.push({ mode: "inline" });
     expect(seen).toHaveLength(1);
+  });
+
+  it("makes a requested floating page transparent and restores its own inline backgrounds", () => {
+    const harness = page();
+    const root = harness.document.documentElement.style;
+    const body = harness.document.body.style;
+
+    harness.push({ mode: "window", window: { transparent: true } });
+    expect(root.getPropertyValue("background-color")).toBe("transparent");
+    expect(root.getPropertyPriority("background-color")).toBe("important");
+    expect(body.getPropertyValue("background-color")).toBe("transparent");
+
+    harness.push({ mode: "window", window: { transparent: false } });
+    expect(root.getPropertyValue("background-color")).toBe("rgb(1, 2, 3)");
+    expect(body.getPropertyValue("background-color")).toBe("rgb(4, 5, 6)");
   });
 
   it("exposes focus, which the page calls from a click handler", async () => {

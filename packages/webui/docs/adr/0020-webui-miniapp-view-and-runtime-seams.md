@@ -62,25 +62,26 @@ hold two credentials instead of one.
 
 - **Native window semantics.** The electron app's detached presentation is a separate operating
   system window with always-on-top, click-through, transparent, frameless and skip-taskbar options
-  and persisted window bounds. A browser tab cannot express any of them. The WebUI keeps the part
-  that a browser can honour — the Mini App alone on screen, and a tab the user can drag to a second
-  display — and drops the native window options.
-- **The page-side window handle.** Dropped from the contract rather than emulated, because the
-  reason is stronger than "the browser cannot". The newer generation adds a third part to the
-  bridge namespace — `window.mcode.miniapp.window` with `getState`, `update` and `focus`, a manifest
-  `surface.window` whitelist of size, `frame`, `transparent`, `alwaysOnTop`, `clickThrough` and
-  `skipTaskbar`, and a Chromium argv surface id — and that block is the page asking for its own
-  native window, bounds and visibility. Beyond the browser's inability to express any of it, the
-  block grants the page a say in *how it is presented*, and presentation is this client's decision.
-  A Mini App appears in its own tab because the client opened one, never because the page asked.
+  and persisted window bounds. A browser tab cannot express those effects. The WebUI keeps the
+  Mini App in the current tab and supports a browser-only floating presentation: the same iframe is
+  positioned over the WebUI page, bounded by that page's viewport, and remains in the same document.
+  It is not an operating system window and does not inherit native window options.
+- **The page-side window handle.** The newer Desktop generation's native-window contract is not
+  imported as-is. Its `surface.window` manifest options and Chromium argv surface id describe native
+  window effects and remain unsupported here. The WebUI provides its own browser-side window
+  channel for `inline` and `window` presentation, viewport bounds and focus. A page can request the
+  floating layout, but the host retains ownership of the presentation and clamps the requested
+  geometry to the browser viewport. Its browser-side `transparent` patch clears the iframe surface
+  and asks the injected page bridge to clear the Mini App document's `html` and `body` backgrounds;
+  native manifest window options remain unsupported.
 - **Host-to-page injection.** The electron app can inject into an embedded page: the agent cursor
   overlay and the comment bridge. A cross-origin Mini App page cannot be reached that way, so a
   Mini App page does not get them.
-- **Moving one live page between presentations.** The electron app moves the same
-  `WebContents` into a window and back into the File Panel, so the page is one instance with one
-  state. A browser tab is a separate document. A Mini App shown in two places is two documents:
-  server-side state is shared, in-page state is not. The two presentations are therefore two client
-  documents, and the service keeps the record of which one is live.
+- **Moving one live page between layouts.** Inline and floating browser layouts use the same iframe
+  and the same page document. The shell owns that view outside the workspace panel so closing the
+  panel, changing workspace tabs, navigating to another WebUI page or selecting another session
+  does not release the floating frame. The service still owns the Mini App presentation lease; the
+  browser shell only retains its viewport-level placement.
 
 ## The contract baseline
 
@@ -251,9 +252,9 @@ insufficient one.
 This repository now has the Agent gateway, session ports, application facade and child-side
 `context.agent` client. The manifest accepts independent `session.run` and `session.read` grants.
 `session.read` currently lists visible user conversations and reads a session summary (including its
-latest assistant text); the published observer API is still not implemented. `surface.window` is
-accepted for package compatibility but remains ignored because a browser page cannot move the same
-live document into a native Mini App window.
+latest assistant text); the published observer API is still not implemented. The manifest's
+`surface.window` block remains compatibility-only: it does not create a native window or enable its
+window flags. The WebUI's browser-side window channel separately supports an in-tab floating iframe.
 
 The connector's wire has to move with it, and the reason is not a preference. In this repository the
 host connector *is* the child's stdout: the child's stdout is the request stream and its stdin the

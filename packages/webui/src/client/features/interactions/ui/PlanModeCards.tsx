@@ -14,7 +14,7 @@
 // it.
 
 import { useEffect, useState, type ReactElement } from "react";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
@@ -76,6 +76,10 @@ export function WebuiPlanReviewDecision({
   useEffect(() => {
     setFeedback("");
   }, [request.id]);
+
+  /* The failure that earned this card is an event, not a state: it is said
+   * once, and the card keeps its shape. */
+  useWebuiToastError(chrome?.error);
 
   const submit = (answers: readonly WebuiQuestionnaireAnswer[]) => {
     if (busy) return;
@@ -181,9 +185,6 @@ export function WebuiPlanReviewDecision({
         </div>
         </WebuiMotionSlot>
       </div>
-      {chrome?.error ? (
-        <FeedbackError message={chrome.error} className="webui-plan-card-error" />
-      ) : null}
     </WebuiMotion>
   );
 }
@@ -200,6 +201,9 @@ export function WebuiPlanEnterConfirmation({
 }): ReactElement {
   const busy = chrome?.busy === true;
   const options = webuiPlanEnterOptions(request);
+  /* The failure that earned this card is an event, not a state: it is said
+   * once, and the card keeps its shape. */
+  useWebuiToastError(chrome?.error);
   return (
     <WebuiMotion as="div" kind="card" state="enter">
       <WebuiStack
@@ -237,9 +241,6 @@ export function WebuiPlanEnterConfirmation({
           ) : null}
         </div>
       </div>
-      {chrome?.error ? (
-        <FeedbackError message={chrome.error} className="webui-plan-card-error" />
-      ) : null}
       </WebuiStack>
     </WebuiMotion>
   );

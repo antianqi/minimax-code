@@ -48,8 +48,8 @@ import { SshTerminalView } from "./ssh-terminal-view.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError, useWebuiToastSuccess } from "../../../ui/toast.js";
 
 export interface SshPanelViewProps {
   readonly snapshot: WebuiSshSnapshot;
@@ -86,6 +86,19 @@ export function SshPanelView(props: SshPanelViewProps): ReactElement {
   // "No host at all" is only true of a successful read: a failed one is not empty, and saying so
   // would invite the person to add a host they may already have.
   const showEmpty = hostRows.length === 0 && props.snapshot.status === "ready";
+  // The two failures and the one confirmation are said once each: they took
+  // room from the panel and stayed there long after the moment had passed.
+  useWebuiToastError(props.snapshot.error, {
+    testId: "ssh-connection-error",
+    dataAttributes: { "data-webui-ssh-error": "true" },
+  });
+  useWebuiToastError(props.error, {
+    testId: "ssh-action-error",
+    dataAttributes: { "data-webui-ssh-action-error": "true" },
+  });
+  useWebuiToastSuccess(props.notice, {
+    dataAttributes: { "data-webui-ssh-notice": "true" },
+  });
 
   return (
     <div
@@ -159,27 +172,6 @@ export function SshPanelView(props: SshPanelViewProps): ReactElement {
           </WebuiButton>
         </div>
         : null}
-      {props.snapshot.error === undefined
-        ? null
-        : <FeedbackError
-          message={props.snapshot.error}
-          testId="ssh-connection-error"
-          className="px-4"
-          dataAttributes={{ "data-webui-ssh-error": "true" }}
-        />}
-      {props.error === undefined
-        ? null
-        : <FeedbackError
-          message={props.error}
-          testId="ssh-action-error"
-          className="px-4"
-          dataAttributes={{ "data-webui-ssh-action-error": "true" }}
-        />}
-      {props.notice === undefined
-        ? null
-        : <p data-webui-ssh-notice="true" className="px-4 text-xs text-text_default_secondary">
-          {props.notice}
-        </p>}
       {projectRows.length === 0
         ? null
         : <WebuiStack as="ul" gap="small" data-webui-ssh-projects="true">

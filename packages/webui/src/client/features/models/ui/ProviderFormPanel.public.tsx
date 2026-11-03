@@ -50,7 +50,8 @@ import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiCheckbox, WebuiField, WebuiFieldError, WebuiFormGrid, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { IconButton, RefreshIcon } from "../../../ui/form-atoms.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import { WebuiMotion } from "../../../ui/page.js";
@@ -248,6 +249,10 @@ export function ProviderFormPanel({
   const [apiFormatOpen, setApiFormatOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+  /* The write that failed and the delete that failed are events, not states:
+   * each is said once, and the form keeps its draft. */
+  useWebuiToastError(formError);
+  useWebuiToastError(deleteError);
   const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   // The API formats the runtime accepts, plus whatever a saved provider carries
   // if this build does not know it: an edit must not silently rewrite it.
@@ -379,7 +384,6 @@ export function ProviderFormPanel({
             {fieldErrors.models ? <WebuiFieldError message={fieldErrors.models} /> : null}
           </WebuiStack>
           <WebuiStack gap="small" className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <WebuiInline key={header.id} gap="small" className="webui-provider-form-header-row"><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton></WebuiInline>)}<WebuiButton variant="outline-secondary" size="compact" className="w-fit self-start" onClick={() => editor.addHeader()}><IconPlus aria-hidden="true" size={16} stroke={1.7} /> 添加 Header</WebuiButton></WebuiStack>
-          {formError ? <FeedbackError message={formError} className="webui-provider-form-error" /> : null}
         </WebuiStack>
         </form>
       </WebuiDialog>
@@ -387,7 +391,6 @@ export function ProviderFormPanel({
         <WebuiButton variant="secondary" disabled={deleteBusy} onClick={() => { setDeleteError(undefined); setProviderPendingDelete(undefined); }}>取消</WebuiButton>
         <WebuiButton variant="danger" disabled={deleteBusy} onClick={() => void confirmDeleteProvider()}>{deleteBusy ? "删除中…" : "删除"}</WebuiButton>
       </WebuiDialogActions>}>
-        {deleteError ? <FeedbackError message={deleteError} /> : null}
       </WebuiDialog>
   </>;
 }
@@ -400,6 +403,9 @@ export function ProviderFormPanel({
  * and a bordered body holding one field per row.
  */
 function ProviderModelCard({ model, index, busy, onChange, onTest, onRemove }: { readonly model: ProviderModelDraft; readonly index: number; readonly busy: boolean; readonly onChange: (patch: ProviderModelPatch) => void; readonly onTest: () => void; readonly onRemove: () => void }): ReactElement {
+  /* The connection test that failed is an event, not a state: it is said once,
+   * and the model keeps its draft. */
+  useWebuiToastError(model.error);
   return <WebuiStack gap="small" className="webui-provider-form-model">
     <div className="webui-provider-form-model-header">
       <span className="text-[13px] font-medium leading-5 text-text_default_primary">模型 {String(index + 1).padStart(2, "0")}</span>
@@ -426,7 +432,6 @@ function ProviderModelCard({ model, index, busy, onChange, onTest, onRemove }: {
         description="所选附件将默认直接发送给模型处理，请确保模型原生支持。其余类型由平台工具处理，需消耗平台积分。"
         control={() => <AttachmentField value={model.modalities} onChange={(modalities) => onChange({ modalities })} />}
       />
-      {model.error ? <FeedbackError message={model.error} className="webui-provider-form-error" /> : null}
     </WebuiStack>
   </WebuiStack>;
 }

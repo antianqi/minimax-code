@@ -17,10 +17,10 @@ import { WebuiIconChevronDown, WebuiIconDiffFile, WebuiIconDiffSummary } from ".
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiDiffState } from "../../review/contracts/review-view.js";
 import { useWebuiTurnReview } from "../../review/bindings/use-turn-review.public.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import type { WebuiDiffFileEntry } from "../../../projection/common/diff-workspace-boundary.js";
 import {
   projectWebuiDiffFiles,
@@ -72,6 +72,19 @@ export function WebuiDiffCard({
   const unsupported = reviewState.unsupported || (initialState?.unsupported ?? false);
   const busy = reviewState.busy;
   const mutationError = reviewState.mutationError ?? initialState?.mutationError;
+  // The failed mutation is said once: the operation did nothing, and the
+  // file list above is now known to be out of date. The toast waits for the
+  // answer, so the dismiss control it carries stays until it is clicked.
+  useWebuiToastError(mutationError ? "这轮文件改动没有生效" : undefined, {
+    description: (
+      <span className="webui-diff-error-reason" data-testid="turn-diff-mutation-error-reason">
+        {mutationError}
+      </span>
+    ),
+    action: { label: "知道了", onClick: dismissError },
+    testId: "turn-diff-mutation-error",
+    dataAttributes: { "data-webui-diff-error": "true" },
+  });
 
   const mutate = (action: "revert" | "reapply") => {
     if (busy) return;
@@ -175,27 +188,6 @@ export function WebuiDiffCard({
           </WebuiStack>
         ) : null}
       </WebuiDisclosure>
-      {mutationError ? (
-        /* `role="alert"` because this replaces what used to be no feedback at
-         * all: the operation did nothing, and the file list above is now known
-         * to be out of date. The controls stay live so the user can retry. */
-        <FeedbackError
-          className="webui-diff-error"
-          dataAttributes={{ "data-webui-diff-error": "true" }}
-          testId="turn-diff-mutation-error"
-          message={
-            <span className="webui-diff-error-copy">
-              <span className="webui-diff-error-title">这轮文件改动没有生效</span>
-              <span className="webui-diff-error-reason" data-testid="turn-diff-mutation-error-reason">{mutationError}</span>
-            </span>
-          }
-          action={
-            <WebuiButton variant="outline-secondary" size="inline-tiny" className="webui-diff-error-dismiss" data-testid="turn-diff-mutation-error-dismiss" onClick={dismissError}>
-              知道了
-            </WebuiButton>
-          }
-        />
-      ) : null}
     </div>
   );
 }

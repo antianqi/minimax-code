@@ -9,7 +9,7 @@ import { WebuiIconFolder } from "../../../shell/icons.js";
 import type { WebuiWorkspaceDirectoryListing } from "../../../../shared/contracts/workspace.js";
 import { looksLikeAbsoluteWorkspacePath } from "../../../projection/common/paths.js";
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiTextInput } from "../../../ui/field.js";
@@ -39,6 +39,9 @@ export function WebuiWorkspaceDirectoryBrowser({
   const loading = browseState.status === "loading";
   const [localError, setLocalError] = useState<string>();
   const error = browseState.status === "error" ? browseState.error : localError;
+  // The browse failed, or the typed path was refused: both are said once, as
+  // toasts, and neither is drawn in the dialog's layout.
+  useWebuiToastError(error);
   const [manualPath, setManualPath] = useState(initialDir ?? "");
 
   const browse = useCallback(
@@ -95,9 +98,6 @@ export function WebuiWorkspaceDirectoryBrowser({
             />
           )}
         />
-        {error ? (
-          <FeedbackError message={error} className="webui-commit-dialog-error" />
-        ) : null}
         <WebuiDialogActions>
           <WebuiButton
             variant="outline"
@@ -140,9 +140,6 @@ export function WebuiWorkspaceDirectoryBrowser({
           {listing?.dir ?? "正在读取目录…"}
         </span>
       </WebuiInline>
-      {error ? (
-        <FeedbackError message={error} className="webui-commit-dialog-error" />
-      ) : null}
       {loading ? (
         <FeedbackEmpty className="webui-composer-menu-empty" title={"正在读取目录…"} />
       ) : listing?.entries.length ? (

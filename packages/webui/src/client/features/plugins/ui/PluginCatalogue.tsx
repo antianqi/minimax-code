@@ -33,8 +33,8 @@ import { MiniAppAppsList } from "../../miniapp/ui/MiniAppAppsList.public.js";
 import { useWebuiMiniAppCatalogueSummary } from "../../miniapp/bindings/use-miniapp-catalogue.public.js";
 import {
   FeedbackBusy,
-  FeedbackError,
 } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiPage } from "../../../ui/page.js";
 import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
@@ -141,6 +141,9 @@ export function PluginCatalogue({
   // busy state; mutation progress is reported independently below.
   const busy = listing.loading;
   const error = localError || snapshot.mutationError || listing.error || "";
+  /* The catalogue's failure is an event, not a state: it is said once and the
+   * catalogue keeps its rows. */
+  useWebuiToastError(error, { testId: "plugin-catalogue-error" });
   const reload = async (): Promise<void> => {
     if (area === "apps") {
       await Promise.all([
@@ -540,7 +543,6 @@ export function PluginCatalogue({
       {area === "plugins" && view === "personal" && !managementOpen ? (
         <h2 className="webui-plugin-market-heading">插件</h2>
       ) : null}
-      {error ? <FeedbackError message={error} testId="plugin-catalogue-error" /> : null}
       {area === "agents" && listing.loading ? (
         <FeedbackBusy label="加载中…" />
       ) : area === "agents" ? (

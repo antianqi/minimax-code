@@ -17,6 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { webuiAnswersEndTurn } from "../../src/client/features/interactions/projection/questionnaire-state.js";
 import {
   buildWebuiPlanApproveAnswers,
@@ -243,7 +244,7 @@ describe("plan cards — SSR", () => {
     expect(html).not.toContain('data-testid="plan-delivery-summary"');
   });
 
-  it("disables the build action and surfaces the error while busy", () => {
+  it("disables the build action while busy, and says the error through the toast", () => {
     const html = renderToStaticMarkup(
       createElement(WebuiPlanDeliveryCard, {
         request: planReviewRequest(),
@@ -256,7 +257,23 @@ describe("plan cards — SSR", () => {
     // 预览 opens the workspace panel, not a pending submission, so it stays
     // usable while the decision is in flight.
     expect(html).not.toMatch(/data-testid="plan-view"[^>]*disabled/);
-    expect(html).toContain("提交失败");
+    // The failure is an event, not a state: it is said once, through the
+    // shared toast, which is drawn over the page (ADR 0030). The card keeps
+    // its shape.
+    expect(html).not.toContain("提交失败");
+    expect(html).toContain('data-testid="plan-delivery-card"');
+    expect(html).toContain('data-testid="plan-delivery-title"');
+  });
+
+  /* The failure is said through the toast, which the server render cannot
+   * see: it is raised in an effect and drawn over the page. The card's own
+   * source is what pins that the failure is reported at all. */
+  it("raises the card's failure through the toast", () => {
+    const source = readFileSync(
+      new URL("../../src/client/features/interactions/ui/PlanModeCards.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("useWebuiToastError(error)");
   });
 
   it("disables 预览 when there is no panel to open", () => {

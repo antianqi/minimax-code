@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { SigninDayStatus, SigninClaimResult, SigninPanelScene } from "@mavis/shared/daily-signin";
 import {
   DailyCheckinClient,
@@ -247,11 +248,31 @@ describe("SigninCard desktop parity", () => {
     expect(html).not.toContain('data-testid="signin-day-reward-1"');
   });
 
-  it("renders the error card with desktop copy and retry", () => {
+  it("says the failure through the toast, and keeps the card's own layout", () => {
     const html = renderCard({ error: "签到暂时不可用，请稍后重试" });
-    expect(html).toContain('data-testid="signin-card-error"');
-    expect(html).toContain("签到暂时不可用，请稍后重试");
-    expect(html).toContain("重试");
+    // The failure is an event, not a state: it is said once, through the shared
+    // toast, which is drawn over the page and takes no room from it (ADR
+    // 0030). A server render never sees it.
+    expect(html).not.toContain('data-testid="signin-card-error"');
+    expect(html).not.toContain("签到暂时不可用，请稍后重试");
+    expect(html).not.toContain("重试");
+    // The card is still there, with its own chrome.
+    expect(html).toContain('data-testid="signin-card"');
+    expect(html).toContain("每日签到");
+  });
+
+  /* The failure is said through the toast, which the server render cannot
+   * see: it is raised in an effect and drawn over the page. The card's own
+   * source is what pins that the failure is reported at all — and that the
+   * toast still carries the retry the card used to hold. */
+  it("raises the failure through the toast, with the retry the card used to hold", () => {
+    const source = readFileSync(
+      new URL("../../src/client/features/account/ui/UserMenuSignin.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain("action: { label: SIGNIN.retry, onClick: onRetry }");
+    expect(source).toContain('testId: "signin-card-error"');
   });
 
   it("renders a claimable panel: streak, seven days, claim button and bonus", () => {

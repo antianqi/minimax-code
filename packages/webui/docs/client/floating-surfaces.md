@@ -26,6 +26,14 @@ The trigger is not "outside": the trigger and the popup are one layer, and the
 trigger's activation opens and closes the popup. The label that names the
 trigger is part of that layer too — see
 [The trigger's region](#the-triggers-region).
+
+The client's notice channel is not "outside" either. The toast
+([ADR 0030](../adr/0030-the-client-reports-failures-and-confirmations-as-toasts.md))
+is drawn over the client and crosses a modal: a press on it answers the
+notice, so it must not close the layer the notice is drawn over, nor the
+dialog that reported the failure. A surface that carries
+`data-webui-live-surface` says so, and the overlay listener reads it before
+it routes the press.
 - **The placement.** The popup is rendered into the portal and positioned in
   viewport coordinates, measured against its anchor.
 

@@ -48,6 +48,7 @@ import type {
   WebuiRemoteControlStatus,
   WebuiWatchRemoteControlResult,
 } from "../shared/contracts/remote-control.js";
+import type { WebuiMiniAppAgentObserveEvent } from "../shared/contracts/miniapp-agent.js";
 import type {
   WebuiSshConnection,
   WebuiSshDiscovery,
@@ -798,6 +799,15 @@ export interface WebuiHarnessPort {
   listMiniAppAgentSessions?(input: {
     readonly caller: WebuiMiniAppAgentCaller;
   }): Promise<MiniAppAgentSessions>;
+  /** Settled activity events the page explicitly subscribed to. */
+  observeMiniAppAgent?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly requestId: string;
+    readonly all?: boolean;
+    readonly sessionId?: string;
+    readonly signal?: AbortSignal;
+    readonly onEvent: (event: WebuiMiniAppAgentObserveEvent) => void;
+  }): Promise<void>;
   /** A session without a turn; a `run` naming it continues it. */
   createMiniAppAgentSession?(input: {
     readonly caller: WebuiMiniAppAgentCaller;

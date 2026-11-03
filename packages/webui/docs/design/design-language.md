@@ -408,8 +408,8 @@ contract owns; if no published size fits, the size is the contract's to add.
 - **The feedback family** — `FeedbackEmpty`, `FeedbackError`, `FeedbackSkeleton`, `FeedbackProgress`,
   `FeedbackBusy`, `FeedbackAnnouncement`, `FeedbackLiveRegion` and `FeedbackLoadingOverlay` own the
   announcement, with `useFeedbackActionLoading` as the one way a control tracks a promise it started.
-  The family is the only place in the client that authors `role="alert"`, `role="status"`,
-  `role="progressbar"`, `role="dialog"`-as-feedback or `aria-live`; a surface whose state *is* the
+  The family and the toast are the only places in the client that author `role="alert"`,
+  `role="status"`, `role="progressbar"`, `role="dialog"`-as-feedback or `aria-live`; a surface whose state *is* the
   thing being announced uses `FeedbackLiveRegion`, a message with no visual form uses
   `FeedbackAnnouncement`, and an action that must be awaited uses `FeedbackLoadingOverlay` through the
   control's `loading` contract rather than a business-drawn spinner. `FeedbackError` provides a named
@@ -419,6 +419,19 @@ contract owns; if no published size fits, the size is the contract's to add.
   `WebuiSkeleton` instead of writing pulse rules. All loading placeholders use the one solid-color pulse
   and the shared reduced-motion policy — the account usage skeleton is an example of that treatment, not
   an exception to it.
+- **The toast** — `WebuiToast` owns the card a transient notice is drawn in: the surface's fill, the
+  hairline border, the 12px radius, the elevation, and the rail in the tone's colour that says which
+  kind of notice this is. The host is drawn against the viewport and takes no room from the page, so
+  a notice never moves the content it interrupts; the column of cards is not a click target and only
+  the cards are. `useWebuiToastError` and `useWebuiToastSuccess` say a message once, when it appears,
+  and leave the layout alone; `useWebuiToast().show` says one with a chosen tone, an action or a
+  description. A notice that offers an action waits for the answer. The rules about which two
+  notices are the same notice, how long each tone lives and how many may be on screen at once live
+  in `client/ui/toast-store.ts` and are described in
+  [ADR 0030](../adr/0030-the-client-reports-failures-and-confirmations-as-toasts.md). A field's own
+  validation error and a state that stays are not notices and keep their place.
+  The notice crosses a modal: the host carries `data-webui-live-surface`, so a modal does not make
+  it inert, silence its announcement, or close when the reader answers it.
 - **The block surface** — `WebuiCard` owns a block's fill, hairline border, 16px radius and soft shadow;
   a caller states its layout and, where it genuinely differs, its own radius or fill through utilities.
 

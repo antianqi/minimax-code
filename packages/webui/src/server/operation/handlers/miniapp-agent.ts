@@ -31,6 +31,9 @@ import { WebuiCapabilityUnavailableError } from "../../../shared/envelope.js";
 import type {
   WebuiMiniAppAgentCallRequest,
   WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentObserveEvent,
+  WebuiMiniAppAgentObserveFrame,
+  WebuiMiniAppAgentObserveRequest,
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../../shared/contracts/miniapp-agent.js";
@@ -83,9 +86,8 @@ type MiniAppAgentFacade = Required<
     | "listMiniAppAgentSessions"
     | "readMiniAppAgentSession"
     | "createMiniAppAgentSession"
-    | "observeMiniAppAgent"
   >
->;
+> & Pick<WebuiOperationPort, "observeMiniAppAgent">;
 
 function requireMiniAppAgent(port: WebuiOperationPort): MiniAppAgentFacade {
   const facade = port as MiniAppAgentFacade;
@@ -220,6 +222,11 @@ async function* observeSource(input: {
     return;
   }
 
+  if (!facade.observeMiniAppAgent) {
+    yield { kind: "failure", code: "runtime_unavailable" };
+    return;
+  }
+
   const queue = createFrameQueue<WebuiMiniAppAgentObserveFrame>();
   const controller = new AbortController();
 
@@ -230,7 +237,7 @@ async function* observeSource(input: {
       ...(body.all === true ? { all: true } : {}),
       ...(body.sessionId !== undefined ? { sessionId: body.sessionId } : {}),
       signal: controller.signal,
-      onEvent: (event) => queue.push({ kind: "event", event }),
+      onEvent: (event: WebuiMiniAppAgentObserveEvent) => queue.push({ kind: "event", event }),
     })
     .then(
       () => queue.close(),

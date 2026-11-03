@@ -30,7 +30,15 @@ const clientRoot = path.join(repoRoot, "packages/webui/src/client");
 const budgetPath = path.join(repoRoot, "scripts/lib/webui-feedback-budget.json");
 
 /** The shared layer itself is where these are allowed, and where nothing else is. */
-const ALLOWED = new Set(["ui/feedback.tsx", "ui/field.tsx", "ui/content-page.tsx", "ui/page.tsx"]);
+const ALLOWED = new Set([
+  "ui/feedback.tsx",
+  "ui/field.tsx",
+  "ui/content-page.tsx",
+  "ui/page.tsx",
+  // The toast is a shared feedback surface: the notice is announced by the card
+  // that carries it, so the card owns the announcement channel.
+  "ui/toast.tsx",
+]);
 
 /**
  * The announcement channels a caller may not author for itself.

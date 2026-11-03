@@ -30,6 +30,7 @@ import {
   type WebuiCronSchedulePreset,
 } from "../projection/scheduling-panel.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiField, WebuiFormLayout, WebuiSelectMenu, WebuiTextarea, WebuiTextInput, useWebuiFormValidation, type WebuiFieldErrors } from "../../../ui/field.js";
 
 export interface SchedulingEditorViewProps {
@@ -46,6 +47,11 @@ export interface SchedulingEditorViewProps {
 
 export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactElement {
   const { draft, onChange } = props;
+  /* The rejection is an event, not a state: it is said once, and the draft
+   * keeps what the person typed. */
+  useWebuiToastError(props.error, {
+    dataAttributes: { "data-webui-scheduling-editor-error": "true" },
+  });
   return (
     <form
       data-webui-component="scheduling-editor"
@@ -246,11 +252,6 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
             />
           )}
         />
-        {props.error
-          ? <p data-webui-scheduling-editor-error="true" className="text-sm text-text_default_secondary">
-            {props.error}
-          </p>
-          : null}
       </WebuiFormLayout>
     </form>
   );

@@ -1,4 +1,4 @@
-// The Mini App page bridge's two operations over the real wire.
+// The Mini App page bridge's operations over the real wire.
 //
 // `packages/webui/AGENTS.md` names this level as the evidence a new operation
 // needs: a real `WebuiService` on a real loopback socket, the real operation
@@ -12,6 +12,7 @@
 //     with a documented code, never a dropped connection);
 //   * a followed turn's events arrive in order and the turn is settled by a frame,
 //     not by the socket closing;
+//   * the all-session activity watch is registered and reaches its runtime port;
 //   * a client that disconnects aborts the turn it was following, because the
 //     runtime's run must not outlive the document that asked for it.
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,6 +25,7 @@ import { createWebuiWire, type WebuiSocket } from "../../src/client/platform/wir
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
 import type {
   WebuiMiniAppAgentCallRequest,
+  WebuiMiniAppAgentObserveFrame,
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../src/shared/contracts/miniapp-agent.js";
@@ -57,12 +59,19 @@ class LoopbackSocket implements WebuiSocket {
 
 interface Recorded {
   readonly calls: WebuiMiniAppAgentCallRequest[];
+  readonly observations: Array<{
+    readonly pluginId: string;
+    readonly hostSessionId: string;
+    readonly requestId: string;
+    readonly all?: true;
+    readonly sessionId?: string;
+  }>;
   readonly turns: WebuiMiniAppAgentTurnRequest[];
   readonly signals: AbortSignal[];
 }
 
 function scriptedPort(): { port: WebuiHarnessPort; recorded: Recorded } {
-  const recorded: Recorded = { calls: [], turns: [], signals: [] };
+  const recorded: Recorded = { calls: [], observations: [], turns: [], signals: [] };
   const port = {
     version: () => ({ version: "loopback-fixture", protocolVersion: 1 }),
     close: async () => undefined,
@@ -107,6 +116,34 @@ function scriptedPort(): { port: WebuiHarnessPort; recorded: Recorded } {
     listMiniAppAgentSessions: async () => ({ sessions: [] }),
     readMiniAppAgentSession: async () => undefined,
     createMiniAppAgentSession: async () => ({ sessionId: MINI_SESSION }),
+    observeMiniAppAgent: async (input: {
+      caller: { pluginId: string; hostSessionId: string; connection: number };
+      requestId: string;
+      all?: boolean;
+      sessionId?: string;
+      onEvent: (event: {
+        type: "turn.finished";
+        sessionId: string;
+        turnId: string;
+        title: string;
+        outcome: string;
+      }) => void;
+    }) => {
+      recorded.observations.push({
+        pluginId: input.caller.pluginId,
+        hostSessionId: input.caller.hostSessionId,
+        requestId: input.requestId,
+        ...(input.all ? { all: true } : {}),
+        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      });
+      input.onEvent({
+        type: "turn.finished",
+        sessionId: MINI_SESSION,
+        turnId: "observed-turn",
+        title: "observed",
+        outcome: "finished",
+      });
+    },
     runMiniAppAgentTurn: (input: {
       caller: unknown;
       text: string;
@@ -297,6 +334,52 @@ describe("the Mini App page bridge over the loopback wire", () => {
       text: "hello over the socket",
       observe: true,
     });
+  });
+
+  it("streams the all-session activity watch used by the MiniMax Pet task panel", async () => {
+    const { wire, recorded } = await connect("loopback.observations");
+    const frames: WebuiMiniAppAgentObserveFrame[] = [];
+    await new Promise<void>((resolve, reject) => {
+      let stop: () => void = () => {};
+      stop = wire.watchMiniAppAgentObservations(
+        "watchMiniAppAgentObservations",
+        {
+          pluginId: PLUGIN,
+          hostSessionId: HOST_SESSION,
+          connection: 1,
+          requestId: "observe-all-sessions",
+          all: true,
+        },
+        (frame) => {
+          frames.push(frame);
+          if (frame.kind === "failure") {
+            stop();
+            reject(new Error(frame.code));
+          } else {
+            stop();
+            resolve();
+          }
+        },
+        reject,
+      );
+    });
+
+    expect(frames).toEqual([{
+      kind: "event",
+      event: {
+        type: "turn.finished",
+        sessionId: MINI_SESSION,
+        turnId: "observed-turn",
+        title: "observed",
+        outcome: "finished",
+      },
+    }]);
+    expect(recorded.observations).toEqual([{
+      pluginId: PLUGIN,
+      hostSessionId: HOST_SESSION,
+      requestId: "observe-all-sessions",
+      all: true,
+    }]);
   });
 
   it("aborts the turn it was following when the client goes away", async () => {

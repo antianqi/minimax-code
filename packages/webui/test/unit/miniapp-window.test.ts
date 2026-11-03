@@ -39,6 +39,7 @@ describe("a page's window request", () => {
     expect(floated.state.mode).toBe("window");
     expect(floated.state.width).toBe(320);
     expect(floated.state.height).toBe(420);
+    expect(floated.state.transparent).toBe(true);
 
     const inlined = applyMiniAppWindowPatch(floated.state, { mode: "inline" }, BOUNDS);
     expect(inlined.state.mode).toBe("inline");
@@ -102,21 +103,51 @@ describe("a page's window request", () => {
       mode: "window",
       x: 40,
       y: 60,
+      transparent: true,
     }, BOUNDS).state;
 
     expect(toMiniAppWindowState(floated)).toEqual({
       mode: "window",
-      window: { x: 40, y: 60, width: floated.width, height: floated.height, clickThrough: false },
+      // A tab never falls through; transparency is rendered by the host's iframe surface.
+      window: { x: 40, y: 60, width: floated.width, height: floated.height, clickThrough: false, transparent: true },
     });
   });
 
-  it("records click-through as a host-page-only behaviour", () => {
+  it("honours a transparent floating surface and keeps it when moving", () => {
+    const floated = applyMiniAppWindowPatch(initialMiniAppWindowState(BOUNDS), {
+      mode: "window",
+      transparent: true,
+    }, BOUNDS);
+    const moved = applyMiniAppWindowPatch(floated.state, { x: 90 }, BOUNDS);
+
+    expect(floated.ignored).toEqual([]);
+    expect(moved.state.transparent).toBe(true);
+    expect(toMiniAppWindowState(moved.state).window?.transparent).toBe(true);
+  });
+
+  it("makes a floating surface transparent by default, while allowing an explicit opaque request", () => {
+    const floated = applyMiniAppWindowPatch(initialMiniAppWindowState(BOUNDS), {
+      mode: "window",
+    }, BOUNDS);
+    const opaque = applyMiniAppWindowPatch(floated.state, { transparent: false }, BOUNDS);
+
+    expect(floated.state.transparent).toBe(true);
+    expect(toMiniAppWindowState(floated.state).window?.transparent).toBe(true);
+    expect(opaque.state.transparent).toBe(false);
+  });
+
+  it("names click-through as something a tab cannot do", () => {
+    // A page that asks to fall through wants clicks to reach the desktop behind it. A tab
+    // has nothing behind it, and making the frame ignore pointer events would also stop
+    // the page from ever seeing the pointer again — the page's own "is the pointer over
+    // me" logic is driven by those events, so it would never ask to become interactive
+    // again. Reported as ignored, and the frame stays clickable.
     const result = applyMiniAppWindowPatch(initialMiniAppWindowState(BOUNDS), {
       clickThrough: true,
     }, BOUNDS);
 
-    expect(result.state.clickThrough).toBe(true);
-    expect(result.ignored).not.toContain("clickThrough");
+    expect(result.ignored).toContain("clickThrough");
+    expect(result.state).not.toHaveProperty("clickThrough");
   });
 });
 
@@ -150,14 +181,14 @@ describe("the layout the frame is drawn with", () => {
     });
   });
 
-  it("lets clicks fall through when the page asked for it", () => {
+  it("keeps the frame clickable even when the page asked to fall through", () => {
     const box = applyMiniAppWindowPatch(
       initialMiniAppWindowState(BOUNDS),
       { mode: "window", clickThrough: true },
       BOUNDS,
     ).state;
 
-    expect(miniAppWindowFrameLayout(box).style?.pointerEvents).toBe("none");
+    expect(miniAppWindowFrameLayout(box).style?.pointerEvents).toBe("auto");
   });
 });
 

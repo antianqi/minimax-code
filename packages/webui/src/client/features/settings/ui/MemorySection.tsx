@@ -12,7 +12,7 @@ import { SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
 import { PERSONALIZATION_SECTION_HINTS, SettingsButton } from "./settings-atoms.js";
 import { MemoryManagerDialog } from "./MemoryManagerDialog.js";
 import { formatMemoryTimestamp, isMemorySaveable, type MemoryHandoff } from "../contracts/memory-handoff.js";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 interface MemorySectionProps {
   readonly getAgentMemory?: (request?: {
@@ -169,7 +169,7 @@ export function MemorySection({
         </p>
       ) : null}
       {error ? (
-        <FeedbackError message=<>error</> className="webui-settings-error" testId="memory-error" />
+        <SettingsErrorNotice message={error} testId="memory-error" />
       ) : null}
       <MemoryManagerDialog
           open={managing}
@@ -180,4 +180,24 @@ export function MemorySection({
         />
     </SettingsSection>
   );
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  useWebuiToastError(message, { testId });
+  return null;
 }

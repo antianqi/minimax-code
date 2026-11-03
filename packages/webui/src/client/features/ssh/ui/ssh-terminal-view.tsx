@@ -8,6 +8,7 @@ import { IconCircleFilled, IconTerminal2 } from "@tabler/icons-react";
 import type { WebuiSshTerminalSnapshot } from "../application/ssh-owner.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 export interface SshTerminalViewProps {
   readonly terminal: WebuiSshTerminalSnapshot;
@@ -24,6 +25,11 @@ export function SshTerminalView(props: SshTerminalViewProps): ReactElement {
   const onResizeRef = useRef(props.onResize);
   const lastOutputRef = useRef("");
   const running = props.terminal.status === "running" && Boolean(props.terminal.terminalId);
+  // The terminal that could not open is said once. The toast owns the
+  // announcement: this surface authors no channel of its own.
+  useWebuiToastError(
+    running ? undefined : props.terminal.error ?? "远程终端打开失败。",
+  );
 
   useEffect(() => {
     onInputRef.current = props.onInput;
@@ -133,13 +139,7 @@ export function SshTerminalView(props: SshTerminalViewProps): ReactElement {
           aria-label="远程终端"
           className="webui-ssh-xterm-host text-left"
         />
-        : <div
-          role="alert"
-          data-webui-component="ssh-terminal-error"
-          className="webui-ssh-terminal-error font-mono text-sm"
-        >
-          {props.terminal.error ?? "远程终端打开失败。"}
-        </div>}
+        : null}
     </WebuiDialog>
   );
 }

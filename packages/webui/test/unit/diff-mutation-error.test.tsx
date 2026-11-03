@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -77,7 +78,7 @@ describe("a failed revert/reapply is reported, not relabelled as a missing capab
     });
   });
 
-  it("renders the failure on the live card instead of the capability-missing card", () => {
+  it("keeps the card alive and the failure off it, so the toast carries the reason", () => {
     const markup = renderToStaticMarkup(
       createElement(WebuiDiffCard, {
         initialView: activeView,
@@ -88,8 +89,12 @@ describe("a failed revert/reapply is reported, not relabelled as a missing capab
       }),
     );
 
-    expect(markup).toContain('data-testid="turn-diff-mutation-error"');
-    expect(markup).toContain("plan-not-safe: 目标路径在工作区之外");
+    // The failed mutation is an event, not a state: it is said once, through
+    // the shared toast, which is drawn over the page and takes no room from it
+    // (ADR 0030). A server render never sees it.
+    expect(markup).not.toContain('data-testid="turn-diff-mutation-error"');
+    expect(markup).not.toContain('data-testid="turn-diff-mutation-error-reason"');
+    expect(markup).not.toContain("plan-not-safe: 目标路径在工作区之外");
     // The card itself must survive: a failure is not a reason to hide the
     // file list or the retry control.
     expect(markup).toContain('data-testid="turn-diff-card"');
@@ -99,14 +104,30 @@ describe("a failed revert/reapply is reported, not relabelled as a missing capab
     expect(markup).not.toContain("当前运行时未提供 session diff 能力");
   });
 
-  it("offers a dismiss control so the reason is not stuck on screen forever", () => {
+  /* The failure is said through the toast, which the server render cannot
+   * see: it is raised in an effect and drawn over the page. The card's own
+   * source is what pins that the failure is reported at all — and that the
+   * toast still carries the reason and the control that answers it. */
+  it("raises the failure through the toast, with the reason and a dismiss action", () => {
+    const source = readFileSync(
+      new URL("../../src/client/features/transcript/ui/DiffCard.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain("mutationError");
+    expect(source).toContain('label: "知道了"');
+    expect(source).toContain("onClick: dismissError");
+  });
+
+  it("offers a dismiss through the toast, so the reason is not stuck on screen forever", () => {
     const markup = renderToStaticMarkup(
       createElement(WebuiDiffCard, {
         initialView: activeView,
         initialState: { ...initialWebuiDiffState, mutationError: "boom" },
       }),
     );
-    expect(markup).toContain('data-testid="turn-diff-mutation-error-dismiss"');
+    // The dismiss control rides on the toast, not on the card.
+    expect(markup).not.toContain('data-testid="turn-diff-mutation-error-dismiss"');
 
     const dismissed = reduceWebuiDiffState(
       { ...initialWebuiDiffState, mutationError: "boom" },

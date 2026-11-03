@@ -28,7 +28,8 @@ import {
 import type {
   WebuiQuestionnaireRequest,
 } from "../../../../shared/contracts/interactions.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton } from "../../../ui/button.js";
 
 /** Shared busy/error plumbing for every plan surface. */
@@ -37,11 +38,15 @@ export interface WebuiPlanCardChrome {
   readonly error?: string;
 }
 
-function PlanCardError({ error }: { readonly error?: string }): ReactElement | null {
-  if (!error) return null;
-  return (
-    <FeedbackError message={error} className="webui-plan-card-error" />
-  );
+/**
+ * The failure a plan card carries.
+ *
+ * Several callers render this atom, so the notice is migrated once, here: the
+ * card keeps its shape and the failure is said once instead of drawn in it.
+ */
+function PlanCardError({ error }: { readonly error?: string }): null {
+  useWebuiToastError(error);
+  return null;
 }
 
 /**

@@ -104,7 +104,10 @@ the same time the shared database decides which host acts on a given slot — th
 needs no change. [ADR 0028](adr/0028-the-webui-has-one-shared-presentation-layer.md) establishes the
 shared presentation layer and its motion foundations; [ADR 0029](adr/0029-page-surfaces-share-layout-skeleton-and-motion-contracts.md)
 defines the page, skeleton and shared motion contracts for route pages, dialogs, drawers and
-repeated semantic elements. A new decision takes the next free number.
+repeated semantic elements. ADR 0030 records the client's one way of saying something that has
+already happened: the shared toast, which reports a failure, a confirmation or a failed read over the
+client instead of in the page, while a field's own validation error and a state that stays keep their
+place. A new decision takes the next free number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |

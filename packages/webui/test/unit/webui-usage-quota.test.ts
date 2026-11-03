@@ -9,6 +9,7 @@
 
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -325,16 +326,32 @@ describe("UsagePanel states", () => {
     expect(html).toContain("webui-motion-loading");
   });
 
-  it("distinguishes auth errors from generic failures and offers retry", () => {
+  it("distinguishes auth errors from generic failures, and offers retry through the toast", () => {
+    // The load failure is an event, not a state: it is said once, through the
+    // shared toast, and the popover's own layout keeps no trace of it (ADR
+    // 0030). A server render never sees it.
     const authHtml = render({ status: "error", errorMessage: "Run mcode login in the TUI, then retry." });
-    expect(authHtml).toContain("请重新登录");
-    expect(authHtml).toContain("重试");
-    expect(authHtml).toContain('data-testid="usage-popover-error"');
+    expect(authHtml).not.toContain("请重新登录");
+    expect(authHtml).not.toContain("重试");
+    expect(authHtml).not.toContain('data-testid="usage-popover-error"');
     const genericHtml = render({
       status: "error",
       errorMessage: "Usage quota membership request failed with HTTP 500",
     });
-    expect(genericHtml).toContain("加载失败");
+    expect(genericHtml).not.toContain("加载失败");
+    // The popover still renders the surface it always did.
+    expect(authHtml).toContain('data-testid="usage-popover"');
+
+    // The two failures are still told apart — in the toast's words, not in the
+    // layout — and the retry still waits for the answer.
+    const source = readFileSync(
+      new URL("../../src/client/features/account/ui/UserMenuUsage.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("请重新登录");
+    expect(source).toContain("加载失败");
+    expect(source).toContain('label: "重试"');
+    expect(source).toContain("onClick: onRetry");
   });
 
   it("shows the signed-out copy when nobody is signed in", () => {

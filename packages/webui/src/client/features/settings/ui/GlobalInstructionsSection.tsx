@@ -15,6 +15,7 @@ import { WebuiTextarea } from "../../../ui/field.js";
 import { PERSONALIZATION_SECTION_HINTS, SettingsButton, SettingsSavedNotice } from "./settings-atoms.js";
 import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 const INSTRUCTIONS_PLACEHOLDER = [
   "# Agents 全局设定",
@@ -183,7 +184,7 @@ export function GlobalInstructionsSection({
         <FeedbackError message="内容超出 {maxBytes} 字节上限，请精简后再保存。" className="webui-settings-error" testId="global-instructions-over-limit" />
       ) : null}
       {error ? (
-        <FeedbackError message=<>error</> className="webui-settings-error" testId="global-instructions-error" />
+        <SettingsErrorNotice message={error} testId="global-instructions-error" />
       ) : null}
       {saved && !dirty ? (
         <SettingsSavedNotice message="已保存" testId="global-instructions-saved" />
@@ -195,4 +196,24 @@ export function GlobalInstructionsSection({
       ) : null}
     </SettingsSection>
   );
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  useWebuiToastError(message, { testId });
+  return null;
 }

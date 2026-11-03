@@ -93,6 +93,7 @@ import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiField, WebuiFormActions, WebuiFormLayout, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
@@ -542,6 +543,13 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
   // "No IM bot exists" is only true of a *successful* empty read: a failed one is not empty, and
   // saying so would invite the reader to create a bot they may already have.
   const showEmpty = rows.length === 0 && props.snapshot.status === "ready";
+  // The two failures are said once each; the panel keeps its own layout.
+  useWebuiToastError(props.snapshot.error, {
+    dataAttributes: { "data-webui-channel-error": "true" },
+  });
+  useWebuiToastError(props.snapshot.actionError, {
+    dataAttributes: { "data-webui-channel-action-error": "true" },
+  });
   return (
     <WebuiInline
       align="stretch"
@@ -627,22 +635,6 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
           {props.snapshot.status === "loading" ? (
             <p className="mt-2 text-xs text-text_default_tertiary">{WEBUI_CHANNEL_LOADING_TEXT}</p>
           ) : null}
-          {props.snapshot.error === undefined ? null : (
-            <p
-              data-webui-channel-error="true"
-              className="mt-2 text-xs leading-4 text-text_status_error"
-            >
-              {props.snapshot.error}
-            </p>
-          )}
-          {props.snapshot.actionError === undefined ? null : (
-            <p
-              data-webui-channel-action-error="true"
-              className="mt-2 text-xs leading-4 text-text_status_error"
-            >
-              {props.snapshot.actionError}
-            </p>
-          )}
         </aside>
 
         <section

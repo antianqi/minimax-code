@@ -58,6 +58,22 @@ const MOTION_COMPONENT_IMPLEMENTATION_FILES = new Set([
   "ui/field.tsx",
   "ui/menu-item.tsx",
   "ui/page.tsx",
+  // The toast card draws the shared surface motion itself: it applies the
+  // family's attributes by hand, because `WebuiMotion` would project a
+  // skeleton over a notice while the page is loading.
+  "ui/toast.tsx",
+]);
+/**
+ * The files that may write the shared motion's attributes by hand.
+ *
+ * `ui/page.tsx` owns `WebuiMotion`, so it writes them. `ui/toast.tsx` is the
+ * one other caller, and it says why in its own source: `WebuiMotion` projects
+ * its children into a skeleton while the page is loading, and a notice that
+ * turns into a placeholder is a notice the user cannot read.
+ */
+const MOTION_ATTRIBUTE_OWNERS = new Set([
+  "ui/page.tsx",
+  "ui/toast.tsx",
 ]);
 const SHARED_FEEDBACK_CONTROLS = new Set([
   "ui/ToggleSwitch.tsx",
@@ -239,7 +255,7 @@ export function sourceMotionOwnershipProblems(file, text) {
       problems.push(`${file}: inline SVG animation bypasses the shared motion component`);
     }
     if (
-      file !== "ui/page.tsx" &&
+      !MOTION_ATTRIBUTE_OWNERS.has(file) &&
       (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
       node.attributes.properties.some((attribute) =>
         ts.isJsxAttribute(attribute) && attribute.name.getText(sourceFile) === "data-webui-motion",

@@ -25,7 +25,7 @@ import { WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiFormGrid, WebuiSelectMenu, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { WebuiSegmentedControl } from "../../../ui/segmented-control.js";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiDisclosure } from "../../../ui/page.js";
 
@@ -156,6 +156,9 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
   // three are not the same thing and must not collapse into one string.
   const [localError, setLocalError] = useState("");
   const { errors, validateRequired, setFieldError, clearFieldError, clearErrors } = useWebuiFormValidation();
+  /* A form-level failure is an event, not a state: it is said once and the
+   * draft keeps what the person typed. */
+  useWebuiToastError(localError);
 
   /** Form fields → one server config, validating as it goes. */
   const configFromForm = (): Row => {
@@ -439,7 +442,6 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
           </WebuiDisclosure>
         </WebuiFormGrid>
       )}
-      {localError ? <FeedbackError message={localError} /> : null}
       <WebuiDialogActions>
         <WebuiButton variant="secondary" size="dialog" onClick={onClose}>
           取消

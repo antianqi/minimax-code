@@ -23,6 +23,7 @@ import { Transcript } from "../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../features/account/ui/UserMenu.js";
 import { readWebuiMemoryHandoffPrompt, type MemoryHandoff } from "../features/settings/contracts/memory-handoff.js";
 import { WebuiWorkspacePanel } from "../features/workspace/ui/WorkspacePanels.js";
+import { MiniAppView } from "../features/miniapp/ui/MiniAppView.public.js";
 import { webuiRailIsDrawer, WEBUI_PROGRESS_PANEL_NARROW_QUERY } from "../ui/layout-thresholds.js";
 import { useOverlayLayer } from "../ui/overlay-coordinator.js";
 import { WebuiIconButton } from "../ui/button.js";
@@ -867,6 +868,23 @@ export function WebuiClientFoundationApp(
     queries: workspaceQueries.files,
     selectedSessionId,
   });
+  const [floatingMiniApp, setFloatingMiniApp] = useState<{ readonly pluginId: string; readonly sessionId?: string }>();
+  const [miniAppMountTarget, setMiniAppMountTarget] = useState<HTMLDivElement | null>(null);
+  const [miniAppToolbarTarget, setMiniAppToolbarTarget] = useState<HTMLDivElement | null>(null);
+  const activeWorkspaceTab = workspacePanel.tabs.find((tab) => tab.id === workspacePanel.activeTabId);
+  const activeMiniApp = workspacePanel.open && activeWorkspaceTab?.content.kind === "miniapp"
+    ? activeWorkspaceTab.content
+    : undefined;
+  const visibleMiniApp = floatingMiniApp ?? (activeMiniApp ? {
+    pluginId: activeMiniApp.pluginId,
+    sessionId: activeMiniApp.sessionId,
+  } : undefined);
+  const onMiniAppWindowModeChange = useCallback((pluginId: string, appSessionId: string | undefined, windowed: boolean) => {
+    setFloatingMiniApp((current) => {
+      if (windowed) return { pluginId, ...(appSessionId !== undefined ? { sessionId: appSessionId } : {}) };
+      return current?.pluginId === pluginId && current.sessionId === appSessionId ? undefined : current;
+    });
+  }, []);
   const [workspaceEnvironmentCollapsed, setWorkspaceEnvironmentCollapsed] = useState(false);
   const [workspaceProgressCollapsed, setWorkspaceProgressCollapsed] = useState(false);
   const [workspaceSubagentsCollapsed, setWorkspaceSubagentsCollapsed] = useState(false);
@@ -1284,6 +1302,8 @@ export function WebuiClientFoundationApp(
                 workspaceDir={selectedSession?.workspaceDir} workspaceFileUrl={workspacePort.workspaceFileUrl}
                 terminal={terminalOwner} onClose={closeWorkspacePanel}
                 onManageMiniApps={manageMiniApps}
+                onMiniAppMountTarget={setMiniAppMountTarget}
+                onMiniAppToolbarTarget={setMiniAppToolbarTarget}
               /></WebuiZoneBoundary> : undefined}
             />
           </WebuiPage>}
@@ -1291,6 +1311,14 @@ export function WebuiClientFoundationApp(
         </div>
       </div>
     </div>
+      {visibleMiniApp ? <MiniAppView
+        key={visibleMiniApp.pluginId}
+        pluginId={visibleMiniApp.pluginId}
+        sessionId={visibleMiniApp.sessionId}
+        toolbarTarget={activeMiniApp?.pluginId === visibleMiniApp.pluginId ? miniAppToolbarTarget : null}
+        mountTarget={miniAppMountTarget}
+        onWindowModeChange={onMiniAppWindowModeChange}
+      /> : null}
       {connectionSettingsOpen && settingsPortalTarget ? createPortal(
         <SettingsModal
           open

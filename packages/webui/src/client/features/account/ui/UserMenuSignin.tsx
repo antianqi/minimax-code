@@ -14,8 +14,9 @@ import {
   isSigninPanelClaimedToday,
 } from "@mavis/shared/daily-signin";
 import type { WebuiSigninPanelView } from "../../../../shared/contracts/account.js";
-import { FeedbackError, WebuiSpinner } from "../../../ui/feedback.js";
+import { WebuiSpinner } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiSkeleton, WebuiTooltip } from "../../../ui/page.js";
 
@@ -324,6 +325,15 @@ export function SigninCard({
   readonly onRetry: () => void;
   readonly onNavigateToUsage: () => void;
 }): ReactElement {
+  // The two failures are said once each. The card keeps its own layout: a
+  // failure is not a reason to hide the panel, and the toast carries the
+  // retry the card used to hold.
+  useWebuiToastError(panel && error ? error : undefined);
+  useWebuiToastError(!panel && !loading ? error ?? SIGNIN.error : undefined, {
+    action: { label: SIGNIN.retry, onClick: onRetry },
+    testId: "signin-card-error",
+  });
+
   if (loading && !panel) return <SigninCardSkeleton />;
 
   const displayPanel = panel;
@@ -469,34 +479,8 @@ export function SigninCard({
                   ) : null}
                 </div>
               </div>
-              {error ? (
-                <FeedbackError
-                  message="error"
-                  className="mb-0 mt-2 text-xs text-text_default_secondary"
-                />
-              ) : null}
             </>
-          ) : (
-            <FeedbackError
-              testId="signin-card-error"
-              className="relative mt-8 flex min-h-[104px] flex-col items-center justify-center gap-2 px-4 text-center"
-              message={
-                <span className="m-0 text-xs leading-4 text-text_default_secondary">
-                  {error ?? SIGNIN.error}
-                </span>
-              }
-              action={
-                <WebuiButton
-                  variant="plain"
-                  size="inline-dense"
-                  onClick={onRetry}
-                  className="webui-signin-retry"
-                >
-                  {SIGNIN.retry}
-                </WebuiButton>
-              }
-            />
-          )}
+          ) : null}
         </div>
       </section>
   );

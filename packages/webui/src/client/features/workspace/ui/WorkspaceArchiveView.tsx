@@ -4,7 +4,8 @@
 // what `readWorkspaceArchive` is willing to name and never invents a path.
 
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import {
   useWebuiWorkspaceArchive,
   useWebuiWorkspaceQueriesState,
@@ -146,6 +147,11 @@ function ArchiveExtractControls({
   readonly extractState: ArchiveExtractState;
   readonly onExtract?: () => void;
 }): ReactElement {
+  // The decompression failed: the failure is said once, as a toast, and the
+  // extract controls keep their own shape.
+  useWebuiToastError(extractState.status === "error" ? extractState.error : undefined, {
+    testId: "workspace-archive-extract-error",
+  });
   return (
     <div className="webui-workspace-archive-extract">
       <p data-testid="workspace-archive-destination">
@@ -168,9 +174,6 @@ function ArchiveExtractControls({
             </FeedbackLiveRegion>
           )
         : null}
-      {extractState.status === "error"
-        ? <FeedbackError message={extractState.error} testId="workspace-archive-extract-error" />
-        : null}
     </div>
   );
 }
@@ -183,10 +186,13 @@ export function WorkspaceArchiveNotice({
   readonly reason: string;
   /** A failure is announced; a state that was never available is not. */
   readonly failure?: boolean;
-}): ReactElement {
-  return failure ? (
-    <FeedbackError message={reason} testId="workspace-archive-notice" />
-  ) : (
+}): ReactElement | null {
+  // A failure is said once, as a toast: the read that failed is a moment that
+  // has passed, and drawing it in the layout would push the archive below it
+  // down. A state that was never available is still a state, and stays.
+  useWebuiToastError(failure ? reason : undefined, { testId: "workspace-archive-notice" });
+  if (failure) return null;
+  return (
     // 这个通知是文件正文的直接子元素，`.webui-workspace-file-document > p`
     // 给过它间距与颜色；换掉元素名后这条选择器不再命中，等价样式留在里面的 p 上。
     <FeedbackLiveRegion testId="workspace-archive-notice">
@@ -251,7 +257,27 @@ export function WorkspaceArchiveView(props: WorkspaceArchiveViewProps): ReactEle
     return <WorkspaceArchiveNotice reason="当前服务没有提供压缩包浏览能力。" />;
   }
   if (load.status === "loading") return <WorkspaceArchiveNotice reason="正在读取压缩包…" />;
-  if (load.status === "error") return <WorkspaceArchiveNotice reason={load.error} failure />;
+  if (load.status === "error") {
+    // The listing could not be read. The failure is said once, as a toast, and
+    // the surface keeps its own shape: the archive path, an empty directory,
+    // and an extract control a failed read cannot fill.
+    return (
+      <>
+        <WorkspaceArchiveNotice reason={load.error} failure />
+        <WorkspaceArchiveListing
+          archivePath={path}
+          prefix={prefix}
+          destination={target}
+          entries={[]}
+          totalEntries={0}
+          truncated={false}
+          extractState={extract}
+          onEnterDirectory={enterDirectory}
+          onGoUp={prefix ? goUp : undefined}
+        />
+      </>
+    );
+  }
   return (
     <WorkspaceArchiveListing
       archivePath={load.listing.archivePath}

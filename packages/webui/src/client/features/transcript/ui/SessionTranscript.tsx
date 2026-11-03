@@ -21,6 +21,7 @@ import type { WebuiTranscriptCommands } from "../contracts/session-read-port.js"
 import type { WebuiQuestionnaireRequest } from "../../../../shared/contracts/interactions.js";
 import { scrollWebuiTargetIntoView } from "../../../bindings/browser-effects.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiQuestionnaireResponseSummary } from "../contracts/transcript-view.js";
@@ -35,7 +36,6 @@ import {
 } from "../projection/transcript-projection.js";
 import { projectWebuiTranscriptMessage } from "../projection/message-projection.js";
 import { projectWebuiTranscriptView } from "../projection/transcript-view-model.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import {
   projectHistoricalTurnView,
   projectLiveTurnView,
@@ -183,6 +183,10 @@ function WebuiSessionTranscriptView({
       ? false
       : transcriptState.loading;
   const error = transcriptState.error;
+  // The load failure is said once and it leaves the layout alone: the list
+  // below is either empty or already drawn, and a notice that takes room
+  // from it is a state pretending to be a message.
+  useWebuiToastError(error === undefined ? undefined : `Unable to load messages: ${error}`);
   const transcriptRef = useRef<HTMLElement | null>(null);
   const stream = useWebuiSessionStream(sessionId);
   const streamPhase = stream.phase;
@@ -324,9 +328,6 @@ function WebuiSessionTranscriptView({
         className="message-list w-full"
         data-webui-message-list="true"
       >
-        {error ? (
-          <FeedbackError message=<>Unable to load messages: {error}</> className="text-text_default_secondary text-size_14 leading-line_height_20" />
-        ) : null}
         {!turnLive && loading && items.length === 0 ? <ChatSkeleton /> : null}
         {showEmptyState ? (
           <FeedbackEmpty

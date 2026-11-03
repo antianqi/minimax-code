@@ -435,17 +435,20 @@ export interface WebuiMiniAppAgentObserveRequest extends WebuiMiniAppAgentCaller
   readonly sessionId?: string;
 }
 
+/** One settled turn delivered to a Mini App's activity watch. */
+export interface WebuiMiniAppAgentObserveEvent {
+  readonly type: "turn.finished";
+  readonly sessionId: string;
+  readonly turnId: string;
+  readonly title: string;
+  readonly outcome: string;
+}
+
 /** What a watch sends: a settled turn, or why the watch could not open. */
 export type WebuiMiniAppAgentObserveFrame =
   | {
       readonly kind: "event";
-      readonly event: {
-        readonly type: string;
-        readonly sessionId: string;
-        readonly turnId: string;
-        readonly title: string;
-        readonly outcome: string;
-      };
+      readonly event: WebuiMiniAppAgentObserveEvent;
     }
   | { readonly kind: "failure"; readonly code: string };
 

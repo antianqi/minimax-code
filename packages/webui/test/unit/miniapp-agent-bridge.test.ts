@@ -90,6 +90,11 @@ function openPage(): PageHarness {
   };
   const context = vm.createContext({
     window: pageWindow,
+    document: { documentElement: {}, body: {} },
+    MutationObserver: class {
+      observe(): void {}
+      disconnect(): void {}
+    },
     Map,
     Math,
     JSON,

@@ -21,6 +21,8 @@
 //   * a lying header is caught, both by the declared-total pre-flight and by the
 //     per-entry expansion ratio;
 //   * a truncated or non-archive file produces a clear message, not a crash;
+//   * an extraction failure is said through the toast, not written into the
+//     archive's own layout;
 //   * the port no longer throws "capability not connected yet".
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -870,6 +872,18 @@ function renderListing(overrides: Record<string, unknown> = {}): string {
   );
 }
 
+/**
+ * The view's own source.
+ *
+ * A notice that is said through the toast is raised in an effect and drawn
+ * into `document.body`, so a server render never carries it. Reading the
+ * source is how a failure is pinned as *reported* rather than merely hidden.
+ */
+const archiveViewSource = readFileSync(
+  new URL("../../src/client/features/workspace/ui/WorkspaceArchiveView.tsx", import.meta.url),
+  "utf8",
+);
+
 describe("workspace archive view", () => {
   it("paints the loading state on first render, before any effect has run", () => {
     // The listing is the archive owner's resource now, so the view is
@@ -951,7 +965,7 @@ describe("workspace archive view", () => {
     expect(nested).toContain("bundle.zip › src");
   });
 
-  it("reports an extraction result and an extraction failure differently", () => {
+  it("reports an extraction result in place and an extraction failure through the toast", () => {
     const done = renderListing({
       extractState: {
         status: "done",
@@ -978,11 +992,20 @@ describe("workspace archive view", () => {
     });
     expect(partial).toContain("仅解压了前一部分");
 
+    // The failure is said once, as a toast: the layout does not carry it,
+    // and the extract controls keep their own shape, so the extraction can be
+    // tried again from the same place.
     const failed = renderListing({
       extractState: { status: "error", error: "压缩包中存在不安全的条目" },
     });
-    expect(failed).toContain('role="alert"');
-    expect(failed).toContain("不安全");
+    expect(failed).not.toContain('role="alert"');
+    expect(failed).not.toContain("不安全");
+    expect(failed).toContain('data-testid="workspace-archive-destination"');
+    expect(failed).toContain('data-testid="workspace-archive-extract"');
+    // And the failure is reported, not merely hidden: the toast carries it,
+    // under the marker the surface owns.
+    expect(archiveViewSource).toContain("useWebuiToastError(");
+    expect(archiveViewSource).toContain("workspace-archive-extract-error");
 
     const running = renderListing({ extractState: { status: "running" } });
     expect(running).toContain("正在解压");
@@ -990,18 +1013,28 @@ describe("workspace archive view", () => {
   });
 
   it("separates a failure from a state that was never available", () => {
+    // A state that was never available is still a state: it is drawn in place.
     const notice = renderToStaticMarkup(
       createElement(WorkspaceArchiveNotice, { reason: "正在读取压缩包…" }),
     );
     expect(notice).toContain('role="status"');
     expect(notice).not.toContain('role="alert"');
+    expect(notice).toContain("正在读取压缩包…");
+    // A failure is said once, as a toast, so the layout carries none of it.
     const failure = renderToStaticMarkup(
       createElement(WorkspaceArchiveNotice, {
         reason: "这不是可识别的 ZIP 压缩包",
         failure: true,
       }),
     );
-    expect(failure).toContain('role="alert"');
+    expect(failure).not.toContain('role="alert"');
+    expect(failure).not.toContain("这不是可识别的 ZIP 压缩包");
+    expect(failure).toBe("");
+    // And the failure is reported, not merely hidden.
+    expect(archiveViewSource).toContain("useWebuiToastError(");
+    expect(archiveViewSource).toMatch(
+      /useWebuiToastError\(\s*failure\s*\?\s*reason\s*:\s*undefined/u,
+    );
   });
 
   it("derives a workspace-relative destination from the archive path", () => {

@@ -265,7 +265,7 @@ async function serveMiniAppStub(page) {
     route.fulfill({
       status: 200,
       contentType: "text/html; charset=utf-8",
-      body: "<!doctype html><html><body><p>Mini App stub</p></body></html>",
+      body: "<!doctype html><html><body><button id='drag-handle'>Drag</button></body></html>",
     }),
   );
 }
@@ -399,7 +399,12 @@ test("the running Mini App offers its refresh, its stop and the runtime's state,
   await expect(picker).toBeVisible();
   await picker.getByRole("button", { name: "打开" }).click();
 
-  await expect(page.getByTestId("miniapp-view-frame")).toBeVisible();
+  const inlineFrame = page.getByTestId("miniapp-view-frame");
+  await expect(inlineFrame).toBeVisible();
+  await expect.poll(async () => {
+    const bounds = await inlineFrame.boundingBox();
+    return Boolean(bounds && bounds.width > 0 && bounds.height > 0);
+  }).toBe(true);
   await expect.poll(() => served).toBe(1);
   await expect(page.getByTestId("miniapp-stop")).toBeVisible();
   await expect(page.getByTestId("miniapp-refresh")).toBeVisible();
@@ -424,6 +429,129 @@ test("the running Mini App offers its refresh, its stop and the runtime's state,
   await page.getByTestId("miniapp-refresh").click();
   await expect.poll(() => served).toBe(2);
   await expect(page.getByTestId("miniapp-view-frame")).toBeVisible();
+});
+
+test("a floating Mini App can leave the workspace panel and stay above the main window", async ({ page }) => {
+  let served = 0;
+  await page.route(`${MINI_APP_ORIGIN}/**`, (route) => {
+    served += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: "<!doctype html><html style=\"background:#fff\"><body style=\"background:#fff\"><p>Mini App stub</p><button id=\"drag-handle\">drag</button></body></html>",
+    });
+  });
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.miniapp",
+        displayName: "演示应用",
+        description: "一个用于浏览器验收的 Mini App",
+        runtime: { kind: "process", status: "running" },
+      }] });
+      window.__fixture.setResponse("openMiniApp", {
+        pluginId: "demo.miniapp",
+        viewUrl: "http://127.0.0.1:49152/__miniapp-stub",
+      });
+    });
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openApp(page);
+  await openWorkspacePanel(page);
+  await openLauncherTile(page, "miniapp-picker");
+  await page.getByRole("button", { name: "展开面板" }).click();
+  await page.getByTestId("miniapp-picker").getByRole("button", { name: "打开" }).click();
+
+  const frame = await loadedMiniAppFrame(page);
+  await frame.evaluate(() => {
+    document.body.addEventListener("pointerdown", (event) => {
+      if (!(event.target instanceof HTMLButtonElement)) return;
+      event.target.setPointerCapture(event.pointerId);
+      window.__miniAppDrag = {
+        originX: 640,
+        originY: 220,
+      };
+    });
+    document.body.addEventListener("pointermove", (event) => {
+      const drag = window.__miniAppDrag;
+      if (!drag) return;
+      drag.originX += event.movementX;
+      drag.originY += event.movementY;
+      window.parent.postMessage({
+        type: "webui.miniapp.window.request",
+        requestId: `drag-${event.timeStamp}`,
+        method: "update",
+        patch: {
+          mode: "window",
+          x: drag.originX,
+          y: drag.originY,
+          width: 320,
+          height: 360,
+        },
+      }, "*");
+    });
+  });
+  await frame.evaluate(() => window.parent.postMessage({
+    type: "webui.miniapp.window.request",
+    requestId: "put-on-desktop",
+    method: "update",
+    patch: { mode: "window", x: 640, y: 220, width: 320, height: 360 },
+  }, "*"));
+
+  const panel = page.getByTestId("workspace-panel");
+  const windowFrame = page.getByTestId("miniapp-view-frame");
+  await expect.poll(async () => (await windowFrame.boundingBox())?.x ?? -1).toBe(640);
+  await expect.poll(() => windowFrame.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  const handle = await frame.locator("#drag-handle").boundingBox();
+  expect(handle).not.toBeNull();
+  const dragStart = { x: handle.x + 20, y: handle.y + 20 };
+  const expectedFloatingX = 640 + 100 - dragStart.x;
+  const expectedFloatingY = 220 + 240 - dragStart.y;
+  await page.mouse.move(dragStart.x, dragStart.y);
+  await page.mouse.down();
+  await page.mouse.move(100, 240, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await windowFrame.boundingBox())?.x ?? -1).toBe(expectedFloatingX);
+  const geometry = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="workspace-panel"]');
+    const frame = document.querySelector('[data-testid="miniapp-view-frame"]');
+    const rect = frame.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + 20, rect.top + 20);
+    return {
+      frameParent: frame.parentElement?.tagName,
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      panelLeft: panel.getBoundingClientRect().left,
+      hitFrame: hit === frame,
+    };
+  });
+  expect(geometry.left).toBe(expectedFloatingX);
+  expect(geometry.top).toBe(expectedFloatingY);
+  expect(geometry.right).toBe(expectedFloatingX + 320);
+  expect(geometry.left).toBeLessThan(geometry.panelLeft);
+  expect(geometry.frameParent).toBe("BODY");
+  expect(geometry.hitFrame).toBe(true);
+  expect(served).toBe(1);
+  await expect(panel).toBeVisible();
+  await frame.evaluate(() => window.parent.postMessage({
+    type: "webui.miniapp.window.request",
+    requestId: "move-away-from-navigation",
+    method: "update",
+    patch: { x: 640, y: 220 },
+  }, "*"));
+  await expect.poll(async () => (await windowFrame.boundingBox())?.x ?? -1).toBe(640);
+  await page.getByRole("button", { name: "关闭面板" }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(windowFrame).toBeVisible();
+  const otherSession = page.getByRole("link", { name: /Synthetic session B/ });
+  await otherSession.focus();
+  await otherSession.press("Enter");
+  await expect(windowFrame).toBeVisible();
+  await page.getByRole("button", { name: "插件", exact: true }).first().click();
+  await expect(windowFrame).toBeVisible();
+  expect(served).toBe(1);
 });
 
 test("the Mini App picker follows the centered app-list layout in a narrow workspace panel", async ({ page }) => {

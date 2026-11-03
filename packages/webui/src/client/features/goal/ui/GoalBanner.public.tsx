@@ -17,7 +17,8 @@ import type {
   WebuiGoalStatus,
 } from "../../../../shared/contracts/goal.js";
 import type { WebuiGoalCommands } from "../contracts/goal-port.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiDisclosure } from "../../../ui/page.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
@@ -65,6 +66,9 @@ export function WebuiGoalClearDialog({
    * holds still reaches it, and the dialog does not close under a delete that
    * is still running.
    */
+  /* The clear that failed is an event, not a state: it is said once, and the
+   * dialog keeps the confirmation it holds. */
+  useWebuiToastError(open ? error : undefined, { testId: "goal-clear-error" });
   return (
     <WebuiDialog
       id="goal-clear-confirm"
@@ -92,7 +96,6 @@ export function WebuiGoalClearDialog({
         </>
       }
     >
-      {error ? <FeedbackError message={error} className="webui-goal-clear-dialog-error" testId="goal-clear-error" /> : null}
     </WebuiDialog>
   );
 }
@@ -119,6 +122,10 @@ export function WebuiGoalBanner({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  /* The pause, resume or edit that failed is an event, not a state: it is said
+   * once, and the banner keeps the goal it holds. The clear dialog says the
+   * clear's own failure. */
+  useWebuiToastError(confirmClear ? undefined : error, { testId: "thread-goal-error" });
   useEffect(() => {
     setObjectiveExpanded(false);
     setConfirmClear(false);
@@ -209,7 +216,6 @@ export function WebuiGoalBanner({
       <WebuiDisclosure id="thread-goal-objective-expanded" open={objectiveExpanded} mountOnOpen data-testid="thread-goal-objective-disclosure">
         <div className="webui-goal-objective-expanded" data-testid="thread-goal-objective-expanded">{goal.objective}</div>
       </WebuiDisclosure>
-      {error && !confirmClear ? <FeedbackError message={error} testId="thread-goal-error" /> : null}
       {clearDialog}
     </section>
   );

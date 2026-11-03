@@ -6,13 +6,30 @@
 // `src`/`title`, the states that must render *instead of* a frame, and — the
 // assertions that actually protect the feature — the absence of a second
 // sandbox layer and of any inlined document.
+//
+// A refusal is said through the toast, which an effect draws into
+// `document.body`, so it is never in the markup: the refusal is pinned by
+// what the layout does not carry, and by the component's own source.
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { WorkspaceHtmlPreview } from "../../src/client/features/workspace/ui/WorkspaceHtmlPreview.js";
 import { hasRelativeDocumentReference } from "../../src/client/features/workspace/projection/html-preview.js";
 
 const FILE_URL = "http://127.0.0.1:8787/workspace-file?dir=%2Frepo&path=index.html&token=t0ken";
+
+/**
+ * The preview's own source.
+ *
+ * A refusal is said through the toast, which is raised in an effect and drawn
+ * into `document.body`, so a server render never carries it. Reading the
+ * source is how the refusal is pinned as *reported* rather than merely hidden.
+ */
+const htmlPreviewSource = readFileSync(
+  new URL("../../src/client/features/workspace/ui/WorkspaceHtmlPreview.tsx", import.meta.url),
+  "utf8",
+);
 
 function render(props: { fileUrl?: string; content?: { readonly type: "text" | "binary"; readonly content: string; readonly mimeType?: string } }): string {
   return renderToStaticMarkup(<WorkspaceHtmlPreview path="site/index.html" fileUrl={props.fileUrl ?? FILE_URL} content={props.content} />);
@@ -48,12 +65,20 @@ describe("workspace HTML preview", () => {
     expect(markup).toContain("<iframe");
   });
 
-  it("refuses a .html file whose bytes the runtime does not report as text/html", () => {
+  it("refuses a .html file whose bytes the runtime does not report as text/html, through the toast", () => {
     const markup = render({ content: { type: "text", content: "key = 1", mimeType: "text/plain" } });
 
+    // The refusal is said once, as a toast: the layout carries no notice, and
+    // the preview area itself now renders nothing.
     expect(markup).not.toContain("<iframe");
-    expect(markup).toContain('role="alert"');
-    expect(markup).toContain("text/plain");
+    expect(markup).not.toContain('role="alert"');
+    expect(markup).not.toContain("text/plain");
+    expect(markup).toBe("");
+    // And the refusal is reported, not merely hidden: the heading became the
+    // toast's message and the body its description.
+    expect(htmlPreviewSource).toContain("useWebuiToastError(");
+    expect(htmlPreviewSource).toContain("不作为 HTML 预览打开");
+    expect(htmlPreviewSource).toContain("运行时报告的类型是 ${mimeType}");
   });
 
   it("accepts a text/html mime that carries a charset parameter", () => {

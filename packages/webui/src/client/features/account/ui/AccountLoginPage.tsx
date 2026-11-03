@@ -35,8 +35,8 @@ import { deriveWebuiAccountLoginPagePhase } from "../application/login-page-phas
 import { webuiAccountLegalLinks } from "../../../../shared/account-legal-links.js";
 import type { WebuiAccountScope } from "../../../../shared/account-legal-links.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { FeedbackAnnouncement, FeedbackError } from "../../../ui/feedback.js";
 import { useDialogLayer } from "../../../ui/overlay-listeners.js";
+import { useWebuiToastError, useWebuiToastSuccess } from "../../../ui/toast.js";
 
 /** The copy this page shows. */
 const COPY = {
@@ -90,6 +90,17 @@ export function AccountLoginPage({
   const phase = deriveWebuiAccountLoginPagePhase(view);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [browserError, setBrowserError] = useState<string | undefined>(undefined);
+  // The page says its three failures once each, and the copy confirmation
+  // once as well: the announcement it used to carry was heard but never seen,
+  // and a confirmation nobody saw is a confirmation nobody has.
+  useWebuiToastSuccess(copyState === "success" ? COPY.linkCopied : undefined);
+  useWebuiToastError(copyState === "error" ? COPY.copyLinkFailed : undefined, {
+    testId: "account-login-copy-error",
+  });
+  useWebuiToastError(phase.kind === "error" ? phase.error : undefined, {
+    testId: "account-login-error",
+  });
+  useWebuiToastError(browserError, { testId: "account-login-browser-error" });
   // The tab the call to action reserved, and the code it is waiting for.
   const reservedTab = useRef<Window | null>(null);
   const authenticatedAt = snapshot.login.authenticatedAt;
@@ -293,33 +304,8 @@ export function AccountLoginPage({
                 <IconCopy size={14} className="text-icon_default_secondary" aria-hidden="true" />
                 <span>{copyState === "success" ? COPY.linkCopied : COPY.copyLoginLink}</span>
               </WebuiButton>
-              {/* The label above changes, and the change is what a reader has
-                * to hear. The shared announcement carries it; the button's own
-                * label stays a plain label. */}
-              {copyState === "success" ? <FeedbackAnnouncement message={COPY.linkCopied} /> : null}
             </div>
-            {copyState === "error" ? (
-              <FeedbackError
-                message={COPY.copyLinkFailed}
-                className="webui-account-login-error"
-                testId="account-login-copy-error"
-              />
-            ) : null}
           </div>
-        ) : null}
-        {phase.kind === "error" ? (
-          <FeedbackError
-            message={phase.error}
-            className="webui-account-login-error"
-            testId="account-login-error"
-          />
-        ) : null}
-        {browserError !== undefined ? (
-          <FeedbackError
-            message={browserError}
-            className="webui-account-login-error"
-            testId="account-login-browser-error"
-          />
         ) : null}
         <div className="mt-[28px] flex h-[28px] w-full max-w-[360px] flex-wrap items-center justify-center gap-x-1 text-center text-[12px] leading-[14px] text-text_default_tertiary">
           <span>{COPY.agreePrefix}</span>

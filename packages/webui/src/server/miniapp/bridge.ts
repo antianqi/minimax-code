@@ -393,10 +393,41 @@ const SCRIPT = `(function () {
   var windowSequence = 0;
   var windowPending = new Map();
   var windowListeners = [];
+  var originalWindowBackgrounds = new WeakMap();
+  function setWindowSurfaceTransparent(transparent) {
+    var elements = [document.documentElement, document.body];
+    for (var surfaceIndex = 0; surfaceIndex < elements.length; surfaceIndex += 1) {
+      var element = elements[surfaceIndex];
+      if (!element) continue;
+      if (!originalWindowBackgrounds.has(element)) {
+        originalWindowBackgrounds.set(element, {
+          value: element.style.getPropertyValue("background-color"),
+          priority: element.style.getPropertyPriority("background-color")
+        });
+      }
+      if (transparent) {
+        element.style.setProperty("background-color", "transparent", "important");
+      } else {
+        var original = originalWindowBackgrounds.get(element);
+        if (original.value) element.style.setProperty("background-color", original.value, original.priority);
+        else element.style.removeProperty("background-color");
+      }
+    }
+  }
+  var windowSurfaceObserver = new MutationObserver(function () {
+    if (document.body && windowSurfaceObserver) {
+      var lastWindowState = window.__mcodeMiniAppWindowState;
+      if (lastWindowState) setWindowSurfaceTransparent(lastWindowState.mode === "window" && lastWindowState.window && lastWindowState.window.transparent === true);
+      if (document.body) windowSurfaceObserver.disconnect();
+    }
+  });
+  windowSurfaceObserver.observe(document.documentElement, { childList: true });
   window.addEventListener("message", function (event) {
     if (event.source !== window.parent) return;
     var data = event.data;
     if (!data || typeof data !== "object" || data.type !== WINDOW_STATE) return;
+    window.__mcodeMiniAppWindowState = data.state;
+    setWindowSurfaceTransparent(data.state && data.state.mode === "window" && data.state.window && data.state.window.transparent === true);
     if (typeof data.requestId === "string") {
       var settle = windowPending.get(data.requestId);
       if (settle) {

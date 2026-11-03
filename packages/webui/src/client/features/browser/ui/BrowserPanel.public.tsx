@@ -64,8 +64,9 @@ import {
   webuiBrowserFrameDataUrl,
 } from "../projection/browser-state.js";
 import { webuiBrowserPicturePoint } from "../application/browser-commands.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 const PANEL_COPY = {
   title: "浏览器",
@@ -126,6 +127,14 @@ export function BrowserPanel({
   const viewed = state ? selectWebuiBrowserViewedTarget(state) : undefined;
   const authorized = state ? isWebuiBrowserSurfaceAuthorized(state.authorization, surface) : false;
   const capability = readWebuiCapability(capabilities, WEBUI_BROWSER_CAPABILITY_NAME);
+  // The failed read is said once. The stable code is what a caller or a test
+  // matches on; the message is for a person. Both come from the failure, so
+  // the toast keeps the code beside it.
+  const panelError = state?.error;
+  useWebuiToastError(panelError?.message, {
+    testId: "browser-panel-error",
+    ...(panelError ? { dataAttributes: { "data-error-code": panelError.code } } : {}),
+  });
   const inputEnabled = Boolean(viewed) && authorized && Boolean(port?.sendBrowserInput);
   const inputQueueRef = useRef(new Map<string, WebuiBrowserInputCommand[]>());
   const inputDrainingRef = useRef(new Set<string>());
@@ -390,17 +399,6 @@ export function BrowserPanel({
         </FeedbackLiveRegion>
       ) : null}
 
-      {state?.error ? (
-        <FeedbackError
-          message={state.error.message}
-          className="webui-browser-notice is-error"
-          testId="browser-panel-error"
-          // The stable code is what a caller or a test matches on; the message
-          // is for a person. Both come from the failure, so the surface keeps
-          // the code beside it.
-          dataAttributes={{ "data-error-code": state.error.code }}
-        />
-      ) : null}
       {/*
         The unauthorized notice is about the *surface*, not about whether a tab
         happens to be listed, so it appears from the first paint of a panel whose

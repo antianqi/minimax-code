@@ -30,6 +30,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactElement,
@@ -75,7 +76,8 @@ import {
   type WebuiMiniAppWindowBounds,
 } from "../../../../shared/contracts/miniapp-window.js";
 import { sessionHash } from "../../../projection/common/router.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiIconButton } from "../../../ui/button.js";
 import { WebuiSkeletonProjection } from "../../../ui/page.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -128,6 +130,10 @@ export interface MiniAppViewProps {
   readonly surface?: WebuiMiniAppSurface;
   /** Workspace toolbar target for the inline app actions; omitted by standalone views. */
   readonly toolbarTarget?: HTMLDivElement | null;
+  /** Panel slot for the view controls and inline placeholder. The iframe stays in body. */
+  readonly mountTarget?: HTMLElement | null;
+  /** Keeps the panel owner informed when the page changes between inline and window. */
+  readonly onWindowModeChange?: (pluginId: string, sessionId: string | undefined, windowed: boolean) => void;
 }
 
 export function MiniAppView({
@@ -136,6 +142,8 @@ export function MiniAppView({
   title,
   surface = "inline",
   toolbarTarget,
+  mountTarget,
+  onWindowModeChange,
 }: MiniAppViewProps): ReactElement {
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
@@ -154,6 +162,22 @@ export function MiniAppView({
    * so reporting itself as "open elsewhere" would be the one wrong answer.
    */
   const detached = !standalone && row?.detached === true;
+  /* The app that stopped and the start that was refused are events, not
+   * states: each is said once, and the view keeps the surface it has. */
+  useWebuiToastError(
+    presentation?.kind === "stopped" && !detached ? presentation.reason : undefined,
+    { testId: "miniapp-view-stopped" },
+  );
+  useWebuiToastError(
+    refusal
+      ? webuiMiniAppRefusalText({
+          code: refusal.code,
+          message: refusal.message,
+          rows: state.listing.rows,
+        })
+      : undefined,
+    { testId: "miniapp-view-refusal" },
+  );
   /**
    * The devices this frame may reach.
    *
@@ -168,6 +192,18 @@ export function MiniAppView({
       (item) => item.id === "device:microphone" && item.enabled,
     ) ?? false;
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const inlineFrameHostRef = useRef<HTMLDivElement>(null);
+  const [inlineFrameBounds, setInlineFrameBounds] = useState<{
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  } | null>(null);
+  // Keep one portal target for the iframe's full lifetime. Moving it between React
+  // parents would reload the cross-origin document and discard the Mini App's state.
+  const [framePortalTarget] = useState<HTMLElement | null>(() =>
+    typeof document === "undefined" ? null : document.body,
+  );
   /**
    * The box this view draws the page in.
    *
@@ -189,6 +225,28 @@ export function MiniAppView({
   const windowBoxRef = useRef(windowBox);
   windowBoxRef.current = windowBox;
   const frameLayout = miniAppWindowFrameLayout(windowBox);
+  const frameStyle = windowBox.mode === "window"
+    ? {
+        ...frameLayout.style,
+        zIndex: 140,
+        ...(windowBox.transparent ? {
+          background: "transparent",
+          border: 0,
+          borderRadius: 0,
+          boxShadow: "none",
+        } : {}),
+      }
+    : inlineFrameBounds
+      ? {
+          position: "fixed" as const,
+          left: inlineFrameBounds.x,
+          top: inlineFrameBounds.y,
+          width: inlineFrameBounds.width,
+          height: inlineFrameBounds.height,
+          pointerEvents: "auto" as const,
+          zIndex: 70,
+        }
+      : { display: "none" as const };
   /**
    * The bridge this view currently answers through, and how many documents it has
    * framed.
@@ -438,7 +496,10 @@ export function MiniAppView({
         message: request,
       });
 
-      if (request.method === "update") setWindowBox(outcome.box);
+      if (request.method === "update") {
+        setWindowBox(outcome.box);
+        onWindowModeChange?.(pluginId, sessionId, outcome.box.mode === "window");
+      }
       // The page asks for focus from a click handler, which is the only place a tab
       // lets a document take keyboard input.
       if (request.method === "focus") frame.focus();
@@ -454,7 +515,7 @@ export function MiniAppView({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [detached, presentation?.kind]);
+  }, [detached, onWindowModeChange, pluginId, presentation?.kind, sessionId]);
 
   /**
    * Pulls a floating box back when the page it floats over shrinks.
@@ -469,6 +530,41 @@ export function MiniAppView({
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  /**
+   * The inline frame is rendered into `body` too, so it has the same stable DOM parent
+   * when it becomes a floating window. This placeholder keeps the panel's flex layout;
+   * its measured rectangle places the portal frame back in the exact space it occupies.
+   */
+  useLayoutEffect(() => {
+    const host = inlineFrameHostRef.current;
+    if (!host) return;
+    const measure = (): void => {
+      if (windowBoxRef.current.mode === "window") return;
+      const rect = host.getBoundingClientRect();
+      setInlineFrameBounds((current) => {
+        const next = { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+        if (
+          current &&
+          current.x === next.x &&
+          current.y === next.y &&
+          current.width === next.width &&
+          current.height === next.height
+        ) return current;
+        return next;
+      });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    measure();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [detached, mountTarget, presentation?.kind, windowBox.mode]);
 
   /**
    * The page's tool channel.
@@ -645,8 +741,39 @@ export function MiniAppView({
       </WebuiIconButton> : null}
     </div>
   ) : null;
+  const frameElement = presentation?.kind === "open" && !detached ? (
+    <iframe
+      // Keyed on the presentation revision so a lease that came and went
+      // remounts the frame: the page's in-page state is gone either way
+      // (ADR 0020), and a stale document would otherwise keep rendering from
+      // an origin the service has already re-pointed.
+      key={`${pluginId}:${row?.presentationRevision ?? 0}:${reloadRevision}:${
+        grantsMicrophone ? "device" : "no-device"
+      }`}
+      ref={frameRef}
+      className={frameLayout.className}
+      data-testid="miniapp-view-frame"
+      // The same iframe stays in one portal for its lifetime. Moving to the page's
+      // desktop changes only its fixed geometry and does not reload the Mini App.
+      style={frameStyle}
+      allow={grantsMicrophone ? "microphone" : undefined}
+      title={title ?? name}
+      src={presentation.viewUrl}
+      onLoad={() => {
+        frameLoadsRef.current += 1;
+        if (reloadPendingRef.current) {
+          reloadPendingRef.current = false;
+          return;
+        }
+        if (frameLoadsRef.current > 1) {
+          agentHostRef.current?.handleDocumentReplaced();
+          workflows?.releaseShown(pluginId);
+        }
+      }}
+    />
+  ) : null;
 
-  return (
+  const viewElement = (
     <WebuiSkeletonProjection>
       <div
         className="webui-miniapp-view"
@@ -691,70 +818,16 @@ export function MiniAppView({
             }}
           />
         ) : null}
-        {presentation?.kind === "open" && !detached ? (
-          <iframe
-            // Keyed on the presentation revision so a lease that came and went
-            // remounts the frame: the page's in-page state is gone either way
-            // (ADR 0020), and a stale document would otherwise keep rendering from
-            // an origin the service has already re-pointed.
-            key={`${pluginId}:${row?.presentationRevision ?? 0}:${reloadRevision}:${
-              grantsMicrophone ? "device" : "no-device"
-            }`}
-            ref={frameRef}
-            className={frameLayout.className}
-            data-testid="miniapp-view-frame"
-            // A floating box is the same frame in a different place. The key above is
-            // untouched, so the page keeps its document and its state across the move —
-            // which is the whole reason this is a layout and not a second presentation.
-            style={frameLayout.style}
-            allow={grantsMicrophone ? "microphone" : undefined}
-            title={title ?? name}
-            src={presentation.viewUrl}
-            onLoad={() => {
-              frameLoadsRef.current += 1;
-              // A refresh this view asked for is not a navigation the page made.
-              // The document is replaced either way, but the turn it opened is
-              // still running in the runtime, and the shipped client keeps it
-              // running across a refresh — so nothing is closed here.
-              if (reloadPendingRef.current) {
-                reloadPendingRef.current = false;
-                return;
-              }
-              // The first load is this view's own document. A later one is a
-              // navigation the page made, so the generation that answered it is
-              // closed before the replacement document can call: its live turns are
-              // cancelled and the shown lease is released, because nothing on screen
-              // shows that session any more.
-              if (frameLoadsRef.current > 1) {
-                agentHostRef.current?.handleDocumentReplaced();
-                workflows?.releaseShown(pluginId);
-              }
-            }}
+        {frameElement && windowBox.mode !== "window" ? (
+          <div
+            ref={inlineFrameHostRef}
+            className="webui-miniapp-view-frame-placeholder"
+            aria-hidden="true"
           />
         ) : null}
         {toolbarTarget !== undefined
           ? toolbarTarget && viewActions ? createPortal(viewActions, toolbarTarget) : null
           : viewActions}
-        {presentation?.kind === "stopped" && !detached ? (
-          <div
-            className="webui-miniapp-view-state webui-miniapp-view-stopped"
-            data-testid="miniapp-view-stopped"
-          >
-            <FeedbackError message={presentation.reason} />
-          </div>
-        ) : null}
-        {presentation === undefined && refusal ? (
-          <div className="webui-miniapp-view-state">
-            <FeedbackError
-              message={webuiMiniAppRefusalText({
-                code: refusal.code,
-                message: refusal.message,
-                rows: state.listing.rows,
-              })}
-              testId="miniapp-view-refusal"
-            />
-          </div>
-        ) : null}
         {presentation === undefined && !refusal && state.unavailable ? (
           <div className="webui-miniapp-view-state">
             <FeedbackEmpty title={state.unavailable} />
@@ -763,4 +836,14 @@ export function MiniAppView({
       </div>
     </WebuiSkeletonProjection>
   );
+  const persistentWindow = windowBox.mode === "window";
+
+  return <>
+    {mountTarget ? createPortal(viewElement, mountTarget) : mountTarget !== undefined || persistentWindow ? null : viewElement}
+    {frameElement && (mountTarget === undefined || mountTarget !== null || persistentWindow)
+      ? framePortalTarget
+        ? createPortal(frameElement, framePortalTarget)
+        : frameElement
+      : null}
+  </>;
 }

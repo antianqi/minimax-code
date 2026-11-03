@@ -196,7 +196,8 @@
   .webui-workspace-file-document > .webui-markdown { max-width: 960px; margin: 0 auto; padding: 32px clamp(24px, 7vw, 64px); }
   .webui-workspace-miniapp-tab { box-sizing: border-box; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: auto; padding: 24px clamp(16px, 3cqi, 32px); }
   .webui-workspace-miniapp-tab.webui-workspace-miniapp-tab--view { display: flex; min-height: 0; flex-direction: column; overflow: hidden; padding: 0; }
-  .webui-workspace-miniapp-tab--view > .webui-miniapp-view { width: 100%; height: auto; }
+  .webui-workspace-miniapp-tab.webui-workspace-miniapp-tab--view > .webui-workspace-miniapp-view-mount { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; }
+  .webui-workspace-miniapp-view-mount > .webui-miniapp-view { width: 100%; height: auto; }
   .webui-workspace-miniapp-tab:not(.webui-workspace-miniapp-tab--view) { display: flex; flex-direction: column; }
   .webui-workspace-miniapp-tab .webui-miniapp-picker { width: min(100%, 480px); margin: auto; }
   .webui-workspace-miniapp-tab .webui-miniapp-picker-heading { display: flex; min-height: 32px; align-items: center; justify-content: space-between; gap: var(--spacing_12); margin: 0 0 16px; color: var(--text_default_primary); }

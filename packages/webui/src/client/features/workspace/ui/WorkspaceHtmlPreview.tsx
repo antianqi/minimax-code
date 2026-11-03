@@ -33,7 +33,8 @@ import { useEffect, useState, type ReactElement } from "react";
 import type { WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
 import { basenamePath } from "../../../projection/common/paths.js";
 import { hasRelativeDocumentReference } from "../projection/html-preview.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButtonLink } from "../../../ui/button.js";
 
 export type WorkspaceHtmlPreviewProps = {
@@ -85,7 +86,7 @@ type WorkspaceHtmlFrameState = "loading" | "loaded" | "failed";
  * file is not `text/html` according to the runtime, there is no file URL to
  * point at, or the frame has not loaded (or failed to).
  */
-export function WorkspaceHtmlPreview({ path, fileUrl, content }: WorkspaceHtmlPreviewProps): ReactElement {
+export function WorkspaceHtmlPreview({ path, fileUrl, content }: WorkspaceHtmlPreviewProps): ReactElement | null {
   const fileName = basenamePath(path);
   const [frameState, setFrameState] = useState<WorkspaceHtmlFrameState>("loading");
 
@@ -100,20 +101,20 @@ export function WorkspaceHtmlPreview({ path, fileUrl, content }: WorkspaceHtmlPr
   // would otherwise be framed as a document the server never agreed to
   // isolate — the CSP branch is keyed on `text/html` too.
   const mimeType = content?.mimeType?.trim().toLowerCase();
-  if (mimeType && !mimeType.startsWith("text/html")) {
-    return (
-      <FeedbackError
-        className="webui-workspace-files-empty"
-        testId="workspace-html-preview-refused"
-        message={
-          <>
-            <strong>不作为 HTML 预览打开</strong>
-            <p>{`文件扩展名是 .html，但运行时报告的类型是 ${mimeType}，服务端不会以隔离文档的策略回答它。`}</p>
-          </>
-        }
-      />
-    );
-  }
+  const refused = Boolean(mimeType && !mimeType.startsWith("text/html"));
+  // The refusal and the failed frame are said once, as toasts: neither is
+  // drawn in the layout, and both are moments that have already passed.
+  useWebuiToastError(refused ? "不作为 HTML 预览打开" : undefined, {
+    description: refused
+      ? `文件扩展名是 .html，但运行时报告的类型是 ${mimeType}，服务端不会以隔离文档的策略回答它。`
+      : undefined,
+    testId: "workspace-html-preview-refused",
+  });
+  useWebuiToastError(frameState === "failed" ? HTML_PREVIEW_COPY.loadFailed : undefined, {
+    testId: "workspace-html-preview-status",
+  });
+
+  if (refused) return null;
 
   if (!fileUrl) {
     // 无法预览是一条播报；class 交给契约的 div，内部的 p 仍是后代，
@@ -127,16 +128,14 @@ export function WorkspaceHtmlPreview({ path, fileUrl, content }: WorkspaceHtmlPr
   const relativeReference = content?.type === "text" ? hasRelativeDocumentReference(content.content) : false;
 
   return <div data-testid="workspace-html-preview" style={{ display: "flex", height: "100%", minWidth: 0, minHeight: 0, flexDirection: "column" }}>
-    {/* A failed load is an error and is announced as one; a load still
-        running is a status and is announced as one. The two are different
-        states, so each carries the shared family's own channel. */}
-    {frameState === "failed" ? (
-      <FeedbackError message={HTML_PREVIEW_COPY.loadFailed} className="webui-workspace-review-status" testId="workspace-html-preview-status" />
-    ) : frameState === "loaded" ? null : (
+    {/* A failed load is said once, as a toast; a load still running is a
+        status and is announced as one. The two are different states, so each
+        carries the shared family's own channel. */}
+    {frameState === "loading" ? (
       <FeedbackLiveRegion className="webui-workspace-review-status" testId="workspace-html-preview-status">
         {HTML_PREVIEW_COPY.loading}
       </FeedbackLiveRegion>
-    )}
+    ) : null}
     <p className="webui-workspace-review-status" data-testid="workspace-html-preview-isolation-note">
       {relativeReference ? HTML_PREVIEW_COPY.relativeDetected : HTML_PREVIEW_COPY.relativeUndetected}
       {" "}

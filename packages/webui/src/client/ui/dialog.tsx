@@ -24,7 +24,12 @@ export interface WebuiDialogProps {
   readonly title: ReactNode;
   readonly description?: ReactNode;
   readonly headerActions?: ReactNode;
-  readonly children: ReactNode;
+  /**
+   * The dialog's body. Optional: a confirmation that states its whole case in
+   * the title and the description has no body, and the surface then renders no
+   * body region at all.
+   */
+  readonly children?: ReactNode;
   readonly footer?: ReactNode;
   readonly bodyClassName?: string;
   readonly footerClassName?: string;

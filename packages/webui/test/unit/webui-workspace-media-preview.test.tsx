@@ -2,7 +2,8 @@
 //
 // Rendered through `renderToStaticMarkup` — the project's SSR test convention
 // (see `workspace-panel-state.test.ts`). That does not run effects, so the
-// error path is asserted by invoking the exported notice component directly,
+// error path is asserted by invoking the exported notice component directly —
+// a failure is said through the toast, so the markup carries none of it —
 // and everything else by the markup the dispatcher emits.
 //
 // The clauses these pin shut:
@@ -14,6 +15,7 @@
 //     control bar that cannot scrub;
 //   * no media element is emitted with an empty `src`.
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -27,6 +29,18 @@ import { isMediaContent } from "../../src/client/features/workspace/projection/m
 
 const FILE_URL = "http://127.0.0.1:8787/workspace-file?token=t";
 const DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
+
+/**
+ * The preview's own source.
+ *
+ * A failure is said through the toast, which is raised in an effect and drawn
+ * into `document.body`, so a server render never carries it. Reading the
+ * source is how the failure is pinned as *reported* rather than merely hidden.
+ */
+const mediaPreviewSource = readFileSync(
+  new URL("../../src/client/features/workspace/ui/WorkspaceMediaPreview.tsx", import.meta.url),
+  "utf8",
+);
 
 function render(props: {
   readonly path: string;
@@ -118,21 +132,32 @@ describe("workspace media preview", () => {
     expect(render({ path: "demo.mp4", mimeType: "video/mp4", fileUrl: "" })).not.toContain("<video");
   });
 
-  it("shows a load failure instead of a silent blank media box", () => {
+  it("says a load failure through the toast instead of a silent blank media box", () => {
     // The error is state driven by `onError`, which static rendering never
-    // fires, so the message the element hands over to is asserted directly —
-    // and the role is what makes it announced rather than merely visible.
+    // fires, so the message the element hands over to is asserted directly.
+    // A failure is said once, as a toast, so the preview area carries none of
+    // it — the media box is left empty rather than holding a notice that
+    // outlasts the moment it is about.
     const failed = renderToStaticMarkup(
       createElement(WorkspaceMediaNotice, { name: "demo.mp4", reason: "视频加载失败。", failure: true }),
     );
-    expect(failed).toContain('role="alert"');
-    expect(failed).toContain("demo.mp4");
-    expect(failed).toContain("视频加载失败。");
+    expect(failed).not.toContain('role="alert"');
+    expect(failed).not.toContain("demo.mp4");
+    expect(failed).not.toContain("视频加载失败。");
+    expect(failed).toBe("");
+    // And the failure is reported, not merely hidden.
+    expect(mediaPreviewSource).toContain("useWebuiToastError(");
+    expect(mediaPreviewSource).toMatch(
+      /useWebuiToastError\(\s*failure\s*\?\s*message\s*:\s*undefined/u,
+    );
 
+    // A state that was never available is still a state: it stays in place.
     const unavailable = renderToStaticMarkup(
       createElement(WorkspaceMediaNotice, { name: "voice.mp3", reason: "没有可按范围请求的文件地址。" }),
     );
     expect(unavailable).toContain('role="status"');
+    expect(unavailable).toContain("voice.mp3");
+    expect(unavailable).toContain("没有可按范围请求的文件地址。");
   });
 
   it("leaves a non-media file to the caller", () => {

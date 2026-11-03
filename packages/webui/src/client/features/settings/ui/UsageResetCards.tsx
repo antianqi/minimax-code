@@ -28,8 +28,8 @@ import type {
 } from "../../account/bindings/use-account-workflows.public.js";
 import { useWebuiAccountWorkflowsState } from "../../account/bindings/use-account-workflows.public.js";
 import { SettingsButton, SettingsDialog } from "./settings-atoms.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError, useWebuiToastSuccess } from "../../../ui/toast.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 /**
@@ -143,6 +143,8 @@ export interface UsageResetCardsProps {
 export function UsageResetCards({ account, state }: UsageResetCardsProps): ReactElement | null {
   const { cards, history, phase, selected, historyOpen } = state;
   const status = formatResetCardStatus(phase);
+  const outcome = resetCardOutcome(phase, status);
+  const pendingStatus = outcome === undefined ? status : undefined;
   const enabled = account?.canUseResetCards === true;
 
   // The list is read when the section appears. The read is guarded by the same
@@ -173,27 +175,22 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
         </SettingsButton>
       }
     >
-      {status ? (
+      {pendingStatus ? (
         <p
           data-testid="settings-usage-reset-card-status"
           className="px-3 pb-1 text-[12px] leading-4 text-text_default_secondary"
         >
-          {status}
+          {pendingStatus}
         </p>
+      ) : null}
+      {outcome ? (
+        <ResetCardOutcomeNotice message={outcome.message} tone={outcome.tone} testId="settings-usage-reset-card-status" />
+      ) : null}
+      {cards.error && cards.items.length === 0 ? (
+        <SettingsErrorNotice message={cards.error} action={{ label: WEBUI_RESET_CARD_COPY.retry, onClick: () => void account?.loadResetCards() }} />
       ) : null}
       {cards.loading && cards.items.length === 0 ? (
         <p className="px-3 py-2 text-[13px] leading-5 text-text_default_secondary">加载中…</p>
-      ) : cards.error && cards.items.length === 0 ? (
-        <FeedbackError
-          message={cards.error}
-          layout="inline"
-          className="px-3 py-2 text-[13px] leading-5 text-text_default_secondary"
-          action={
-            <SettingsButton size="compact" onClick={() => void account?.loadResetCards()}>
-              {WEBUI_RESET_CARD_COPY.retry}
-            </SettingsButton>
-          }
-        />
       ) : cards.items.length === 0 ? (
         <p
           data-testid="settings-usage-reset-card-empty"
@@ -268,6 +265,8 @@ function ResetCardConfirmDialog({
 }): ReactElement {
   const busy = phase === "using" || phase === "refreshing";
   const status = formatResetCardStatus(phase);
+  const outcome = resetCardOutcome(phase, status);
+  const pendingStatus = outcome === undefined ? status : undefined;
   return (
     <ResetCardPortal>
       <SettingsDialog
@@ -296,13 +295,16 @@ function ResetCardConfirmDialog({
           {WEBUI_RESET_CARD_COPY.confirmDescription}
         </p>
         {card ? <p className="text-[13px] leading-5 text-text_default_primary">{formatResetCardName(card)}</p> : null}
-        {status ? (
+        {pendingStatus ? (
           <p
             className="text-[12px] leading-4 text-text_default_secondary"
             data-testid="settings-usage-reset-card-confirm-status"
           >
-            {status}
+            {pendingStatus}
           </p>
+        ) : null}
+        {outcome ? (
+          <ResetCardOutcomeNotice message={outcome.message} tone={outcome.tone} testId="settings-usage-reset-card-confirm-status" />
         ) : null}
       </SettingsDialog>
     </ResetCardPortal>
@@ -343,19 +345,11 @@ function ResetCardHistoryDialog({
         <p className="text-[12px] leading-4 text-text_default_secondary">
           {WEBUI_RESET_CARD_COPY.historyWindow}
         </p>
+        {history.error && history.items.length === 0 ? (
+          <SettingsErrorNotice message={WEBUI_RESET_CARD_COPY.historyLoadError} action={{ label: WEBUI_RESET_CARD_COPY.retry, onClick: onLoadMore }} />
+        ) : null}
         {history.loading && history.items.length === 0 ? (
           <p className="py-2 text-[13px] leading-5 text-text_default_secondary">加载中…</p>
-        ) : history.error && history.items.length === 0 ? (
-          <FeedbackError
-            message={WEBUI_RESET_CARD_COPY.historyLoadError}
-            layout="inline"
-            className="py-2 text-[13px] leading-5 text-text_default_secondary"
-            action={
-              <SettingsButton size="compact" onClick={onLoadMore}>
-                {WEBUI_RESET_CARD_COPY.retry}
-              </SettingsButton>
-            }
-          />
         ) : history.items.length === 0 ? (
           <FeedbackEmpty
             className="webui-settings-dialog-empty"
@@ -396,4 +390,78 @@ function ResetCardPortal({ children }: { readonly children: ReactElement }): Rea
   const { dom } = useWebuiBrowserCapabilities();
   const portalTarget = dom.portalTarget();
   return portalTarget ? createPortal(children, portalTarget) : children;
+}
+
+/**
+ * The reset result, and the tone it is said in.
+ *
+ * A phase that reports a result is said as a notice: the outcome says what
+ * happened and goes away. A phase that reports an operation in flight is not a
+ * result — "正在重置额度…" is what the section says while the card is being
+ * used — so it stays in the page.
+ */
+function resetCardOutcome(
+  phase: WebuiResetCardPhase,
+  status: string | undefined,
+): { readonly message: string; readonly tone: "success" | "error" } | undefined {
+  if (status === undefined) return undefined;
+  switch (phase) {
+    case "success":
+    case "replayed":
+      return { message: status, tone: "success" };
+    case "unavailable":
+    case "offline":
+    case "retryable":
+    case "busy":
+    case "unknown":
+    case "refresh_failed":
+      return { message: status, tone: "error" };
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The reset result, said once.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function ResetCardOutcomeNotice({
+  message,
+  tone,
+  testId,
+}: {
+  readonly message: string;
+  readonly tone: "success" | "error";
+  readonly testId: string;
+}): ReactElement | null {
+  useWebuiToastSuccess(tone === "success" ? message : undefined, { testId });
+  useWebuiToastError(tone === "error" ? message : undefined, { testId });
+  return null;
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+  action,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+  readonly action?: { readonly label: string; readonly onClick: () => void };
+}): ReactElement | null {
+  useWebuiToastError(message, { testId, ...(action === undefined ? {} : { action }) });
+  return null;
 }

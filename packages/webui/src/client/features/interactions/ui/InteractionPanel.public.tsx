@@ -9,7 +9,7 @@ import {
   toggleWebuiQuestionnaireOption,
 } from "../projection/questionnaire-state.js";
 import { WebuiPlanSurface } from "./PlanModeCards.js";
-import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireAnswer,
@@ -95,6 +95,12 @@ export function WebuiInteractionPanel({
     // same deadline re-derives the window instead of leaving the old interval
     // comparing against a deadline that no longer exists.
   }, [questionnaire?.id, questionnaire?.purpose, questionnaire?.expiresAt]);
+  /* The answer that failed is an event, not a state: it is said once, and the
+   * panel keeps the step the person is on. */
+  useWebuiToastError(
+    interactionError ? `Unable to answer interaction: ${interactionError}` : undefined,
+    { testId: "questionnaire-error" },
+  );
   const visiblePermissions = permissions.filter(
     (permission) => permission.sessionId === sessionId,
   );
@@ -478,9 +484,6 @@ export function WebuiInteractionPanel({
             </WebuiButton>
           </WebuiInline>
         </WebuiCard>
-      ) : null}
-          {interactionError ? (
-        <FeedbackError message="Unable to answer interaction: {interactionError}" className="text-text_default_secondary text-size_12" testId="questionnaire-error" />
       ) : null}
     </WebuiStack>
   );

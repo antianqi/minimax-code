@@ -75,11 +75,18 @@ describe("code review page states", () => {
     expect(unavailable).toContain("当前工作区没有待审查的变更。");
   });
 
-  it("does show a failed load as an error, with the reason", () => {
+  it("marks a failed load as the error state and says the reason through the toast", () => {
     const failed = panel(reduceWebuiReviewState(initialWebuiReviewState, { type: "load-failed", reason: "仓库读取失败" }));
+    // The state marker is the surface's own: it still says which state it is in.
     expect(failed).toContain('data-webui-review-state="error"');
-    expect(failed).toContain('role="alert"');
-    expect(failed).toContain("仓库读取失败");
+    // The reason is an event, not a state: it is said once, through the shared
+    // toast, which is drawn over the page (ADR 0030). A server render never
+    // sees it, so the page's own layout keeps no trace of it.
+    expect(failed).not.toContain("仓库读取失败");
+    expect(failed).not.toContain('data-testid="review-note"');
+    expect(failed).not.toContain('role="alert"');
+    // The page still renders the frame it always did.
+    expect(failed).toContain('data-testid="settings-review-page"');
   });
 
   it("shows totals and one row per file when ready", () => {
@@ -153,15 +160,22 @@ describe("a review line is a real jump target, and only where one exists", () =>
 });
 
 describe("per-file diff outcomes are told apart", () => {
-  it("shows a file failure instead of an empty diff", () => {
+  it("keeps a file's diff body empty and says the failure through the toast", () => {
     const state = reduceWebuiReviewState(
       reduceWebuiReviewState(ready, { type: "diffs-loaded", diffs: {}, errors: { f1: "补丁过大" } }),
       { type: "toggle-file", fileId: "f1" },
     );
     const markup = panel(state);
-    expect(markup).toContain('data-testid="review-file-error"');
-    expect(markup).toContain("补丁过大");
+    // The file failed, so its diff body is still not drawn — an empty diff
+    // would read as "this file has no changes".
     expect(markup).not.toContain('data-testid="review-lines"');
+    // The reason is an event, not a state: it is said once, through the shared
+    // toast, which is drawn over the page (ADR 0030).
+    expect(markup).not.toContain('data-testid="review-file-error"');
+    expect(markup).not.toContain("补丁过大");
+    // The row itself survives, so the file is still there to act on.
+    expect(markup).toContain('data-testid="review-file"');
+    expect(markup).toContain("src/one.ts");
   });
 
   it("says it is loading rather than showing an empty diff body", () => {
@@ -172,6 +186,26 @@ describe("per-file diff outcomes are told apart", () => {
     const markup = panel(state);
     expect(markup).toContain("正在读取这个文件的补丁…");
     expect(markup).not.toContain('data-testid="review-lines"');
+  });
+});
+
+/* The two failures the review page can carry are said through the shared
+ * toast. The toast is raised in an effect and drawn over the page, so a server
+ * render cannot see it — the page's own source is what pins that the failures
+ * are reported at all, and that neither is drawn in the page's layout. */
+describe("the review page's failures are reported through the toast", () => {
+  const source = readFileSync(
+    fileURLToPath(new URL("../../src/client/features/review/ui/ReviewSettingsPage.public.tsx", import.meta.url)),
+    "utf8",
+  );
+
+  it("raises the load failure and the per-file failure through the toast", () => {
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain('state.status === "error" ? state.error : undefined');
+    expect(source).toContain('useWebuiToastError(diffError, { testId: "review-file-error" })');
+    // And neither of them is drawn in the page's own layout any more.
+    expect(source).not.toContain('className="webui-review-error"');
+    expect(source).not.toContain('className="webui-review-file-error"');
   });
 });
 

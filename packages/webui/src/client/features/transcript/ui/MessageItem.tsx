@@ -39,11 +39,11 @@ import {
   buildWebuiRewindRequest,
   webuiClientRequestId,
 } from "../../sessions/projection/action-requests.public.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 /**
  * The single message renderer shared by persisted history and the live turn.
@@ -150,6 +150,13 @@ function MessageItemView({
   // late reply cannot overwrite what they wrote.
   const forkTitleEdited = useRef(false);
   const { errors: editErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
+  // The mutation failure is said once, and it leaves the layout alone. The
+  // guard is the one the inline error had: the dialogs that own their own
+  // failure speak for themselves while they are open, and the assistant row
+  // is the only one that carried the notice beside the message.
+  useWebuiToastError(
+    role === "assistant" && !rewindOpen && !forkOpen ? mutationError : undefined,
+  );
   const openRewind = () => {
     setRewindOpen(true);
     setRewindPreview(undefined);
@@ -321,7 +328,6 @@ function MessageItemView({
       />
       <WebuiMessageActions {...actionProps} />
       {renderedForkDialog}
-      {mutationError && !rewindOpen && !forkOpen ? <FeedbackError message={mutationError} className="webui-message-mutation-error" /> : null}
     </div>
   );
 }

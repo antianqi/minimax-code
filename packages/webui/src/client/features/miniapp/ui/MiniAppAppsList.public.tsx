@@ -24,7 +24,8 @@ import {
   type WebuiMiniAppRow,
 } from "../projection/miniapp-view.js";
 import { readWebuiPluginRow } from "../../plugins/contracts/plugin-rows.js";
-import { FeedbackBusy, FeedbackError } from "../../../ui/feedback.js";
+import { FeedbackBusy } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
@@ -56,6 +57,23 @@ export interface MiniAppAppsListProps {
   readonly selectedSessionId?: string;
 }
 
+/**
+ * A start this app's Mini App refused.
+ *
+ * The refusal is a fact about the app; the client says it once instead of
+ * drawing it in the row, so each refused app needs its own notice.
+ */
+function MiniAppAppsListRefusal({
+  pluginId,
+  text,
+}: {
+  readonly pluginId: string;
+  readonly text: string;
+}): null {
+  useWebuiToastError(text, { testId: `miniapp-app-refusal-${pluginId}` });
+  return null;
+}
+
 export function MiniAppAppsList({
   installedPlugins = [],
   query = "",
@@ -69,6 +87,12 @@ export function MiniAppAppsList({
   const { rows, loading, error } = state.listing;
   const permissionSlice =
     permissionsPluginId === undefined ? undefined : state.permissions[permissionsPluginId];
+  /* The read that failed, the list that is unavailable and the permission slice
+   * that failed are events, not states: each is said once, and the list keeps
+   * the rows it has. */
+  useWebuiToastError(error);
+  useWebuiToastError(state.unavailable);
+  useWebuiToastError(permissionSlice?.error);
   // The page's visibility is the platform's fact, not this component's: the
   // dependency rules keep `document` out of the bindings, and the browser port
   // already answers both questions this surface asks of it.
@@ -154,15 +178,6 @@ export function MiniAppAppsList({
   return (
     <WebuiSkeletonProjection>
       <div className="webui-miniapp-apps" data-testid="miniapp-apps">
-        {error ? (
-          <FeedbackError message={error} className="webui-plugin-error" />
-        ) : null}
-        {state.unavailable ? (
-          <FeedbackError
-            message={state.unavailable}
-            className="webui-plugin-error"
-          />
-        ) : null}
         {listingRows.length === 0 ? (
           <FeedbackEmpty
             className="webui-plugin-empty"
@@ -210,10 +225,9 @@ export function MiniAppAppsList({
                   <h2>{item.name}</h2>
                   <p>{item.description || item.pluginId}</p>
                   {refusal ? (
-                    <FeedbackError
-                      className="webui-plugin-error"
-                      testId={`miniapp-app-refusal-${item.pluginId}`}
-                      message={webuiMiniAppRefusalText({
+                    <MiniAppAppsListRefusal
+                      pluginId={item.pluginId}
+                      text={webuiMiniAppRefusalText({
                         code: refusal.code,
                         message: refusal.message,
                         rows,
@@ -362,9 +376,6 @@ export function MiniAppAppsList({
                 permissionsPluginId}
               的权限
             </h3>
-            {permissionSlice.error ? (
-              <FeedbackError message={permissionSlice.error} />
-            ) : null}
             {permissionSlice.items.length > 0 ? (
               permissionSlice.items.map((permission) => (
                 <ToggleSwitch

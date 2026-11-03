@@ -10,7 +10,9 @@
  *     working one;
  *   * the rendered branches are pinned through `renderToStaticMarkup` — this package has no jsdom.
  */
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -30,7 +32,7 @@ import {
   WEBUI_SSH_EMPTY_TITLE,
   WEBUI_SSH_NO_HOSTS_TEXT,
 } from "../../src/client/features/ssh/projection/ssh-panel.js";
-import { SshPanelView } from "../../src/client/features/ssh/ui/SshPanel.public.js";
+import { SshPanelView, type SshPanelViewProps } from "../../src/client/features/ssh/ui/SshPanel.public.js";
 import type {
   WebuiSshConnection,
   WebuiSshDiscovery,
@@ -167,11 +169,13 @@ describe("the SSH projection", () => {
 });
 
 describe("the SSH panel", () => {
-  // The view is called as a function rather than written as JSX: this file is a `.ts`, and the
-  // rendered result is the same.
-  const view = (overrides: Record<string, unknown> = {}): string =>
+  // The view carries hooks now — its two failures are said through the toast — so it is
+  // rendered as a component rather than called as a plain function: a hook outside a
+  // render is an invalid hook call. The file is a `.ts` and the package has no JSX
+  // transform for one.
+  const view = (overrides: Partial<SshPanelViewProps> = {}): string =>
     renderToStaticMarkup(
-      SshPanelView({
+      createElement(SshPanelView, {
         snapshot: { status: "ready", connections: [], projects: [] },
         terminal: { status: "closed", output: "" },
         onOpenAdd: () => undefined,
@@ -199,12 +203,20 @@ describe("the SSH panel", () => {
     expect(markup).not.toContain("data-webui-ssh-list");
   });
 
-  it("does not show the empty state when the read failed", () => {
+  it("does not show the empty state, and leaves the failed read to the toast", () => {
     const markup = view({
       snapshot: { status: "error", connections: [], projects: [], error: "读取 SSH 主机失败。" },
     });
+    // A failed read is not an empty list: saying so would invite the person to add a
+    // host they may already have.
     expect(markup).not.toContain("data-webui-ssh-empty");
-    expect(markup).toContain("读取 SSH 主机失败。");
+    // The reason is an event, not a state: it is said once, through the shared toast,
+    // which is drawn over the page (ADR 0030). A server render never sees it, so the
+    // panel keeps no trace of it.
+    expect(markup).not.toContain("读取 SSH 主机失败。");
+    expect(markup).not.toContain('data-webui-ssh-error="true"');
+    // The panel itself is still there.
+    expect(markup).toContain('data-testid="ssh-connections-section"');
   });
 
   it("shows a host with its status, its switch and its actions", () => {
@@ -246,5 +258,25 @@ describe("the SSH panel", () => {
       terminal: { status: "running", output: "hello from the remote shell", terminalId: "t1" },
     });
     expect(markup).toContain("hello from the remote shell");
+  });
+});
+
+/* The two failures and the one confirmation the panel carries are said through
+ * the shared toast (ADR 0030). The toast is raised in an effect and drawn over
+ * the page, so a server render never sees it: the panel's own source is what
+ * pins that the failures are reported at all, and not merely hidden. */
+describe("the SSH panel reports its failures through the toast", () => {
+  const source = readFileSync(
+    new URL("../../src/client/features/ssh/ui/SshPanel.public.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("raises the snapshot failure and the action failure through the toast", () => {
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain("props.snapshot.error");
+    expect(source).toContain("props.error");
+    expect(source).toContain("useWebuiToastSuccess(");
+    // And the panel's own layout draws neither of them any more.
+    expect(source).not.toContain("FeedbackError");
   });
 });

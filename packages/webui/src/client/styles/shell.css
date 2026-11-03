@@ -455,6 +455,11 @@
     border: 0;
     background: var(--bg_grouped_secondary);
   }
+  .webui-miniapp-view-frame-placeholder {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+  }
   /**
    * The question a page's `ask` is waiting on.
    *
@@ -511,7 +516,10 @@
    * would trail the pointer that is dragging it.
    */
   .webui-miniapp-window-frame {
-    z-index: 60;
+    /* Above the workspace panel's expanded tier (70) and below the launcher (150): a
+       floating page is a window over the whole app, not a layer inside the panel that
+       happens to hold its tab. */
+    z-index: 140;
     border: 1px solid var(--border_heavy);
     border-radius: var(--radius_12);
     background: var(--bg_default_primary);

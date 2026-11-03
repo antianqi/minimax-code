@@ -24,8 +24,8 @@ import {
 import { SettingsDivider, SettingsPage, SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
 import { SettingsButton } from "./settings-atoms.js";
 import { shortcutActionTitle, shortcutSettingsRows } from "../projection/settings-shortcuts.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import { useDialogLayer } from "../../../ui/overlay-listeners.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 export interface ShortcutsSettingsProps {
   readonly bindings: ShortcutBindings;
@@ -96,7 +96,7 @@ export function ShortcutsSettings({ bindings, onChange, onReset }: ShortcutsSett
           </SettingsButton>
         }
       >
-        {error ? <FeedbackError message={error} className="mavis-settings-shortcut-error" testId="mavis-settings-shortcut-error" /> : null}
+        {error ? <SettingsErrorNotice message={error} testId="mavis-settings-shortcut-error" /> : null}
         {rows.map((row, index) => (
           <Fragment key={row.actionId}>
             {index > 0 ? <SettingsDivider /> : null}
@@ -125,4 +125,24 @@ export function ShortcutsSettings({ bindings, onChange, onReset }: ShortcutsSett
       </SettingsSection>
     </SettingsPage>
   );
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  useWebuiToastError(message, { testId });
+  return null;
 }

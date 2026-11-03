@@ -44,7 +44,8 @@ import {
 } from "../../../bindings/use-query-state.js";
 import { FolderIcon, SearchIcon } from "../../../ui/settings-glyphs.js";
 import { SettingsCard, SettingsPage } from "../../../ui/settings-layout.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 type WebuiReviewStateAction = Parameters<typeof reduceWebuiReviewState>[1];
@@ -218,9 +219,10 @@ export function WebuiReviewWorkspacePicker({ workspaces, selected, loading, erro
   readonly onSelect?: (workspaceDir: string) => void;
 }): ReactElement {
   const state = error ? "error" : loading ? "loading" : workspaces.length ? "ready" : "empty";
+  // The failed read is said once; the picker keeps its own layout.
+  useWebuiToastError(error, { testId: "review-workspace-error" });
   return <SettingsPage loading={loading} testId="review-workspace-picker" dataAttributes={{ "data-webui-workspace-state": state }}>
     <FeedbackEmpty className="webui-review-empty" title={"选一个工作区来审查它的变更。"} />
-    {error ? <FeedbackError message={error} className="webui-review-error" testId="review-workspace-error" /> : null}
     {!loading && !error && workspaces.length === 0 ? (
       /* Saying why matters more than saying that: an empty list under the same
        * heading reads as the bug this page is fixing. */
@@ -264,6 +266,11 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
 }): ReactElement {
   const rows = visible ?? state.files;
   const filterActive = filtering ?? isWebuiReviewFiltering(state);
+  // The failure is said once. The note is not a failure: it stays a plain
+  // line of text under the list.
+  useWebuiToastError(state.status === "error" ? state.error : undefined, {
+    testId: "review-note",
+  });
   return <SettingsPage loading={loading} testId="settings-review-page" dataAttributes={{ "data-webui-review-state": state.status, ...(state.reviewSnapshotId ? { "data-webui-review-snapshot": state.reviewSnapshotId } : {}) }}>
     {state.status === "ready" ? <div className="webui-review-totals" data-testid="review-totals">
       <span>{state.totals.files} 个文件</span>
@@ -282,13 +289,11 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
     /> : null}
     {state.searchPending && !loading ? <FeedbackLiveRegion className="webui-review-loading">正在搜索…</FeedbackLiveRegion> : null}
     {note || state.error ? (
-      // A failure is announced; a note is not. The two are different states,
-      // so the error one carries the shared feedback family's alert and the
-      // note one stays a plain line of text. The family's own chrome would
-      // restyle this line, so the surface keeps its own class beside it.
-      state.status === "error" ? (
-        <FeedbackError message={state.error ?? ""} className="webui-review-error" testId="review-note" />
-      ) : (
+      // A failure is announced by the toast; a note is not. The two are
+      // different states, so the note one stays a plain line of text. The
+      // family's own chrome would restyle this line, so the surface keeps its
+      // own class beside it.
+      state.status === "error" ? null : (
         <p className="webui-review-empty" data-testid="review-note">{note}</p>
       )
     ) : null}
@@ -332,9 +337,8 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
               data-testid="review-file-body"
             >
               {/* 读取补丁的进展和结果都要被听到，播报通道交给共享契约。 */}
-              {!withinWorkspace ? <FeedbackLiveRegion className="webui-review-file-error" testId="review-file-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</FeedbackLiveRegion> : null}
+              <WebuiReviewFileFailure withinWorkspace={withinWorkspace} diffError={diffError} />
               {pending ? <FeedbackLiveRegion className="webui-review-loading">正在读取这个文件的补丁…</FeedbackLiveRegion> : null}
-              {diffError ? <FeedbackLiveRegion className="webui-review-file-error" testId="review-file-error">{diffError}</FeedbackLiveRegion> : null}
               {diff ? <ol className="webui-review-lines" data-testid="review-lines">
                 {projectWebuiReviewLines(diff).map((line, index) => {
                   const target = webuiReviewLineTarget(line);
@@ -357,4 +361,26 @@ export function WebuiReviewPanel({ state, visible, filtering, loading, note, emp
       </ul>
     </SettingsCard>
   </SettingsPage>;
+}
+
+/**
+ * The two failures a file's diff can carry.
+ *
+ * A hook cannot be called inside the list, so the row that carries the
+ * failure speaks for itself: the toast is said once, by the file that owns
+ * it, and the row keeps its own layout.
+ */
+function WebuiReviewFileFailure({
+  withinWorkspace,
+  diffError,
+}: {
+  readonly withinWorkspace: boolean;
+  readonly diffError?: string;
+}): ReactElement | null {
+  useWebuiToastError(
+    withinWorkspace ? undefined : WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE,
+    { testId: "review-file-outside-workspace" },
+  );
+  useWebuiToastError(diffError, { testId: "review-file-error" });
+  return null;
 }

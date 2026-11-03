@@ -21,7 +21,7 @@
 import { useId, type ReactElement, type ReactNode } from "react";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
-import { FeedbackAnnouncement } from "../../../ui/feedback.js";
+import { useWebuiToastSuccess } from "../../../ui/toast.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 
 export const PERSONALIZATION_SECTION_HINTS = {
@@ -97,37 +97,31 @@ export function SettingsButton({
  * The settings pages' confirmation that a write landed.
  *
  * Three settings surfaces say 已保存 after a write, and each of them said it in
- * its own paragraph. Two problems came with that. The paragraph was a plain
- * `<p>`, so a screen reader never heard it: it appeared silently, and the user
- * who cannot see the green text has no idea the write landed. And each surface
- * wrote the same words in the same place, so the confirmation drifted with the
- * surfaces rather than with the shared family.
+ * its own paragraph. Two problems came with that. The paragraph took room in
+ * the page — it pushed the content below it down and stayed there until the
+ * user edited the field again, long after the write had landed. And each
+ * surface wrote the same words in the same place, so the confirmation drifted
+ * with the surfaces rather than with the shared family.
  *
- * So the confirmation lives here. The words are the settings pages' own — a
- * tooltip is text the user reads, and a paraphrase that reads fine still means
- * two surfaces stop saying the same thing about the same event.
+ * So the confirmation lives here, and it is a notice: it pops up over the
+ * client through the shared toast and takes no room from the page that earned
+ * it. The toast announces it, so the confirmation is heard as well as seen —
+ * which the paragraph never was, since it was a plain `<p>` the screen reader
+ * never heard at all.
  *
- * The live region is always in the DOM and its content changes when the state
- * changes. A live region that is inserted together with its text is announced
- * inconsistently across screen readers; one that is already there and then
- * changes is announced reliably. That is why `message` is empty when there is
- * nothing to say rather than the whole element being absent.
+ * The words are the settings pages' own: a confirmation is text the user
+ * reads, and a paraphrase that reads fine still means two surfaces stop saying
+ * the same thing about the same event.
  */
 export function SettingsSavedNotice({
   message,
   testId,
 }: {
-  readonly message: ReactNode;
+  readonly message: string;
   readonly testId?: string;
-}): ReactElement {
-  return (
-    <>
-      <p data-testid={testId} className="webui-personalization-saved" aria-hidden="true">
-        {message}
-      </p>
-      <FeedbackAnnouncement message={message} />
-    </>
-  );
+}): ReactElement | null {
+  useWebuiToastSuccess(message, { testId });
+  return null;
 }
 
 /**

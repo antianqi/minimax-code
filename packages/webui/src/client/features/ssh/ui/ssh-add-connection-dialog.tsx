@@ -17,8 +17,8 @@ import {
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
-import { FeedbackError } from "../../../ui/feedback.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { SshConnectionPicker } from "./ssh-connection-picker.js";
 
 export interface SshAddConnectionDialogProps {
@@ -47,6 +47,12 @@ export function SshAddConnectionDialog(props: SshAddConnectionDialogProps): Reac
   const portalTarget = dom.portalTarget();
   const hosts = props.discovery?.hosts ?? [];
   const empty = !props.loading && hosts.length === 0;
+  // The failed attempt is said once; the dialog keeps the controls that can
+  // still answer it.
+  useWebuiToastError(props.error, {
+    testId: "ssh-add-connection-error",
+    dataAttributes: { "data-webui-ssh-add-error": "true" },
+  });
 
   return (
     <WebuiDialog
@@ -89,14 +95,6 @@ export function SshAddConnectionDialog(props: SshAddConnectionDialogProps): Reac
           {...(props.selected === undefined ? {} : { selected: props.selected })}
           onSelect={props.onSelect}
         />}
-      {props.error
-        ? <FeedbackError
-          message={props.error}
-          testId="ssh-add-connection-error"
-          className="mt-2"
-          dataAttributes={{ "data-webui-ssh-add-error": "true" }}
-        />
-        : null}
       {!props.manual
         ? <WebuiInline gap="small" className="mt-3">
             <WebuiButton

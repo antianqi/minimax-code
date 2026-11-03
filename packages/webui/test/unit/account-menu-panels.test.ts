@@ -124,11 +124,18 @@ describe("the menu offers the switch-account row", () => {
   });
 });
 
-describe("a quota failure is an error with a retry, not an empty panel", () => {
-  it("renders the error state with a retry control wired to the loader", () => {
-    expect(usage).toContain('state.status === "error" ? (');
-    expect(usage).toContain('data-testid="usage-popover-error"');
-    expect(usage).toContain("onClick={onRetry}");
-    expect(usage).toContain("重试");
+describe("a quota failure is said once, through the toast", () => {
+  it("raises the failure through the toast, with a retry that waits for the answer", () => {
+    // The failure is an event, not a state: it is said once, through the shared
+    // toast (ADR 0030), and the fly-out's own layout keeps no trace of it.
+    expect(usage).toContain("useWebuiToastError(");
+    expect(usage).toContain('label: "重试"');
+    expect(usage).toContain("onClick: onRetry");
+    // The fly-out no longer draws the failure itself, and it has no error
+    // branch of its own left to draw.
+    expect(usage).not.toContain('data-testid="usage-popover-error"');
+    expect(usage).not.toContain('state.status === "error" ? (');
+    // What it can still show, it still shows.
+    expect(usage).toContain('data-testid="usage-popover-content"');
   });
 });

@@ -4,14 +4,21 @@
 // DOM framework by design, so a render branch is asserted through its markup.
 // What that proves and what it does not is worth stating — it proves the panel
 // frames the URL the open operation answered with, that a row renders the
-// runtime's state and the surface's refusals, and that the capacity refusal names
-// the running applications. It does not prove the page inside the frame loads, or
-// that a click reaches a handler; the browser suite owns that.
+// runtime's state, and that the surfaces keep the rows, the controls and the
+// empty states they always had. It does not prove the page inside the frame
+// loads, or that a click reaches a handler; the browser suite owns that.
+//
+// The failures and the confirmations are said through the shared toast (ADR
+// 0030), which is raised in an effect and drawn over the page: a server render
+// never sees it. So what a case pins about a failure here is that the layout
+// does not carry it — and, from the surfaces' own sources, that it is still
+// reported at all.
 //
 // The registry half is real: an actual upstream `http.Server`, an actual listener,
 // and a close that has to free its port — because the whole reason it exists is
 // that a leaked listener holds a port the next start derives again.
 
+import { readFileSync } from "node:fs";
 import http from "node:http";
 
 import { describe, expect, it } from "vitest";
@@ -148,7 +155,7 @@ describe("the plugin catalogue's apps area", () => {
     expect(markup).toContain("停用");
   });
 
-  it("reports an app another client owns, naming that client and its pid", async () => {
+  it("leaves the refusal another client owns to the toast, and keeps the row", async () => {
     const workflows = createWebuiMiniAppWorkflows({
       port: port({
         miniApps: [summary("shared", "stopped")],
@@ -163,9 +170,16 @@ describe("the plugin catalogue's apps area", () => {
     await workflows.loadListing();
     await workflows.open("shared");
     const markup = render(createElement(MiniAppAppsList, {}), workflows);
-    expect(markup).toContain("electron");
-    expect(markup).toContain("4242");
-    expect(markup).toContain("已在其他客户端运行");
+    // The refusal is an event, not a state: it is said once, through the shared
+    // toast, which is drawn over the page (ADR 0030). A server render never
+    // sees it, so the row carries no trace of it.
+    expect(markup).not.toContain("electron");
+    expect(markup).not.toContain("4242");
+    expect(markup).not.toContain("已在其他客户端运行");
+    // The row itself survives: the app is still listed, with the state it has.
+    expect(markup).toContain("shared 应用");
+    expect(markup).toContain('data-testid="miniapp-app-status-shared"');
+    expect(markup).toContain("已停止");
   });
 
   it("shows confirmed cross-client ownership before open and disables both launch actions", async () => {
@@ -267,15 +281,19 @@ describe("the plugin catalogue's apps area", () => {
     expect(withSession).toMatch(/<button[^>]*aria-label="查看"[^>]*title="[^"]+"[^>]*>[^<]*查看<\/button>/u);
   });
 
-  it("says the capability is absent rather than showing an empty list", () => {
+  it("says the capability is absent through the toast, and shows the empty state", () => {
     const workflows = createWebuiMiniAppWorkflows({ port: { pluginManagement: async () => undefined } });
     const markup = render(createElement(MiniAppAppsList, {}), workflows);
-    expect(markup).toContain("没有提供 Mini App 能力");
+    // The absent capability is an event, not a state: it is said once, through
+    // the shared toast (ADR 0030), so the list keeps its own empty state.
+    expect(markup).not.toContain("没有提供 Mini App 能力");
+    expect(markup).toContain("暂无已安装的 Mini App");
+    expect(markup).toContain('data-testid="miniapp-apps"');
   });
 });
 
 describe("the launcher's picker", () => {
-  it("names the three running apps when a fourth start is refused", async () => {
+  it("keeps the running rows when a fourth start is refused, and says the capacity through the toast", async () => {
     const running = [summary("one", "running"), summary("two", "running"), summary("three", "running")];
     const workflows = createWebuiMiniAppWorkflows({
       port: port({
@@ -291,11 +309,16 @@ describe("the launcher's picker", () => {
       createElement(MiniAppPicker, { onOpened: () => undefined }),
       workflows,
     );
-    expect(markup).toContain("同时最多运行 3 个 Mini App");
+    // The capacity that was reached is an event, not a state: it is said once,
+    // through the shared toast, which is drawn over the page (ADR 0030). A
+    // server render never sees it.
+    expect(markup).not.toContain("同时最多运行 3 个 Mini App");
+    expect(markup).not.toContain("请先停止一个");
+    // The rows the picker can still show, it still shows.
     expect(markup).toContain("one 应用");
     expect(markup).toContain("three 应用");
-    expect(markup).toContain("请先停止一个");
     // Each running row carries the stop button that frees the capacity.
+    expect(markup).toContain('data-testid="miniapp-picker-stop-one"');
     expect(markup).toContain("停止");
   });
 
@@ -356,7 +379,7 @@ describe("the Mini App view the panel frames", () => {
     expect(markup).not.toContain('data-testid="miniapp-stop"');
   });
 
-  it("renders a cleared view with its reason and a button, and starts nothing on its own", async () => {
+  it("renders a cleared view with its button, and starts nothing on its own", async () => {
     let opens = 0;
     const workflows = createWebuiMiniAppWorkflows({
       port: {
@@ -375,14 +398,18 @@ describe("the Mini App view the panel frames", () => {
       workflows,
     );
     expect(markup).toContain('data-state="stopped"');
-    expect(markup).toContain("运行已停止。");
+    // The reason the app stopped is an event, not a state: it is said once,
+    // through the shared toast, which is drawn over the page (ADR 0030).
+    expect(markup).not.toContain("运行已停止。");
+    // The retry the person can press is still here.
+    expect(markup).toContain('data-testid="miniapp-reopen"');
     expect(markup).toContain("重新打开");
     expect(markup).not.toContain("miniapp-view-frame");
     // A render is not a restart: the person's button is.
     expect(opens).toBe(1);
   });
 
-  it("reports a refusal instead of an empty frame", async () => {
+  it("reports the refusal through the toast, and shows no frame", async () => {
     const workflows = createWebuiMiniAppWorkflows({
       port: port({
         miniApps: [summary("shared", "stopped")],
@@ -399,8 +426,14 @@ describe("the Mini App view the panel frames", () => {
       createElement(MiniAppView, { pluginId: "shared", sessionId: "session-1" }),
       workflows,
     );
-    expect(markup).toContain("pid 99");
+    // The refusal is an event, not a state: it is said once, through the shared
+    // toast (ADR 0030). A server render never sees it.
+    expect(markup).not.toContain("pid 99");
+    expect(markup).not.toContain("electron");
     expect(markup).not.toContain("miniapp-view-frame");
+    // The view itself still renders, so there is a surface to look at.
+    expect(markup).toContain('data-testid="miniapp-view"');
+    expect(markup).toContain('data-state="idle"');
   });
 });
 
@@ -525,7 +558,7 @@ describe("the standalone presentation's controls", () => {
     expect(markup).toContain('data-testid="miniapp-view-frame"');
   });
 
-  it("reports a refused session lookup as unresolved, never as ended", async () => {
+  it("says a refused session lookup as unresolved, never as ended", async () => {
     const workflows = createWebuiMiniAppWorkflows({
       port: {
         ...standalonePort({ detached: true, presentationRevision: 3 }),
@@ -544,10 +577,17 @@ describe("the standalone presentation's controls", () => {
     );
     release();
 
-    expect(markup).toContain('data-testid="miniapp-standalone-session-unresolved"');
-    expect(markup).toContain("无法确认会话状态");
-    expect(markup).toContain("harness unavailable");
+    // The lookup that failed is an event, not a state: it is said once,
+    // through the shared toast, which is drawn over the page (ADR 0030). A
+    // server render never sees it, so the page carries no trace of the reason.
+    expect(markup).not.toContain('data-testid="miniapp-standalone-session-unresolved"');
+    expect(markup).not.toContain("无法确认会话状态");
+    expect(markup).not.toContain("harness unavailable");
+    // It is never read as an ended session either.
     expect(markup).not.toContain("该会话已结束");
+    // The page keeps the Mini App it frames.
+    expect(markup).toContain('data-testid="miniapp-standalone"');
+    expect(markup).toContain('data-testid="miniapp-view-frame"');
   });
 });
 
@@ -700,11 +740,12 @@ describe("a detached view whose standalone tab goes away", () => {
 
     expect(await workflows.presentInline(PLUGIN)).toBe("blocked");
     expect(opens()).toBe(0);
-    // The stop is reported rather than swallowed: the surface says why, and the
-    // retry it offers is the person's.
+    // The stop is reported rather than swallowed: the reason is said through
+    // the shared toast (ADR 0030), and the retry the surface offers is the
+    // person's.
     const stopped = renderInline(workflows);
-    expect(stopped).toContain('data-testid="miniapp-view-stopped"');
-    expect(stopped).toContain("运行已停止");
+    expect(stopped).not.toContain("运行已停止");
+    expect(stopped).toContain('data-testid="miniapp-reopen"');
     expect(stopped).toContain("重新打开");
     expect(stopped).not.toContain("miniapp-view-frame");
     // Every later tick is terminal too: the poll cannot become a restart.
@@ -923,5 +964,44 @@ describe("the device access a Mini App is framed with", () => {
     expect(before).toContain('allow="microphone"');
     expect(after).not.toBe(before);
     expect(after).not.toContain('allow="microphone"');
+  });
+});
+
+/* The failures these surfaces carry are said through the shared toast (ADR
+ * 0030). The toast is raised in an effect and drawn over the page, so a server
+ * render never sees it: the surfaces' own sources are what pin that the
+ * failures are reported at all, and not merely hidden. */
+describe("the Mini App surfaces report their failures through the toast", () => {
+  const source = (file: string): string =>
+    readFileSync(
+      new URL(`../../src/client/features/miniapp/ui/${file}`, import.meta.url),
+      "utf8",
+    );
+
+  it("raises the refusal, the absent capability and the capacity through the toast", () => {
+    const apps = source("MiniAppAppsList.public.tsx");
+    expect(apps).toContain("useWebuiToastError(");
+    expect(apps).toContain("miniapp-app-refusal-");
+    expect(apps).toContain("state.unavailable");
+    // And the list draws neither of them in its own layout any more.
+    expect(apps).not.toContain("FeedbackError");
+
+    const picker = source("MiniAppPicker.public.tsx");
+    expect(picker).toContain("useWebuiToastError(");
+    expect(picker).toContain("miniapp-picker-capacity");
+    expect(picker).not.toContain("FeedbackError");
+  });
+
+  it("raises the stopped reason, the refusal and the unresolved session through the toast", () => {
+    const view = source("MiniAppView.public.tsx");
+    expect(view).toContain("useWebuiToastError(");
+    expect(view).toContain("miniapp-view-stopped");
+    expect(view).toContain("miniapp-view-refusal");
+    expect(view).not.toContain("FeedbackError");
+
+    const standalone = source("MiniAppStandalone.public.tsx");
+    expect(standalone).toContain("useWebuiToastError(");
+    expect(standalone).toContain("miniapp-standalone-session-unresolved");
+    expect(standalone).not.toContain("FeedbackError");
   });
 });

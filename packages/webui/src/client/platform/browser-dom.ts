@@ -10,6 +10,22 @@ import type {
 export type { WebuiBrowserCanvas, WebuiBrowserImage };
 
 /**
+ * The marker for a surface that stays live while a modal is open.
+ *
+ * A modal makes the page behind it inert, so that a keyboard reader and a
+ * screen reader stay inside it. Some surfaces are not that page: the client's
+ * notice channel is where a failure that happened inside the modal is said.
+ * Silencing it would swallow exactly the announcement the modal exists to
+ * deliver, and would take away the action that notice carries — the failure
+ * would still be drawn, but unreachable and unheard.
+ *
+ * The marker is a contract rather than a class name, so any surface that has
+ * to cross a modal can carry it; the modal's exclusive zone leaves such a
+ * surface alone.
+ */
+const LIVE_SURFACE_SELECTOR = "[data-webui-live-surface]";
+
+/**
  * The last element to hold focus outside every modal surface.
  *
  * A dialog opened from a menu item cannot give focus back to that item: the menu
@@ -45,6 +61,7 @@ function trackOutsideModalFocus(ownerDocument: Document): HTMLElement {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (target.closest("[data-webui-dialog-mask], .webui-settings-mask, [data-overlay-layer]")) return;
+    if (target.closest(LIVE_SURFACE_SELECTOR)) return;
     recordOutsideModalFocus(ownerDocument, target);
   }, true);
   return initial;
@@ -269,7 +286,10 @@ export function createWebuiBrowserDom(
         ? ownerDocument.activeElement
         : null;
       const changed = [...(mask.parentElement?.children ?? [])]
-        .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== mask)
+        .filter((element): element is HTMLElement =>
+          element instanceof HTMLElement &&
+          element !== mask &&
+          !element.matches(LIVE_SURFACE_SELECTOR))
         .map((element) => ({ element, inert: element.inert }));
       for (const { element } of changed) element.inert = true;
       const focusable = () => [...surface.querySelectorAll<HTMLElement>(
@@ -277,6 +297,8 @@ export function createWebuiBrowserDom(
       )].filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
       const containFocus = (event: FocusEvent) => {
         if (event.target instanceof Node && !surface.contains(event.target)) {
+          // A live surface crosses the modal, so focus may rest on it.
+          if (event.target instanceof Element && event.target.closest(LIVE_SURFACE_SELECTOR)) return;
           const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-overlay-layer]") : null;
           const targetIds = target?.dataset.overlayLayer?.split(/\s+/u) ?? [];
           if (targetIds.some((id) => allowedPortalLayerIds().has(id))) return;
@@ -292,6 +314,7 @@ export function createWebuiBrowserDom(
             'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
           ) ?? [])].filter((element) => {
             if (surface.contains(element)) return false;
+            if (element.closest(LIVE_SURFACE_SELECTOR)) return true;
             const layer = element.closest<HTMLElement>("[data-overlay-layer]");
             return layer?.dataset.overlayLayer?.split(/\s+/u).some((id) => allowedIds.has(id)) ?? false;
           }),

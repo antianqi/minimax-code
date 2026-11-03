@@ -24,6 +24,7 @@ import { SettingsPage } from "../../../ui/settings-layout.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiSkeleton } from "../../../ui/page.js";
 import { SettingsButton, SettingsDialog } from "./settings-atoms.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { formatPlanName } from "../projection/usage-plan.js";
 import {
   buildUsageHeatmapModel,
@@ -468,9 +469,7 @@ export function AccountUsageShareAction(): ReactElement | null {
                     </WebuiInline>
                   </SettingsButton>
                   {exportError ? (
-                    <div className="absolute -bottom-6 text-center text-xs text-text_status_error">
-                      图片保存失败，请重试。
-                    </div>
+                    <SettingsErrorNotice message="图片保存失败，请重试。" />
                   ) : null}
                 </WebuiStack>
               </SettingsDialog>
@@ -508,4 +507,24 @@ function AccountUsageShareAvatar({
       {initial}
     </WebuiInline>
   );
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  useWebuiToastError(message, { testId });
+  return null;
 }

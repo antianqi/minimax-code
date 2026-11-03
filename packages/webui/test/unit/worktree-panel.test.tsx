@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { WebuiWorktreePanel } from "../../src/client/features/settings/ui/SettingsModal.js";
@@ -86,11 +87,19 @@ describe("worktree page", () => {
     expect(markup).toContain("派生自 s1");
   });
 
-  it("reports a failed load as an error", () => {
+  it("marks a failed load as the error state and leaves the reason to the toast", () => {
     const markup = panel([], { error: "会话列表读取失败" });
+    // The state marker is the page's own: it still says which state it is in.
     expect(markup).toContain('data-webui-worktree-state="error"');
-    expect(markup).toContain('role="alert"');
-    expect(markup).toContain("会话列表读取失败");
+    // The reason is an event, not a state: it is said once, through the shared
+    // toast, which is drawn over the page (ADR 0030). A server render never sees
+    // it, so the page's own layout keeps no trace of it.
+    expect(markup).not.toContain("会话列表读取失败");
+    expect(markup).not.toContain('data-testid="worktree-error"');
+    expect(markup).not.toContain('role="alert"');
+    // The page still renders what it can: the frame and the empty state.
+    expect(markup).toContain('data-testid="settings-worktree-page"');
+    expect(markup).toContain('data-testid="worktree-empty"');
   });
 
   it("shows the full checkout path so two branches of the same name are distinguishable", () => {
@@ -99,5 +108,23 @@ describe("worktree page", () => {
       session("s2", 300, { workspaceDir: branchA }),
     ]);
     expect(markup).toContain(branchA);
+  });
+});
+
+/* The load failure is said through the shared toast (ADR 0030). The toast is raised
+ * in an effect and drawn over the page, so a server render never sees it: the
+ * panel's own source is what pins that the failure is reported at all, and not
+ * merely hidden. */
+describe("the worktree page reports its load failure through the toast", () => {
+  const source = readFileSync(
+    new URL("../../src/client/features/settings/ui/SettingsModal.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("raises the load failure through the toast, and draws it nowhere in the page", () => {
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain('testId="worktree-error"');
+    // The page itself draws no failure of its own any more.
+    expect(source).not.toContain("FeedbackError");
   });
 });

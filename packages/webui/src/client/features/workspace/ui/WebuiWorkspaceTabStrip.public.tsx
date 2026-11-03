@@ -67,6 +67,7 @@ import { WebuiMenuItem } from "../../../ui/menu-item.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 const STRIP_COPY = {
   addTab: "新建标签页",
@@ -401,6 +402,9 @@ export function WebuiWorkspaceLauncher({
   workspaceDir,
 }: WebuiWorkspaceLauncherProps): ReactElement | null {
   const request = tab.content.kind === "launcher" ? tab.content.request : undefined;
+  // The runtime refused the page: the refusal is said once, as a toast, and is
+  // not drawn in the launcher's layout.
+  useWebuiToastError(request?.error, { testId: "workspace-launcher-error" });
   const slice = useWebuiPortSlice("browser");
   const openBrowserWebTab = slice?.openBrowserWebTab;
   const [typed, setTyped] = useState("");
@@ -576,11 +580,6 @@ export function WebuiWorkspaceLauncher({
       {openBrowserWebTab ? null : (
         <p className="webui-workspace-launcher-unavailable">{STRIP_COPY.launcherUnavailable}</p>
       )}
-      {request?.error ? (
-        <p className="webui-workspace-launcher-error" data-testid="workspace-launcher-error">
-          {request.error}
-        </p>
-      ) : null}
       </div>
     </div>
   );

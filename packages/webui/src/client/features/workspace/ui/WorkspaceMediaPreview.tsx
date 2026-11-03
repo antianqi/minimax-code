@@ -6,7 +6,8 @@ import { useState, type ReactElement } from "react";
 import type { WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";
 import { basenamePath } from "../../../projection/common/paths.js";
 import { mediaKind, isMediaContent } from "../projection/media-preview.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 export type WorkspaceMediaPreviewProps = {
   /** The file path the preview tab was opened with, used for `alt` text. */
@@ -47,13 +48,16 @@ export function WorkspaceMediaNotice({
   readonly reason: string;
   /** A failure is announced; a state that was never available is not. */
   readonly failure?: boolean;
-}): ReactElement {
+}): ReactElement | null {
   // A failure is announced, an unavailable state is not: one component that
   // renders both roles is exactly the conflation the family separates.
   const message = `${name} 预览不可用：${reason}`;
-  return failure ? (
-    <FeedbackError message={message} />
-  ) : (
+  // The failure is said once, as a toast: the media that could not be loaded
+  // is a moment that has passed, and the preview area is left empty rather
+  // than holding a notice that outlasts it.
+  useWebuiToastError(failure ? message : undefined);
+  if (failure) return null;
+  return (
     // 不可用是一条播报；播报通道交给共享契约，内联样式留在承载文字的元素上。
     <FeedbackLiveRegion>
       <p style={{ margin: "var(--spacing_16)", color: "var(--text_default_tertiary)" }}>

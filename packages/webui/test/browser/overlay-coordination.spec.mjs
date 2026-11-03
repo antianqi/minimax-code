@@ -218,8 +218,16 @@ test("closing the dialog returns focus to the control that opened it", async ({ 
   await expect.poll(() => page.getByTestId("agent-memory-manager").evaluate((surface) =>
     [...(surface.parentElement?.parentElement?.children ?? [])]
       .filter((element) => element !== surface.parentElement)
+      // The notice channel is not the page behind the dialog: it stays live so
+      // that the failure the dialog reports is still announced and still
+      // answerable. Everything else behind the dialog is inert.
+      .filter((element) => !element.hasAttribute("data-webui-live-surface"))
       .every((element) => element.inert),
   )).toBe(true);
+  // And the channel itself is the one thing behind the dialog that is not
+  // inert: an inert subtree is also gone from the accessibility tree, so an
+  // inert notice would be drawn and never heard.
+  await expect(page.locator("[data-webui-toast-host]")).not.toHaveAttribute("inert", "");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.evaluate(() => {
     window.__memoryDialogExitEnded = false;

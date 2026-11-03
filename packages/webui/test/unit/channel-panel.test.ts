@@ -10,7 +10,10 @@
  * The list is Desktop's bot list, not its bound-client list: a bot whose QR scan has not finished
  * belongs in it, in the unbound shape. That distinction is what the first block pins.
  */
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -70,11 +73,21 @@ function snapshot(overrides: Partial<WebuiChannelSnapshot> = {}): WebuiChannelSn
 
 const noop = (): void => {};
 
+/** The pane's own source: the toast is raised in an effect, so only the source pins it. */
+const panelSource = readFileSync(
+  fileURLToPath(
+    new URL("../../src/client/features/channel/ui/ChannelConnectPanel.public.tsx", import.meta.url),
+  ),
+  "utf8",
+);
+
 function view(snap: WebuiChannelSnapshot, menuOpen = false): string {
-  // The pure view carries no hooks, so it is called the way the house style calls it: this file
-  // is a `.ts` and the package has no JSX transform for one.
+  // The view carries hooks now — its two failures are said through the toast —
+  // so it is rendered as a component rather than called as a plain function: a
+  // hook outside a render is an invalid hook call. The file is a `.ts` and the
+  // package has no JSX transform for one.
   return renderToStaticMarkup(
-    ChannelConnectPanelView({
+    createElement(ChannelConnectPanelView, {
       snapshot: snap,
       menuOpen: menuOpen,
       deleting: false,
@@ -602,7 +615,25 @@ describe("the rendered 接入 IM pane", () => {
     // A failed read is not empty: saying so would invite the reader to bind a bot again.
     const failed = view(snapshot({ status: "error", connections: [], error: "读不到" }));
     expect(failed).not.toContain(WEBUI_CHANNEL_EMPTY_TEXT);
-    expect(failed).toContain("读不到");
+    // The failure is said once, through the toast, and the pane keeps its own
+    // layout: the reason is not drawn where the bots are listed.
+    expect(failed).not.toContain("读不到");
+    expect(failed).not.toContain('data-webui-channel-error="true"');
+    expect(failed).toContain('data-webui-component="channel-connect-panel"');
+  });
+
+  /* The two failures the pane can carry are events, not states: each is said
+   * once, through the shared toast, and neither is drawn in the pane's own
+   * layout (ADR 0030). The toast is raised in an effect and drawn over the
+   * page, so a server render cannot see it — the pane's own source is what
+   * pins that the failures are reported at all. */
+  it("raises the snapshot failure and the action failure through the toast", () => {
+    expect(panelSource).toContain("useWebuiToastError(");
+    expect(panelSource).toContain("props.snapshot.error");
+    expect(panelSource).toContain("props.snapshot.actionError");
+    // And the pane's own layout draws neither of them any more.
+    expect(panelSource).not.toContain('data-webui-channel-error="true"');
+    expect(panelSource).not.toContain('data-webui-channel-action-error="true"');
   });
 
   it("draws a bound bot with the association copy, 解除连接, and no QR", () => {

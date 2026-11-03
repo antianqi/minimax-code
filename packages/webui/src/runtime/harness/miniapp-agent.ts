@@ -20,10 +20,10 @@
 import type {
   MiniAppAgentAgents,
   MiniAppAgentModels,
-  type MiniAppAgentObserveEvent,
-  type MiniAppAgentRunEvent,
+  MiniAppAgentRunEvent,
   MiniAppAgentRunResult,
 } from "@mavis/shared/miniapp-surface";
+import type { WebuiMiniAppAgentObserveEvent } from "../../shared/contracts/miniapp-agent.js";
 
 import {
   MINIAPP_CAPABILITY_ABSENT,
@@ -47,6 +47,7 @@ type AgentMembers = Required<
     | "listMiniAppAgentModels"
     | "listMiniAppAgentAgents"
     | "listMiniAppAgentSessions"
+    | "observeMiniAppAgent"
     | "readMiniAppAgentSession"
     | "createMiniAppAgentSession"
     | "observeMiniAppAgent"
@@ -111,6 +112,7 @@ export function createMiniAppAgentAdapter(host: WebuiRuntimeHostHandle): Pick<
   | "listMiniAppAgentModels"
   | "listMiniAppAgentAgents"
   | "listMiniAppAgentSessions"
+  | "observeMiniAppAgent"
   | "readMiniAppAgentSession"
   | "createMiniAppAgentSession"
 > {
@@ -141,7 +143,7 @@ export function createMiniAppAgentAdapter(host: WebuiRuntimeHostHandle): Pick<
       readonly all?: boolean;
       readonly sessionId?: string;
       readonly signal?: AbortSignal;
-      readonly onEvent: (event: MiniAppAgentObserveEvent) => void;
+      readonly onEvent: (event: WebuiMiniAppAgentObserveEvent) => void;
     }): Promise<void> {
       return requireMiniAppAgent(host).observeMiniAppAgent({
         caller: input.caller,

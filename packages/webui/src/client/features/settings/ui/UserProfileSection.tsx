@@ -18,6 +18,7 @@ import { WebuiTextarea } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import { PERSONALIZATION_SECTION_HINTS, SettingsButton, SettingsSavedNotice } from "./settings-atoms.js";
 import { FeedbackError } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 
 const PROFILE_PLACEHOLDER = "告诉 Agent 你的背景和长期偏好……";
 
@@ -247,10 +248,10 @@ export function UserProfileSection({
         <FeedbackError message="超过 {maxChars} 字符后，超出部分不会注入提示，请精简后再保存。" className="webui-settings-error" testId="user-profile-over-limit" />
       ) : null}
       {malformed ? (
-        <FeedbackError message="user.md 的标记不完整，为避免覆盖记忆中已收集的内容，这里不做写入。" className="webui-settings-error" testId="user-profile-malformed" />
+        <SettingsErrorNotice message="user.md 的标记不完整，为避免覆盖记忆中已收集的内容，这里不做写入。" testId="user-profile-malformed" />
       ) : null}
       {error ? (
-        <FeedbackError message=<>error</> className="webui-settings-error" testId="user-profile-error" />
+        <SettingsErrorNotice message={error} testId="user-profile-error" />
       ) : null}
       {saved && !saving ? (
         <SettingsSavedNotice message="已保存" testId="user-profile-saved" />
@@ -262,4 +263,24 @@ export function UserProfileSection({
       ) : null}
     </SettingsSection>
   );
+}
+
+/**
+ * The failure notice.
+ *
+ * The toast is said from a component of its own, mounted only while there is
+ * something to say: the toast reads the client-wide provider, and a surface
+ * that is rendered on its own — a page test, a static frame — has no provider
+ * to say it through. `SettingsSavedNotice` has the same shape for the same
+ * reason.
+ */
+function SettingsErrorNotice({
+  message,
+  testId,
+}: {
+  readonly message: string;
+  readonly testId?: string;
+}): ReactElement | null {
+  useWebuiToastError(message, { testId });
+  return null;
 }

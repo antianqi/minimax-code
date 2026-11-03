@@ -36,6 +36,10 @@ import { WebuiPortSlicesProvider } from "./bindings/port-slices-context.js";
 // one (ADR 0028 § Overlay coordination).
 import { OverlayCoordinatorProvider } from "./ui/overlay-coordinator.js";
 import { OverlayListenerHost } from "./ui/overlay-listeners.js";
+// The toast queue is provided once per client document, here at the composition
+// root, and its host is mounted beside the app: a notice is drawn against the
+// viewport, so it takes no room from the page it is about.
+import { WebuiToastHost, WebuiToastProvider } from "./ui/toast.js";
 import { WEBUI_PROTOCOL_VERSION, WebuiWireError, WebuiErrorCode } from "../shared/envelope.js";
 
 declare const document: {
@@ -335,7 +339,18 @@ const app = <WebuiClientRoot
  */
 const unresolved = currentRoute === "404" || (currentRoute === "miniapp" && !standalone);
 const renderApplication = (): void => root.render(
-  unresolved ? <NotFound /> : <WebuiBrowserCapabilitiesProvider value={browserCapabilities}><WebuiErrorBoundary><ArchonPage>{app}</ArchonPage></WebuiErrorBoundary></WebuiBrowserCapabilitiesProvider>,
+  unresolved ? <NotFound /> : (
+    <WebuiBrowserCapabilitiesProvider value={browserCapabilities}>
+      <WebuiToastProvider>
+        <WebuiErrorBoundary>
+          <ArchonPage>{app}</ArchonPage>
+        </WebuiErrorBoundary>
+        {/* The host is a sibling of the app, not a child of it: it portals into
+          the document body and is drawn against the viewport. */}
+        <WebuiToastHost />
+      </WebuiToastProvider>
+    </WebuiBrowserCapabilitiesProvider>
+  ),
 );
 if (unresolved) renderApplication();
 else void transport.version().then((version) => {

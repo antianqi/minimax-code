@@ -416,6 +416,10 @@ export function createOperationRegistry(
   registerOperation(registry, entry("deleteCronTask"));
   registerOperation(registry, entry("runCronTaskNow"));
   registerOperation(registry, entry("listCronTaskRuns"));
+  // Appended: the Mini App activity stream. Its handler existed with the other page bridge
+  // operations, but without this registry entry the pet's all-session watch returned
+  // `unknown_operation` and marked local activity unavailable.
+  registerOperation(registry, entry("watchMiniAppAgentObservations"));
   return registry;
 }
 

@@ -36,7 +36,6 @@ import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 // web tab, this file mounts `BrowserPanelHost` with the tab's target.
 import { BrowserPanelHost, WebuiBrowserToolbar } from "../../browser/ui/BrowserPanelHost.public.js";
 import { MiniAppPicker } from "../../miniapp/ui/MiniAppPicker.public.js";
-import { MiniAppView } from "../../miniapp/ui/MiniAppView.public.js";
 import type {
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
@@ -82,7 +81,8 @@ import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip, webuiWorkspaceLauncherOpenPage, webuiWorkspaceLauncherUrl } from "./WebuiWorkspaceTabStrip.public.js";
 import { webuiFileLanguage, projectWebuiUnifiedDiffLines, projectWebuiSplitDiffRows, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import {
   projectWebuiDiffFile,
@@ -149,6 +149,9 @@ function highlightFileLine(line: string, language: string | undefined): string |
 
 function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSelect, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: (path: string) => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
   const [expanded, setExpanded] = useState(defaultOpen);
+  // The diff could not be loaded: the failure is said once, as a toast, and is
+  // not drawn in the layout.
+  useWebuiToastError(error);
   const diff = file.withinWorkspace && typeof file.diff === "string" ? file.diff : "";
   const allLines = useMemo(() => projectWebuiUnifiedDiffLines(diff), [diff]);
   const lines = useMemo(() => allLines.filter((line) => showContext || line.kind !== "context"), [allLines, showContext]);
@@ -180,7 +183,7 @@ function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSe
            * person can still act on. */
           ? <p className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>
           /* 加载中的差异是一条播报；播报通道交给共享契约，类名不变，样式继续命中。 */
-      : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : error ? <FeedbackError message={error} className="webui-turn-review-unavailable" /> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${lines.length * 19.8}px` }}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
+      : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${lines.length * 19.8}px` }}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
         if (row.kind === "hunk" || row.kind === "noNewline") {
           return <span className={`webui-turn-review-line webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}><span className="webui-turn-review-hunk">{row.content}</span></span>;
         }
@@ -241,6 +244,10 @@ export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFi
   const previewMarkdown = /\.md$/iu.test(content.path) && !codeMode;
   const text = result?.content?.content ?? "";
   const language = webuiFileLanguage(content.path);
+  // The read failed, or the content came back carrying an error of its own:
+  // both are said once, as toasts, and neither is drawn in the layout.
+  useWebuiToastError(result?.error);
+  useWebuiToastError(result?.content?.error);
   // Dispatched ahead of the read result on purpose: an archive never becomes
   // text, and an HTML preview is a stream the browser fetches rather than a
   // string the panel holds. Waiting on `readWorkspaceFile` first would either
@@ -256,9 +263,7 @@ export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFi
         /* 加载文件是一条播报；播报通道交给共享契约。`.webui-workspace-file-document > p`
            靠元素名命中，契约多了一层 div，等价的间距与颜色留在里面的 p 上。 */
         ?? (result?.loading ? <FeedbackLiveRegion><p className="m-spacing_16 text-text_default_tertiary">正在加载文件…</p></FeedbackLiveRegion>
-        : result?.error ? <FeedbackError message={result.error} />
           : result?.content && isMediaContent(result.content, content.path) ? <WorkspaceMediaPreview path={content.path} content={result.content} fileUrl={workspaceFileUrl?.({ workspaceDir: content.workspaceDir, path: content.path })} />
-            : result?.content?.error ? <FeedbackError message={result.content.error} />
             : result?.content?.type === "binary" ? <p>无法在文本预览中显示二进制文件。</p>
               : result?.content ? previewMarkdown ? <WebuiMarkdown source={text} /> : <pre className="webui-file-code"><code className={language ? `hljs language-${language}` : ""}>{text.split("\n").map((line, index) => {
                 const lineNumber = index + 1;
@@ -269,7 +274,7 @@ export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFi
   </div>;
 }
 
-function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, terminal: terminalOwner, onClose, onManageMiniApps }: {
+function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, terminal: terminalOwner, onClose, onManageMiniApps, onMiniAppMountTarget, onMiniAppToolbarTarget }: {
   readonly state: WorkspacePanelState;
   readonly dispatch: (command: WorkspacePanelCommand) => void;
   readonly sessionId?: string; readonly workspaceDir?: string;
@@ -283,6 +288,8 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   readonly terminal?: WebuiTerminalOwner;
   readonly onClose?: () => void;
   readonly onManageMiniApps?: () => void;
+  readonly onMiniAppMountTarget?: (target: HTMLDivElement | null) => void;
+  readonly onMiniAppToolbarTarget?: (target: HTMLDivElement | null) => void;
 }): ReactElement {
   const browserPort = useWebuiPortSlice("browser");
   const [panelWidth, setPanelWidth] = useState<number>();
@@ -400,7 +407,8 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   const [reviewSectionsExpanded, setReviewSectionsExpanded] = useState<boolean>();
   const [reviewDiffLayout, setReviewDiffLayout] = useState<"unified" | "split">("unified");
   const [reviewShowContext, setReviewShowContext] = useState(true);
-  const [miniAppToolbarTarget, setMiniAppToolbarTarget] = useState<HTMLDivElement | null>(null);
+  const setMiniAppToolbarTarget = onMiniAppToolbarTarget ?? (() => undefined);
+  const setMiniAppMountTarget = onMiniAppMountTarget ?? (() => undefined);
   const [terminals, setTerminalsState] = useState<readonly Record<string, unknown>[]>([]);
   /**
    * A terminal list answer is rendered directly (`terminals.find`, `terminals.map`),
@@ -438,6 +446,12 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   const terminalAvailability = terminalSupport === "absent" ? "当前服务未提供终端。"
     : terminalSupport === "not-ready" ? "终端服务尚未就绪。"
       : terminalSupport === "incompatible" ? "终端接口与当前页面不兼容，请检查服务版本。" : undefined;
+  // The terminal failed: the failure is said once, as a toast, and is not drawn
+  // in the terminal's own status line.
+  useWebuiToastError(terminalError, {
+    testId: "workspace-terminal-status",
+    dataAttributes: { "data-webui-terminal-availability": terminalSupport },
+  });
   const terminalHost = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal>();
   const terminalStop = useRef<(() => void) | undefined>();
@@ -450,6 +464,9 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
    */
   const reportedTerminalSize = useRef<WebuiTerminalSize>();
   const activeWorkspace = activeTab && "workspaceDir" in activeTab.content ? activeTab.content.workspaceDir : workspaceDir;
+  // The file tree could not be read: the failure is said once, as a toast, and
+  // is not drawn in the tree's own scroll area.
+  useWebuiToastError(fileTree.workspaceDir === activeWorkspace && !fileTree.loading ? fileTree.error : undefined);
   const activeWorkspaceRef = useRef(activeWorkspace);
   activeWorkspaceRef.current = activeWorkspace;
   const activeFilePath = activeTab?.content.kind === "file-preview" ? activeTab.content.path : undefined;
@@ -639,6 +656,15 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   }, [selectedFilePath, selectedReviewPath, expandedDirectories, visibleFiles]);
   const activeSessionId = activeTab && "sessionId" in activeTab.content ? activeTab.content.sessionId : sessionId;
   const activeReview = webuiWorkspaceReviewContent(activeTab?.content);
+  // The review summary, the search and the diffs each answer with their own
+  // failure; each one is said once, as a toast, and none of them is drawn in
+  // the layout.
+  const workspaceReviewSummaryError = reviewSummary && reviewSummary.error && !reviewSummary.summary ? reviewSummary.error : undefined;
+  const workspaceReviewSearchError = reviewSearchAppliedQuery ? currentWorkspaceReviewSearch?.error : undefined;
+  const workspaceReviewDiffError = reviewDiffs && reviewDiffs.tabId === activeTab?.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? reviewDiffs.error : undefined;
+  useWebuiToastError(workspaceReviewSummaryError);
+  useWebuiToastError(workspaceReviewSearchError);
+  useWebuiToastError(workspaceReviewDiffError);
   useEffect(() => {
     if (!terminalOwner) {
       setTerminals([]);
@@ -879,12 +905,10 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
     {tab === "file-preview" && activeTab?.content.kind === "file-preview" ? <WebuiFilePreview tabId={activeTab.id} content={activeTab.content} result={fileResults.get(activeFileKey!)} codeMode={fileCodeMode} workspaceFileUrl={workspaceFileUrl} /> : null}
     {tab === "review" && activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? <div className="webui-turn-review" data-testid="workspace-review">
       {/* 下面的状态文案都是播报通道，交给共享契约；类名不变，样式继续命中。 */}
-      {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <FeedbackLiveRegion className="webui-turn-review-empty">正在收集变更…</FeedbackLiveRegion> : reviewSummary.error && !reviewSummary.summary ? <FeedbackError message={reviewSummary.error} className="webui-turn-review-empty" /> : reviewSummary.summary ? <>
+      {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <FeedbackLiveRegion className="webui-turn-review-empty">正在收集变更…</FeedbackLiveRegion> : reviewSummary.summary ? <>
         <WebuiInline gap="medium" justify="between" className="webui-turn-review-summary"><span>{reviewSummary.summary.totals.files} 个文件</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{reviewSummary.summary.totals.additions}</span>{reviewSummary.summary.totals.deletions ? <span className="webui-diff-del">-{reviewSummary.summary.totals.deletions}</span> : null}</span></WebuiInline>
         {reviewSummary.summary.files.length ? <>
           {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.loading ? <FeedbackLiveRegion className="webui-workspace-review-status">正在搜索变更…</FeedbackLiveRegion> : null}
-          {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.error ? <FeedbackError message={currentWorkspaceReviewSearch.error} className="webui-workspace-review-status" /> : null}
-          {reviewDiffs?.error && reviewDiffs.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? <FeedbackError message={reviewDiffs.error} className="webui-workspace-review-status" /> : null}
           {showingWorkspaceReviewSearchResults && matchedWorkspaceReviewFiles.length === 0 ? <FeedbackLiveRegion className="webui-turn-review-empty">没有匹配的变更文件。</FeedbackLiveRegion> : null}
           {!reviewSearchAppliedQuery || !currentWorkspaceReviewSearch?.loading && !currentWorkspaceReviewSearch?.error && matchedWorkspaceReviewFiles.length > 0 ? <div className="webui-turn-review-files" data-show-context={reviewShowContext ? "true" : "false"} data-testid={showingWorkspaceReviewSearchResults ? "workspace-review-search-results" : undefined}>{matchedWorkspaceReviewFiles.map((file) => {
             const result = reviewDiffs?.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? reviewDiffs.diffs[file.fileId] : undefined;
@@ -965,40 +989,26 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
         data-tab-id={activeTab.id}
         data-plugin-id={activeTab.content.pluginId}
       >
-        <MiniAppView
-          pluginId={activeTab.content.pluginId}
-          sessionId={activeTab.content.sessionId}
-          toolbarTarget={miniAppToolbarTarget}
-        />
+        <div className="webui-workspace-miniapp-view-mount" ref={setMiniAppMountTarget} />
       </div>
     ) : null}
     {tab === "terminal" ? <div className="webui-terminal-content">
         <div ref={terminalHost} className="webui-xterm-host" />
-        {/* A terminal that failed is an error and is announced as one; a
-            terminal still coming up is a status and is announced as one. The
-            two are different states, so each carries the shared family's own
-            channel. The line keeps no paragraph of its own: the family's
-            channel is the element, and the terminal's own metrics come from
+        {/* A terminal that failed is said once, as a toast; a terminal still
+            coming up is a status and is announced as one. The two are
+            different states, so each carries the shared family's own channel.
+            The line keeps no paragraph of its own: the family's channel is the
+            element, and the terminal's own metrics come from
             `.webui-terminal-content > .webui-terminal-status`. */}
-        {!terminalsReady || !terminalTargetId && (terminalAvailability || terminalError) ? (
-          terminalError ? (
-            <FeedbackError
-              message={terminalError}
-              className="webui-terminal-status"
-              testId="workspace-terminal-status"
-              dataAttributes={{ "data-webui-terminal-availability": terminalSupport }}
-            />
-          ) : (
-            <FeedbackLiveRegion
-              className="webui-terminal-status"
-              testId="workspace-terminal-status"
-              dataAttributes={{ "data-webui-terminal-availability": terminalSupport }}
-            >
-              {!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability}
-            </FeedbackLiveRegion>
-          )
+        {!terminalsReady || !terminalTargetId && terminalAvailability ? (
+          <FeedbackLiveRegion
+            className="webui-terminal-status"
+            testId="workspace-terminal-status"
+            dataAttributes={{ "data-webui-terminal-availability": terminalSupport }}
+          >
+            {!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability}
+          </FeedbackLiveRegion>
         ) : null}
-        {terminalError && terminalTargetId ? <FeedbackError message={terminalError} /> : null}
     </div> : null}
       </div>
       {hasFileWorkspace ? <WebuiDisclosure as="aside" open={fileTreeOpen} axis="horizontal" className="webui-workspace-file-tree-panel" data-webui-page="panel" aria-label="工作区文件树">
@@ -1006,7 +1016,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
         <div className="webui-workspace-file-tree-scroll" ref={fileTreeScrollRef}>
           {/* 加载中是一条播报；播报通道交给共享契约。契约本身带 role="status"，
               仍是这个滚动容器的直接子元素，`.webui-workspace-file-tree-scroll > [role="status"]` 继续命中。 */}
-          {fileTree.workspaceDir !== activeWorkspace || fileTree.loading ? <FeedbackLiveRegion>正在加载文件…</FeedbackLiveRegion> : fileTree.error ? <FeedbackError message={fileTree.error} /> : fileTree.files.length ? visibleFiles.length ? <FileTree files={visibleFiles} expandedPaths={expandedDirectories} loadingPaths={fileTree.loadingDirectories} directoryErrors={fileTree.directoryErrors} onToggle={toggleWorkspaceDirectory} selectedPath={activeTab?.content.kind === "file-preview" ? selectedFilePath : activeTab?.content.kind === "review" ? selectedReviewPath : undefined} onOpen={openWorkspaceTreeFile} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"没有匹配的文件。"} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"此工作区没有可显示的文件。"} />}
+          {fileTree.workspaceDir !== activeWorkspace || fileTree.loading ? <FeedbackLiveRegion>正在加载文件…</FeedbackLiveRegion> : fileTree.files.length ? visibleFiles.length ? <FileTree files={visibleFiles} expandedPaths={expandedDirectories} loadingPaths={fileTree.loadingDirectories} directoryErrors={fileTree.directoryErrors} onToggle={toggleWorkspaceDirectory} selectedPath={activeTab?.content.kind === "file-preview" ? selectedFilePath : activeTab?.content.kind === "review" ? selectedReviewPath : undefined} onOpen={openWorkspaceTreeFile} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"没有匹配的文件。"} /> : <FeedbackEmpty className="webui-workspace-tree-empty" title={"此工作区没有可显示的文件。"} />}
         </div>
       </WebuiDisclosure> : null}
     </div>

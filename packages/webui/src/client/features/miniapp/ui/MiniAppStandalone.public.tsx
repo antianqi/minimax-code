@@ -25,7 +25,8 @@ import {
   useWebuiMiniAppWorkflowsState,
 } from "../bindings/use-miniapp-workflows.js";
 import { MiniAppView } from "./MiniAppView.public.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiPage } from "../../../ui/page.js";
 
 export interface MiniAppStandaloneProps {
@@ -64,6 +65,14 @@ export function MiniAppStandalone({
     standalone === undefined &&
     state.standaloneFailure === undefined &&
     state.unavailable === undefined;
+  /* The session lookup that failed is an event, not a state: it is said once,
+   * and the page keeps the Mini App it frames. */
+  useWebuiToastError(
+    state.standaloneFailure !== undefined
+      ? `无法确认会话状态：${state.standaloneFailure}`
+      : undefined,
+    { testId: "miniapp-standalone-session-unresolved" },
+  );
 
   return (
     <WebuiPage
@@ -91,13 +100,6 @@ export function MiniAppStandalone({
         >
           无法确认会话状态，Mini App 仍在运行。
         </FeedbackLiveRegion>
-      ) : null}
-      {state.standaloneFailure !== undefined ? (
-        <FeedbackError
-          message=<>无法确认会话状态：{state.standaloneFailure}</>
-          className="webui-miniapp-standalone-notice"
-          testId="miniapp-standalone-session-unresolved"
-        />
       ) : null}
       <MiniAppView
         pluginId={pluginId}

@@ -31,6 +31,10 @@
 /* The feedback family's arrangement (ADR 0028 § Shared contracts): empty, error,
  * skeleton, progress, busy and announcement. */
 @import "./feedback.css";
+/* The toast family's arrangement: the one place a notice is drawn. It comes
+ * after the feedback family, because a toast is a feedback surface that
+ * floats over the client rather than sitting in it. */
+@import "./toast.css";
 @import "./shell.css";
 /* The shared menu-item contract (ADR 0028 § Shared contracts): the row, its
  * two slots and its states. It comes after the shell so a business that reads

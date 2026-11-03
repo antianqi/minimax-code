@@ -45,7 +45,8 @@ import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiDisclosure } from "../../../ui/page.js";
 import { WebuiSearchField } from "../../../ui/field.js";
 import { WebuiCard } from "../../../ui/card.js";
-import { FeedbackEmpty, FeedbackError } from "../../../ui/feedback.js";
+import { FeedbackEmpty } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import type { WebuiCronDraft } from "../projection/scheduling-panel.js";
 
 export interface SchedulingPanelViewProps {
@@ -99,6 +100,18 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
   const showEmpty = rows.length === 0 && (
     props.snapshot.status === "ready" || (props.snapshot.status === "loading" && hasLoadedBefore)
   );
+  /* The read that failed and the run that failed are events, not states: each
+   * is said once, and the panel keeps the rows it already has. The snapshot's
+   * failure is said once, even though the panel used to say it in two places. */
+  const snapshotError = props.snapshot.status === "error"
+    ? props.snapshot.error ?? "读取定时任务失败。"
+    : undefined;
+  useWebuiToastError(snapshotError, {
+    dataAttributes: { "data-webui-scheduling-error": "true" },
+  });
+  useWebuiToastError(props.runError, {
+    dataAttributes: { "data-webui-scheduling-run-error": "true" },
+  });
   const templates = [
     {
       title: "每日工作总结",
@@ -167,9 +180,6 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
           {initialLoading && rows.length === 0
             ? <p data-webui-scheduling-loading="true" className="webui-scheduling-sidebar-empty">{WEBUI_SCHEDULING_LOADING_TEXT}</p>
             : null}
-          {props.snapshot.status === "error" && rows.length === 0
-            ? <FeedbackError message={props.snapshot.error ?? "读取定时任务失败。"} />
-            : null}
           {rows.length > 0 && matchingRows.length === 0
             ? <FeedbackEmpty title="没有匹配的任务" className="webui-scheduling-sidebar-empty" />
             : null}
@@ -196,10 +206,6 @@ export function SchedulingPanelView(props: SchedulingPanelViewProps): ReactEleme
         </div>
       </aside>
       <main className="webui-scheduling-main" data-webui-scheduling-main="true">
-        {props.runError ? <FeedbackError message={props.runError} dataAttributes={{ "data-webui-scheduling-run-error": "true" }} /> : null}
-        {props.snapshot.status === "error" && props.snapshot.error
-          ? <FeedbackError message={props.snapshot.error} dataAttributes={{ "data-webui-scheduling-error": "true" }} />
-          : null}
         {showEmpty
           ? <div className="webui-scheduling-empty-state">
             <span className="webui-scheduling-empty-icon"><IconClockHour4 size={42} stroke={1.35} /></span>

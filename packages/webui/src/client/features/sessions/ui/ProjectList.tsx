@@ -23,9 +23,10 @@ import {
 } from "../projection/rail-groups.js";
 import { ProjectExpansion } from "./project-expansion.js";
 import { SessionActivityMeta } from "./session-activity-meta.js";
-import { FeedbackAnnouncement, FeedbackError } from "../../../ui/feedback.js";
+import { FeedbackAnnouncement } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import {
   WebuiDisclosure,
   WebuiMotion,
@@ -140,6 +141,17 @@ export function ProjectList({
     }
     return result;
   }, [page.sessions, pinnedProjectGroups, pinnedSessionState, projects, visibleProjectSessionCounts]);
+  // The two load failures are said once each, and they leave the rail's
+  // layout alone: the list below is either drawn or empty, and a notice
+  // that takes room from it is a state pretending to be a message.
+  useWebuiToastError(
+    error === undefined ? undefined : `Unable to load projects: ${error}`,
+  );
+  useWebuiToastError(
+    projectLoadError === undefined
+      ? undefined
+      : `Unable to load project list: ${projectLoadError}`,
+  );
 
   if (catalogLoading) {
     return (
@@ -377,18 +389,6 @@ export function ProjectList({
             className="webui-project-section-content-inner"
             data-webui-projects-section="true"
           >
-            {error ? (
-              <FeedbackError
-                message="Unable to load projects: {error}"
-                className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16"
-              />
-            ) : null}
-            {projectLoadError ? (
-              <FeedbackError
-                message="Unable to load project list: {projectLoadError}"
-                className="px-1 pb-1 text-text_default_secondary text-size_12 leading-line_height_16"
-              />
-            ) : null}
             {!error && projects.length === 0 ? (
               <p className="webui-project-empty">
                 <WebuiIconFolder aria-hidden="true" />

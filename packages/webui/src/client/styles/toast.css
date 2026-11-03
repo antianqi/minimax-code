@@ -1,0 +1,96 @@
+/*
+ * The toast family's arrangement: the one place a notice is drawn.
+ *
+ * A toast is a card that floats over the client. It is drawn against the
+ * viewport, not against a surface, because its whole point is that it takes
+ * no room from the page it is about: the host is positioned against the
+ * window, the column of cards grows downward from it, and the page beneath
+ * never moves.
+ *
+ * The card is the client's own surface — the same fill, the same hairline and
+ * the same elevation the dialog and the dropdown use — with one addition: a
+ * rail in the tone's colour. The rail is the only part of the card that says
+ * which kind of notice this is; the icon repeats it, and the words carry it.
+ *
+ * The colours are the status tokens, so a toast reads the same way in both
+ * themes without a second set of values.
+ */
+
+@layer components {
+  .webui-toast-host {
+    position: fixed;
+    top: var(--spacing_16);
+    left: 50%;
+    z-index: 160;
+    display: flex;
+    width: min(420px, calc(100vw - 32px));
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing_8);
+    /* The column is not a click target: only the cards are. */
+    pointer-events: none;
+    transform: translateX(-50%);
+  }
+  .webui-toast {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: var(--spacing_8);
+    border: 1px solid var(--border_default);
+    /* The rail: the tone's own colour, on the edge the eye reads first. */
+    border-left: 3px solid var(--webui-toast-accent);
+    border-radius: var(--radius_12);
+    padding: var(--spacing_12) var(--spacing_8) var(--spacing_12) var(--spacing_12);
+    background: var(--bg_default_primary);
+    box-shadow: var(--elevation_lg);
+    color: var(--text_default_primary);
+    pointer-events: auto;
+  }
+  .webui-toast--info {
+    --webui-toast-accent: var(--text_status_blue);
+  }
+  .webui-toast--success {
+    --webui-toast-accent: var(--text_status_success);
+  }
+  .webui-toast--warning {
+    --webui-toast-accent: var(--text_status_warning);
+  }
+  .webui-toast--error {
+    --webui-toast-accent: var(--text_status_error);
+  }
+  .webui-toast-icon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding-top: 1px;
+    color: var(--webui-toast-accent);
+  }
+  .webui-toast-body {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--spacing_4);
+  }
+  .webui-toast-message {
+    margin: 0;
+    font-size: 13px;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+  }
+  .webui-toast-description {
+    margin: 0;
+    color: var(--text_default_secondary);
+    font-size: 12px;
+    line-height: 16px;
+    overflow-wrap: anywhere;
+  }
+  .webui-toast-action {
+    display: flex;
+    margin-top: var(--spacing_2);
+  }
+  .webui-toast-close {
+    flex: none;
+  }
+}

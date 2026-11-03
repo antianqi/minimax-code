@@ -10,7 +10,8 @@ import {
 import { WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconFile, WebuiIconRunLocation } from "../../../shell/icons.js";
 import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
 import { WebuiField, WebuiTextarea, useWebuiFormValidation } from "../../../ui/field.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiPage, WebuiSkeletonProjection } from "../../../ui/page.js";
@@ -111,6 +112,9 @@ function WorkspaceCommitDialog({ open, environment, workspaceDir, mutateGit, onC
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  // The commit or the push failed: the failure is said once, as a toast, and
+  // is not drawn in the dialog's layout.
+  useWebuiToastError(error);
   const { errors: fieldErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
   const hasChanges = environment.changedFiles > 0;
   const submit = (action: "commit" | "commitAndPush" | "push") => {
@@ -130,7 +134,6 @@ function WorkspaceCommitDialog({ open, environment, workspaceDir, mutateGit, onC
     <WebuiButton variant="primary" onClick={() => submit(hasChanges ? "commitAndPush" : "push")} disabled={busy}>{hasChanges ? "提交并推送" : "推送"}</WebuiButton>
   </WebuiDialogActions>}>
     {hasChanges ? <WebuiField className="webui-commit-dialog-label" label="提交说明" required error={fieldErrors.message} control={(props) => <WebuiTextarea {...props} value={message} onChange={(event) => { setMessage(event.target.value); clearFieldError("message"); }} placeholder="例如：修复搜索框样式" autoFocus />} /> : <p className="webui-commit-dialog-hint">当前没有未提交变更，将推送当前分支。</p>}
-    {error ? <FeedbackError message={error} className="webui-commit-dialog-error" /> : null}
   </WebuiDialog>;
 }
 
@@ -164,6 +167,9 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
     // workspace's environment (a commit or a git-changed signal).
     queries.loadEnvironment(workspaceDir);
   }, [queries, workspaceDir, isDefaultWorkspace, workspaceEnvironment, environmentRevision]);
+  // The environment could not be read: the failure is said once, as a toast,
+  // and is not drawn in the panel's body.
+  useWebuiToastError(environmentError ? `环境信息加载失败：${environmentError}` : undefined);
   const pending = Boolean(!environment && !environmentError && !isDefaultWorkspace && (
     loading || (workspaceDir && queries?.canReadEnvironment && (!environmentMatchesWorkspace || queryState.environment.loading || !queryState.environment.environment))
   ));
@@ -190,7 +196,7 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
     <WorkspaceProgressSection kind="environment" className={`webui-environment-panel${pending ? " is-loading" : ""}`} title={PROGRESS_COPY.environment} collapsed={collapsed} onToggle={onToggle} busy={pending}>
         <>
           {pending ? <FeedbackLiveRegion screenReaderOnly>正在加载环境信息</FeedbackLiveRegion> : null}
-          {environmentError ? <FeedbackError message=<>环境信息加载失败：{environmentError}</> className="webui-environment-loading" /> : environment || pending ? <WebuiSkeletonProjection loading={pending}>{environmentBody}</WebuiSkeletonProjection> : null}
+          {environment || pending ? <WebuiSkeletonProjection loading={pending}>{environmentBody}</WebuiSkeletonProjection> : null}
         </>
     </WorkspaceProgressSection>
     {environment && workspaceDir && queries?.canMutateGit ? <WorkspaceCommitDialog open={commitOpen} environment={environment} workspaceDir={workspaceDir} mutateGit={queries.mutateGit} onClose={() => setCommitOpen(false)} /> : null}

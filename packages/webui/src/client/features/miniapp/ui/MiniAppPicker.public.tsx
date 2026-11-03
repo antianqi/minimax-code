@@ -25,7 +25,8 @@ import {
   webuiMiniAppRunningRows,
 } from "../projection/miniapp-view.js";
 import { WebuiIconApps, WebuiIconChevronRight, WebuiIconSites } from "../../../shell/icons.js";
-import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiMotion, WebuiPage, WebuiSkeleton } from "../../../ui/page.js";
 import { WebuiButton } from "../../../ui/button.js";
 import {
@@ -245,6 +246,24 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
     {launcher}
   </>;
 }
+
+/**
+ * A start this row's Mini App refused.
+ *
+ * The refusal is a fact about the row; the client says it once instead of
+ * drawing it in the row, so each refused row needs its own notice.
+ */
+function MiniAppPickerRefusal({
+  pluginId,
+  text,
+}: {
+  readonly pluginId: string;
+  readonly text: string;
+}): null {
+  useWebuiToastError(text, { testId: `miniapp-picker-refusal-${pluginId}` });
+  return null;
+}
+
 export interface MiniAppPickerProps {
   /** The session the chosen Mini App's view belongs to. */
   readonly sessionId?: string;
@@ -269,6 +288,11 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
   const running = webuiMiniAppRunningRows(rows);
   const refused = Object.values(state.refusals);
   const capacityRefused = refused.some((refusal) => refusal.code === "BUSY");
+  /* The capacity that was reached is an event, not a state: it is said once,
+   * and the picker keeps the rows it has. */
+  useWebuiToastError(capacityRefused ? webuiMiniAppCapacityText(rows) : undefined, {
+    testId: "miniapp-picker-capacity",
+  });
 
   useEffect(() => {
     void workflows?.loadListing();
@@ -306,9 +330,6 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
       ) : null}
       {/* A refused fourth start says which applications are using the capacity,
           and each of them carries the stop button that frees one. */}
-      {capacityRefused ? (
-        <FeedbackError message={webuiMiniAppCapacityText(rows)} className="webui-plugin-error" testId="miniapp-picker-capacity" />
-      ) : null}
       <PluginRowList>
         {rows.map((row) => {
           const refusal = state.refusals[row.pluginId];
@@ -341,10 +362,9 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
                   {row.statusLabel}{row.errorCode ? `（${webuiMiniAppFailureCodeText(row.errorCode)}）` : ""}
                 </span>
                 {refusal ? (
-                  <FeedbackError
-                    className="webui-plugin-error"
-                    testId={`miniapp-picker-refusal-${row.pluginId}`}
-                    message={webuiMiniAppRefusalText({
+                  <MiniAppPickerRefusal
+                    pluginId={row.pluginId}
+                    text={webuiMiniAppRefusalText({
                       code: refusal.code,
                       message: refusal.message,
                       rows,

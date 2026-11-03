@@ -6,7 +6,9 @@
  * refusal a host without a Cron service gets, and the refresh that makes a task created in another
  * client appear. Rendering goes through `renderToStaticMarkup` — this package has no jsdom.
  */
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -305,9 +307,13 @@ describe("the editor's presets", () => {
 });
 
 describe("the rendered editor", () => {
+  // The editor carries a hook now — its rejection is said through the toast — so it is
+  // rendered as a component rather than called as a plain function: a hook outside a
+  // render is an invalid hook call. The file is a `.ts` and the package has no JSX
+  // transform for one.
   const render = (draft: Parameters<typeof SchedulingEditorView>[0]["draft"]) =>
     renderToStaticMarkup(
-      SchedulingEditorView({
+      createElement(SchedulingEditorView, {
         mode: "create",
         draft,
         busy: false,
@@ -335,9 +341,9 @@ describe("the rendered editor", () => {
     );
   });
 
-  it("shows the rejection message beside the form", () => {
+  it("says the rejection through the toast, and keeps the form", () => {
     const markup = renderToStaticMarkup(
-      SchedulingEditorView({
+      createElement(SchedulingEditorView, {
         mode: "create",
         draft: WEBUI_CRON_EMPTY_DRAFT,
         busy: false,
@@ -347,8 +353,33 @@ describe("the rendered editor", () => {
         onSubmit: () => undefined,
       }),
     );
-    expect(markup).toContain('data-webui-scheduling-editor-error="true"');
-    expect(markup).toContain("schedule.expression必须是五段的 cron 表达式。");
+    // The rejection is an event, not a state: it is said once, through the shared
+    // toast, which is drawn over the page (ADR 0030). A server render never sees it,
+    // so the editor's own layout carries no trace of it.
+    expect(markup).not.toContain('data-webui-scheduling-editor-error="true"');
+    expect(markup).not.toContain("schedule.expression必须是五段的 cron 表达式。");
+    // The form and its fields are still there: the draft the person typed survives.
+    expect(markup).toContain('data-webui-component="scheduling-editor"');
+    expect(markup).toContain('data-webui-scheduling-field="time"');
+  });
+});
+
+/* The rejection is said through the shared toast (ADR 0030). The toast is raised in
+ * an effect and drawn over the page, so a server render never sees it: the editor's
+ * own source is what pins that the rejection is reported at all, and not merely
+ * hidden. */
+describe("the scheduling editor reports its rejection through the toast", () => {
+  const source = readFileSync(
+    new URL("../../src/client/features/scheduling/ui/scheduling-editor.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("raises the rejection through the toast, and draws it nowhere in the form", () => {
+    expect(source).toContain("useWebuiToastError(");
+    expect(source).toContain("props.error");
+    // The form itself draws no failure of its own any more.
+    expect(source).not.toContain("FeedbackError");
+    expect(source).not.toContain('data-webui-scheduling-editor-error="true"');
   });
 });
 

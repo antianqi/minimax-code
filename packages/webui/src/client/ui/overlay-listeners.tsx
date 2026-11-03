@@ -29,6 +29,22 @@ const ParentLayerContext = createContext<string | null>(null);
  */
 const LAYER_ATTRIBUTE = "data-overlay-layer";
 
+/**
+ * The marker for a surface that stays live while a layer is open.
+ *
+ * The client's notice channel is not the page behind a dialog: it is where the
+ * failure a dialog reports is said. A press on it is a press on the notice, so
+ * no layer may claim it — otherwise the press would dismiss the very dialog
+ * the notice is drawn over, and the action the notice carries would run against
+ * a dialog that had just closed.
+ */
+const LIVE_SURFACE_SELECTOR = "[data-webui-live-surface]";
+
+/** Is this press on a surface that stays live across layers? */
+function onLiveSurface(node: EventTarget | null): boolean {
+  return node instanceof Element && node.closest(LIVE_SURFACE_SELECTOR) !== null;
+}
+
 /** The managed layers containing a node, innermost first. */
 export function layersAt(node: Element | null): string[] {
   const found: string[] = [];
@@ -66,6 +82,10 @@ export function OverlayListenerHost(): ReactElement | null {
       if (decision.route !== "ignore") event.stopPropagation();
     });
     const stopPointerDown = dom.listenForPointerDown((event) => {
+      // The notice channel is not a layer and not the page behind one, so a
+      // press on it belongs to nobody: the layer on top keeps its state, and
+      // the press still reaches the notice that raised it.
+      if (onLiveSurface(event.target)) return;
       const decision = coordinator.dispatch({
         kind: "pointerdown",
         insideLayerIds: layersAt(event.target as Element | null),

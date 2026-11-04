@@ -28,7 +28,8 @@ import type {
 } from "../../account/bindings/use-account-workflows.public.js";
 import { useWebuiAccountWorkflowsState } from "../../account/bindings/use-account-workflows.public.js";
 import { SettingsButton, SettingsDialog } from "./settings-atoms.js";
-import { WebuiInline } from "../../../ui/layout-primitives.js";
+import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
+import { WebuiSkeleton } from "../../../ui/page.js";
 import { useWebuiToastError, useWebuiToastSuccess } from "../../../ui/toast.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -151,10 +152,12 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
   // gate as the render, so an account without a plan never asks for cards.
   useEffect(() => {
     if (!enabled) return;
-    if (cards.page === 0 && !cards.loading) void account?.loadResetCards();
+    if (cards.page === 0 && !cards.loading && !cards.error) {
+      void account?.loadResetCards();
+    }
   // The owner is stable; the read is keyed on the list's own page.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, enabled, cards.page, cards.loading]);
+  }, [account, enabled, cards.page, cards.loading, cards.error]);
 
   // The reset cards are a plan feature: only a subscribed account gets them,
   // so an account without a plan gets no section at all.
@@ -165,6 +168,7 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
     <SettingsSection
       title={WEBUI_RESET_CARD_COPY.title}
       testId="settings-usage-reset-cards"
+      bare={cards.loading && cards.items.length === 0}
       actions={
         <SettingsButton
           size="compact"
@@ -190,7 +194,15 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
         <SettingsErrorNotice message={cards.error} action={{ label: WEBUI_RESET_CARD_COPY.retry, onClick: () => void account?.loadResetCards() }} />
       ) : null}
       {cards.loading && cards.items.length === 0 ? (
-        <p className="px-3 py-2 text-[13px] leading-5 text-text_default_secondary">加载中…</p>
+        <WebuiStack gap="small" className="px-3 py-2" aria-busy="true" data-testid="settings-usage-reset-card-loading">
+            {[0, 1, 2].map((row) => <WebuiInline key={row} justify="between" className="w-full py-2">
+              <WebuiStack gap="small" className="w-1/2">
+                <WebuiSkeleton variant="text" width={`${[62, 48, 56][row]}%`} />
+                <WebuiSkeleton variant="text" width={`${[38, 32, 42][row]}%`} />
+              </WebuiStack>
+              <WebuiSkeleton variant="control" width={68} height={24} />
+            </WebuiInline>)}
+        </WebuiStack>
       ) : cards.items.length === 0 ? (
         <p
           data-testid="settings-usage-reset-card-empty"
@@ -349,7 +361,15 @@ function ResetCardHistoryDialog({
           <SettingsErrorNotice message={WEBUI_RESET_CARD_COPY.historyLoadError} action={{ label: WEBUI_RESET_CARD_COPY.retry, onClick: onLoadMore }} />
         ) : null}
         {history.loading && history.items.length === 0 ? (
-          <p className="py-2 text-[13px] leading-5 text-text_default_secondary">加载中…</p>
+          <WebuiStack gap="small" className="py-2" aria-busy="true" data-testid="settings-usage-reset-card-history-loading">
+            {[0, 1, 2].map((row) => <WebuiInline key={row} justify="between" className="w-full py-2">
+              <WebuiStack gap="small" className="w-1/2">
+                <WebuiSkeleton variant="text" width={`${[52, 64, 44][row]}%`} />
+                <WebuiSkeleton variant="text" width={`${[34, 40, 29][row]}%`} />
+              </WebuiStack>
+              <WebuiSkeleton variant="text" width={row === 1 ? 76 : 58} />
+            </WebuiInline>)}
+          </WebuiStack>
         ) : history.items.length === 0 ? (
           <FeedbackEmpty
             className="webui-settings-dialog-empty"

@@ -353,8 +353,11 @@ describe("real host over the loopback service", () => {
           backdropFixed: getComputedStyle(backdrop).position === "fixed",
           backdropCoversViewport: backdropRect.left <= 0 && backdropRect.top <= 0 &&
             backdropRect.right >= innerWidth && backdropRect.bottom >= innerHeight,
-          centered: Math.abs(rect.left + rect.width / 2 - innerWidth / 2) < 3 &&
-            Math.abs(rect.top + rect.height / 2 - innerHeight / 2) < 3,
+          // Centred in the mask, not in the window: the mask is what the surface
+          // is laid out inside, and a scrollbar makes the window's centre differ
+          // from it by a few pixels.
+          centered: Math.abs(rect.left + rect.width / 2 - (backdropRect.left + backdropRect.width / 2)) < 3 &&
+            Math.abs(rect.top + rect.height / 2 - (backdropRect.top + backdropRect.height / 2)) < 3,
           insideViewport: rect.left >= 0 && rect.top >= 0 &&
             rect.right <= innerWidth && rect.bottom <= innerHeight,
           fieldsGrid: getComputedStyle(fields).display === "grid",

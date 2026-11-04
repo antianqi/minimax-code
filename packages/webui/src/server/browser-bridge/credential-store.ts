@@ -401,7 +401,24 @@ function createLinuxSecretServiceStore(
   return {
     async isAvailable() {
       try {
-        const result = await runCommand("secret-tool", ["--version"]);
+        // `secret-tool` has **no** `--version` flag: libsecret-tools 0.21
+        // prints its usage and exits 2, so probing with it reports a Secret
+        // Service that works perfectly as unavailable — and the bridge then
+        // refuses to mint an installation key for a browser the person has
+        // switched on, reporting it as "not enabled".
+        //
+        // `search` answers the question this actually asks — is the service
+        // reachable — because it exits 0 when the service answers (whether or
+        // not anything matches the attributes) and non-zero when it does not.
+        // The attributes are a probe of this service's own, so the search
+        // cannot match a real credential.
+        const result = await runCommand("secret-tool", [
+          "search",
+          "service",
+          serviceName,
+          "key",
+          `${serviceName}-availability-probe`,
+        ]);
         return result.exitCode === 0;
       } catch {
         return false;

@@ -1063,22 +1063,20 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     });
     await browserExpect(page.locator('[data-webui-composer-attachments="true"]')
       .getByText("runtime-note.txt")).toBeVisible();
-    await composer.fill("Summarize the referenced project file. @reference-target");
-    const mention = page.getByRole("option", { name: "reference-target.md", exact: true });
-    await browserExpect(mention).toBeVisible();
-    await mention.click();
-    await browserExpect(composer).toHaveValue("Summarize the referenced project file. @reference-target.md ");
+    // The `@` menu no longer offers workspace files, so the attachment is what
+    // this turn carries: the prompt names it and the payload has to arrive with
+    // it on the wire.
+    await composer.fill("Summarize the attached file.");
     await page.locator("[data-webui-composer-submit]").click();
     await browserExpect(page.getByText("Reference and attachment reached the runtime.")).toBeVisible({ timeout: 30_000 });
     await browserExpect.poll(async () => (await page.locator("body").textContent()) ?? "")
-      .toContain("Summarize the referenced project file.");
+      .toContain("Summarize the attached file.");
     const referenceRequest = modelRequests.find((request) =>
-      request.body.includes("Summarize the referenced project file."));
+      request.body.includes("Summarize the attached file."));
     const referenceSend = requests.find((request) => request.operation === "sendMessage" &&
-      request.body?.content === "Summarize the referenced project file. @reference-target.md");
+      request.body?.content === "Summarize the attached file.");
     expect(referenceSend).toBeDefined();
     expect(referenceRequest).toBeDefined();
-    expect(referenceRequest?.body).toContain("@reference-target.md");
     expect(referenceRequest?.body).toContain("runtime-note.txt");
     const referencePayload = JSON.parse(referenceRequest?.body ?? "{}") as {
       messages?: readonly { content?: unknown }[];
@@ -1104,10 +1102,10 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await expect.poll(async () => JSON.stringify((await port.getMessages({ id: sessionId })).messages ?? []))
       .toContain("Reference and attachment reached the runtime.");
     await expect.poll(async () => JSON.stringify((await port.getMessages({ id: sessionId })).messages ?? []))
-      .toContain("@reference-target.md");
+      .toContain("Summarize the attached file.");
     await browserExpect.poll(() => port.getActiveTurn({ id: sessionId })).toBeUndefined();
     const completedReferenceUserMessage = page.locator('[data-webui-message-role="user"]')
-      .filter({ hasText: "Summarize the referenced project file." });
+      .filter({ hasText: "Summarize the attached file." });
     await browserExpect(completedReferenceUserMessage).toBeVisible();
     const completedReferenceTranscript = (await page.locator("body").textContent()) ?? "";
     const referencePromptPosition = completedReferenceTranscript.indexOf("Summarize the referenced project file.");

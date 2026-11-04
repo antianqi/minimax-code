@@ -130,6 +130,17 @@ export function ShortcutsSettings({ bindings, onChange, onReset }: ShortcutsSett
                   aria-label={`${row.title}的快捷键，当前为${row.label}`}
                   aria-pressed={capturing === row.actionId}
                   onClick={() => { setError(""); setCapturing(row.actionId); }}
+                  // The capture's own control answers Escape: it holds focus while
+                  // the capture is open, so the key reaches it before any surface
+                  // above decides what to do with it — and leaving the capture
+                  // also drops the conflict notice it raised.
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape" || capturing !== row.actionId) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setCapturing(undefined);
+                    setError("");
+                  }}
                 >
                   {capturing === row.actionId ? "按下组合键…" : row.label}
                 </WebuiButton>

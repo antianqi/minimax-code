@@ -56,7 +56,10 @@ describe("desktop settings registry", () => {
     // default kind reads "M Plan" — the legacy "Token Plan" name belongs to
     // the legacy `token_plan` subscription only.
     expect(markup).toContain("M Plan");
-    expect(markup).toContain("加载中…");
+    // The loading branch is the shared skeleton with its own marker; the plain
+    // 「加载中…」 line it used to draw was replaced when the page got its shell.
+    expect(markup).toContain('data-testid="settings-usage-quota-loading"');
+    expect(markup).toContain('aria-busy="true"');
   });
 
   it("keeps every cloud billing control inert and leaves credit fallback unchecked", () => {

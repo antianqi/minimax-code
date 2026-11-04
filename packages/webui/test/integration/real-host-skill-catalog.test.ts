@@ -122,6 +122,7 @@ const booted: Booted[] = [];
 const stubs: Stub[] = [];
 const previousDataDir = process.env.MINIMAX_DATA_DIR;
 const previousBuildEnv = process.env.MAVIS_BUILD_ENV;
+const previousRegion = process.env.MAVIS_REGION;
 
 afterEach(async () => {
   for (const entry of booted.splice(0)) await entry.close();
@@ -130,6 +131,8 @@ afterEach(async () => {
   else process.env.MINIMAX_DATA_DIR = previousDataDir;
   if (previousBuildEnv === undefined) delete process.env.MAVIS_BUILD_ENV;
   else process.env.MAVIS_BUILD_ENV = previousBuildEnv;
+  if (previousRegion === undefined) delete process.env.MAVIS_REGION;
+  else process.env.MAVIS_REGION = previousRegion;
 });
 
 interface CatalogRun {
@@ -153,7 +156,12 @@ async function runTurnAndReadCatalog(betaMcodeTools: boolean | undefined): Promi
   stubs.push(stub);
   // A test build honours a loopback content-review base URL, so the turn can
   // reach a real review endpoint instead of the placeholder host.
+  // The scope the runtime resolves is a COMPLETE pair: a lone build env is
+  // not a scope, so the resolver replaces it with the default — and the
+  // default's content-review endpoint is the production one, which the stub
+  // cannot answer.
   process.env.MAVIS_BUILD_ENV = "test";
+  process.env.MAVIS_REGION = "cn";
   const reviewBaseUrl = stub.url.replace(/\/v1$/u, "");
 
   const dataDir = await mkdtemp(join(tmpdir(), "webui-real-host-skill-catalog-"));

@@ -469,6 +469,7 @@ export function createWebuiApplication(
     return selectWebuiSessionAgentName(selectWebuiSessionLookups(flat, tree), sessionId);
   };
   const readAgentName = deps.readAgentName ?? catalogueAgentName;
+  let recoverTurnForSession: ((sessionId: string) => void) | undefined;
   const interactions = createWebuiInteractionSessionOwners({
     store,
     // The assembly builds the intents because it is what holds the store; the
@@ -477,6 +478,7 @@ export function createWebuiApplication(
       createWebuiInteractionPhaseIntents({
         setStream: store.createSessionWriter({ kind: "session", sessionId }).setStream,
       }),
+    recoverTurn: (sessionId) => recoverTurnForSession?.(sessionId),
     // Same split for the interaction writers: Sessions publishes the commands,
     // the assembly composes them for the session it is building an owner for.
     commandsFor: (sessionId) =>
@@ -578,6 +580,7 @@ export function createWebuiApplication(
       // revision — which is how newer typing in that slot was erased.
     });
   };
+  recoverTurnForSession = (sessionId) => turnCommandsFor(sessionId).recover();
   /**
    * The one reconciliation entry point: the same owner routes the event path
    * uses, so selection and reconnect do not run a second one.

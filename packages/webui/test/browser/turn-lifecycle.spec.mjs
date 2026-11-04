@@ -526,6 +526,78 @@ test("a queued user message hands the activity indicator to the transcript tail"
   await expect(liveIndicator(page)).toHaveCount(0);
 });
 
+test("approving a plan reattaches when the resumed turn start event was missed", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await startTurn(page, "A", "绘制 SVG 花朵");
+  await emitAgentMessage(page, "A", {
+    msg_id: "plan-review-message",
+    msg_content: "方案已写入 plan.md。",
+  });
+
+  await page.evaluate(() => window.__fixture.emitEvent({
+    type: "questionnaire.ask",
+    payload: {
+      sessionId: "A",
+      request: {
+        schemaVersion: 2,
+        id: "plan-review-request",
+        title: "计划完成，实施计划？",
+        presentation: { replaceComposer: true, showProgress: true, allowBackNavigation: true },
+        steps: [{
+          id: "plan-review",
+          question: "确认实施计划",
+          description: "方案已写好",
+          selectionMode: 0,
+          allowOther: false,
+          otherPlaceholder: "",
+          required: false,
+        }],
+        mode: "plan",
+        tool: { messageId: "plan-review-message", callId: "plan-review-call" },
+        modePayload: { planReview: { markdown: "# SVG 花朵\n\n实施步骤", path: "/workspace/plan.md" } },
+      },
+    },
+    timestamp: 1_700_000_000_250,
+    source: "synthetic",
+  }));
+  await expect(page.getByTestId("plan-review-approve")).toBeVisible();
+
+  // The plan-writing stream ends while the questionnaire keeps the turn open.
+  // After approval, the runtime continues that turn; this test deliberately
+  // omits its session.start event to exercise the same recovery gap as a missed
+  // process event during reconnect.
+  await emitStream(page, "A", { dataJson: "[DONE]" });
+  await page.evaluate(() => window.__fixture.setActiveTurn({
+    turnId: "plan-execution-turn",
+    busyReason: "turn",
+    locallyOwned: false,
+  }));
+  await page.evaluate(() => window.__fixture.delayEvery("getActiveTurn", { id: "A" }));
+  await page.getByTestId("plan-review-approve").click();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "replyQuestionnaire" && request.body.requestId === "plan-review-request",
+  ))).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
+    (request) => request.operation === "getActiveTurn" && request.body.id === "A",
+  ))).toBe(true);
+  await expect(page.getByText("思考中…")).toBeVisible();
+  await page.evaluate(() => window.__fixture.resolve("getActiveTurn", { id: "A" }, {
+    turnId: "plan-execution-turn",
+    busyReason: "turn",
+    locallyOwned: false,
+  }));
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "resumeSession" && request.body.id === "A",
+  ))).toBe(true);
+  await emitAgentMessage(page, "A", {
+    msg_id: "plan-execution-reply",
+    thinking_content: "开始按计划实施。",
+    msg_content: "已完成第一步。",
+  });
+  await expect(page.getByText("已完成第一步。", { exact: true })).toBeVisible();
+});
+
 /** Ordered `ANSWER` / `PULSE` markers as rendered inside the assistant body. */
 async function assistantRowOrder(page) {
   return page.evaluate(() => {

@@ -62,6 +62,8 @@ export function createWebuiInteractionSessionOwners(deps: {
    * a pending interaction implies.
    */
   readonly readPhaseIntents: (sessionId: string) => WebuiInteractionPhaseIntents;
+  /** Reconcile a turn resumed by an accepted questionnaire answer. */
+  readonly recoverTurn?: (sessionId: string) => void;
   /** The interaction capability. Absent on a host with nothing wired. */
   readonly port?: WebuiInteractionPortSlice;
   /**
@@ -98,6 +100,7 @@ export function createWebuiInteractionSessionOwners(deps: {
           applyQuestionnaire: commands.applyQuestionnaire,
         },
         streams,
+        ...(deps.recoverTurn ? { recoverTurn: () => deps.recoverTurn!(recordKey) } : {}),
         pendingVersionRef,
         sessionId: runtimeSessionId,
         agentName: () => readAgentName?.(recordKey) ?? "main",

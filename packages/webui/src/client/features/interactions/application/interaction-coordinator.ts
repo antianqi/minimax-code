@@ -111,6 +111,8 @@ export interface WebuiInteractionCoordinatorOptions {
    * aborted slice, so it is not handed the member that does.
    */
   readonly streams: WebuiInteractionPhaseIntents;
+  /** Reconcile an accepted continuation in case its session.start event was missed. */
+  readonly recoverTurn?: () => void;
   /** Persists request/mutation order across render-scoped coordinator objects. */
   readonly pendingVersionRef: WebuiVersionCell;
   /** The session these flows belong to. Absent means nothing to refresh. */
@@ -151,6 +153,7 @@ export function createWebuiInteractionCoordinator({
   agentName,
   pendingVersionRef,
   streams,
+  recoverTurn,
 }: WebuiInteractionCoordinatorOptions): WebuiInteractionCoordinator {
   const {
     listPendingPermissions,
@@ -236,9 +239,9 @@ export function createWebuiInteractionCoordinator({
         // command. Leaving `streaming` after a skip strands the transcript's
         // thinking pulse, because a finished turn never sends the frame that
         // would clear it.
-        streams.markStreamPhase(
-          webuiAnswersEndTurn(answers) ? "idle" : "streaming",
-        );
+        const endsTurn = webuiAnswersEndTurn(answers);
+        streams.markStreamPhase(endsTurn ? "idle" : "streaming");
+        if (!endsTurn) recoverTurn?.();
         return { ok: true };
       } catch (error) {
         return { ok: false, error: describe(error) };

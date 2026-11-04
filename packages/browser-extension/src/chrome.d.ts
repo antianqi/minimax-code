@@ -85,7 +85,14 @@ declare const chrome: {
       ) => boolean | undefined
     >;
     sendMessage(message: unknown): Promise<unknown>;
-    getManifest(): { version: string };
+    /**
+     * The extension's own manifest.
+     *
+     * `key` is the store's public key, present only in a published build. It
+     * is what fixes a published build's identity, so the options page reads it
+     * to tell a published build from a local one.
+     */
+    getManifest(): { version: string; key?: string };
   };
   readonly storage: {
     readonly local: WebuiBrowserExtensionStorageArea;

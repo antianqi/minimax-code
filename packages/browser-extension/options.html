@@ -24,8 +24,37 @@
         gap: 0.5rem;
         align-items: center;
       }
+      .value {
+        width: auto;
+        flex: 1;
+        min-width: 0;
+        background: #f4f4f5;
+      }
+      /* The host setting is a long line, and a truncated one cannot be read
+         off the screen — so it gets a row of its own. */
+      .row.stacked {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .row.stacked .value {
+        width: 100%;
+      }
+      .row.stacked button {
+        align-self: flex-start;
+      }
+      .label {
+        margin: 0;
+        min-width: 11rem;
+        color: #555;
+      }
+      h2 {
+        font-size: 1rem;
+        margin-top: 2rem;
+      }
       #stored,
-      #origin-stored {
+      #origin-stored,
+      #build-kind,
+      #identity-note {
         color: #555;
       }
       #status:empty {
@@ -39,6 +68,20 @@
       This browser connects to a local WebUI. Set that WebUI's address, then
       paste the installation key it shows in its own Settings page.
     </p>
+    <h2>This extension</h2>
+    <p id="build-kind"></p>
+    <div class="row">
+      <span class="label">Extension id</span>
+      <input id="extension-id" class="value" type="text" readonly spellcheck="false" />
+      <button id="copy-extension-id" type="button">Copy</button>
+    </div>
+    <div class="row stacked">
+      <span class="label">Development host setting</span>
+      <input id="host-allowlist" class="value" type="text" readonly spellcheck="false" />
+      <button id="copy-host-allowlist" type="button">Copy</button>
+    </div>
+    <p id="identity-note"></p>
+    <h2>The WebUI</h2>
     <label for="bridge-origin">WebUI address</label>
     <input
       id="bridge-origin"

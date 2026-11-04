@@ -449,3 +449,34 @@ Three consequences follow, and they are the shape of the decision:
 
 The mechanism is described in
 [`../browser-use/10-browser-core-integration.md`](../browser-use/10-browser-core-integration.md).
+
+### A10 — The published identity is a build-time constant, not configuration
+
+A6 settled that a packaged host admits store identities and never development
+ones, and left the store identity as "an ordinary configuration value": an
+operator ran the packaged entry with `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`
+naming the identity to admit. That is what a released product must not ask of
+the person it is published to. A store identity is not a property of the
+machine — it is derived from the store's public key, and the key is a property
+of the release.
+
+The derivation was measured rather than assumed: a build carrying a known
+public key was loaded into a real Chromium, and the id the browser assigned is
+the first 16 bytes of the key's SHA-256, rendered as hex and mapped onto
+`a`–`p`. The published identity is therefore knowable before the build is
+even submitted, and a packaged host can be built knowing the identity it
+admits.
+
+So the published identity is baked into the package at package time and
+admitted with no environment variable, no allowlist to write and no restart
+with a hand-made setting. The store allowlist variables stay available for a
+self-hosted store build, and they add to the published identity rather than
+replacing it — a published identity is not something an environment variable
+can talk the host out of.
+
+The development identities are unchanged: an unpacked build's id depends on the
+directory it was loaded from, so a development host still has to be told which
+id it admits. That configuration is now visible where the id is: the
+extension's options page shows its own id and the exact setting line that
+carries it, so a person no longer has to read the id out of the browser's
+extension manager to satisfy the host.

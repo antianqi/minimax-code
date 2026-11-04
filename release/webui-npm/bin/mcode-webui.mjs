@@ -29,6 +29,38 @@ if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
 const dataDir = process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
 process.env.MAVIS_BUILTIN_AGENTS_V2_DIR ??= path.join(packageRoot, "assets/agents");
 process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents");
+
+/**
+ * The published extension identities this package was built for.
+ *
+ * A store build's identity is derived from the store's public key, so it is
+ * known at package time and written into `bin/store-extension-ids.json`. It
+ * is a property of the package rather than of the machine it is installed on,
+ * which is why it is read from the package and not from the environment.
+ *
+ * A package built without a store public key carries no identity, and the
+ * bridge then admits nobody. The refusal is visible — every extension is
+ * turned away at the upgrade — rather than silent.
+ */
+async function readStoreExtensionIds() {
+  let parsed;
+  try {
+    parsed = JSON.parse(await readFile(path.join(packageRoot, "bin", "store-extension-ids.json"), "utf8"));
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== "object") return {};
+  const ids = {};
+  for (const [surface, value] of Object.entries(parsed)) {
+    if (surface !== "edge" && surface !== "chrome") continue;
+    // A Chrome extension id is 32 letters from `a` to `p`. Anything else is
+    // not an identity the bridge could ever compare against, so it is dropped
+    // rather than carried into the allowlist.
+    if (typeof value !== "string" || !/^[a-p]{32}$/.test(value)) continue;
+    ids[surface] = [value];
+  }
+  return ids;
+}
 // The extension bridge is assembled here, beside the browser adapter, because
 // the layer matrix forbids `src/runtime/**` from importing `src/server/**`. This
 // file is the composition root: it is the one place that can hand the bridge's
@@ -47,10 +79,22 @@ process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents")
 // extension happened to be present. The development entry
 // (`scripts/run-webui-server.mjs`) is the one that reads the development
 // allowlist.
+//
+// The identity of the **published** extension is not read from the
+// environment at all: it is a constant of this release, derived from the
+// store's public key, and it is written into the package at package time (see
+// `scripts/package-webui-npm.mjs`). So the person who installs this package
+// configures nothing: the bridge admits the published extension, and the
+// environment variables above remain available for a self-hosted store build.
+//
+// The published identities are read here rather than in the server bundle,
+// because they are a property of the **package** — of which store's build it
+// ships — and not of the code.
 const browserBridge = new BrowserBridgeServer({
   host: "127.0.0.1",
   dev: true,
   packaged: true,
+  storeExtensionIds: await readStoreExtensionIds(),
 });
 await browserBridge.start();
 // The browser adapter is built before the runtime host, because the host is

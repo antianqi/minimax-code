@@ -784,4 +784,62 @@ describe("the bridge's extension identity", () => {
     expect(development.pairings.get("chrome")!.admitsExtensionId(developmentId)).toBe(true);
     await development.close();
   });
+
+  it("a packaged host admits the published identity it was built for, with nothing configured", async () => {
+    // The published extension's id is derived from the store's public key, so
+    // it is a constant of the release rather than a property of the machine
+    // the package is installed on. The packaged host is built with it, and the
+    // person who installs the package configures nothing.
+    const publishedId = "dddddddddddddddddddddddddddddddde";
+    const packaged = new BrowserBridgeServer({
+      host: "127.0.0.1",
+      dev: true,
+      packaged: true,
+      credentialStore: createInMemorySecureCredentialStore(),
+      env: {},
+      storeExtensionIds: { chrome: [publishedId] },
+    });
+    expect(packaged.pairings.get("chrome")!.admitsExtensionId(publishedId)).toBe(true);
+    // And it still refuses an identity it was not built for.
+    expect(
+      packaged.pairings.get("chrome")!.admitsExtensionId("eeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+    ).toBe(false);
+    await packaged.close();
+  });
+
+  it("a packaged host keeps the identities its environment names alongside the one it was built for", async () => {
+    // The environment stays available for a self-hosted store build. It adds
+    // to what the host was built for; it does not replace it, because a
+    // published identity is not something an environment variable can talk
+    // the host out of.
+    const publishedId = "dddddddddddddddddddddddddddddddde";
+    const selfHostedId = "ffffffffffffffffffffffffffffffff";
+    const packaged = new BrowserBridgeServer({
+      host: "127.0.0.1",
+      dev: true,
+      packaged: true,
+      credentialStore: createInMemorySecureCredentialStore(),
+      env: { MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS: selfHostedId },
+      storeExtensionIds: { chrome: [publishedId] },
+    });
+    expect(packaged.pairings.get("chrome")!.admitsExtensionId(publishedId)).toBe(true);
+    expect(packaged.pairings.get("chrome")!.admitsExtensionId(selfHostedId)).toBe(true);
+    await packaged.close();
+  });
+
+  it("normalizes the identities it was built for", async () => {
+    // The browser reports an extension origin's id in lowercase, so an id
+    // that was written with capitals has to match anyway.
+    const publishedId = "dddddddddddddddddddddddddddddddde";
+    const packaged = new BrowserBridgeServer({
+      host: "127.0.0.1",
+      dev: true,
+      packaged: true,
+      credentialStore: createInMemorySecureCredentialStore(),
+      env: {},
+      storeExtensionIds: { chrome: [`  ${publishedId.toUpperCase()}  `] },
+    });
+    expect(packaged.pairings.get("chrome")!.admitsExtensionId(publishedId)).toBe(true);
+    await packaged.close();
+  });
 });

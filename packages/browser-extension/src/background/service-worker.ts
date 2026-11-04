@@ -13,6 +13,7 @@ import {
   WebuiBrowserBridgeClient,
 } from "../bridge-client.js";
 import { createWebuiBrowserBridgeImageStream } from "../images.js";
+import { webuiBrowserBridgeBrowserName } from "../extension-identity.js";
 import {
   WEBUI_BROWSER_BRIDGE_DEBUGGER_VERSION,
   createWebuiBrowserBridgeInputDispatcher,
@@ -347,11 +348,12 @@ async function resolveOrigin(): Promise<string | undefined> {
 /**
  * Which browser this is.
  *
- * Both Edge and Chrome advertise themselves in the user agent, and the host
- * authorizes each surface separately, so the two are never treated as one.
+ * The reading itself lives in `extension-identity.ts`, next to the rest of
+ * what the extension knows about itself, so the options page and the worker
+ * cannot disagree about which browser they are in.
  */
 function detectBrowser(): WebuiBrowserBridgeBrowserName {
-  return navigator.userAgent.includes("Edg/") ? "edge" : "chrome";
+  return webuiBrowserBridgeBrowserName(navigator.userAgent);
 }
 
 function sleep(ms: number): Promise<void> {

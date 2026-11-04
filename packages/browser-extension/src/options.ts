@@ -37,6 +37,11 @@ import {
   WEBUI_BROWSER_BRIDGE_LAST_ERROR_STORAGE_KEY,
   WEBUI_BROWSER_BRIDGE_STATUS_STORAGE_KEY,
 } from "./settings.js";
+import {
+  webuiBrowserBridgeBrowserName,
+  webuiBrowserBridgeBuildKind,
+  webuiBrowserBridgeDevelopmentAllowlistLine,
+} from "./extension-identity.js";
 
 /**
  * How long the page waits for the worker to report an outcome.
@@ -62,6 +67,12 @@ const save = element<HTMLButtonElement>("save");
 const clear = element<HTMLButtonElement>("clear");
 const status = element<HTMLParagraphElement>("status");
 const stored = element<HTMLParagraphElement>("stored");
+const extensionIdInput = element<HTMLInputElement>("extension-id");
+const copyExtensionId = element<HTMLButtonElement>("copy-extension-id");
+const buildKind = element<HTMLParagraphElement>("build-kind");
+const hostAllowlistInput = element<HTMLInputElement>("host-allowlist");
+const copyHostAllowlist = element<HTMLButtonElement>("copy-host-allowlist");
+const identityNote = element<HTMLParagraphElement>("identity-note");
 
 function say(message: string): void {
   status.textContent = message;
@@ -85,6 +96,49 @@ async function renderStored(): Promise<void> {
   stored.textContent = state.stored
     ? `An installation key is stored (fingerprint ${state.fingerprint}).`
     : "No installation key is stored in this browser yet.";
+}
+
+/**
+ * Render what this extension is, and what the host has to be told about it.
+ *
+ * The id is the one thing the person cannot work out on their own: it is
+ * shown in the browser's extension manager, but a person who is setting the
+ * bridge up has no reason to go and read it out of there, and a development
+ * host needs it before it will admit this extension at all.
+ *
+ * A published build carries the store's public key, so its id is fixed and
+ * the released WebUI package already knows it: there is nothing to configure
+ * on the host side. A local build's id comes from the folder it was loaded
+ * from, so it differs per machine and the host has to be told.
+ */
+async function renderIdentity(): Promise<void> {
+  const extensionId = chrome.runtime.id;
+  const kind = webuiBrowserBridgeBuildKind(chrome.runtime.getManifest());
+  const browser = webuiBrowserBridgeBrowserName(navigator.userAgent);
+  extensionIdInput.value = extensionId;
+  hostAllowlistInput.value = webuiBrowserBridgeDevelopmentAllowlistLine(
+    browser,
+    extensionId,
+  );
+  buildKind.textContent =
+    kind === "published"
+      ? "This is the published build. Its identity is fixed by the store's key, so it is the same on every machine."
+      : "This is a local build. Its identity comes from the folder it was loaded from, so it differs on every machine.";
+  identityNote.textContent =
+    kind === "published"
+      ? "The released WebUI package already admits this extension, so there is nothing to set on the host side. The setting below is only for a development WebUI."
+      : "A development WebUI admits only the extensions you name, so start it with the setting below.";
+}
+
+/** Put a value on the clipboard, or say that the clipboard was not there. */
+async function copyValue(value: string): Promise<void> {
+  try {
+    if (!navigator.clipboard) throw new Error("no clipboard");
+    await navigator.clipboard.writeText(value);
+    say("Copied to the clipboard.");
+  } catch {
+    say("The clipboard is not available here — select the text and copy it.");
+  }
 }
 
 /**
@@ -212,5 +266,12 @@ save.addEventListener("click", () => {
 clear.addEventListener("click", () => {
   void onClear();
 });
+copyExtensionId.addEventListener("click", () => {
+  void copyValue(extensionIdInput.value);
+});
+copyHostAllowlist.addEventListener("click", () => {
+  void copyValue(hostAllowlistInput.value);
+});
+void renderIdentity();
 void renderOrigin();
 void renderStored();

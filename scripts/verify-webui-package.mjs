@@ -18,8 +18,18 @@ const { values } = parseArgs({ options: { "package-dir": { type: "string" } } })
  * bridge's origin parser rejects anything else, so the shape has to be right
  * for the check to mean anything.
  */
-const STORE_EXTENSION_ID = "a".repeat(32);
+const SELF_HOSTED_EXTENSION_ID = "a".repeat(32);
 const DEVELOPMENT_EXTENSION_ID = "b".repeat(32);
+
+/**
+ * The store public key the package is built with.
+ *
+ * A published extension id is derived from this key, so the package knows the
+ * identity it admits before anybody installs it. The key is a synthetic one —
+ * it signs nothing, and nothing compares against it but the derivation — but
+ * it is a real RSA key, because the derivation takes a real key's bytes.
+ */
+const STORE_PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnOhYRa1KUfkMMF25O1aGxrQTooncMH0Yt3CqWq1AcZNkZ5+ACczWCI9/BknmlyFIk1sRYt9fouhB/PEIeVu1TCW+1xq7zds7Trp7kdXl35YMR6yb98EGVmbVlgO1xTZOEBWaC1vhNLElJn16VVcozt5uMSePNQUPOogABfjIQCgpa44D9Bn77H6YovXgzphziIXZd9Z+F5akDfAZlsMtI7hYe/nNWSDvLPrIhc6pb0IZ/4gxIIkslgHaXxknc7Aj5Xfz0xkfkj5ccGfV6OYlgIs4JpjmzGRfoeyQxO4rSYTmYZXkMOtPSTkoGv7o2Ixs14B1pHm0PjHwbCR/svH7aQIDAQAB";
 
 const scratch = process.env.MCODE_WEBUI_VERIFY_DIR ?? path.resolve(root, `../${path.basename(root)}-webui-work/package-checks`);
 if (!path.relative(root, path.resolve(scratch)).startsWith("..")) throw new Error("WebUI package verification directory must be outside the repository");
@@ -34,7 +44,19 @@ function run(command, args, options = {}) {
 let child;
 try {
   const packageDir = values["package-dir"] ? path.resolve(values["package-dir"]) : path.join(work, "package");
-  if (!values["package-dir"]) run(process.execPath, ["scripts/package-webui-npm.mjs", "--outdir", packageDir]);
+  // The package is built with the store's public key, so it carries the
+  // published identity it admits. That is the point of this acceptance: the
+  // person who installs the package configures nothing.
+  if (!values["package-dir"]) {
+    run(process.execPath, ["scripts/package-webui-npm.mjs", "--outdir", packageDir], {
+      env: { ...process.env, MAVIS_BROWSER_STORE_CHROME_PUBLIC_KEY: STORE_PUBLIC_KEY },
+    });
+  }
+  const publishedIds = readPublishedIds(path.join(packageDir, "bin", "store-extension-ids.json"));
+  const publishedId = publishedIds.chrome;
+  if (!publishedId) {
+    throw new Error("The installed WebUI package carries no published extension identity; a published package is built with the store's public key");
+  }
   const packed = JSON.parse(run(npm, ["pack", packageDir, "--json", "--pack-destination", work]));
   if (packed.length !== 1) throw new Error("Expected exactly one WebUI npm archive");
   const prefix = path.join(work, "install");
@@ -55,7 +77,11 @@ try {
       // The packaged host is configured with both allowlists, on purpose: the
       // store identity has to be admitted and the development identity has to
       // be refused, and the only way to show that is to have both present.
-      MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS: STORE_EXTENSION_ID,
+      //
+      // The published identity is deliberately NOT among them: it is baked
+      // into the package, and the check below is that it is admitted without
+      // anybody naming it.
+      MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS: SELF_HOSTED_EXTENSION_ID,
       MAVIS_BROWSER_CHROME_EXTENSION_IDS: DEVELOPMENT_EXTENSION_ID,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -82,8 +108,16 @@ try {
   // configured. The bridge's own path is checked here, against the process
   // that was actually started, rather than against a bridge the test built
   // itself.
-  const admitted = await bridgeUpgrade(port, STORE_EXTENSION_ID);
-  if (!admitted) throw new Error("The installed WebUI refused the store extension identity");
+  // The published identity, the one the package was built for: it is
+  // admitted with nothing configured, because the package knows it.
+  const admittedPublished = await bridgeUpgrade(port, publishedId);
+  if (!admittedPublished) {
+    throw new Error("The installed WebUI refused the published extension identity it was built for");
+  }
+  // A self-hosted store build, named through the environment, is admitted
+  // alongside it.
+  const admitted = await bridgeUpgrade(port, SELF_HOSTED_EXTENSION_ID);
+  if (!admitted) throw new Error("The installed WebUI refused the store extension identity its environment named");
   const refused = await bridgeUpgrade(port, DEVELOPMENT_EXTENSION_ID);
   if (refused) throw new Error("The installed WebUI accepted a development extension identity");
   const exited = once(child, "exit");
@@ -99,6 +133,28 @@ try {
     await exited;
   }
   rmSync(work, { recursive: true, force: true });
+}
+
+/**
+ * The published extension identities a package carries.
+ *
+ * They are written into the package at package time, because they are a
+ * constant of the release rather than a property of the machine it is
+ * installed on. A package built without a store public key carries none, and
+ * its host then admits nobody.
+ */
+function readPublishedIds(file) {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (!parsed || typeof parsed !== "object") return {};
+    const ids = {};
+    for (const [surface, value] of Object.entries(parsed)) {
+      if (typeof value === "string" && /^[a-p]{32}$/.test(value)) ids[surface] = value;
+    }
+    return ids;
+  } catch {
+    return {};
+  }
 }
 
 /**

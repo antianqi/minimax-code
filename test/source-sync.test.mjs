@@ -22,6 +22,7 @@ import { compareRuns, exitCodeForStatus, renderReport, spread, validateRun, vali
 import { copyMcodeToolsArtifact, downloadMcodeToolsArtifact, MCODE_TOOLS_ARTIFACT } from '../scripts/lib/mcode-tools-artifact.mjs';
 import { checkWindowsSourceLocation, runWindowsSourceLocationCheck } from '../scripts/check-windows-source-location.mjs';
 import { recordBuildIntegrity, verifyBuildIntegrity } from '../scripts/lib/webui-build-integrity.mjs';
+import { extensionIdFromPublicKey, parseExtensionIdList, readStoreExtensionIds } from '../scripts/lib/extension-identity.mjs';
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
@@ -49,6 +50,33 @@ test('WebUI artifact integrity rejects changed sources, changed output and absen
   writeFileSync(source, 'export const value = 1');
   writeFileSync(output, 'const value = 2');
   assert.throws(() => verifyBuildIntegrity(root, metafile), /Stale or modified/);
+});
+
+// A fixed RSA public key, and the extension id a real Chromium assigned to a
+// build carrying it. The id was measured in the browser rather than taken
+// from a description of the algorithm, so this is a statement about what
+// browsers do rather than about what this repository believes.
+const MEASURED_PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnOhYRa1KUfkMMF25O1aGxrQTooncMH0Yt3CqWq1AcZNkZ5+ACczWCI9/BknmlyFIk1sRYt9fouhB/PEIeVu1TCW+1xq7zds7Trp7kdXl35YMR6yb98EGVmbVlgO1xTZOEBWaC1vhNLElJn16VVcozt5uMSePNQUPOogABfjIQCgpa44D9Bn77H6YovXgzphziIXZd9Z+F5akDfAZlsMtI7hYe/nNWSDvLPrIhc6pb0IZ/4gxIIkslgHaXxknc7Aj5Xfz0xkfkj5ccGfV6OYlgIs4JpjmzGRfoeyQxO4rSYTmYZXkMOtPSTkoGv7o2Ixs14B1pHm0PjHwbCR/svH7aQIDAQAB';
+const MEASURED_EXTENSION_ID = 'hjojgoodkakpameagdkbncgiegafaphh';
+
+test('a published extension id is the one a real browser assigned', () => {
+  // The derivation is what lets a packaged host know the published identity
+  // it admits without asking the person who installed it for it.
+  assert.equal(extensionIdFromPublicKey(MEASURED_PUBLIC_KEY), MEASURED_EXTENSION_ID);
+  assert.throws(() => extensionIdFromPublicKey(''), /missing/);
+  assert.throws(() => extensionIdFromPublicKey('!!!!'), /base64/);
+});
+
+test('the published identities a package carries come from the store public keys', () => {
+  assert.deepEqual(readStoreExtensionIds({}), {});
+  assert.deepEqual(
+    readStoreExtensionIds({ MAVIS_BROWSER_STORE_CHROME_PUBLIC_KEY: MEASURED_PUBLIC_KEY }),
+    { chrome: MEASURED_EXTENSION_ID },
+  );
+  // An allowlist variable holds a comma-separated list, and an empty one
+  // admits nobody rather than everybody.
+  assert.deepEqual(parseExtensionIdList(' A , b ,, '), ['a', 'b']);
+  assert.deepEqual(parseExtensionIdList(undefined), []);
 });
 
 test('WebUI exception ledgers require rationale, ownership and unique edges', () => {

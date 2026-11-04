@@ -295,6 +295,7 @@
       "packages/browser-extension/test/input.test.ts",
       "packages/browser-extension/test/cdp.test.ts",
       "packages/browser-extension/test/settings.test.ts",
+      "packages/browser-extension/test/extension-identity.test.ts",
       "packages/local-runtime/test/unit/channel-bridge-surface.test.ts"
     ],
     "status-contract": [

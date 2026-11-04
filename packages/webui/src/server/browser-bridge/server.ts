@@ -149,6 +149,22 @@ export interface BrowserBridgeServerOptions {
    * an unpacked build's id is derived from the directory it was loaded from.
    */
   readonly packaged?: boolean;
+  /**
+   * The extension identities this build was built for.
+   *
+   * A published extension's id is derived from the store's public key, so it
+   * is a constant of the release rather than a property of the machine the
+   * package is installed on. The packaged host is therefore built knowing the
+   * identity it admits, and the person who installs it configures nothing.
+   *
+   * The identities are unioned with the environment's and never replace them:
+   * the environment stays available for a self-hosted store build, and a
+   * published identity cannot be talked out of the allowlist by an
+   * environment variable.
+   */
+  readonly storeExtensionIds?: Readonly<
+    Partial<Record<WebuiBridgeBrowserSurface, readonly string[]>>
+  >;
 }
 
 /**
@@ -256,6 +272,22 @@ export function readAllowedExtensionIds(
   return new Set(ids);
 }
 
+/**
+ * The build-time identities of one surface, normalized.
+ *
+ * Lowercased and trimmed, because the browser reports an extension origin's
+ * id in lowercase and a comparison that missed on a capital letter would
+ * refuse an extension that is on the allowlist. An empty entry is dropped:
+ * an empty id is not an identity, and an allowlist that carried one would
+ * look configured while admitting nobody.
+ */
+function normalizeExtensionIds(ids: readonly string[] | undefined): readonly string[] {
+  if (!ids) return [];
+  return ids
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
 export class BrowserBridgeServer {
   /** The bridge's own WebSocket server. Never the WebUI's. */
   readonly server: WebSocketServer;
@@ -283,9 +315,12 @@ export class BrowserBridgeServer {
     const env = options.env ?? process.env;
     const pairings = new Map<WebuiBridgeBrowserSurface, BrowserBridgePairing>();
     for (const surface of WEBUI_BRIDGE_BROWSER_SURFACES) {
-      const allowedExtensionIds = readAllowedExtensionIds(surface, env, {
-        packaged: this.packaged,
-      });
+      const allowedExtensionIds = new Set([
+        ...readAllowedExtensionIds(surface, env, {
+          packaged: this.packaged,
+        }),
+        ...normalizeExtensionIds(options.storeExtensionIds?.[surface]),
+      ]);
       this.#allowedIds.set(surface, allowedExtensionIds);
       pairings.set(
         surface,

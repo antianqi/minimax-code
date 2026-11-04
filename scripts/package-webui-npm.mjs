@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readStoreExtensionIds } from "./lib/extension-identity.mjs";
 import { copyLocalRuntimeAssets } from "./lib/local-runtime-assets.mjs";
 import { copyMcodeToolsArtifact } from "./lib/mcode-tools-artifact.mjs";
 import { readExtraction } from "./lib/release-metadata.mjs";
@@ -137,6 +138,34 @@ cpSync(path.join(root, "THIRD_PARTY_NOTICES.md"), path.join(outdir, "THIRD_PARTY
 cpSync(path.join(root, "release/webui-npm/README.md"), path.join(outdir, "README.md"));
 cpSync(path.join(root, "release/webui-npm/bin"), path.join(outdir, "bin"), { recursive: true });
 cpSync(path.join(root, "release/webui-npm/package.json"), path.join(outdir, "package.json"));
+
+// The published extension this package is built for.
+//
+// A store build's identity is derived from the store's public key, so it is
+// a build-time constant: the id the browser will assign to the published
+// extension is known here, at package time, without asking the person who
+// installs the package. The id is written into the package so the packaged
+// host admits the published extension with no configuration at all.
+//
+// It was previously an environment variable instead, which asked the person
+// who installed the package to supply an identity the package already knew —
+// and which they had no way of learning, because it is a constant of the
+// release rather than a property of their machine.
+//
+// A missing public key leaves the package without a published identity, and
+// the packaged host then admits nothing. That is said out loud here rather
+// than left to be discovered by a refused connection.
+const storeExtensionIds = readStoreExtensionIds(process.env);
+writeFileSync(
+  path.join(outdir, "bin", "store-extension-ids.json"),
+  `${JSON.stringify(storeExtensionIds, null, 2)}\n`,
+  "utf8",
+);
+if (Object.keys(storeExtensionIds).length === 0) {
+  console.warn(
+    "[package-webui-npm] no store public key is in the environment, so the package carries no published extension identity; the packaged host will refuse every extension until one is provided.",
+  );
+}
 const packageJsonPath = path.join(outdir, "package.json");
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
 packageJson.version = version;

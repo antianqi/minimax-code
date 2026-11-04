@@ -65,8 +65,8 @@ and it is the current state of both composition roots:
 
 | Entry point | Line | `dev` | Bridge allowlist |
 | --- | --- | --- | --- |
-| `scripts/run-webui-server.mjs` | 56 | `dev: true` | development — `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
-| `release/webui-npm/bin/mcode-webui.mjs` | 48 | `dev: true` | **store** — `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
+| `scripts/run-webui-server.mjs` | 67 | `dev: true` | development — `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
+| `release/webui-npm/bin/mcode-webui.mjs` | 93 | `dev: true` | **store** — the published identity the package was built for, plus `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
 
 So on a packaged WebUI today, the generic path already accepts any upgrade that passes the loopback
 Host, URL-host and origin checks **without presenting the token at all**. ADR 0019 already records that
@@ -81,6 +81,20 @@ allowlist, because that is where the ids of unpacked builds belong. The distinct
 against a real browser in [`09-acceptance-record.md`](09-acceptance-record.md): the id a store build
 gets is the one its public key determines, a packaged host admits that id, and the same packaged host
 refuses it when the id is named only in the development allowlist.
+
+**The published identity is not configuration, and it is not asked of the person who installs the
+package.** A published extension's id is derived from the store's public key — the first 16 bytes of
+the key's SHA-256, rendered as hex and mapped onto `a`–`p` — and that derivation was measured
+against a real browser rather than assumed (`scripts/lib/extension-identity.mjs`, pinned by
+`test/source-sync.test.mjs` against an id a real Chromium assigned). The id is therefore a constant of
+the release, known at package time, and `scripts/package-webui-npm.mjs` writes it into the package as
+`bin/store-extension-ids.json`. The packaged entry reads that file and hands the identities to the
+bridge, which admits them alongside whatever the environment names.
+
+The consequence is the one that matters for a released product: **installing the published package
+requires no extension id, no environment variable and no restart with a hand-written setting.** The
+store allowlist variables remain for a self-hosted store build, and they add to the published
+identity rather than replacing it.
 
 **`implemented`: the bridge admission path never reads `dev`.** The pairing proof is verified
 unconditionally, and the browser switch is checked unconditionally. `admission.ts:135` holds an

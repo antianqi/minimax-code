@@ -69,10 +69,11 @@ identity the host does not know is refused:
 MAVIS_BROWSER_EDGE_EXTENSION_IDS=<extension-id> pnpm --filter @mavis/webui dev:server
 ```
 
-The id is on the extension's own card in `edge://extensions`. The packaged
-WebUI entry reads the **store** allowlist instead
+The extension's options page shows its own id and the exact setting line to
+copy, so the id never has to be read out of the browser's extension manager.
+The packaged WebUI entry reads the **store** allowlist instead
 (`MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`), and a locally loaded build is not
-on it.
+on it — a released package admits the published extension on its own.
 
 Then point the extension at the WebUI host. The extension cannot learn the
 host's address by itself, so an absent origin is reported rather than replaced
@@ -95,7 +96,11 @@ options*:
 - the **WebUI address**, which the options page checks against the same rule
   the client dials with (a loopback `http:` address, with no path);
 - the **installation key** from the WebUI's Settings page, which is
-  write-only: the page shows a fingerprint afterwards and never the key.
+  write-only: the page shows a fingerprint afterwards and never the key;
+- the **extension id** and the **development host setting** it belongs in,
+  which the page derives from the build it is: a published build says that the
+  released WebUI package already admits it, and a local build says which
+  variable has to carry its id.
 
 Saving either one wakes the worker, which re-reads the configuration and
 pairs with the host.
@@ -140,3 +145,12 @@ builds come from this one source package, and they are the same build:
 sources and adds the store's public key, which fixes the extension's identity
 so it is the identity the store issued rather than one derived from the
 directory it was loaded from.
+
+That key also makes the identity knowable in advance: an extension id is the
+first 16 bytes of the public key's SHA-256, rendered as hex and mapped onto
+`a`–`p`, so the id a published build is given can be derived from the key
+before the build is even submitted. The released WebUI package is built with
+the same key and therefore carries that id, which is why a person who
+installs the released package configures nothing: the bridge admits the
+published extension, and the allowlist environment variables stay available
+for a self-hosted store build.

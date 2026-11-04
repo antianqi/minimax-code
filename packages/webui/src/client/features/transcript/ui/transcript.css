@@ -625,6 +625,10 @@
 
   .webui-diff-header {
     display: flex;
+    /* The header is the card's one band: it fills the card's width rather
+     * than the width of what it happens to contain, so the hover fill is a
+     * full row instead of a patch that stops where the summary stops. */
+    width: 100%;
     align-items: center;
     gap: var(--spacing_12);
     min-height: 70px;
@@ -633,6 +637,13 @@
 
   .webui-diff-header:hover {
     background: var(--bg_interaction_secondary_default);
+  }
+
+  /* The divider separates the summary from the actions. On a filled header it
+   * would read as a slit cut through the fill, so it takes the fill's own
+   * colour and the hovered row reads as one surface. */
+  .webui-diff-header:hover .webui-diff-header-divider {
+    background: transparent;
   }
 
   .webui-diff-summary {

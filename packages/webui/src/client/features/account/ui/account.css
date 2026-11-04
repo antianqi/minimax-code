@@ -238,14 +238,6 @@
     min-height: 72px;
     padding: var(--spacing_8) 0;
   }
-  .webui-user-menu-usage-skeleton-row {
-    padding: var(--spacing_4) 0;
-    border-radius: var(--radius_8);
-  }
-  .webui-user-menu-usage-skeleton-line {
-    width: 100%;
-    min-width: 0;
-  }
 
   /* ---- Daily check-in card ----
    * The `.signin-*` rules and the `mavis-button` base are declared in this

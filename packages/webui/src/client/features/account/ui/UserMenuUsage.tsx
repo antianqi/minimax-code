@@ -14,7 +14,7 @@ import type {
 import { formatUsageResetLabel } from "../projection/usage.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiSkeleton } from "../../../ui/page.js";
+import { WebuiSkeletonGroup } from "../../../ui/page.js";
 import { WebuiFlyoutSurface } from "../../../ui/Dropdown.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 
@@ -25,26 +25,13 @@ export interface UsageState {
 }
 
 function UsageSkeleton({ loading }: { readonly loading?: boolean }): ReactElement {
-  const bars = () => (
-    <>
-      <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
-        <WebuiSkeleton />
-        <WebuiSkeleton />
-      </WebuiInline>
-      <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
-        <WebuiSkeleton />
-        <WebuiSkeleton />
-      </WebuiInline>
-    </>
-  );
   return (
     <WebuiStack
       gap="small"
       className="webui-user-menu-usage-skeleton"
       data-testid={loading ? "usage-popover-loading" : "usage-popover-pending"}
     >
-      <WebuiStack gap="small" className="webui-user-menu-usage-skeleton-row">{bars()}</WebuiStack>
-      <WebuiStack gap="small" className="webui-user-menu-usage-skeleton-row">{bars()}</WebuiStack>
+      <WebuiSkeletonGroup rows={8} />
     </WebuiStack>
   );
 }

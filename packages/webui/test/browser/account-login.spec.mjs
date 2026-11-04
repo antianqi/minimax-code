@@ -141,14 +141,16 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
   await expect(skeletons).toHaveCount(8);
   await expect.poll(() => skeletons.first().evaluate((element) => getComputedStyle(element).animationName))
     .toBe("webui-skeleton-pulse");
-  const loadingGeometry = await page.locator('[data-testid="usage-popover-loading"] .webui-user-menu-usage-skeleton-line').evaluateAll((rows) =>
-    rows.map((row) => Array.from(row.querySelectorAll(".webui-skeleton"), (element) => {
+  const loadingGeometry = await page.locator('[data-testid="usage-popover-loading"] .webui-skeleton-group > .webui-skeleton').evaluateAll((elements) =>
+    elements.map((element) => {
       const rect = element.getBoundingClientRect();
       return { width: rect.width, height: rect.height };
-    })),
+    }),
   );
-  expect(loadingGeometry.every((row) => row.length === 2 && row.every((shape) => shape.width >= 72 && shape.height === 28))).toBe(true);
-  expect(loadingGeometry.every((row) => row[0].width > row[1].width), JSON.stringify(loadingGeometry)).toBe(true);
+  expect(loadingGeometry).toHaveLength(8);
+  expect(loadingGeometry.every((shape) => shape.width >= 72 && shape.height === 28)).toBe(true);
+  expect(new Set(loadingGeometry.map((shape) => shape.width)).size).toBeGreaterThan(4);
+  expect(loadingGeometry.slice(1).some((shape, index) => shape.width > loadingGeometry[index].width)).toBe(true);
 
   await page.evaluate(() => window.__fixture.resolveAllPending("getUsageQuota", {}, { signedIn: false }));
   await expect(page.locator('[data-testid="usage-sign-in-button"]')).toBeVisible();

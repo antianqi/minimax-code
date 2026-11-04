@@ -3867,6 +3867,7 @@ function defaultCompatibility(
     },
     cron: {
       bindAgentCleanup: (service) => mocked.cleanupServices.push(service),
+      bindAgentToolService: vi.fn(),
       deleteAgentTasks: vi.fn(async () => undefined),
     },
     agentHost: {

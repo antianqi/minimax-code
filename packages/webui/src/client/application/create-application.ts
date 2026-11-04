@@ -882,7 +882,6 @@ export function createWebuiApplication(
   });
   const composerPluginCatalogue = createWebuiComposerPluginCatalogue({
     actions: createWebuiPluginActions(slices.plugins),
-    ...(slices.plugins.listSkills ? { listSkills: slices.plugins.listSkills } : {}),
   });
   /**
    * The agent a skill write was aimed at, or `undefined` for the runtime-wide

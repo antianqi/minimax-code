@@ -115,6 +115,24 @@ describe("plan-review workflow ownership", () => {
     expect(s.applyQuestionnaire).not.toHaveBeenCalled();
   });
 
+  it("keeps the Plan review visible when runtime approval processing fails", async () => {
+    const request = questionnaire() as WebuiQuestionnaireRequest;
+    const { c, s, st } = coordinator({
+      replyQuestionnaire: vi.fn().mockRejectedValue(
+        new Error("Questionnaire answer was saved, but the continuation could not start"),
+      ),
+    });
+    const workflow = createWebuiPlanReviewWorkflow({
+      answerQuestionnaire: c.answerQuestionnaire,
+    });
+
+    await expect(workflow.answerPlanBuild(request)).rejects.toThrow(
+      "Questionnaire answer was saved, but the continuation could not start",
+    );
+    expect(s.applyQuestionnaire).not.toHaveBeenCalled();
+    expect(st.markStreamPhase).not.toHaveBeenCalled();
+  });
+
   it("reports an unavailable questionnaire capability instead of accepting a no-op", async () => {
     const { c, s, st } = coordinator({});
     const workflow = createWebuiPlanReviewWorkflow({

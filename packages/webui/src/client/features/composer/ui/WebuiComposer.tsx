@@ -530,10 +530,10 @@ export function WebuiComposer({
   }, [composerMenu, mentionRange !== undefined, pluginCatalogue]);
 
   // The skills submenu and the slash palette render the same pool, so they read
-  // it through one loader. The request cache is the catalogue's, keyed by agent,
-  // rather than a ref in this component: a second reader joins the request the
-  // first one started instead of replacing the pool underneath it, and the
-  // composer no longer owns that lifetime.
+  // it through one loader. The request cache is the catalogue's, keyed by the
+  // read's scope, rather than a ref in this component: a second reader joins the
+  // request the first one started instead of replacing the pool underneath it,
+  // and the composer no longer owns that lifetime.
   const [slashSkills, setSlashSkills] = useState<readonly WebuiSlashSkillSummary[]>(
     [],
   );
@@ -541,8 +541,12 @@ export function WebuiComposer({
     readonly WebuiSlashSkillSummary[]
   > => {
     if (!pluginCatalogue) return Promise.reject(new Error("技能目录暂不可用"));
-    return pluginCatalogue.runtimeSkills(agentName);
-  }, [pluginCatalogue, agentName]);
+    // The roster is read for THIS session's agent and workspace. The runtime
+    // resolves a session's working directory from the session itself, so the
+    // session id is what brings the workspace's own skills into the roster;
+    // the agent names whose roster is read.
+    return pluginCatalogue.runtimeSkills({ agentName, sessionId });
+  }, [pluginCatalogue, agentName, sessionId]);
 
   useEffect(() => {
     if (composerMenu !== "skills") return;
@@ -677,29 +681,27 @@ export function WebuiComposer({
   // trims to "/name" and matches again.
   const commandRange = findWebuiSlashRange(draft, composerCaret);
   const commandQuery = commandRange?.query ?? "";
-  // Pull a fresh skill pool from the harness when the catalogue is wired up.
-  // The fallback (fixtures resolved at module init) keeps the popover
-  // functional even if the RPC is unavailable or rejects; once the live
-  // registry returns, fetched entries replace the fixtures in the sectioning
-  // pass.
-  const slashSkillsLoadedRef = useRef(false);
+  // Pull a fresh skill pool from the runtime roster when the catalogue is
+  // wired up. The fallback (fixtures resolved at module init) keeps the popover
+  // functional even if the read is unavailable or rejects; once the live roster
+  // returns, fetched entries replace the fixtures in the sectioning pass.
+  //
+  // The read is scoped, so it follows the scope: another session is another
+  // roster, and the old one goes rather than standing in for it. The pool is
+  // emptied first for the same reason — showing the previous session's skills
+  // under the new session's composer would be a lie.
   useEffect(() => {
     if (!pluginCatalogue) return;
-    if (slashSkillsLoadedRef.current) return;
     let cancelled = false;
-    slashSkillsLoadedRef.current = true;
+    setSlashSkills([]);
     readSlashSkills()
       .then((skills) => {
         if (cancelled) return;
         setSlashSkills(skills);
       })
       .catch(() => {
-        // The popover keeps using the fixtures when the RPC rejects; the
-        // submenu reports the failure in its own state. Clearing the flag lets
-        // the next effect run retry; within one mount that means an
-        // `agentName` change, not every keystroke.
-        if (cancelled) return;
-        slashSkillsLoadedRef.current = false;
+        // The popover keeps using the fixtures when the read rejects; the
+        // submenu reports the failure in its own state.
       });
     return () => {
       cancelled = true;
@@ -1181,6 +1183,7 @@ export function WebuiComposer({
                     mentionCount: mentionSuggestions.length,
                     commandRange,
                     commandCount: commandSuggestions.length,
+                    submitCommand: commandCanRun,
                     composerMenu,
                     permissionMenuOpen,
                     goalMode,

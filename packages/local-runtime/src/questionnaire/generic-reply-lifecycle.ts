@@ -101,17 +101,14 @@ export class QuestionnaireGenericReplyLifecycle {
         sessionId: record.sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
-      if (ownedAction) {
-        this.deps.onOwnedActionFailure?.(record.requestId);
-      } else {
-        throw new LocalQuestionnaireError(
-          503,
-          'QUESTIONNAIRE_CONTINUATION_NOT_STARTED',
-          `Questionnaire answer was saved, but the continuation could not start: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      }
+      if (ownedAction) this.deps.onOwnedActionFailure?.(record.requestId);
+      throw new LocalQuestionnaireError(
+        503,
+        'QUESTIONNAIRE_CONTINUATION_NOT_STARTED',
+        `Questionnaire answer was saved, but the continuation could not start: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
     if (completed && !completed.completed) {
       this.deps.emitBusEvent('questionnaire.inject_failed', {
@@ -122,6 +119,13 @@ export class QuestionnaireGenericReplyLifecycle {
       });
       if (ownedAction) {
         this.deps.onOwnedActionFailure?.(record.requestId);
+        throw new LocalQuestionnaireError(
+          completed.status ?? 503,
+          'QUESTIONNAIRE_CONTINUATION_NOT_STARTED',
+          `Questionnaire answer was saved, but the continuation could not start${
+            completed.status === undefined ? '.' : ` (HTTP ${String(completed.status)}).`
+          }${completed.error ? ` ${completed.error}` : ''}`,
+        );
       } else {
         throw new LocalQuestionnaireError(
           completed.status ?? 503,

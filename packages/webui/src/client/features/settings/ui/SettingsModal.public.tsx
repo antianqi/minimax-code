@@ -11,9 +11,9 @@
 // suffix is a publication marker; the dialog and the pages it mounts are
 // unchanged, and every other settings surface stays in the private sibling.
 
-import { Fragment, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
-import { WebuiSearchField, WebuiSelectMenu, WebuiTextInput } from "../../../ui/field.js";
+import { WebuiSearchField, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
@@ -79,24 +79,6 @@ function Icon({ name, size = 18 }: { readonly name: string; readonly size?: numb
 }
 function stored(key: string, fallback: string, storage: ReturnType<typeof useWebuiBrowserCapabilities>["storage"]): string {
   return storage.getItem(key) ?? fallback;
-}
-function Select({ value, onChange, disabled = false, wide = false, testId }: { readonly value: string; readonly onChange?: (value: string) => void; readonly disabled?: boolean; readonly wide?: boolean; readonly testId?: string }): ReactElement {
-  const labelId = useId();
-  return (
-    <WebuiInline inline className={`webui-ant-select${wide ? " is-wide" : ""}`} data-testid={testId}>
-      <span id={labelId} className="sr-only">{value}</span>
-      <WebuiSelectMenu
-        id={`${labelId}-control`}
-        labelId={labelId}
-        aria-label={value}
-        className="webui-control--dense h-full"
-        options={[{ value, label: value }]}
-        value={value}
-        disabled={disabled}
-        onChange={(nextValue) => onChange?.(nextValue)}
-      />
-    </WebuiInline>
-  );
 }
 
 /** Compatibility alias for the settings modal's capability surface.
@@ -358,15 +340,6 @@ function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contex
       <SettingsSection title="应用" testId="application-section">
         <Appearance theme={theme} setTheme={setTheme} />
       </SettingsSection>
-      <SettingsSection title="链接" testId="link-open-destination-section">
-        <SettingsRow title="网页链接打开位置" description="公开网页链接默认打开位置" testId="web-link-open-destination-row">
-          <Select value="内置浏览器" wide disabled testId="web-link-open-destination-row-select" />
-        </SettingsRow>
-        <SettingsDivider />
-        <SettingsRow title="本地链接打开位置" description="本地开发页面默认打开位置" testId="local-link-open-destination-row">
-          <Select value="内置浏览器" wide disabled testId="local-link-open-destination-row-select" />
-        </SettingsRow>
-      </SettingsSection>
       <SettingsSection title="文件" testId="file-section">
         <SettingsRow title="在新的标签页打开文件" description="关闭后，默认复用未固定的文件标签页；已固定的标签页会保留。" testId="file-open-in-new-tab-switch">
           <Switch checked={newTab} onChange={setNewTab} label="在新的标签页打开文件" />
@@ -387,14 +360,7 @@ function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contex
         </SettingsRow>
       </SettingsSection>
       <SettingsSection title="关于" testId="about-section">
-        <SettingsRow title="上传日志" description="上传日志以协助排查问题">
-          <Button disabled>上传</Button>
-        </SettingsRow>
-        <SettingsDivider />
         <SettingsRow title="应用版本" description={version}>
-          <Button variant="black" disabled>
-            检查更新
-          </Button>
         </SettingsRow>
       </SettingsSection>
     </SettingsPage>

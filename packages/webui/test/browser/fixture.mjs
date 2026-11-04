@@ -138,7 +138,23 @@ export function installFixtureTransport() {
   // one action at a time (`{action, input}`), so a test stages exactly the
   // listing it wants (an MCP server list with connection states, say) and
   // every other action keeps the empty default.
-  const pluginManagementResults = {};
+  const pluginManagementResults = {
+    // The composer's skill pool is the runtime ROSTER, which the composer
+    // reads through this facade's `listRuntimeSkills` action. One synthetic
+    // skill is enough for the palette to render a roster row; the management
+    // page reads `listManageableSkills`, which keeps its empty default.
+    listRuntimeSkills: {
+      skills: [
+        {
+          name: "fixture-skill",
+          description: "A synthetic roster skill.",
+          sourceKind: "user",
+          sourceType: 2,
+          enabled: true,
+        },
+      ],
+    },
+  };
   // Account login state machine for the three login operations. `begin`
   // starts "pending" with a deterministic prompt; a test flips the state
   // (authenticated / error) with setAccountLoginState to drive the dialog's

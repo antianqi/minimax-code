@@ -64,10 +64,13 @@ plugin works in WebUI.
 | 12 | `deleteSkill` | owner; `ui/PluginManagementList.tsx` | `plugins` |
 | 13 | `installSkill` | owner; `ui/PluginMarketplace.tsx` | `plugins` |
 | 14 | `createSkill` | owner; `ui/SkillForm.tsx` | `plugins` |
-| 15 | `listRuntimeSkills` | **no client caller** — see below | `plugins`, with no surface to build |
+| 15 | `listRuntimeSkills` | composer catalogue; `features/plugins/application/composer-catalogue.ts` | `plugins` |
 
 The personal skill list is read through `listManageableSkills` on purpose: the runtime skill list
 excludes disabled entries, and the management list must include them so one can be turned back on.
+
+The composer's roster is read through `listRuntimeSkills`, which is a different list: it is what
+the agent can run, and it carries the plugin skills and the workspace's own skills.
 
 ### Surface `apps` — the mini-app catalogue (1)
 
@@ -98,15 +101,20 @@ excludes disabled entries, and the management list must include them so one can 
 | 28 | `updateAgent` | owner; `ui/AgentForm.tsx` | `plugins` |
 | 29 | `deleteAgent` | owner; `ui/PluginCatalogue.tsx` | `plugins` — capability |
 
-**All 29 actions belong to `plugins`.** Exactly one (`listRuntimeSkills`) has no client surface.
+**All 29 actions belong to `plugins`.** Every one has a client caller.
 
 ## Two facts worth keeping
 
-**`listRuntimeSkills` has no client caller and no surface should be built for it.** It appears on no
-client module — only as a union value and a server validator entry. The composer's slash palette does
-not use it; the palette's reads are `listSkills` (through the `plugins` port) and
-`listInstalledPlugins`. The suite asserts that this action is the only one the owner does not
-dispatch, so adding a caller for it fails the suite until this file says so.
+**`listRuntimeSkills` is the composer's roster read, and it is not the management list.** The
+runtime keeps two skill lists: the roster (`listRuntimeSkills`), which is what a turn can load and
+which carries the plugin skills and the workspace's own skills, and the management catalogue
+(`listManageableSkills`), which is paged, user-facing, and stops at the first page. The composer's
+slash palette shows the roster, the way the Desktop palette does — reading the management catalogue
+there offered a fraction of the skills, and none of the plugin ones.
+
+The action is dispatched by the composer-facing read model
+(`features/plugins/application/composer-catalogue.ts`) rather than by the owner module, so the
+suite asserts that it is the one action the owner does not dispatch and that the catalogue does.
 
 **Agent administration is a capability inside `plugins`, not a thirteenth business.** The six
 `agents` actions are one tab of the same page, reached from one rail row, held by the same owner

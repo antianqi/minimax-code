@@ -280,7 +280,11 @@ export function WebuiActivityGroup({
     const status = toolCallStatus(tool);
     return status === "pending" || status === "running";
   });
-  const [expanded, setExpanded] = useState(initiallyExpanded);
+  // The reader's own choice outranks the running default, for the same reason
+  // as the turn process: a tool that keeps running must not keep folding the
+  // reader's timeline back open.
+  const [readerChoice, setReaderChoice] = useState<boolean | undefined>(undefined);
+  const open = readerChoice ?? (active || initiallyExpanded);
   const disclosureId = useId();
   if (tools.length === 0) return null;
   const thinkingCount = activityItems?.filter((item) => item.type === "thinking").length ?? 0;
@@ -317,18 +321,18 @@ export function WebuiActivityGroup({
       <WebuiButton
         variant="plain"
         size="regular"
-        className={`activity-group-header${active || expanded ? " is-open" : ""}`}
-        aria-expanded={active || expanded}
+        className={`activity-group-header${open ? " is-open" : ""}`}
+        aria-expanded={open}
         aria-controls={disclosureId}
-        onClick={() => { if (!active) setExpanded((value) => !value); }}
+        onClick={() => setReaderChoice(!open)}
       >
         <span className="activity-group-icon" data-webui-activity-icon-category={iconCategory} aria-hidden="true"><WebuiToolIcon category={iconCategory} /></span>
         <span className="activity-group-summary">{summary}</span>
-        <WebuiMotionSlot kind="disclosure-transform" rotation={active || expanded ? 90 : 0}>
+        <WebuiMotionSlot kind="disclosure-transform" rotation={open ? 90 : 0}>
           <WebuiIconChevronDown className="activity-group-chevron" />
         </WebuiMotionSlot>
       </WebuiButton>
-      <WebuiDisclosure id={disclosureId} open={active || expanded} className="activity-group-disclosure">
+      <WebuiDisclosure id={disclosureId} open={open} className="activity-group-disclosure">
         <div className="activity-group-body">
           <span className="timeline-spine" aria-hidden="true" />
           <div className="activity-group-items">
@@ -392,15 +396,25 @@ export function WebuiTurnProcess({
   /** Render one live thinking indicator after the complete turn content. */
   readonly showLiveActivity?: boolean;
 }): ReactElement {
+  // The reader's own choice outranks the live default. A live turn opens its
+  // process by itself, but a reader who folds the reasoning away keeps it
+  // folded: the turn keeps streaming, and the stream must not keep folding the
+  // process back open under the reader's hand.
   const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [readerChoice, setReaderChoice] = useState<boolean | undefined>(undefined);
   const disclosureId = useId();
   const wasActive = useRef(active);
   useEffect(() => {
-    if (wasActive.current && !active) setExpanded(false);
+    // A settled turn folds its process away again: the answer is what the
+    // reader came for, and the choice made during the turn goes with it.
+    if (wasActive.current && !active) {
+      setExpanded(false);
+      setReaderChoice(undefined);
+    }
     wasActive.current = active;
   }, [active]);
   const canToggle = hasExpandableContent && !forceExpanded && !disabled;
-  const contentExpanded = forceExpanded || disabled || active || expanded;
+  const contentExpanded = forceExpanded || disabled || (readerChoice ?? (active || expanded));
   const [, forceTick] = useState(0);
   useEffect(() => {
     if (!active) return undefined;
@@ -466,7 +480,7 @@ export function WebuiTurnProcess({
             aria-controls={disclosureId}
             data-testid="turn-process-trigger"
             data-summary-text={summary}
-            onClick={() => setExpanded((value) => !value)}
+            onClick={() => setReaderChoice(!contentExpanded)}
           >
             <span data-testid="turn-process-summary-text">{summary}</span>
             <WebuiMotionSlot kind="disclosure-transform" rotation={contentExpanded ? 90 : 0}>
@@ -542,7 +556,12 @@ export function WebuiThinkingBlock({
   readonly initiallyExpanded?: boolean;
 }): ReactElement | null {
   const [, forceTick] = useState(0);
-  const [detailOpen, setDetailOpen] = useState(initiallyExpanded);
+  // The reader's own choice outranks the streaming default. While the turn
+  // streams, the reasoning opens by itself; a reader who folds it away keeps it
+  // folded, because a turn that keeps folding the reasoning back open cannot be
+  // read next to the answer.
+  const [readerChoice, setReaderChoice] = useState<boolean | undefined>(undefined);
+  const open = readerChoice ?? (streaming || initiallyExpanded);
   const disclosureId = useId();
   const [contentExpanded, setContentExpanded] = useState(false);
   const [contentOverflows, setContentOverflows] = useState(false);
@@ -555,7 +574,7 @@ export function WebuiThinkingBlock({
   }, [streaming, showStreamingStatus]);
   useEffect(() => {
     const content = contentRef.current;
-    if (!detailOpen || !content) return undefined;
+    if (!open || !content) return undefined;
     const measure = () => {
       setContentHeight(content.scrollHeight);
       setContentOverflows(content.scrollHeight > 224);
@@ -565,7 +584,7 @@ export function WebuiThinkingBlock({
     const observer = new ResizeObserver(measure);
     observer.observe(content);
     return () => observer.disconnect();
-  }, [detailOpen, text]);
+  }, [open, text]);
   if (!text.trim()) return null;
   // `think-container`: a pulse dot + 推理中... with a live-second
   // counter while streaming, collapsing to 已完成推理 + total seconds.
@@ -581,11 +600,11 @@ export function WebuiThinkingBlock({
       <WebuiButton
         variant="plain"
         size="regular"
-        className={`webui-thinking-summary${streaming || detailOpen ? " is-open" : ""}`}
+        className={`webui-thinking-summary${open ? " is-open" : ""}`}
         data-webui-thinking="true"
-        aria-expanded={streaming || detailOpen}
+        aria-expanded={open}
         aria-controls={disclosureId}
-        onClick={() => { if (!streaming) setDetailOpen((value) => !value); }}
+        onClick={() => setReaderChoice(!open)}
       >
         {summaryLabel === "思考过程" ? (
           <span className="webui-tool-icon webui-tool-icon--thinking" aria-hidden="true"><WebuiToolIcon category="thinking" /></span>
@@ -594,11 +613,11 @@ export function WebuiThinkingBlock({
         {!streaming && typeof elapsed === "number" && elapsed >= 1 ? (
           <span className="webui-thinking-elapsed">{elapsed}s</span>
         ) : null}
-        <WebuiMotionSlot kind="disclosure-transform" rotation={streaming || detailOpen ? 180 : 0}>
+        <WebuiMotionSlot kind="disclosure-transform" rotation={open ? 180 : 0}>
           <WebuiIconChevronDown className="webui-thinking-chevron" />
         </WebuiMotionSlot>
       </WebuiButton>
-      <WebuiDisclosure id={disclosureId} open={streaming || detailOpen} className="webui-thinking-disclosure">
+      <WebuiDisclosure id={disclosureId} open={open} className="webui-thinking-disclosure">
         <div className="webui-thinking-detail">
           {showDetailHeading ? (
             <div className="webui-thinking-detail-heading">

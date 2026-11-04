@@ -89,6 +89,59 @@ test("an agent turn streams thinking and answer, then settles on DONE", async ({
   await expect(page.locator('[data-webui-message-kind="assistant"]')).toHaveCount(1);
 });
 
+test("the reasoning can be folded away while the turn is still streaming", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await startTurn(page, "A", "Run the synthetic turn");
+  await emitAgentMessage(page, "A", {
+    msg_id: "a-fold-1",
+    thinking_content: "Synthetic reasoning",
+    msg_content: "Synthetic answer",
+  });
+
+  // The reasoning opens by itself while the turn streams.
+  const reasoning = page.locator('[data-webui-thinking="true"]').first();
+  await expect(reasoning).toBeVisible();
+  await expect(reasoning).toHaveAttribute("aria-expanded", "true");
+
+  // The reader folds it away, and it stays folded: the turn keeps streaming, and
+  // the stream must not keep folding the reasoning back open under the reader's
+  // hand.
+  await reasoning.click();
+  await expect(reasoning).toHaveAttribute("aria-expanded", "false");
+  await emitStream(page, "A", {
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: { msg_id: "a-fold-1", thinking_content: " and more reasoning" },
+    }),
+  });
+  await expect(reasoning).toHaveAttribute("aria-expanded", "false");
+  // The turn is still running: the live pulse says so.
+  await expect(livePulse(page)).toHaveCount(1);
+
+  // And the reader can open it again.
+  await reasoning.click();
+  await expect(reasoning).toHaveAttribute("aria-expanded", "true");
+});
+
+test("the turn process can be folded away while the turn is still streaming", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await startTurn(page, "A", "Run the synthetic turn");
+  await emitAgentMessage(page, "A", {
+    msg_id: "a-fold-2",
+    thinking_content: "Synthetic reasoning",
+    msg_content: "Synthetic answer",
+  });
+
+  const process = page.locator('[data-testid="turn-process-trigger"]').first();
+  await expect(process).toHaveAttribute("aria-expanded", "true");
+  await process.click();
+  await expect(process).toHaveAttribute("aria-expanded", "false");
+  // The live turn is unaffected: it keeps running and keeps reporting itself.
+  await expect(livePulse(page)).toHaveCount(1);
+  await process.click();
+  await expect(process).toHaveAttribute("aria-expanded", "true");
+});
+
 test("a server-initiated turn attaches a stream instead of hanging on 思考中", async ({ page }) => {
   await openApp(page, "#session=A");
   // The goal flow posts a hidden continuation prompt, a queued message

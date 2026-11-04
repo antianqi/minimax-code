@@ -16,6 +16,7 @@ import {
   PluginRowIcon,
   PluginRowList,
 } from "../../plugins/ui/PluginRow.public.js";
+import { webuiPluginIconSource } from "./PluginIconSource.public.js";
 
 export type PluginManagementArea =
   "plugins" | "skills" | "apps" | "mcp" | "agents";
@@ -120,6 +121,7 @@ export function PluginManagementList({
         {rows.map((row, index) => {
           const item = row.source;
           const name = row.name || `item-${index}`;
+          const iconSource = webuiPluginIconSource(row.iconUrl);
           const isOn = row.enabled;
           const pluginIntent = (
             kind: "installPlugin" | "enablePlugin" | "disablePlugin",
@@ -143,10 +145,10 @@ export function PluginManagementList({
                   <span className="webui-plugin-skill-icon-tile">
                     <IconFileCode aria-hidden="true" size={22} stroke={1.5} />
                   </span>
-                ) : row.iconUrl ? (
+                ) : iconSource ? (
                   <>
                     <img
-                      src={row.iconUrl}
+                      src={iconSource}
                       alt=""
                       loading="lazy"
                       onError={(event) => {

@@ -454,6 +454,11 @@ async function expectMobileDialog(dialog, page, fieldsSelector) {
 }
 
 test("plugin marketplace keeps its card grid and expand/collapse count", async ({ page }, testInfo) => {
+  await page.route("**/workspace-file?*", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/svg+xml",
+    body: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"red\"/></svg>",
+  }));
   await page.addInitScript(() => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
     window.__WEBUI_FIXTURE_SETUP__.push(() => {
@@ -463,11 +468,17 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
           name: `market-plugin-${index + 1}`,
           displayName: `Market plugin ${index + 1}`,
           description: "Marketplace card",
+          ...(index === 0 ? { icon_url: "/mavis/api/file/preview?path=%2Fplugins%2Fmarket-plugin-1%2Ficon.svg" } : {}),
           ...(index === 0 ? { installed: true } : {}),
         })),
       });
       window.__fixture.setPluginManagementResult("listInstalledPlugins", {
-        plugins: [],
+        plugins: [{
+          name: "market-plugin-1",
+          displayName: "Market plugin 1",
+          description: "Installed plugin",
+          enabled: true,
+        }],
       });
     });
   });
@@ -478,6 +489,9 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   const cards = page.locator('[data-plugin-category-section="featured"] .webui-plugin-grid .webui-plugin-row');
   await expect(cards).toHaveCount(10);
   await expect(cards.nth(9)).toBeVisible();
+  const icon = cards.first().locator("img");
+  await expect(icon).toHaveAttribute("src", /\/workspace-file\?token=synthetic-token&dir=%2Fplugins%2Fmarket-plugin-1&path=icon\.svg/u);
+  await expect.poll(() => icon.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
   await expect(page.getByRole("heading", { name: "精选" }).last()).toBeVisible();
   const installedActionInset = await cards.first().getByRole("button", { name: "已安装" }).evaluate((button) => {
     const row = button.closest(".webui-plugin-row");
@@ -498,6 +512,7 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
   const expandedList = page.getByTestId("webui-plugin-expanded-list");
   await expect(expandedList).toHaveAttribute("aria-hidden", "true");
   await expect.poll(() => expandedList.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
+
   await expect(page.getByRole("button", { name: "查看全部 10 个" })).toBeVisible();
   const showAllGeometry = await page.getByRole("button", { name: "查看全部 10 个" }).evaluate((button) => {
     const container = button.closest(".webui-plugin-page-content");
@@ -534,6 +549,11 @@ test("plugin marketplace keeps its card grid and expand/collapse count", async (
     expect(Math.abs(preview.left - expanded.left), "expanded cards keep the preview column alignment").toBeLessThan(8);
     expect(Math.abs(preview.width - expanded.width), "expanded cards keep the preview column width").toBeLessThan(8);
   }
+
+  await page.getByTestId("plugin-manage-trigger").click();
+  const installedIcon = page.locator(".webui-plugin-management.is-managing .webui-plugin-list img").first();
+  await expect(installedIcon).toHaveAttribute("src", /\/workspace-file\?token=synthetic-token&dir=%2Fplugins%2Fmarket-plugin-1&path=icon\.svg/u);
+  await expect.poll(() => installedIcon.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
 });
 
 test("Skill add form is centered, usable and submits through plugin management", async ({ page }) => {

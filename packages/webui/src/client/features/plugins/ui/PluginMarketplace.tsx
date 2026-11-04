@@ -14,6 +14,7 @@ import {
   PluginRowIcon,
   PluginRowList,
 } from "../../plugins/ui/PluginRow.public.js";
+import { webuiPluginIconSource } from "./PluginIconSource.public.js";
 
 const MARKET_PREVIEW_COUNT = 8;
 const categoryDefinitions: readonly { value: number; label: string }[] = [
@@ -76,6 +77,7 @@ function PluginMarketCard({
 }): ReactElement {
   const item = row.source;
   const name = row.name || `item-${index}`;
+  const iconSource = webuiPluginIconSource(row.iconUrl);
   const pluginIntent = (
     kind: "installPlugin" | "enablePlugin" | "disablePlugin",
   ): WebuiPluginIntent => ({
@@ -95,10 +97,10 @@ function PluginMarketCard({
           <span className="webui-plugin-skill-icon-tile">
             <IconFileCode aria-hidden="true" size={22} stroke={1.5} />
           </span>
-        ) : row.iconUrl ? (
+        ) : iconSource ? (
           <>
             <img
-              src={row.iconUrl}
+              src={iconSource}
               alt=""
               loading="lazy"
               onError={(event) => {

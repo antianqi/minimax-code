@@ -1,7 +1,9 @@
 // Slash palette for the composer hinting model.
 //
 // Uses three data pools (built-in commands, the plugin
-// registry, and the skills resolver), sectioning, and four-rank filtering.
+// registry, and the skills resolver), sectioning, and ranked filtering (exact,
+// prefix, substring, then a subsequence pass so a shortened query still finds
+// its row).
 // The built-in list covers the composer modes plus every name the harness
 // port's `runCommand` accepts; behavior fields keep the same record shape.
 //
@@ -280,15 +282,21 @@ export const WEBUI_SKILL_FIXTURES: readonly SlashCommandEntry[] = [
 ];
 
 /**
- * Minimal projection of the harness `SkillInfo` the slash palette needs.
- * Mirrors `WebuiSkillEntry` from the server side: the harness ships only
- * these three fields so the popover can render without dragging the full
- * `SkillInfo` shape across the websocket.
+ * Minimal projection of the runtime roster's `SkillInfo` the slash palette
+ * needs. The roster ships only these fields, so the popover can render without
+ * dragging the full `SkillInfo` shape across the websocket.
+ *
+ * `sourceKind` and `sourceType` are the runtime's own: they say where the
+ * skill came from, and the palette's display rules read them. `enabled` says
+ * whether the skill is turned off — a turned-off skill is not offered.
  */
 export interface WebuiSlashSkillSummary {
   readonly name: string;
   readonly displayName?: string;
   readonly description?: string;
+  readonly enabled?: boolean;
+  readonly sourceKind?: string;
+  readonly sourceType?: number;
 }
 
 /**
@@ -387,15 +395,27 @@ async function resolveSkillEntries(
 export function slashSkillSummaryToEntry(
   skill: WebuiSlashSkillSummary,
 ): SlashCommandEntry {
-  const displayName = skill.displayName?.trim() || skill.name;
+  const name = skill.name;
+  // The palette shows the skill's NAME — the token the user types — and not
+  // the runtime's display name, the way the Desktop palette does. A built-in
+  // skill the runtime prefixes with the agent's own name loses that prefix
+  // ("mavis-doctor" reads as "doctor"), because the prefix names the owner and
+  // not the skill. A plugin skill keeps its namespaced name: that is the token
+  // its plugin answers to.
+  const displayName =
+    skill.sourceKind !== "plugin" &&
+    skill.sourceType === 1 &&
+    name.startsWith("mavis-")
+      ? name.slice("mavis-".length)
+      : name;
   return {
-    name: skill.name,
+    name,
     displayName,
     label: displayName,
     description: skill.description ?? "",
     source_type: 1,
-    source_kind: "plugin",
-    icon: iconForSkillName(skill.name),
+    ...(skill.sourceKind ? { source_kind: skill.sourceKind } : {}),
+    icon: iconForSkillName(name),
     paletteSection: "skills",
     supported: true,
   };

@@ -58,13 +58,17 @@ export interface WebuiComposerControllerDeps {
 
 const HOME_KEY = WEBUI_COMPOSER_HOME_KEY;
 
+interface CommandState {
+  readonly running: boolean;
+  readonly name?: string;
+  readonly output?: string;
+}
+
 /** Application coordinator for the existing composer store and owners. */
 export function createWebuiComposerController(deps: WebuiComposerControllerDeps): WebuiComposerController {
-  let commandRunning = false;
-  let commandName: string | undefined;
+  const commandsBySession = new Map<string, CommandState>();
   let goalSubmitting = false;
   let interactionError: string | undefined;
-  let commandOutput: string | undefined;
   let inspectionSessionId: string | undefined;
   let createdSession: WebuiComposerControllerSnapshot["createdSession"];
   let viewGeneration = 0;
@@ -74,13 +78,14 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
   let snapshot: WebuiComposerControllerSnapshot;
 
   const publish = (): void => {
+    const commandState = commandsBySession.get(inspectionSessionId ?? HOME_KEY);
     snapshot = {
       composer: deps.store.getSnapshot(),
-      commandRunning,
-      ...(commandName === undefined ? {} : { commandName }),
+      commandRunning: commandState?.running ?? false,
+      ...(commandState?.name === undefined ? {} : { commandName: commandState.name }),
+      ...(commandState?.output === undefined ? {} : { commandOutput: commandState.output }),
       goalSubmitting,
       ...(interactionError === undefined ? {} : { interactionError }),
-      ...(commandOutput === undefined ? {} : { commandOutput }),
       ...(inspectionSessionId === undefined ? {} : { inspectionSessionId }),
       canCompose: deps.canSend,
       canQueue: deps.canEnqueue && deps.readSelectedSessionId() !== undefined,
@@ -185,7 +190,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
 
   snapshot = {
     composer: deps.store.getSnapshot(),
-    commandRunning,
+    commandRunning: false,
     goalSubmitting,
     canCompose: deps.canSend,
     canQueue: deps.canEnqueue && deps.readSelectedSessionId() !== undefined,
@@ -204,8 +209,12 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     submit: async (input) => {
       if (disposed) return { kind: "ignored" };
       interactionError = undefined;
-      commandOutput = undefined;
       const sessionId = deps.readSelectedSessionId();
+      const sessionKey = sessionId ?? HOME_KEY;
+      const previousCommand = commandsBySession.get(sessionKey);
+      if (previousCommand?.output !== undefined) {
+        commandsBySession.set(sessionKey, { running: previousCommand.running, ...(previousCommand.name ? { name: previousCommand.name } : {}) });
+      }
       const intent = resolveWebuiSubmissionIntent({
         draft: input.draft,
         commandMatch: input.commandMatch,
@@ -272,8 +281,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       if (resolved.kind === "run-command") {
         if (!deps.commandWorkflows.canRunCommand) return { kind: "ignored" };
         const captured = captureInput();
-        commandRunning = true;
-        commandName = resolved.command.name;
+        commandsBySession.set(sessionKey, { running: true, name: resolved.command.name });
         publish();
         try {
           const request: WebuiRunCommandRequest = {
@@ -285,7 +293,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           };
           const result = await deps.commandWorkflows.runCommand(request);
           const output = typeof result.output === "string" ? result.output : JSON.stringify(result.data ?? result, null, 2);
-          commandOutput = output;
+          commandsBySession.set(sessionKey, { running: true, name: resolved.command.name, output });
           consumeDraft(captured);
           publish();
           return { kind: "command-completed", output };
@@ -294,8 +302,11 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           publish();
           return { kind: "failed", error: interactionError };
         } finally {
-          commandRunning = false;
-          commandName = undefined;
+          const commandState = commandsBySession.get(sessionKey);
+          commandsBySession.set(sessionKey, {
+            running: false,
+            ...(commandState?.output === undefined ? {} : { output: commandState.output }),
+          });
           publish();
         }
       }

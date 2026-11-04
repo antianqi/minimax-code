@@ -7,6 +7,11 @@
 // stop being followed. The first case is the one that fails when the follower is
 // gone; the second pins the other half of the policy (a gesture the viewport can
 // answer releases it, and nothing re-arms it until the reader returns to the end).
+//
+// The third case is the one the reader actually hits: a wheel over a live turn.
+// The follower used to answer the wheel from the scroll event that follows it,
+// and the browser runs that event after the pin has already dragged the viewport
+// back to the end — so the gesture was undone by the turn it happened in.
 
 import { expect } from "@playwright/test";
 
@@ -29,6 +34,12 @@ async function setScrollTop(page, value) {
 }
 
 /** One assistant chunk with its own message id, so the transcript grows. */
+async function wheelOverViewport(page, deltaY) {
+  const box = await page.locator(VIEWPORT).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, deltaY);
+}
+
 async function grow(page, msgId, lines = 24) {
   await emitStream(page, "A", {
     dataJson: JSON.stringify({
@@ -45,9 +56,8 @@ async function grow(page, msgId, lines = 24) {
 async function scrollableLiveTranscript(page) {
   await openApp(page);
   await startTurn(page, "A", "hello");
-  // Several messages, and a viewport deep enough to have a middle: the follower's
-  // threshold is 150px, so a barely-scrollable transcript cannot express "the
-  // reader is away from the end".
+  // Several messages, and a viewport deep enough to have a middle: a barely
+  // scrollable transcript cannot express "the reader is away from the end".
   for (const msgId of ["seed-1", "seed-2", "seed-3", "seed-4"]) {
     await grow(page, msgId, 40);
   }
@@ -100,12 +110,45 @@ test("the follower pins again once the reader is back at the end", async ({ page
   await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
   // Let the scroll this assignment produced be processed BEFORE the content
   // grows. Otherwise the browser may deliver it after the growth, when the
-  // viewport is no longer at the end, and the still-set gesture intent releases
-  // the follower — a race in the case, not in the policy, and one this wait
-  // removes.
+  // viewport is no longer at the end, and the walk back is not read as a walk
+  // back — a race in the case, not in the policy, and one this wait removes.
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
+  await grow(page, "m2", 40);
+  await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
+});
+
+test("a wheel over a live turn keeps the reader's position", async ({ page }) => {
+  await scrollableLiveTranscript(page);
+  await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
+
+  // A real wheel over the transcript: the browser scrolls the viewport, and the
+  // turn keeps streaming underneath the reader.
+  await wheelOverViewport(page, -120);
+  await expect.poll(() => endGap(page)).toBeGreaterThan(50);
+  const held = await scrollTop(page);
+  const gapBefore = await endGap(page);
+
+  // The next chunk arrives. The follower must not take the viewport back: the
+  // reader's position is where the reader put it.
+  await grow(page, "m2", 40);
+  await expect.poll(() => endGap(page)).toBeGreaterThan(gapBefore + 200);
+  expect(Math.abs((await scrollTop(page)) - held)).toBeLessThanOrEqual(8);
+});
+
+test("the follower takes over again once the reader walks back to the end", async ({ page }) => {
+  await scrollableLiveTranscript(page);
+  await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
+
+  await wheelOverViewport(page, -120);
+  await expect.poll(() => endGap(page)).toBeGreaterThan(50);
+
+  // The reader walks back down to the newest content.
+  await wheelOverViewport(page, 4000);
+  await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
+
+  // The turn keeps streaming, and the end stays in view.
   await grow(page, "m2", 40);
   await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
 });

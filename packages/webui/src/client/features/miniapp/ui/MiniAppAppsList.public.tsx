@@ -24,6 +24,7 @@ import {
   type WebuiMiniAppRow,
 } from "../projection/miniapp-view.js";
 import { readWebuiPluginRow } from "../../plugins/contracts/plugin-rows.js";
+import { webuiPluginIconSource } from "../../plugins/ui/PluginIconSource.public.js";
 import { FeedbackBusy } from "../../../ui/feedback.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
@@ -186,6 +187,7 @@ export function MiniAppAppsList({
         ) : null}
         <PluginRowList>
           {listingRows.map((item) => {
+            const iconSource = webuiPluginIconSource(item.iconUrl);
             const row = item.runtime;
             const refusal = row ? state.refusals[row.pluginId] : undefined;
             const opened = row ? state.presentations[row.pluginId] : undefined;
@@ -202,10 +204,10 @@ export function MiniAppAppsList({
                 testId={`miniapp-app-${item.pluginId}`}
               >
                 <PluginRowIcon>
-                  {item.iconUrl ? (
+                  {iconSource ? (
                     <>
                       <img
-                        src={item.iconUrl}
+                        src={iconSource}
                         alt=""
                         loading="lazy"
                         onError={(event) => {

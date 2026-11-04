@@ -33,10 +33,20 @@ export interface WebuiComposerPluginCatalogue {
   readonly installedPlugins: () => Promise<readonly WebuiComposerPluginSummary[]>;
   /**
    * The runtime skills the slash palette and the skills submenu render from.
-   * Keyed by agent, because the runtime answers per agent.
+   *
+   * This is the runtime ROSTER — the skills the agent can actually run — and
+   * not the management catalogue. The two are different lists in the runtime:
+   * the roster is what a turn can load (it carries the plugin skills and the
+   * workspace's own skills), while the management catalogue is the paged,
+   * user-facing list of what is installed. The slash palette shows the roster,
+   * the way the Desktop palette does.
+   *
+   * The scope is the roster's own: the agent names which roster is read, and
+   * the session names the workspace the roster is read for, because the
+   * runtime resolves a session's working directory from the session itself.
    */
   readonly runtimeSkills: (
-    agentName?: string,
+    scope?: WebuiComposerSkillScope,
   ) => Promise<readonly WebuiComposerSkillSummary[]>;
   /**
    * The installed-plugin read is stale. Every slot goes, because a plugin write
@@ -47,8 +57,25 @@ export interface WebuiComposerPluginCatalogue {
    * One agent's skill read is stale. Slots for other agents survive: a plugin
    * write does not answer a different agent's runtime, so re-reading them would
    * cost a round trip to learn nothing.
+   *
+   * A write that names no agent cannot be attributed to one, so every slot
+   * goes in that case: the default agent's roster may have changed, and the
+   * runtime-wide slot is the one that reads it.
    */
   readonly invalidateSkills: (agentName?: string) => void;
+}
+
+/**
+ * What a roster read is scoped by.
+ *
+ * The agent names whose skills are read; the session names the workspace they
+ * are read for. The workspace may also be given on its own, for a read that
+ * has no session yet (the home composer).
+ */
+export interface WebuiComposerSkillScope {
+  readonly agentName?: string;
+  readonly sessionId?: string;
+  readonly workspaceDir?: string;
 }
 
 /** One runtime skill, as the slash palette and the skills submenu need it. */
@@ -56,4 +83,10 @@ export interface WebuiComposerSkillSummary {
   readonly name: string;
   readonly displayName?: string;
   readonly description?: string;
+  /** False when the skill is turned off. A turned-off skill is not offered. */
+  readonly enabled?: boolean;
+  /** The runtime's own kind: "user", "global", "builtin-…", "plugin". */
+  readonly sourceKind?: string;
+  /** The runtime's own source type. 1 is built in, 2 is the user's own. */
+  readonly sourceType?: number;
 }

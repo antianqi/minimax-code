@@ -13,6 +13,13 @@
 //     showed and the skills the plugin manager listed were two unrelated
 //     requests with two unrelated lifetimes.
 //
+// The skill read is the runtime ROSTER — `listRuntimeSkills`, the list a turn
+// can load — and not the management catalogue. The palette shows what the
+// agent can run; the management page shows what is installed. They are
+// different lists in the runtime, and the palette was reading the wrong one:
+// the catalogue is paged, carries no plugin skills, and stops at the runtime's
+// first page, so the palette offered a fraction of the roster.
+//
 // Both are the same mistake: the composer's view of what is installed is a
 // business fact, so it is answered here and the composer asks a question.
 //
@@ -36,6 +43,7 @@ import {
 import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
+  WebuiComposerSkillScope,
   WebuiComposerSkillSummary,
 } from "./composer-catalogue.public.js";
 
@@ -45,6 +53,48 @@ const COMPOSER_PLUGIN_LIMIT = 200;
 function text(row: Record<string, unknown>, key: string): string {
   const value = row[key];
   return typeof value === "string" ? value : "";
+}
+
+/**
+ * The cache key of one roster read.
+ *
+ * The scope is the key, because the scope is what decides the answer: the same
+ * agent read for another session is another roster, and reading it twice would
+ * cost a round trip to learn the same thing.
+ */
+function skillSlotKey(scope: WebuiComposerSkillScope | undefined): string {
+  return JSON.stringify([
+    scope?.agentName ?? "",
+    scope?.sessionId ?? "",
+    scope?.workspaceDir ?? "",
+  ]);
+}
+
+/**
+ * One roster row, read as the palette's summary.
+ *
+ * The runtime spells a skill's description twice — the raw one and the
+ * displayable one — and the displayable one wins, because that is the copy the
+ * palette shows.
+ */
+function toSkillSummary(
+  row: Record<string, unknown>,
+): WebuiComposerSkillSummary | undefined {
+  const name = text(row, "name");
+  if (!name) return undefined;
+  const displayName = text(row, "displayName");
+  const description = text(row, "displayDescription") || text(row, "description");
+  const sourceKind = text(row, "sourceKind");
+  const sourceType = row.sourceType;
+  const enabled = row.enabled;
+  return {
+    name,
+    ...(displayName ? { displayName } : {}),
+    ...(description ? { description } : {}),
+    ...(typeof enabled === "boolean" ? { enabled } : {}),
+    ...(sourceKind ? { sourceKind } : {}),
+    ...(typeof sourceType === "number" ? { sourceType } : {}),
+  };
 }
 
 /**
@@ -67,16 +117,6 @@ export interface WebuiComposerPluginCatalogueOwner extends WebuiComposerPluginCa
 
 export function createWebuiComposerPluginCatalogue(deps: {
   readonly actions: WebuiPluginActions;
-  /** The port's own `listSkills`, absent on a runtime that predates it. */
-  readonly listSkills?: (request?: {
-    readonly agentName?: string;
-  }) => Promise<{
-    readonly skills: readonly {
-      readonly name: string;
-      readonly displayName?: string;
-      readonly description?: string;
-    }[];
-  }>;
 }): WebuiComposerPluginCatalogueOwner {
   const { actions } = deps;
   let disposed = false;
@@ -90,7 +130,12 @@ export function createWebuiComposerPluginCatalogue(deps: {
   // something it reads changed is owned by whoever wrote it, not by whichever
   // view happens to be looking at a cached answer when it does.
   const pluginReads = new Map<string, Promise<readonly WebuiComposerPluginSummary[]>>();
-  const skillReads = new Map<string, Promise<readonly WebuiComposerSkillSummary[]>>();
+  // The skill slot is keyed by the SCOPE, not by the agent alone: the same
+  // agent's roster differs per workspace, and a session names the workspace.
+  const skillReads = new Map<
+    string,
+    { readonly agentName?: string; readonly read: Promise<readonly WebuiComposerSkillSummary[]> }
+  >();
 
   return {
     available: actions.available,
@@ -132,20 +177,46 @@ export function createWebuiComposerPluginCatalogue(deps: {
     },
 
     invalidateSkills: (agentName) => {
-      skillReads.delete(agentName ?? "");
+      // A write that names an agent only makes that agent's slots stale. A
+      // write that names none cannot be attributed, so every slot goes: the
+      // default agent's roster may have changed with it.
+      if (agentName === undefined) {
+        skillReads.clear();
+        return;
+      }
+      for (const [key, slot] of skillReads) {
+        if (slot.agentName === agentName) skillReads.delete(key);
+      }
     },
 
-    runtimeSkills: (agentName) => {
+    runtimeSkills: (scope) => {
       if (disposed) return disposedRead();
-      const listSkills = deps.listSkills;
-      if (!listSkills) {
-        return Promise.reject(new Error("技能目录暂不可用"));
-      }
-      const key = agentName ?? "";
+      const agentName = scope?.agentName;
+      const key = skillSlotKey(scope);
       const started = skillReads.get(key);
-      if (started) return started;
-      const request = listSkills({ agentName })
-        .then((result) => result.skills)
+      if (started) return started.read;
+      // The runtime ROSTER, not the management catalogue. The roster is the
+      // list a turn can load: it carries the plugin skills and the workspace's
+      // own skills, and the runtime answers it for one agent and one session.
+      // The management catalogue is a different list — paged, user-facing, and
+      // without the plugin skills — and it is what the management page reads.
+      const request = actions
+        .invoke("listRuntimeSkills", {
+          ...(agentName ? { agentName } : {}),
+          ...(scope?.sessionId ? { sessionId: scope.sessionId } : {}),
+          ...(scope?.workspaceDir ? { workspaceDir: scope.workspaceDir } : {}),
+          // The plugin skills are part of the roster the agent can run, so they
+          // belong in the palette; the management page reads them separately.
+          includePluginSkills: true,
+        })
+        .then((result) =>
+          webuiPluginRows(result, "skills")
+            .map(toSkillSummary)
+            .filter((skill): skill is WebuiComposerSkillSummary => skill !== undefined)
+            // A turned-off skill is not offered: the agent cannot run it, so
+            // the palette must not offer it either.
+            .filter((skill) => skill.enabled !== false),
+        )
         .catch((reason: unknown) => {
           skillReads.delete(key);
           throw reason;
@@ -155,7 +226,7 @@ export function createWebuiComposerPluginCatalogue(deps: {
           // not re-enter the cache afterwards.
           if (disposed) skillReads.delete(key);
         });
-      skillReads.set(key, request);
+      skillReads.set(key, { agentName, read: request });
       return request;
     },
 

@@ -128,7 +128,6 @@ export function buildPermissionRouteContext(
 export function buildQuestionnaireServiceDeps(
   host: RouteContextHostHandle,
 ): LocalQuestionnaireServiceDeps {
-  const tuiProductPolicy = host.getRuntimeOwnerKind?.() === 'tui';
   const deps: LocalQuestionnaireServiceDeps = {
     store: host.questionnaireStore as never,
     nowMs: host.nowMs,
@@ -174,22 +173,18 @@ export function buildQuestionnaireServiceDeps(
     enumerable: true,
     get: () => questionnaireRequestAdmissionBindings.get(host),
   });
-  if (tuiProductPolicy) {
-    // TUI process-local facades are assembled before Plan registers its owner.
-    Object.defineProperties(deps, {
-      ownedActionHandler: {
-        enumerable: true,
-        get: () => questionnaireOwnedActionBindings.get(host)?.ownedActionHandler,
-      },
-      onOwnedActionFailure: {
-        enumerable: true,
-        get: () => questionnaireOwnedActionBindings.get(host)?.onFailure,
-      },
-    });
-  } else {
-    const ownedActionBinding = questionnaireOwnedActionBindings.get(host);
-    if (ownedActionBinding) deps.ownedActionHandler = ownedActionBinding.ownedActionHandler;
-    if (ownedActionBinding?.onFailure) deps.onOwnedActionFailure = ownedActionBinding.onFailure;
-  }
+  // Process-local questionnaire facades can be created before the Plan owner
+  // initializes and binds its handler. Keep both callbacks late-bound so every
+  // runtime owner observes the same binding regardless of startup order.
+  Object.defineProperties(deps, {
+    ownedActionHandler: {
+      enumerable: true,
+      get: () => questionnaireOwnedActionBindings.get(host)?.ownedActionHandler,
+    },
+    onOwnedActionFailure: {
+      enumerable: true,
+      get: () => questionnaireOwnedActionBindings.get(host)?.onFailure,
+    },
+  });
   return deps;
 }

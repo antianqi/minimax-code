@@ -145,6 +145,22 @@ test("the 编码 section is not listed in the settings sidebar", async ({ page }
   await search.fill("");
 });
 
+test("the 通用 page lists no link-destination or log-upload rows", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await openSettings(page);
+
+  // 通用 is the tab settings opens on, so these are the rows a user sees first.
+  // 链接 went with them: both of its rows were the section, so nothing is left
+  // to head. The remaining sections are asserted so an empty page cannot pass
+  // this as "the rows are absent".
+  await expect(page.locator('[data-testid="web-link-open-destination-row"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="local-link-open-destination-row"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="link-open-destination-section"]')).toHaveCount(0);
+  await expect(page.locator(".webui-settings-content").getByText("上传日志")).toHaveCount(0);
+  await expect(page.locator('[data-testid="file-section"]')).toBeVisible();
+  await expect(page.locator('[data-testid="about-section"]')).toBeVisible();
+});
+
 test("clicking the account tab shows the account panel", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);

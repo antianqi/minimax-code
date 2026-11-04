@@ -85,16 +85,31 @@ describe("the inventory is the population the carve covers", () => {
 });
 
 describe("each action's business is the one the inventory records", () => {
-  it("is invoked by the plugin owner", () => {
-    // `plugins'` owner names every action it publishes. The one exception is the action the
-    // inventory records as having no client surface to carve — declaring it beats inventing one.
-    // The owner names them through its two dispatch helpers — `call` for reads, `mutate` for
-    // writes — so both forms count as naming the action.
-    const notInOwner = actions.filter(
-      (action) => !new RegExp(`(?:call|mutate)\\(\\s*"${action}"`, "u").test(workflowSrc),
+  it("is invoked by the plugin business", () => {
+    // Every action has a client caller, and the business owns all of them. The owner
+    // module dispatches all but one: `listRuntimeSkills` is the composer's roster read,
+    // and the composer-facing read model dispatches it. The inventory records that
+    // split, so an action that loses its caller fails here, and so does a caller that
+    // appears where the inventory does not name one.
+    const catalogueSrc = read(
+      new URL("features/plugins/application/composer-catalogue.ts", CLIENT),
     );
-    expect(sorted(notInOwner)).toEqual(sorted(callerless));
-    expect(sorted(callerless)).toEqual(["listRuntimeSkills"]);
+    const dispatchedBy = (source: string, helpers: string): readonly string[] =>
+      actions.filter((action) =>
+        new RegExp(`(?:${helpers})\\(\\s*"${action}"`, "u").test(source),
+      );
+    const inOwner = dispatchedBy(workflowSrc, "call|mutate");
+    const inCatalogue = dispatchedBy(catalogueSrc, "call|invoke");
+    // The owner names the actions through its two dispatch helpers — `call` for reads,
+    // `mutate` for writes — so both forms count as naming the action.
+    expect(sorted(actions.filter((action) => !inOwner.includes(action)))).toEqual([
+      "listRuntimeSkills",
+    ]);
+    expect(sorted(inCatalogue)).toEqual(["listInstalledPlugins", "listRuntimeSkills"]);
+    // Between the two, every action has a caller.
+    expect(sorted([...new Set([...inOwner, ...inCatalogue])])).toEqual(sorted(actions));
+    // And the inventory records no action as having no caller at all.
+    expect(sorted(callerless)).toEqual([]);
   });
 
   it("is reached from no client module outside the plugin business", () => {

@@ -12,6 +12,7 @@ export interface ComposerInputKeyOptions {
   readonly mentionCount: number;
   readonly commandRange?: WebuiSlashRange;
   readonly commandCount: number;
+  readonly submitCommand: boolean;
   readonly composerMenu?: string;
   readonly permissionMenuOpen: boolean;
   readonly goalMode: boolean;
@@ -198,6 +199,11 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
         return;
       }
     }
+    if (event.key === "Enter" && !event.shiftKey && options.submitCommand && !options.submitBlocked) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+      return;
+    }
     if (options.commandCount === 0) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -206,6 +212,12 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
       event.preventDefault();
       setCommandIndex((current) => (current - 1 + options.commandCount) % options.commandCount);
     } else if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      options.chooseCommand(commandIndex);
+    } else if (event.key === "Tab" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      // Tab completes the highlighted row the way a shell completes a path:
+      // the typed query is the beginning of the name and only the panel knows
+      // the rest. Shift+Tab keeps its meaning — leave the field, focus back.
       event.preventDefault();
       options.chooseCommand(commandIndex);
     }

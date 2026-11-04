@@ -8,12 +8,19 @@
 //
 // One follower for the whole transcript, not one per way of arriving at it.
 // Auto-follow is armed on a session change and when a turn goes live; a gesture
-// releases it only when the viewport can answer that gesture; and being back at
-// the bottom re-arms it. A non-live session used to have a second follower that
-// released on any wheel or touchmove wherever the viewport sat and then never
-// re-armed, so content arriving after such a gesture stayed below the fold — and
-// a wheel at the bottom, which is recorded as `wheel-intent:ignored-boundary`,
-// was enough to trigger it.
+// releases it only when the viewport can answer that gesture; and the reader
+// re-arms it by walking back to the end. A non-live session used to have a
+// second follower that released on any wheel or touchmove wherever the viewport
+// sat and then never re-armed, so content arriving after such a gesture stayed
+// below the fold — and a wheel at the bottom, which is recorded as
+// `wheel-intent:ignored-boundary`, was enough to trigger it.
+//
+// The release has to happen inside the gesture handler, not in the scroll event
+// that follows it. The browser applies the gesture's scroll in the frame's input
+// step and then runs the resize steps, where the pin below drags the viewport
+// back to the end; the scroll event is delivered after that. A release that
+// waits for the scroll event therefore reads a viewport that is already back at
+// the bottom, and the reader's gesture is undone by the very turn it happened in.
 //
 // Pinning cannot be a one-off either: after the first paint the content keeps
 // growing (highlighting, images, markdown tables), and a single jump lands on the
@@ -24,8 +31,9 @@ import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
 import {
   webuiScrollBottomTop,
-  webuiScrollFollowsBottom,
+  webuiScrollFollowsAgain,
   webuiScrollIntent,
+  webuiScrollMovedTowardEnd,
 } from "../projection/transcript-scroll.js";
 
 const TRANSCRIPT_VIEWPORT_SELECTOR = '[data-webui-session-scroll="true"]';
@@ -84,7 +92,7 @@ export function useWebuiTranscriptScroll(input: {
 }): { readonly releaseAutoFollow: () => void } {
   const { transcriptRef, sessionId, turnLive } = input;
   const autoFollowRef = useRef(true);
-  const manualScrollIntentRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
   const previousTurnStateRef = useRef({ sessionId, turnLive });
 
   useLayoutEffect(() => {
@@ -95,20 +103,28 @@ export function useWebuiTranscriptScroll(input: {
     previousTurnStateRef.current = { sessionId, turnLive };
     if (previous.sessionId !== sessionId || (turnLive && !previous.turnLive)) {
       autoFollowRef.current = true;
-      manualScrollIntentRef.current = false;
     }
+    lastScrollTopRef.current = viewport.scrollTop;
     const followBottom = () => pinTranscriptToBottom(viewport, autoFollowRef.current);
     const onScroll = () => {
-      if (webuiScrollFollowsBottom(viewport)) {
+      const previousTop = lastScrollTopRef.current;
+      const currentTop = viewport.scrollTop;
+      lastScrollTopRef.current = currentTop;
+      // 还在跟随时，滚动不改任何状态：贴底跟随自己的 pin 也是一次滚动。
+      if (autoFollowRef.current) return;
+      // 释放之后，只有读者自己走回末尾才重新跟随。
+      const movedTowardEnd = webuiScrollMovedTowardEnd(previousTop, currentTop);
+      if (webuiScrollFollowsAgain({ metrics: viewport, movedTowardEnd })) {
         autoFollowRef.current = true;
-        manualScrollIntentRef.current = false;
-      } else if (manualScrollIntentRef.current) {
-        autoFollowRef.current = false;
       }
     };
     const onIntent = (event: "wheel" | "touchmove", deltaY: number) => {
       if (webuiScrollIntent({ event, deltaY, metrics: viewport }) === "ignore") return;
-      manualScrollIntentRef.current = true;
+      // 读者把视口从最新内容上带走了：现在就交还控制权。
+      // 不能等 scroll 事件——浏览器在滚轮手势之后才滚动视口，而它在下一帧的
+      // resize 步骤里就会先跑贴底 pin；等 scroll 事件到达时，视口已经被拽回
+      // 底部，事件报告的仍是「读者在底部」，手势就白滚了。
+      autoFollowRef.current = false;
     };
     const onWheel = (event: WheelEvent) => {
       onIntent("wheel", event.deltaY);

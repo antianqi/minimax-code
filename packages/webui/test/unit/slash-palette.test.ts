@@ -16,7 +16,8 @@ import {
   WEBUI_RUN_COMMAND_NAMES,
 } from "../../src/client/features/composer/contracts/slash-command.js";
 
-// These tests cover sectioning, four-rank filtering, lite-mode filtering,
+// These tests cover sectioning, ranked filtering (including the subsequence
+// pass), lite-mode filtering,
 // and the `isWebuiRunnableCommand` narrowing.
 
 describe("WebUI slash palette — sectioning", () => {
@@ -152,6 +153,53 @@ describe("WebUI slash palette — rank filter", () => {
     // "目标" only appears in `goal`'s description — rank 3 hit.
     const result = rankWebuiSlashPalette(palette, "目标");
     expect(result.map((entry) => entry.name)).toContain("goal");
+  });
+
+  it("finds a shortened query as a subsequence across the row's names", () => {
+    const rows = [
+      slashSkillSummaryToEntry({ name: "code-review" }),
+      slashSkillSummaryToEntry({ name: "codebase-design" }),
+      slashSkillSummaryToEntry({ name: "model" }),
+    ];
+    // None of these queries is a substring of anything, so before the
+    // subsequence pass every one of them answered an empty panel — the "模糊
+    // 搜索无效" report. The characters are typed in order, gaps allowed.
+    expect(rankWebuiSlashPalette(rows, "mdl").map((entry) => entry.name)).toEqual(["model"]);
+    expect(rankWebuiSlashPalette(rows, "crev").map((entry) => entry.name)).toEqual([
+      "code-review",
+    ]);
+    expect(
+      rankWebuiSlashPalette(rows, "cdsgn").map((entry) => entry.name),
+    ).toEqual(["codebase-design"]);
+  });
+
+  it("keeps a contiguous hit ahead of a subsequence one", () => {
+    // "mdl" is a prefix of the first row and only a subsequence of the second,
+    // and the subsequence row sits first in the palette: the result can only
+    // come out this way if the fuzzy rank is last.
+    const rows = [
+      slashSkillSummaryToEntry({ name: "model" }),
+      slashSkillSummaryToEntry({ name: "mdl-tool" }),
+    ];
+    expect(rankWebuiSlashPalette(rows, "mdl").map((entry) => entry.name)).toEqual([
+      "mdl-tool",
+      "model",
+    ]);
+  });
+
+  it("does not fuzzy-match inside a description", () => {
+    // Descriptions are prose: "m … k … e" scattered through one is noise, not a
+    // command the user asked for. The substring pass still reads them.
+    const rows = [
+      slashSkillSummaryToEntry({
+        name: "alpha",
+        description: "marked letters in a sentence",
+      }),
+    ];
+    expect(rankWebuiSlashPalette(rows, "mke")).toEqual([]);
+    expect(
+      rankWebuiSlashPalette(rows, "marked").map((entry) => entry.name),
+    ).toEqual(["alpha"]);
   });
 
   it("preserves original index within the same rank", () => {
@@ -368,19 +416,23 @@ describe("WebUI slash palette — fetched skills", () => {
     expect(skillNames).toContain("ask-matt");
   });
 
-  it("maps a harness skill summary into a popover row", () => {
+  it("maps a roster skill summary into a popover row", () => {
     const entry = slashSkillSummaryToEntry({
       name: "review-pr",
-      displayName: "Review PR",
       description: "Reviews a pull request",
+      sourceKind: "user",
+      sourceType: 2,
+      enabled: true,
     });
     expect(entry).toMatchObject({
       name: "review-pr",
-      displayName: "Review PR",
-      label: "Review PR",
+      // The row shows the skill's NAME — the token the user types — and not
+      // the runtime's display name, the way the Desktop palette does.
+      displayName: "review-pr",
+      label: "review-pr",
       description: "Reviews a pull request",
       source_type: 1,
-      source_kind: "plugin",
+      source_kind: "user",
       paletteSection: "skills",
       supported: true,
     });
@@ -395,6 +447,47 @@ describe("WebUI slash palette — fetched skills", () => {
     expect(entry.displayName).toBe("bare-bones");
     expect(entry.label).toBe("bare-bones");
     expect(entry.description).toBe("");
+  });
+
+  it("keeps a plugin skill's namespaced name, which is the token it answers to", () => {
+    // A plugin skill is named "<plugin>:<skill>", and that full name is what
+    // the slash has to carry for the plugin to answer it. The row shows it
+    // unchanged.
+    const entry = slashSkillSummaryToEntry({
+      name: "lark:lark-doc",
+      displayName: "lark:lark-doc",
+      description: "读取飞书云文档",
+      sourceKind: "plugin",
+    });
+    expect(entry.name).toBe("lark:lark-doc");
+    expect(entry.displayName).toBe("lark:lark-doc");
+    expect(entry.label).toBe("lark:lark-doc");
+    expect(entry.source_kind).toBe("plugin");
+  });
+
+  it("drops the agent prefix from a built-in skill's name, as the Desktop palette does", () => {
+    // A built-in the runtime owns as "mavis-<skill>" reads as "<skill>": the
+    // prefix names the owner, not the skill. The token stays the full name.
+    const entry = slashSkillSummaryToEntry({
+      name: "mavis-doctor",
+      description: "诊断环境",
+      sourceKind: "builtin-agent",
+      sourceType: 1,
+    });
+    expect(entry.name).toBe("mavis-doctor");
+    expect(entry.displayName).toBe("doctor");
+    expect(entry.label).toBe("doctor");
+  });
+
+  it("keeps the prefix on a skill that is not built in", () => {
+    // The rule is the built-in's, not the name's: a user's own skill called
+    // "mavis-notes" keeps its name.
+    const entry = slashSkillSummaryToEntry({
+      name: "mavis-notes",
+      sourceKind: "user",
+      sourceType: 2,
+    });
+    expect(entry.displayName).toBe("mavis-notes");
   });
 
   it("uses the fixture icon for the four known skill names", () => {

@@ -99,10 +99,13 @@ test("typing / opens the slash palette; filtering and Escape behave", async ({ p
   await input.pressSequentially("/");
   const menu = commandMenu(page);
   await expect(menu).toBeVisible();
-  // The fixture's listSkills answers empty, so the palette shows the two
-  // runnable built-ins plus the inert deploy-website row.
+  // The fixture's roster answers with one skill, so the palette shows it
+  // beside the two runnable built-ins. The roster is the runtime's own list of
+  // what the agent can run — the palette used to read the management
+  // catalogue instead, which is why it showed a fraction of the skills.
   await expect(menu.getByRole("option", { name: /目标/ })).toBeVisible();
   await expect(menu.getByRole("option", { name: /计划/ })).toBeVisible();
+  await expect(menu.getByRole("option", { name: /fixture-skill/ })).toBeVisible();
 
   await input.pressSequentially("go");
   await expect(menu.getByRole("option", { name: /目标/ })).toBeVisible();
@@ -113,6 +116,45 @@ test("typing / opens the slash palette; filtering and Escape behave", async ({ p
   await input.press("Escape");
   await expect(commandMenu(page)).toHaveCount(0);
   await expect(input).toHaveValue("");
+});
+
+test("the slash palette answers a shortened query no row contains literally", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.click();
+  await input.pressSequentially("/mdl");
+
+  // Not one palette row contains "mdl", so before the subsequence pass this
+  // query drew an empty popover — what "模糊搜索无效" looked like. The typed
+  // characters are matched in order with gaps allowed, and only the row they
+  // name comes back: 计划 has no `m` at all and must stay out.
+  const menu = commandMenu(page);
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("option")).toHaveCount(1);
+  await expect(menu.getByRole("option", { name: /模型/ })).toBeVisible();
+  await expect(menu.getByRole("option", { name: /计划/ })).toHaveCount(0);
+});
+
+test("Tab completes the slash palette's highlighted suggestion", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.click();
+  await input.pressSequentially("/mdl");
+  // The fuzzy hit is what Tab completes: "mdl" is not a prefix of any command,
+  // so this only reaches /model through the subsequence rank.
+  await expect(commandMenu(page).getByRole("option", { name: /模型/ })).toBeVisible();
+
+  await input.press("Tab");
+
+  // Completion rewrites the token to the full name and leaves the caret after
+  // the trailing space — anything less and the palette pops straight back open
+  // on "/model", which is the failure this asserts against.
+  await expect(input).toHaveValue("/model ");
+  await expect(commandMenu(page)).toHaveCount(0);
+  // Tab is a completion here, not a focus move: the caret stays in the field.
+  await expect(input).toBeFocused();
 });
 
 test("/compact from the slash palette reaches the runtime with its instruction", async ({ page }) => {
@@ -137,6 +179,49 @@ test("/compact from the slash palette reaches the runtime with its instruction",
     input: "preserve code changes",
     sessionId: "A",
   });
+});
+
+test("pressing Enter sends an exact /compact command", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.fill("/compact");
+  await input.press("Enter");
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "runCommand" && request.body.command === "compact",
+  ))).toHaveLength(1);
+  const run = await page.evaluate(() => window.__fixture.requests.find(
+    (request) => request.operation === "runCommand" && request.body.command === "compact",
+  ));
+  expect(run.body.sessionId).toBe("A");
+});
+
+test("a completed /compact result stays with its original session after New Task", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.delayNext("runCommand", { command: "compact" });
+  });
+  await openApp(page, "#session=A");
+
+  await composer(page).fill("/compact");
+  await page.getByTestId("composer-send").click();
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
+    (request) => request.operation === "runCommand" && request.body.command === "compact" && request.body.sessionId === "A",
+  ))).toBe(true);
+
+  await page.locator(".webui-brand-create-button").click();
+  await expect.poll(() => page.evaluate(() => new URLSearchParams(location.hash.replace(/^#/u, "")).get("session"))).toBeNull();
+  await expect(page.locator("[data-webui-command-running]")).toHaveCount(0);
+  await expect(composer(page)).toBeEnabled();
+  await page.evaluate(() => window.__fixture.resolve(
+    "runCommand",
+    { command: "compact" },
+    { handled: true, output: "Compaction completed. Messages: 2 → 1" },
+  ));
+
+  await expect(page.locator("[data-webui-command-output]")).toHaveCount(0);
+  await switchSession(page, "A");
+  await expect(page.locator("[data-webui-command-output]")).toHaveText("Compaction completed. Messages: 2 → 1");
 });
 
 test("/compact shows progress while running and confirms the result", async ({ page }) => {

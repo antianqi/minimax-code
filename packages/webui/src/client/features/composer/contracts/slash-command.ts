@@ -63,25 +63,80 @@ export function rankWebuiSlashPalette<T extends WebuiSlashPaletteFields>(
   const trimmed = query.trim();
   if (!trimmed) return [...palette];
   const needle = trimmed.toLowerCase();
-  const scored: { cmd: T; rank: number; idx: number }[] = [];
+  const scored: { cmd: T; rank: number; span: number; idx: number }[] = [];
   palette.forEach((entry, idx) => {
     const name = entry.name.toLowerCase();
     const display = entry.displayName.toLowerCase();
-    let rank: number;
-    if (name === needle || display === needle) rank = 0;
-    else if (name.startsWith(needle) || display.startsWith(needle)) rank = 1;
-    else if (name.includes(needle) || display.includes(needle)) rank = 2;
-    else {
-      const haystack = [entry.name, entry.displayName, entry.label, entry.description,
-        entry.display_name, entry.display_description, ...(entry.searchTerms ?? [])]
-        .filter((value): value is string => Boolean(value)).join(" ").toLowerCase();
-      if (!haystack.includes(needle)) return;
-      rank = 3;
+    if (name === needle || display === needle) {
+      scored.push({ cmd: entry, rank: 0, span: 0, idx });
+      return;
     }
-    scored.push({ cmd: entry, rank, idx });
+    if (name.startsWith(needle) || display.startsWith(needle)) {
+      scored.push({ cmd: entry, rank: 1, span: 0, idx });
+      return;
+    }
+    if (name.includes(needle) || display.includes(needle)) {
+      scored.push({ cmd: entry, rank: 2, span: 0, idx });
+      return;
+    }
+    const haystack = [entry.name, entry.displayName, entry.label, entry.description,
+      entry.display_name, entry.display_description, ...(entry.searchTerms ?? [])]
+      .filter((value): value is string => Boolean(value)).join(" ").toLowerCase();
+    if (haystack.includes(needle)) {
+      scored.push({ cmd: entry, rank: 3, span: 0, idx });
+      return;
+    }
+    // Fuzzy: the typed characters appear in order with gaps allowed, so a
+    // shortened query ("mdl" for /model) still finds the row. Only the names a
+    // row answers to are searched this way — a description is prose, and a
+    // scattered hit inside one is noise rather than a match the user meant.
+    // A tighter span wins, which is what keeps "/model" ahead of a row whose
+    // name merely happens to contain the same letters far apart.
+    const span = tightestSubsequenceSpan(
+      [entry.name, entry.displayName, entry.label, entry.display_name]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.toLowerCase()),
+      needle,
+    );
+    if (span === undefined) return;
+    scored.push({ cmd: entry, rank: 4, span, idx });
   });
-  scored.sort((left, right) => left.rank - right.rank || left.idx - right.idx);
+  scored.sort(
+    (left, right) =>
+      left.rank - right.rank || left.span - right.span || left.idx - right.idx,
+  );
   return scored.map((entry) => entry.cmd);
+}
+
+/**
+ * How tightly `needle` sits inside `field` as a subsequence — the number of
+ * characters skipped by the greedy walk — or `undefined` when a character is
+ * missing altogether.
+ */
+function subsequenceSpan(field: string, needle: string): number | undefined {
+  let cursor = 0;
+  let first = -1;
+  for (const character of needle) {
+    const found = field.indexOf(character, cursor);
+    if (found === -1) return undefined;
+    if (first === -1) first = found;
+    cursor = found + 1;
+  }
+  return cursor - first - 1;
+}
+
+/** The tightest span across a row's names; `undefined` when none contains it. */
+function tightestSubsequenceSpan(
+  fields: readonly string[],
+  needle: string,
+): number | undefined {
+  let best: number | undefined;
+  for (const field of fields) {
+    const span = subsequenceSpan(field, needle);
+    if (span === undefined) continue;
+    if (best === undefined || span < best) best = span;
+  }
+  return best;
 }
 
 export interface WebuiSlashCommandFields {

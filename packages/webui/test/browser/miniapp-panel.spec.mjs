@@ -993,6 +993,11 @@ test("a Mini App the runtime already reports as running can be shown in the pane
 });
 
 test("the apps area uses installed plugin metadata and has no separate install button", async ({ page }) => {
+  await page.route("**/workspace-file?*", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/svg+xml",
+    body: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"red\"/></svg>",
+  }));
   await configureFixture(page, () => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
     window.__WEBUI_FIXTURE_SETUP__.push(() => {
@@ -1005,7 +1010,7 @@ test("the apps area uses installed plugin metadata and has no separate install b
       window.__fixture.setPluginManagementResult("listMarketplacePlugins", {
         pluginTotal: 4,
         plugins: [
-          { name: "demo.miniapp", displayName: "演示应用", description: "一个用于浏览器验收的 Mini App", icon_url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3C/svg%3E", tags: [{ key: "miniapp" }] },
+          { name: "demo.miniapp", displayName: "演示应用", description: "一个用于浏览器验收的 Mini App", icon_url: "/mavis/api/file/preview?path=%2Fplugins%2Fdemo%2Ficon.svg", tags: [{ key: "miniapp" }] },
           { name: "minimax-stocks", displayName: "股市", description: "股市插件", tags: [{ key: "miniapp" }] },
           { name: "market-two", displayName: "Market two", description: "Marketplace card", tags: [{ key: "miniapp" }] },
           { name: "market-three", displayName: "Market three", description: "Marketplace card", tags: [{ key: "miniapp" }] },
@@ -1033,8 +1038,8 @@ test("the apps area uses installed plugin metadata and has no separate install b
   await expect(apps.getByTestId("miniapp-app-demo.miniapp")).toContainText("演示应用");
   await expect(apps.locator(".webui-plugin-row")).toHaveCount(5);
   const icon = apps.getByTestId("miniapp-app-demo.miniapp").locator("img");
-  await expect(icon).toHaveAttribute("src", /^data:image\/svg\+xml,/);
-  await expect.poll(() => icon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(icon).toHaveAttribute("src", /\/workspace-file\?token=synthetic-token&dir=%2Fplugins%2Fdemo&path=icon\.svg/u);
+  await expect.poll(() => icon.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
   await expect(apps.getByTestId("miniapp-app-minimax-stocks").locator("h2")).toHaveText("股市");
   await expect(apps.getByTestId("miniapp-app-status-minimax-stocks")).toHaveAttribute("data-status", "unavailable");
   await expect(apps.getByTestId("miniapp-app-status-market-disabled")).toHaveAttribute("data-status", "disabled");

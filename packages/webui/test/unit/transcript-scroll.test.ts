@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   WEBUI_SCROLL_EDGE_THRESHOLD_PX,
-  WEBUI_SCROLL_FOLLOW_THRESHOLD_PX,
+  WEBUI_SCROLL_END_THRESHOLD_PX,
+  webuiScrollAtEnd,
   webuiScrollBottomTop,
-  webuiScrollFollowsBottom,
+  webuiScrollFollowsAgain,
   webuiScrollIntent,
+  webuiScrollMovedTowardEnd,
 } from "../../src/client/features/transcript/projection/transcript-scroll.js";
 
 describe("transcript scroll geometry", () => {
@@ -20,32 +22,84 @@ describe("transcript scroll geometry", () => {
     ).toBe(0);
   });
 
-  it("treats the near-bottom band as following", () => {
+  it("treats the very end as the end, and nothing above it", () => {
     const bottom = webuiScrollBottomTop({
       scrollTop: 0,
       scrollHeight: 4200,
       clientHeight: 800,
     });
     expect(
-      webuiScrollFollowsBottom({
-        scrollTop: bottom - WEBUI_SCROLL_FOLLOW_THRESHOLD_PX,
+      webuiScrollAtEnd({
+        scrollTop: bottom,
         scrollHeight: 4200,
         clientHeight: 800,
       }),
     ).toBe(true);
     expect(
-      webuiScrollFollowsBottom({
-        scrollTop: bottom - WEBUI_SCROLL_FOLLOW_THRESHOLD_PX - 1,
+      webuiScrollAtEnd({
+        scrollTop: bottom - WEBUI_SCROLL_END_THRESHOLD_PX,
+        scrollHeight: 4200,
+        clientHeight: 800,
+      }),
+    ).toBe(true);
+    expect(
+      webuiScrollAtEnd({
+        scrollTop: bottom - WEBUI_SCROLL_END_THRESHOLD_PX - 1,
         scrollHeight: 4200,
         clientHeight: 800,
       }),
     ).toBe(false);
   });
 
-  it("reads an unfilled viewport as following so an empty session never unfollows", () => {
+  it("reads an unfilled viewport as at the end so an empty session never unfollows", () => {
     expect(
-      webuiScrollFollowsBottom({ scrollTop: 0, scrollHeight: 120, clientHeight: 800 }),
+      webuiScrollAtEnd({ scrollTop: 0, scrollHeight: 120, clientHeight: 800 }),
     ).toBe(true);
+  });
+});
+
+/**
+ * When the follower follows again after a gesture released it.
+ *
+ * The reader has to walk back to the end by themselves. The gesture's own
+ * scroll event is not that walk: it moves away from the end, and the browser
+ * delivers it after the pin has already dragged the viewport back down.
+ */
+describe("when the transcript follows again", () => {
+  const TALL = { scrollHeight: 4200, clientHeight: 800 };
+  const bottom = webuiScrollBottomTop({ scrollTop: 0, ...TALL });
+
+  it("reads the direction of a scroll from the two positions it moved between", () => {
+    expect(webuiScrollMovedTowardEnd(1848, 1849)).toBe(true);
+    expect(webuiScrollMovedTowardEnd(1848, 1848)).toBe(false);
+    expect(webuiScrollMovedTowardEnd(1848, 1728)).toBe(false);
+  });
+
+  it("follows again once the reader walked back to the end", () => {
+    expect(
+      webuiScrollFollowsAgain({
+        metrics: { scrollTop: bottom, ...TALL },
+        movedTowardEnd: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not follow again while the reader is still away from the end", () => {
+    expect(
+      webuiScrollFollowsAgain({
+        metrics: { scrollTop: bottom - 200, ...TALL },
+        movedTowardEnd: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not follow again on a scroll that walked away from the end", () => {
+    expect(
+      webuiScrollFollowsAgain({
+        metrics: { scrollTop: bottom, ...TALL },
+        movedTowardEnd: false,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -95,10 +149,10 @@ describe("which gestures release the transcript's follow", () => {
     expect(webuiScrollIntent({ event: "touchmove", deltaY: -40, metrics: { scrollTop: 2000, ...TALL } })).toBe("release");
   });
 
-  it("uses the edge band for gestures, not the wider band that arms the follower", () => {
-    // Being inside the follow band does not put the viewport at an edge: a
-    // downward wheel there still moves, so it still counts.
-    expect(WEBUI_SCROLL_EDGE_THRESHOLD_PX).toBeLessThan(WEBUI_SCROLL_FOLLOW_THRESHOLD_PX);
+  it("uses the edge band for gestures, not the narrow band that counts as the end", () => {
+    // Being near the end does not put the viewport at an edge: a downward wheel
+    // there still moves, so it still counts.
+    expect(WEBUI_SCROLL_EDGE_THRESHOLD_PX).toBeGreaterThan(WEBUI_SCROLL_END_THRESHOLD_PX);
     expect(
       webuiScrollIntent({
         event: "wheel",

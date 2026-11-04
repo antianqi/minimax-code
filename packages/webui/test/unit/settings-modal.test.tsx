@@ -51,7 +51,7 @@ describe("desktop settings registry", () => {
   });
 
   it("keeps the generic page structure and control contracts", () => {
-    expect(GENERIC_SECTION_TEST_IDS).toEqual(["app-mode-section", "application-section", "link-open-destination-section", "file-section", "session-management-section", "agent-control-permission-section", "about-section"]);
+    expect(GENERIC_SECTION_TEST_IDS).toEqual(["app-mode-section", "application-section", "file-section", "session-management-section", "agent-control-permission-section", "about-section"]);
     expect(GENERIC_FILE_ROW_ORDER).toEqual(["file-open-in-new-tab-switch", "file-line-wrap-switch"]);
     expect(GENERIC_RADIO_CONTRACT).toEqual({ position: "absolute right-4 top-[22px]", accentToken: "icon_default_accent" });
     const iconPaths = SETTINGS_ICON_PATHS as Readonly<Record<string, string>>;

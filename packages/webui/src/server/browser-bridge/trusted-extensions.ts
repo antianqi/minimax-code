@@ -102,6 +102,13 @@ export function createInMemoryTrustedExtensionStore(): TrustedExtensionStore {
  *
  *   { "edge": ["mdbfmgllfnkmfambfjjnfchmhkphiggk"], "chrome": [] }
  *
+ * The order inside a surface is the order the ids were trusted in, so the last
+ * one is the extension the host learned most recently. That matters because a
+ * machine can hold more than one build of the same extension — each unpacked
+ * build has its own id — and the host has to be able to name the one the
+ * person is actually using. The order is not sorted: a sorted list would say
+ * nothing about recency.
+ *
  * It is written atomically — a temporary file and a rename — so a crash in
  * the middle of a write cannot leave a half-written file that reads as
  * "this machine trusts nothing", or worse, as a set of ids nobody proved.
@@ -136,7 +143,9 @@ export function createFileTrustedExtensionStore(options: {
     const payload: Record<string, string[]> = {};
     for (const [surface, ids] of bySurface) {
       if (ids.size === 0) continue;
-      payload[surface] = [...ids].sort();
+      // The trust order, not the alphabetical one: the last id is the
+      // extension the host learned most recently.
+      payload[surface] = [...ids];
     }
     try {
       mkdirSync(dirname(options.file), { recursive: true, mode: 0o700 });

@@ -17,8 +17,8 @@
   .webui-composer-mascot {
     position: absolute;
     z-index: 1;
-    top: -50px;
-    right: 8px;
+    top: -90px;
+    right: var(--spacing_24);
     width: 60px;
     height: auto;
     pointer-events: none;

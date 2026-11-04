@@ -52,6 +52,7 @@ import {
   parseWebuiAppMode,
   type WebuiAppMode,
 } from "../../../platform/app-mode.js";
+import { WEBUI_BROWSER_AUTO_OPEN_STORAGE_KEY } from "../../../platform/browser-auto-open.js";
 import { WebuiMotion, WebuiPage } from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -196,6 +197,12 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   // The application mode: what a session created from this client runs as. The
   // runtime owns what the mode means; this page owns the choice.
   const [appMode, setAppMode] = useState(() => parseWebuiAppMode(stored(WEBUI_APP_MODE_STORAGE_KEY, WEBUI_APP_MODE_DEFAULT, storage)));
+  // Agent 控制权限 › 自动打开浏览器面板. Off by default, like the Desktop's
+  // `browserUseAutoOpenPanelEnabled`: a panel that opens itself is a surprise
+  // unless the reader asked for it.
+  const [autoOpenBrowser, setAutoOpenBrowser] = useState(
+    () => stored(WEBUI_BROWSER_AUTO_OPEN_STORAGE_KEY, "false", storage) === "true",
+  );
   const [shortcuts, setShortcuts] = useState(() => parseShortcutBindings(storage.getItem(SHORTCUT_STORAGE_KEY)));
   const actualTheme = resolveThemePreference(theme, systemDark);
   useEffect(() => {
@@ -214,9 +221,10 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
     storage.setItem("file_open_in_new_tab", String(newTab));
     storage.setItem("webui-context-window-usage", String(contextWindow));
     storage.setItem(WEBUI_APP_MODE_STORAGE_KEY, appMode);
+    storage.setItem(WEBUI_BROWSER_AUTO_OPEN_STORAGE_KEY, String(autoOpenBrowser));
     storage.setItem(SHORTCUT_STORAGE_KEY, serializeShortcutBindings(shortcuts));
     dom.dispatchContextWindowUsageChange();
-  }, [actualTheme, contextWindow, dom, language, newTab, shortcuts, storage, theme, wrap]);
+  }, [actualTheme, appMode, autoOpenBrowser, contextWindow, dom, language, newTab, shortcuts, storage, theme, wrap]);
   useEffect(() => {
     if (!open) return;
     void modelsWorkflows?.loadModels(sessionId);
@@ -304,7 +312,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
               {active === "account" ? <AccountUsageShareAction /> : null}
             </header>
             <WebuiZoneBoundary zone={active === "coding" ? "review" : "settings"}>
-              {active === "desktop" ? <GenericPage theme={theme} setTheme={setTheme} wrap={wrap} setWrap={setWrap} newTab={newTab} setNewTab={setNewTab} contextWindow={contextWindow} setContextWindow={setContextWindow} appMode={appMode} setAppMode={setAppMode} version={version?.version ?? ""} /> : null}
+              {active === "desktop" ? <GenericPage theme={theme} setTheme={setTheme} wrap={wrap} setWrap={setWrap} newTab={newTab} setNewTab={setNewTab} contextWindow={contextWindow} setContextWindow={setContextWindow} appMode={appMode} setAppMode={setAppMode} autoOpenBrowser={autoOpenBrowser} setAutoOpenBrowser={setAutoOpenBrowser} version={version?.version ?? ""} /> : null}
               {active === "custom-instructions" ? <PersonalizationSettings {...(onCreateMemorySession ? { onCreateInSession: onCreateMemorySession } : {})} /> : null}
               {active === "shortcuts" ? <ShortcutsSettings bindings={shortcuts} onChange={setShortcuts} onReset={() => setShortcuts(DEFAULT_SHORTCUT_BINDINGS)} /> : null}
               {active === "browser" ? <BrowserSettingsPage /> : null}
@@ -337,7 +345,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   );
 }
 
-function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contextWindow, setContextWindow, appMode, setAppMode, version }: { readonly theme: string; readonly setTheme: (value: string) => void; readonly wrap: boolean; readonly setWrap: (value: boolean) => void; readonly newTab: boolean; readonly setNewTab: (value: boolean) => void; readonly contextWindow: boolean; readonly setContextWindow: (value: boolean) => void; readonly appMode: WebuiAppMode; readonly setAppMode: (value: WebuiAppMode) => void; readonly version: string }): ReactElement {
+function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contextWindow, setContextWindow, appMode, setAppMode, autoOpenBrowser, setAutoOpenBrowser, version }: { readonly theme: string; readonly setTheme: (value: string) => void; readonly wrap: boolean; readonly setWrap: (value: boolean) => void; readonly newTab: boolean; readonly setNewTab: (value: boolean) => void; readonly contextWindow: boolean; readonly setContextWindow: (value: boolean) => void; readonly appMode: WebuiAppMode; readonly setAppMode: (value: WebuiAppMode) => void; readonly autoOpenBrowser: boolean; readonly setAutoOpenBrowser: (value: boolean) => void; readonly version: string }): ReactElement {
   return (
     <SettingsPage testId="content-body">
       <SettingsSection title="模式" testId="app-mode-section" bare>
@@ -374,7 +382,7 @@ function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contex
       </SettingsSection>
       <SettingsSection title="Agent 控制权限" testId="agent-control-permission-section">
         <SettingsRow title="自动打开浏览器面板" description="Agent 操作网页时，自动打开右侧浏览器面板" testId="browser-use-auto-open-row">
-          <Switch checked={false} label="自动打开浏览器面板" disabled testId="browser-use-auto-open-switch" />
+          <Switch checked={autoOpenBrowser} label="自动打开浏览器面板" onChange={setAutoOpenBrowser} testId="browser-use-auto-open-switch" />
         </SettingsRow>
       </SettingsSection>
       <SettingsSection title="关于" testId="about-section">

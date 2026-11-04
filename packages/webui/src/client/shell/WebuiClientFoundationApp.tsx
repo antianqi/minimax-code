@@ -23,6 +23,8 @@ import { Transcript } from "../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../features/account/ui/UserMenu.js";
 import { readWebuiMemoryHandoffPrompt, type MemoryHandoff } from "../features/settings/contracts/memory-handoff.js";
 import { WebuiWorkspacePanel } from "../features/workspace/ui/WorkspacePanels.js";
+import { webuiWorkspaceAutoOpenBrowser } from "../features/workspace/ui/WebuiWorkspaceTabStrip.public.js";
+
 import { MiniAppView } from "../features/miniapp/ui/MiniAppView.public.js";
 import { webuiRailIsDrawer, WEBUI_PROGRESS_PANEL_NARROW_QUERY } from "../ui/layout-thresholds.js";
 import { useOverlayLayer } from "../ui/overlay-coordinator.js";
@@ -739,6 +741,27 @@ export function WebuiClientFoundationApp(
       release();
     };
   }, [application, dispatchShellSurface, miniAppWorkflows, selectSession, workspacePanelOwner]);
+
+  // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板 — the Desktop's
+  // `browserUseAutoOpenPanelEnabled`: a page the Agent starts while the panel is
+  // closed brings the panel up with it. The subscription lives here rather than
+  // in the tab strip because the strip is mounted by the panel: with the panel
+  // closed there is no strip to hear the snapshot.
+  const watchBrowserWebTabs = portSlices.browser?.watchBrowserWebTabs;
+  useEffect(() => {
+    if (!watchBrowserWebTabs || !selectedSessionId) return;
+    const stop = watchBrowserWebTabs(
+      { surface: "isolated-chromium", runId: selectedSessionId },
+      (snapshot) => {
+        if (!application.browserAutoOpen?.read()) return;
+        const panel = workspacePanelOwner.stateFor(selectedSessionId).workspacePanel;
+        if (panel.open) return;
+        if (!webuiWorkspaceAutoOpenBrowser({ tabs: panel.tabs, snapshot, enabled: true })) return;
+        workspacePanelOwner.dispatch(selectedSessionId, { type: "open-panel" });
+      },
+    );
+    return stop;
+  }, [watchBrowserWebTabs, selectedSessionId, workspacePanelOwner]);
   // ---- Rail activity: which sessions are running, and when each last moved.
   //
   // The runtime runs sessions in parallel -- `queue.dispatcher.ts` keeps one

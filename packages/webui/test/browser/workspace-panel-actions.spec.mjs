@@ -199,6 +199,33 @@ test("the workspace file tree uses the shared disclosure transition when a direc
   expect(await disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });
 
+test("a page the Agent starts opens the closed panel, when 自动打开浏览器面板 is on", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page, "#session=A");
+  // A fresh session has the workspace panel closed; the switch defaults to off,
+  // so the first page the Agent starts must leave it closed.
+  await expect(page.getByTestId("workspace-panel")).toHaveCount(0);
+  await page.evaluate(() =>
+    window.__fixture.setBrowserTabs([{ id: "agent-page-1", title: "Agent Page", url: "https://example.test/agent" }]),
+  );
+  await page.waitForTimeout(150);
+  await expect(page.getByTestId("workspace-panel")).toHaveCount(0);
+
+  // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板 turned on: the next page the
+  // Agent starts brings the panel up with it, which is the Desktop's rule.
+  await page.evaluate(() => window.localStorage.setItem("webui-browser-auto-open", "true"));
+  await page.evaluate(() =>
+    window.__fixture.setBrowserTabs([
+      { id: "agent-page-1", title: "Agent Page", url: "https://example.test/agent" },
+      { id: "agent-page-2", title: "Second Page", url: "https://example.test/second" },
+    ]),
+  );
+  await expect(page.getByTestId("workspace-panel")).toHaveCount(1);
+  // The panel comes up on the page the Agent just started, named as the page is
+  // named: the tab row is the panel's own evidence that the page arrived.
+  await expect(page.getByTestId("workspace-panel").getByRole("tab", { name: /Second Page/ })).toBeVisible();
+});
+
 test("the file tree's search field stays inside the panel on both sides", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);

@@ -34,6 +34,7 @@ import {
   webuiWorkspaceLauncherTileCommand,
   webuiWorkspaceLauncherUrl,
   webuiWorkspaceTabStripReconcile,
+  webuiWorkspaceAutoOpenBrowser,
 } from "../../src/client/features/workspace/ui/WebuiWorkspaceTabStrip.public.js";
 import { WebuiPortSlicesProvider } from "../../src/client/bindings/port-slices-context.js";
 import { createWebuiPortSlices } from "../../src/client/application/port-slices.js";
@@ -261,6 +262,61 @@ describe("the workspace panel's tab strip", () => {
 
     expect(commands).toHaveLength(1);
     expect(commands[0]?.command).toMatchObject({ type: "open-web-tab", title: "Second" });
+  });
+
+  it("opens the panel for a page it did not have, and only for that", () => {
+    // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板. Three answers the rule owes:
+    // a page the panel has no tab for brings the panel up, a snapshot that only
+    // moves the page of a tab the reader already has does not, and the reader's
+    // "off" wins over both.
+    const existing: WorkspacePanelState["tabs"] = [
+      {
+        id: "tab-1",
+        content: { kind: "web", target: target({ browserId: "browser-2", targetId: "tab-1" }), title: "First", url: "https://example.test/" },
+      } as WorkspacePanelTab,
+    ];
+    const movedPage: WebuiBrowserWebTabSnapshot = {
+      surface: "isolated-chromium",
+      tabs: [webTab({ target: target({ browserId: "browser-2", targetId: "tab-1" }), title: "First, further" })],
+    };
+    const newPage: WebuiBrowserWebTabSnapshot = {
+      surface: "isolated-chromium",
+      tabs: [
+        webTab({ target: target({ browserId: "browser-2", targetId: "tab-1" }), title: "First" }),
+        webTab({ target: target({ browserId: "browser-2", targetId: "tab-2" }), title: "Second" }),
+      ],
+    };
+
+    expect(webuiWorkspaceAutoOpenBrowser({ tabs: existing, snapshot: newPage, enabled: true })).toBe(true);
+    expect(webuiWorkspaceAutoOpenBrowser({ tabs: existing, snapshot: movedPage, enabled: true })).toBe(false);
+    expect(webuiWorkspaceAutoOpenBrowser({ tabs: existing, snapshot: newPage, enabled: false })).toBe(false);
+    // Nothing open yet: the first page the Agent starts is a page it did not have.
+    expect(webuiWorkspaceAutoOpenBrowser({ tabs: [], snapshot: newPage, enabled: true })).toBe(true);
+    // An empty snapshot asks for nothing.
+    expect(webuiWorkspaceAutoOpenBrowser({ tabs: [], snapshot: { surface: "isolated-chromium", tabs: [] }, enabled: true })).toBe(false);
+  });
+
+  it("marks a page the panel had no tab for, and only that one, as new", () => {
+    // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板 reads this flag: a page the
+    // Agent starts brings the panel up, while a snapshot that merely moves the
+    // page of a tab the reader already has must not re-open a closed panel.
+    const existing: WorkspacePanelState["tabs"] = [
+      {
+        id: "tab-1",
+        content: { kind: "web", target: target({ browserId: "browser-2", targetId: "tab-1" }), title: "First", url: "https://example.test/" },
+      } as WorkspacePanelTab,
+    ];
+    const reconciled = webuiWorkspaceTabStripReconcile(existing, {
+      surface: "isolated-chromium",
+      tabs: [
+        webTab({ target: target({ browserId: "browser-2", targetId: "tab-1" }), title: "First" }),
+        webTab({ target: target({ browserId: "browser-2", targetId: "tab-2" }), title: "Second" }),
+      ],
+    });
+
+    expect(reconciled.map((entry) => ({ target: entry.target.targetId, isNew: entry.isNew }))).toEqual([
+      { target: "tab-2", isNew: true },
+    ]);
   });
 
   it("does not dispatch when the snapshot's tabs are already panel tabs", () => {

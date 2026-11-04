@@ -291,6 +291,10 @@ test("Agents management shows the first agent and a half-size detail avatar by d
   await openManagement(page);
   await page.locator(".webui-plugin-category-filter button", { hasText: "Agents" }).click();
 
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) =>
+    request.operation === "pluginManagement" && request.body.action === "listAgents" &&
+    request.body.input?.include?.split(",").includes("model"),
+  ))).toBe(true);
   await expect(page.getByTestId("webui-agent-detail-name")).toHaveText("first-agent");
   await expect(page.getByTestId("webui-agent-detail-description")).toHaveText("First description");
   await expect(page.getByTestId("webui-agent-detail-model")).toHaveText("stub-model");
@@ -317,6 +321,9 @@ test("Agent add and edit forms show the model picker above the system prompt", a
   const dialog = page.locator('[data-webui-dialog-shell="true"][data-overlay-layer="plugin-item-dialog"]');
   await page.getByRole("button", { name: "First Agent" }).click();
   await expect(dialog.getByLabel("模型")).toContainText("Stub Model");
+  await dialog.getByLabel("模型").click();
+  await expect(page.locator('[data-webui-model-list-row="fixture/stub-model/"]')).toBeVisible();
+  await page.keyboard.press("Escape");
   const editOrder = await dialog.locator(".webui-agent-form").evaluate((form) =>
     [...form.querySelectorAll("label")].map((label) => label.textContent.trim()),
   );

@@ -353,8 +353,8 @@ function BrowserInstallationKeyDialog({
           </WebuiButtonLink>
         ) : (
           <p className="text-[13px] text-text_default_secondary">
-            这个扩展还没有连接过这台主机，主机不知道它的选项页地址。请在浏览器的扩展管理页里找到「MiniMax Code Browser
-            Bridge」，点「扩展选项」后粘贴密钥。
+这台主机还没有见过这个扩展的连接，不知道它的选项页地址。请在浏览器的扩展管理页（edge://extensions
+            或 chrome://extensions）里找到「MiniMax Code Browser Bridge」，点「扩展选项」后粘贴密钥。
           </p>
         )}
       </WebuiStack>

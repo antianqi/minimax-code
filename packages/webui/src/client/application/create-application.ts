@@ -196,6 +196,13 @@ export interface WebuiApplicationDeps {
    * Read when a session is created, so the choice takes effect on the next
    * session rather than on a running one — the runtime reads it at creation.
    */
+  /**
+   * 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板, injected from the
+   * composition root: the shell may not read platform storage itself (plan §5.3).
+   */
+  readonly browserAutoOpen?: {
+    readonly read: () => boolean;
+  };
   readonly appModePreference?: {
     readonly read: () => "coding" | "work";
   };
@@ -278,6 +285,10 @@ export interface WebuiApplication {
    * ingress; `disposed` is terminal and refuses to restart.
    */
   readonly state: () => WebuiApplicationLifecycleState;
+  /** Whether a page the Agent starts brings the browser panel up with it. */
+  readonly browserAutoOpen?: {
+    readonly read: () => boolean;
+  };
   /**
    * Install the assembly's routes and open the one event ingress.
    *
@@ -998,6 +1009,7 @@ export function createWebuiApplication(
 
   return {
     state: () => lifecycle,
+    ...(deps.browserAutoOpen ? { browserAutoOpen: deps.browserAutoOpen } : {}),
     disposalFailures: () => disposalFailures,
     start: (options) => {
       // A disposed instance is terminal: no hydration, no ingress, no second

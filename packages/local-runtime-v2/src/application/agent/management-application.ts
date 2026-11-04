@@ -26,6 +26,7 @@ interface IncludeFlags {
   readonly identity: boolean;
   readonly persona: boolean;
   readonly systemPrompt: boolean;
+  readonly model: boolean;
 }
 
 /** V2 Agent RPC adapter. All persistence and root sequencing stays in AgentApplication. */
@@ -63,7 +64,10 @@ export class AgentManagementApplication {
                   includeContent: true,
                 })
               : agent;
-          return toAgentDetail(detail, include);
+          const model = include.model
+            ? (await application.getConfigDocument(agent.requestRef)).configured.model
+            : undefined;
+          return toAgentDetail(detail, include, model);
         }),
       );
       return { agents };
@@ -127,7 +131,10 @@ export class AgentManagementApplication {
       const agent = await application.get(name, {
         includeContent: include.persona || include.systemPrompt,
       });
-      return { agent: toAgentDetail(agent, include) };
+      const model = include.model
+        ? (await application.getConfigDocument(name)).configured.model
+        : undefined;
+      return { agent: toAgentDetail(agent, include, model) };
     });
   }
 
@@ -156,7 +163,10 @@ export class AgentManagementApplication {
       const detail = await application.get(updated.requestRef, {
         includeContent: true,
       });
-      return { success: true, agent: toAgentDetail(detail, ALL_INCLUDE) };
+      const model = (
+        await application.getConfigDocument(updated.requestRef)
+      ).configured.model;
+      return { success: true, agent: toAgentDetail(detail, ALL_INCLUDE, model) };
     });
   }
 
@@ -189,6 +199,7 @@ const ALL_INCLUDE: IncludeFlags = {
   identity: true,
   persona: true,
   systemPrompt: true,
+  model: true,
 };
 
 function readInclude(raw: string | undefined): IncludeFlags {
@@ -207,6 +218,7 @@ function readInclude(raw: string | undefined): IncludeFlags {
       tokens.has("prompt") ||
       tokens.has("system_prompt") ||
       tokens.has("systemprompt"),
+    model: all || tokens.has("model"),
   };
 }
 
@@ -221,10 +233,12 @@ function toAgentDetail(
     readonly systemPrompt?: string;
   },
   include: IncludeFlags,
+  model?: string,
 ): AgentDetail {
   return {
     ...toAgentIdentity(agent, include),
     ...toAgentContent(agent, include),
+    ...(include.model && model ? { model } : {}),
   };
 }
 

@@ -54,7 +54,11 @@ import {
   createPlatformSecureCredentialStore,
   type SecureCredentialStore,
 } from "./credential-store.js";
-import { admitBrowserBridgeUpgrade, parseExtensionOrigin } from "./admission.js";
+import {
+  admitBrowserBridgeUpgrade,
+  parseExtensionOrigin,
+  rejectBrowserBridgeUpgrade,
+} from "./admission.js";
 import { WebuiBridgeCoreTransport } from "./core-transport.js";
 import { BrowserBridgePairing } from "./pairing.js";
 import { BrowserBridgeRegistry } from "./registry.js";
@@ -512,9 +516,12 @@ async readInstallationKey(
    *
    * The live session's identity comes first: it is the extension the person
    * is working with right now. The identities this host has proved come
-   * next, and the ones an operator configured last — the last two only when
-   * there is exactly one of them, because a page named for the wrong
-   * extension is worse than no page at all.
+   * next, most recently learned first — a machine can hold several builds of
+   * the same extension, because each unpacked build has its own id, and the
+   * one that connected last is the one the person is most likely holding.
+   * The identities an operator configured come last, and only when there is
+   * exactly one of them, because a page named for the wrong extension is
+   * worse than no page at all.
    */
   #extensionPage(
     surface: WebuiBridgeBrowserSurface,
@@ -524,7 +531,7 @@ async readInstallationKey(
     const configured = [...(this.#allowedIds.get(surface) ?? [])];
     const extensionId =
       live ??
-      (trusted.length === 1 ? trusted[0] : undefined) ??
+      trusted.at(-1) ??
       (configured.length === 1 ? configured[0] : undefined);
     if (!extensionId) return undefined;
     return {
@@ -567,6 +574,13 @@ async readInstallationKey(
    * the WebUI's `WebSocketServer` is never handed this socket.
    */
   handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    // A host that is closing admits nobody. An extension that reconnects
+    // during the shutdown would otherwise be attached to a server that is
+    // already on its way out, and it would keep the close waiting.
+    if (this.#closed) {
+      rejectBrowserBridgeUpgrade(socket, 503, "the host is shutting down");
+      return;
+    }
     const rejection = admitBrowserBridgeUpgrade(request, request.url, socket, {
       pairings: this.pairings,
       host: this.#host,
@@ -601,6 +615,20 @@ async readInstallationKey(
     this.#closed = true;
     this.#surfaces.clear();
     await this.registry.shutdown();
+    // Force-terminate every extension socket before the server closes. `ws`
+    // waits for the peer to ack the close handshake, and a peer that is gone
+    // — or one that is still mid-handshake and never answers — never acks.
+    // The close would then wait out the platform TCP timeout, and the host
+    // waiting on it (the service's own close, which closes the bridge before
+    // the HTTP listener) would never release its port: a host that cannot
+    // stop is a host that cannot be restarted.
+    for (const client of this.server.clients) {
+      try {
+        client.terminate();
+      } catch {
+        // Already torn down.
+      }
+    }
     await new Promise<void>((resolve) => {
       this.server.close(() => resolve());
     });

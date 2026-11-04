@@ -199,6 +199,30 @@ async function openUsagePage(page) {
   await expect(page.locator('[data-testid="settings-usage-token-plan"]')).toBeVisible();
 }
 
+test("the browser auto-open switch is the reader's, and remembers the answer", async ({ page }) => {
+  // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板. The row used to be a dead
+  // switch: always `checked={false}` and `disabled`, so nothing could turn it on.
+  await configureFixture(page, () => undefined);
+  await openApp(page, "#session=A");
+  await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
+  await page.locator('[data-testid="user-menu-settings"]').click();
+  await expect(settingsDialog(page)).toBeVisible();
+  const autoOpen = page.locator('[data-testid="browser-use-auto-open-switch"]');
+  await expect(autoOpen).toBeVisible();
+  await expect(autoOpen).toBeEnabled();
+  await expect(autoOpen).toHaveAttribute("aria-checked", "false");
+
+  await autoOpen.click();
+  await expect(autoOpen).toHaveAttribute("aria-checked", "true");
+  expect(await page.evaluate(() => window.localStorage.getItem("webui-browser-auto-open"))).toBe("true");
+
+  // The choice outlives the dialog, and the dialog reads it back.
+  await page.keyboard.press("Escape");
+  await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
+  await page.locator('[data-testid="user-menu-settings"]').click();
+  await expect(settingsDialog(page).locator('[data-testid="browser-use-auto-open-switch"]')).toHaveAttribute("aria-checked", "true");
+});
+
 test("usage settings keeps one page loader while its data is pending", async ({ page }) => {
   await configureFixture(page, () => {
     window.__fixture.setUsageQuotaResult({

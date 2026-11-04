@@ -44,6 +44,40 @@ test("shared text fields use the shared feedback transition contract", async ({ 
   expect(properties).toContain("outline-color");
 });
 
+test("composer mascot plays the transparent octopus and respects reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openApp(page, "#session=A");
+
+  const mascot = page.locator("video.webui-composer-mascot");
+  await expect(mascot).toBeVisible();
+  await expect(mascot).toHaveAttribute("src", "/assets/img/minimax-octopus-composer.webm");
+  await expect.poll(() => mascot.evaluate((video) => video.readyState >= 2)).toBe(true);
+  await expect.poll(() => mascot.evaluate((video) => !video.paused)).toBe(true);
+  const searchBox = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
+  for (const size of [{ width: 760, height: 900 }, { width: 1000, height: 700 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(size);
+    const mascotBox = await mascot.boundingBox();
+    const searchBoxBounds = await searchBox.boundingBox();
+    expect(Math.abs(mascotBox.x + mascotBox.width / 2 - (searchBoxBounds.x + searchBoxBounds.width / 2))).toBeLessThanOrEqual(1);
+  }
+  const alpha = await mascot.evaluate((video) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D is unavailable");
+    context.drawImage(video, 0, 0);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  });
+  expect(alpha).toBe(0);
+  if (process.env.WEBUI_COMPOSER_MASCOT_SCREENSHOT) {
+    await page.screenshot({ path: process.env.WEBUI_COMPOSER_MASCOT_SCREENSHOT, fullPage: true });
+  }
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(() => mascot.evaluate((video) => video.paused)).toBe(true);
+});
+
 function composer(page) {
   return page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
 }

@@ -579,7 +579,7 @@ export function createWebuiPluginWorkflows(deps: {
     const result = await call("listAgents", {
       limit: 100,
       search: query || undefined,
-      include: "identity,persona,system_prompt",
+      include: "identity,persona,system_prompt,model",
     });
     const base = webuiPluginRows(result, "agents");
     const rows = await Promise.all(

@@ -257,6 +257,29 @@ export function WebuiComposer({
 }): ReactElement {
 
   const { dom } = useWebuiBrowserCapabilities();
+  const composerMascotVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setPrefersReducedMotion(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  useEffect(() => {
+    const video = composerMascotVideoRef.current;
+    if (!video) return;
+    if (prefersReducedMotion) {
+      video.pause();
+      return;
+    }
+    void video.play().catch(() => undefined);
+  }, [prefersReducedMotion]);
   const { stream, sending, transcript } = useWebuiSessionState(sessionId);
   const turnCommands = useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides. The composer registers
@@ -1086,11 +1109,16 @@ export function WebuiComposer({
           <WebuiStack gap="compact" align="center" className="message-input-home-container rounded-[20px] bg-bg_default_scrim pb-2">
             <div className="w-full rounded-[20px] border border-border_default bg-bg_grouped_secondary_elevated p-3 webui-composer-card">
               {sessionLayout && sessionId ? (
-                <img
+                <video
+                  ref={composerMascotVideoRef}
                   className="webui-composer-mascot"
-                  src="/assets/img/minimax-octopus-composer.png"
-                  alt=""
+                  src="/assets/img/minimax-octopus-composer.webm"
                   aria-hidden="true"
+                  autoPlay={!prefersReducedMotion}
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
                   draggable="false"
                 />
               ) : null}

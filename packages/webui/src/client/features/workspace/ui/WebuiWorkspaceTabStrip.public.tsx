@@ -67,6 +67,7 @@ import { WebuiMenuItem } from "../../../ui/menu-item.js";
 import { WebuiTextInput } from "../../../ui/field.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
+
 import { useWebuiToastError } from "../../../ui/toast.js";
 
 const STRIP_COPY = {
@@ -120,7 +121,16 @@ export interface WebuiWorkspaceTabStripProps {
 export function webuiWorkspaceTabStripReconcile(
   tabs: readonly WorkspacePanelTab[],
   snapshot: WebuiBrowserWebTabSnapshot,
-): readonly { readonly command: WorkspacePanelCommand; readonly target: WebuiBrowserWebTab["target"] }[] {
+): readonly {
+  readonly command: WorkspacePanelCommand;
+  readonly target: WebuiBrowserWebTab["target"];
+  /**
+   * Whether the panel has no tab for this target yet — a page nobody was
+   * looking at until now. The auto-open rule reads this flag, so a snapshot
+   * that only moves an open tab's page cannot open the panel a second time.
+   */
+  readonly isNew: boolean;
+}[] {
   const known = new Map(
     tabs
       .filter(
@@ -133,33 +143,58 @@ export function webuiWorkspaceTabStripReconcile(
       ]),
   );
   return snapshot.tabs
-    .filter((published) => {
+    .map((published) => {
       const current = known.get(`${published.target.browserId}/${published.target.targetId}`);
       // A web tab the panel does not have yet is new, and a web tab whose
       // title, url, favicon or generation moved is the same tab showing another page.
       // A snapshot that changes nothing produces no work.
-      if (!current) return true;
-      return (
+      const isNew = current === undefined;
+      const changed =
+        isNew ||
         current.title !== published.title ||
         current.url !== published.url ||
         current.faviconUrl !== published.faviconUrl ||
         current.canGoBack !== published.canGoBack ||
         current.canGoForward !== published.canGoForward ||
-        current.target.generation !== published.target.generation
-      );
-    })
-    .map((published) => ({
-      command: {
-        type: "open-web-tab",
+        current.target.generation !== published.target.generation;
+      return {
+        changed,
+        isNew,
+        command: {
+          type: "open-web-tab",
+          target: published.target,
+          title: published.title,
+          url: published.url,
+          ...(published.faviconUrl ? { faviconUrl: published.faviconUrl } : {}),
+          ...(published.canGoBack !== undefined ? { canGoBack: published.canGoBack } : {}),
+          ...(published.canGoForward !== undefined ? { canGoForward: published.canGoForward } : {}),
+        } satisfies WorkspacePanelCommand,
         target: published.target,
-        title: published.title,
-        url: published.url,
-        ...(published.faviconUrl ? { faviconUrl: published.faviconUrl } : {}),
-        ...(published.canGoBack !== undefined ? { canGoBack: published.canGoBack } : {}),
-        ...(published.canGoForward !== undefined ? { canGoForward: published.canGoForward } : {}),
-      },
-      target: published.target,
-    }));
+      };
+    })
+    .filter((entry) => entry.changed)
+    .map(({ command, target, isNew }) => ({ command, target, isNew }));
+}
+
+/**
+ * Whether a published snapshot must bring the workspace panel up with it.
+ *
+ * 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板, the Desktop's
+ * `browserUseAutoOpenPanelEnabled`: a page the Agent starts on a panel that is
+ * not showing opens the panel. Only a target the panel has no tab for counts —
+ * a snapshot that merely moves an open tab's page must not re-open a panel the
+ * reader closed — and the reader's "off" wins over both.
+ *
+ * Pure, so the rule is asserted without a DOM; the shell dispatches
+ * `{ type: "open-panel" }` when it answers `true`.
+ */
+export function webuiWorkspaceAutoOpenBrowser(input: {
+  readonly tabs: readonly WorkspacePanelTab[];
+  readonly snapshot: WebuiBrowserWebTabSnapshot;
+  readonly enabled: boolean;
+}): boolean {
+  if (!input.enabled) return false;
+  return webuiWorkspaceTabStripReconcile(input.tabs, input.snapshot).some((entry) => entry.isNew);
 }
 
 /**
@@ -313,7 +348,11 @@ export function WebuiWorkspaceTabStrip({
         // Agent uses to open a tab (issue #206). A snapshot that lands
         // twice turns into no work, because the target is the reducer's
         // identity for a web tab.
-        for (const { command } of webuiWorkspaceTabStripReconcile(latestTabsRef.current, snapshot)) {
+        // 自动打开浏览器面板 is the shell's decision, not this effect's: the
+        // strip only exists while the panel is open, so the closed-panel case it
+        // answers never reaches here (see `WebuiClientFoundationApp`).
+        const reconciled = webuiWorkspaceTabStripReconcile(latestTabsRef.current, snapshot);
+        for (const { command } of reconciled) {
           dispatch(command);
         }
       },

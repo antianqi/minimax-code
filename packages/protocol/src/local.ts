@@ -1386,6 +1386,7 @@ export interface AgentDetail {
   description?: string;
   persona?: string;
   systemPrompt?: string;
+  model?: string;
 }
 
 export interface ListAgentsInput {

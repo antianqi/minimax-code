@@ -198,6 +198,47 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   await expect.poll(async () => (await panel.boundingBox()).width).toBeGreaterThan(after.width + 10);
 });
 
+test("the new tab launcher fits its wordmark, address box and shortcuts at compact panel sizes", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  await openPanel(page);
+  await openLauncher(page);
+
+  const sizes = [
+    { width: 760, height: 900 },
+    { width: 1000, height: 600 },
+    { width: 1280, height: 480 },
+    { width: 1280, height: 400 },
+    { width: 1280, height: 360 },
+  ];
+  for (const size of sizes) {
+    await page.setViewportSize(size);
+    const geometry = await page.evaluate(() => {
+      const rect = (selector) => {
+        const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect();
+        return { x, y, width, height, right: x + width, bottom: y + height };
+      };
+      const launcher = rect(".webui-workspace-launcher");
+      const brand = rect(".webui-workspace-launcher-brand");
+      const wordmark = rect(".webui-workspace-launcher-wordmark");
+      const omnibox = rect(".webui-workspace-launcher-omnibox");
+      const tiles = rect(".webui-workspace-launcher-tiles");
+      return { launcher, brand, wordmark, omnibox, tiles };
+    });
+    expect(geometry.wordmark.x).toBeGreaterThanOrEqual(geometry.brand.x - 1);
+    expect(geometry.wordmark.right).toBeLessThanOrEqual(geometry.brand.right + 1);
+    expect(geometry.brand.x).toBeGreaterThanOrEqual(geometry.launcher.x);
+    expect(geometry.brand.right).toBeLessThanOrEqual(geometry.launcher.right);
+    expect(geometry.omnibox.x).toBeGreaterThanOrEqual(geometry.launcher.x);
+    expect(geometry.omnibox.right).toBeLessThanOrEqual(geometry.launcher.right);
+    expect(geometry.brand.y).toBeGreaterThanOrEqual(geometry.launcher.y);
+    expect(geometry.tiles.y).toBeGreaterThanOrEqual(geometry.omnibox.bottom);
+    expect(geometry.brand.bottom).toBeLessThanOrEqual(geometry.omnibox.y);
+    expect(geometry.omnibox.bottom).toBeLessThanOrEqual(geometry.tiles.y);
+    expect(geometry.tiles.bottom).toBeLessThanOrEqual(geometry.launcher.bottom);
+  }
+});
+
 test("a narrow workspace crops the page instead of stretching its aspect ratio", async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 900 });
   await configureFixture(page, () => undefined);

@@ -418,6 +418,29 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     expect(harness.bridge.createProvider("chrome")).toBeUndefined();
   });
 
+  it("closes while an extension socket is still connected", async () => {
+    // A host that cannot stop is a host that cannot be restarted: the port it
+    // still holds makes the next start fail, and the person is told the
+    // restart happened when it did not. The close therefore has to finish
+    // even when a peer is connected and never answers.
+    const harness = await startHarness();
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${harness.port}${WEBUI_BROWSER_BRIDGE_PATH}`,
+      { headers: { origin: `chrome-extension://${EDGE_EXTENSION_ID}/` } },
+    );
+    await new Promise<void>((resolve, reject) => {
+      socket.once("open", () => resolve());
+      socket.once("error", reject);
+    });
+    // The socket never introduces itself: it is connected but not admitted,
+    // so nothing in the registry holds it and nothing answers for it.
+    const outcome = await Promise.race([
+      harness.bridge.close().then(() => "closed" as const),
+      new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 2_000)),
+    ]);
+    expect(outcome).toBe("closed");
+  });
+
   it("lists the announced targets of the live extension session", async () => {
     const harness = await startHarness();
     const client = await pairEdge(harness);
@@ -511,6 +534,24 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     expect(view?.extensionId).toBe(EDGE_EXTENSION_ID);
     expect(view?.optionsUrl).toBe(`chrome-extension://${EDGE_EXTENSION_ID}/options.html`);
     client.socket.terminate();
+  });
+
+  it("names the extension it learned most recently when a machine holds several", async () => {
+    // Every unpacked build of the extension has its own id, so one machine can
+    // hold more than one of them. The live session names the build in use;
+    // without one, the host names the build it learned last, because that is
+    // the one the person is most likely holding.
+    const earlier = "a".repeat(32);
+    const later = "b".repeat(32);
+    const trusted = createInMemoryTrustedExtensionStore();
+    trusted.trust("edge", earlier);
+    trusted.trust("edge", later);
+    const harness = await startHarness({ env: {}, trustedExtensionStore: trusted });
+
+    const view = await harness.bridge.readInstallationKey("edge");
+
+    expect(view?.extensionId).toBe(later);
+    expect(view?.optionsUrl).toBe(`chrome-extension://${later}/options.html`);
   });
 
   it("stops answering once the extension session goes away", async () => {

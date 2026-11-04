@@ -31,6 +31,24 @@ if (!process.env.WEBUI_SERVER_TSX) {
     if (signal) process.kill(process.pid, signal);
     else process.exit(code ?? 1);
   });
+  // The child owns the shutdown. It runs in this process group, so the
+  // terminal's Ctrl+C reaches it directly, and the parent must not die first:
+  // a parent that exits while the child lives leaves the server orphaned. It
+  // keeps the port bound and keeps logging, so the next start fails on an
+  // address nobody released — and the person is told the restart happened
+  // when it did not.
+  let stopping = false;
+  const onSignal = () => {
+    if (stopping) return;
+    stopping = true;
+    // A child that cannot stop itself must not keep the parent alive either:
+    // the whole point of the signal is that the port comes back.
+    const force = setTimeout(() => child.kill("SIGKILL"), 20_000);
+    force.unref?.();
+    child.on("exit", () => clearTimeout(force));
+  };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 } else {
   const os = await import("node:os");
   const path = await import("node:path");
@@ -184,6 +202,32 @@ const port = createHarnessPortFromHost(assembled.host, {
     await service.close();
     await browser.close();
   };
-  process.once("SIGINT", () => void close());
-  process.once("SIGTERM", () => void close());
+  // Ctrl+C has to end the process, and it has to be bounded. The close is
+  // graceful — the extensions get their `closed` frame and the listeners are
+  // released — but a peer that never answers, or a handle that never drains,
+  // must not keep the port bound. A server that cannot be stopped is a server
+  // that cannot be restarted, and the next start fails on the address it
+  // still holds.
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) {
+      // The second signal is the person saying they meant it.
+      process.exit(130);
+    }
+    stopping = true;
+    const force = setTimeout(() => process.exit(130), 15_000);
+    force.unref?.();
+    void close().then(
+      () => {
+        clearTimeout(force);
+        process.exit(0);
+      },
+      () => {
+        clearTimeout(force);
+        process.exit(1);
+      },
+    );
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }

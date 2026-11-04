@@ -24,3 +24,17 @@ export function readWebuiPluginRow(row: WebuiPluginRow, ...keys: readonly string
   for (const key of keys) if (typeof row[key] === "string") return row[key] as string;
   return "";
 }
+
+/** Agent models may be projected directly or remain inside their definition. */
+export function readWebuiAgentModel(row: WebuiPluginRow): string {
+  const direct = readWebuiPluginRow(row, "model");
+  if (direct) return direct;
+  for (const key of ["initialDefinition", "definition", "config"] as const) {
+    const nested = row[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const model = readWebuiPluginRow(nested as WebuiPluginRow, "model");
+      if (model) return model;
+    }
+  }
+  return "";
+}

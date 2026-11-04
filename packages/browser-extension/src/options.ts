@@ -48,15 +48,6 @@ import {
  */
 const OUTCOME_WAIT_MS = 8_000;
 
-/**
- * How far back a parked failure still counts as this attempt's.
- *
- * The worker's clock and the page's are the same clock, but the failure is
- * written a moment after the save, and a round to the nearest second is
- * enough to keep a genuine failure from being read as somebody else's.
- */
-const FRESHNESS_SLACK_MS = 1_000;
-
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
   if (!found) throw new Error(`options page is missing #${id}`);
@@ -104,7 +95,17 @@ async function renderStored(): Promise<void> {
  * extension would sit there configured but unconnected — and the person
  * would have to reload the extension by hand to find out.
  */
-async function wake(since: number): Promise<void> {
+async function wake(): Promise<void> {
+  // The previous outcome is cleared first, so what the page reports is this
+  // attempt's and not an earlier one. A timestamp would not do it: the
+  // worker parks its failure the moment it starts, which can be within a
+  // second of the paste, and a failure that old would still look fresh.
+  await chrome.storage.session
+    .remove([
+      WEBUI_BROWSER_BRIDGE_STATUS_STORAGE_KEY,
+      WEBUI_BROWSER_BRIDGE_LAST_ERROR_STORAGE_KEY,
+    ])
+    .catch(() => undefined);
   try {
     const reply = await chrome.runtime.sendMessage({
       type: WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE,
@@ -119,7 +120,7 @@ async function wake(since: number): Promise<void> {
     say("Saved. The extension could not be woken to connect — reload the extension and try again.");
     return;
   }
-  await reportOutcome(since);
+  await reportOutcome();
 }
 
 /**
@@ -131,7 +132,7 @@ async function wake(since: number): Promise<void> {
  * ignored, because an error from before the paste says nothing about the
  * paste.
  */
-async function reportOutcome(since: number): Promise<void> {
+async function reportOutcome(): Promise<void> {
   const deadline = Date.now() + OUTCOME_WAIT_MS;
   while (Date.now() < deadline) {
     const [status, failure] = await Promise.all([
@@ -143,20 +144,13 @@ async function reportOutcome(since: number): Promise<void> {
       return;
     }
     const parked = failure[WEBUI_BROWSER_BRIDGE_LAST_ERROR_STORAGE_KEY];
-    if (isFreshFailure(parked, since)) {
+    if (parked !== undefined) {
       say(failureMessage(parked));
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
   say("Still connecting to the WebUI…");
-}
-
-/** Whether a parked failure belongs to the attempt being watched. */
-function isFreshFailure(value: unknown, since: number): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const at = (value as { at?: unknown }).at;
-  return typeof at === "number" && at >= since;
 }
 
 /** The message of a parked failure, or a generic one. */
@@ -178,9 +172,8 @@ async function onSaveOrigin(): Promise<void> {
     return;
   }
   await renderOrigin();
-  const since = Date.now() - FRESHNESS_SLACK_MS;
   say("Address saved. Connecting to the WebUI…");
-  await wake(since);
+  await wake();
 }
 
 async function onSave(): Promise<void> {
@@ -197,9 +190,8 @@ async function onSave(): Promise<void> {
   // the DOM is the one place this page could leak it.
   input.value = "";
   await renderStored();
-  const since = Date.now() - FRESHNESS_SLACK_MS;
   say("Saved. Connecting to the WebUI…");
-  await wake(since);
+  await wake();
 }
 
 async function onClear(): Promise<void> {

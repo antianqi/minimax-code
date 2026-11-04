@@ -119,10 +119,16 @@ export function webuiBrowserBridgeWebSocketFactory(url: string): WebuiBrowserBri
       // established.
       //
       // The platform does not say *why* a WebSocket failed (it withholds the
-      // reason on purpose), so the cause is replaced with the one thing the
-      // person can act on: the address that was tried.
+      // reason on purpose), and the two reasons a person can act on look the
+      // same from here: the host is not listening, or the host is listening
+      // and refused this browser. The message therefore names both, along
+      // with the address that was tried.
       socket.addEventListener("error", () =>
-        handlers.onError(new Error(`the WebUI could not be reached at ${url}`)),
+        handlers.onError(
+          new Error(
+            `the WebUI did not accept the connection at ${url} — it may not be running, or it may not be allowed to admit this browser`,
+          ),
+        ),
       );
     },
   };

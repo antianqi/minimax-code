@@ -264,6 +264,18 @@ function validateCreateSessionRequestBody(
       code: WebuiErrorCode.invalidBody,
       message: "teamModeOff must be a boolean",
     };
+  // The application mode is the two values the runtime resolves, or absent (its
+  // own default). Anything else is a client bug rather than a mode to guess at.
+  if (
+    candidate.appMode !== undefined &&
+    candidate.appMode !== "coding" &&
+    candidate.appMode !== "work"
+  )
+    return {
+      ok: false,
+      code: WebuiErrorCode.invalidBody,
+      message: "appMode must be coding or work",
+    };
   return {
     ok: true,
     body: {
@@ -274,6 +286,9 @@ function validateCreateSessionRequestBody(
       ...(candidate.teamModeOff === undefined
         ? {}
         : { teamModeOff: candidate.teamModeOff }),
+      ...(candidate.appMode === undefined
+        ? {}
+        : { appMode: candidate.appMode }),
     },
   };
 }

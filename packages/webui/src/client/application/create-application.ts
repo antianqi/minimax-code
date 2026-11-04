@@ -190,6 +190,15 @@ export interface WebuiApplicationDeps {
     readonly readNoProjectFlag?: () => boolean;
     readonly writeNoProjectFlag?: (value: boolean) => void;
   };
+  /**
+   * The application mode (设置 › 通用 › 模式) this client remembers.
+   *
+   * Read when a session is created, so the choice takes effect on the next
+   * session rather than on a running one — the runtime reads it at creation.
+   */
+  readonly appModePreference?: {
+    readonly read: () => "coding" | "work";
+  };
   /** Seed for the composer store (SSR / tests). */
   readonly composer?: WebuiComposerStore;
   /**
@@ -920,6 +929,9 @@ export function createWebuiApplication(
     // goal path read it before this became the one owner. `WebuiTransport` satisfies both slices, so
     // production has one source; a host that wires only one of them still creates here.
     ...(slices.sessions.createSession ? { createSession: slices.sessions.createSession } : {}),
+    // The remembered mode reaches session creation through the host: the
+    // preference is browser storage, which this layer may not read itself.
+    ...(deps.appModePreference ? { readAppMode: deps.appModePreference.read } : {}),
     storage: {
       readNoProjectFlag: () => deps.workspacePreference?.readNoProjectFlag?.() ?? false,
       writeNoProjectFlag: (value) => deps.workspacePreference?.writeNoProjectFlag?.(value),

@@ -50,6 +50,8 @@ export interface WebuiClientCreateSessionRequest {
   /** Optional: absent means "use the default workspace" (harness resolves it). */
   readonly workspaceDir?: string;
   readonly teamModeOff?: boolean;
+  /** What the session runs as; see `WebuiCreateSessionRequest.appMode`. */
+  readonly appMode?: "coding" | "work";
 }
 
 export interface WebuiClientCreateSessionResult {

@@ -191,6 +191,13 @@ export interface WebuiCreateSessionRequest {
   /** Optional: absent means "use the default workspace" (harness resolves it). */
   readonly workspaceDir?: string;
   readonly teamModeOff?: boolean;
+  /**
+   * What the session runs as. The runtime owns the meaning: it resolves the mode
+   * to the session's prompts and to the capabilities it gates
+   * (`packages/local-runtime/src/runtime/app-mode.ts`). Absent keeps the
+   * runtime's own default (`coding`), so an older client is unchanged.
+   */
+  readonly appMode?: "coding" | "work";
 }
 
 /**

@@ -2351,6 +2351,26 @@ describe("WebUI composer app-to-helper seam", () => {
     ).toBe(false);
   });
 
+  it("carries the application mode to session creation, or nothing at all", () => {
+    // The mode changes what the runtime resolves for the session (prompts and
+    // the capabilities it gates), so it must survive validation unchanged; and
+    // an absent mode must stay absent rather than being coerced to the default,
+    // because absent is how an older client keeps the runtime's own default.
+    const coding = createSessionOperation.validate({ name: "main", appMode: "coding" });
+    expect(coding.ok).toBe(true);
+    expect(coding.ok ? coding.body : undefined).toEqual({ name: "main", appMode: "coding" });
+
+    const work = createSessionOperation.validate({ name: "main", appMode: "work" });
+    expect(work.ok ? work.body : undefined).toEqual({ name: "main", appMode: "work" });
+
+    expect(createSessionOperation.validate({ name: "main" }).ok).toBe(true);
+
+    // Anything else is a client bug, and the reason names the two values.
+    const rejected = createSessionOperation.validate({ name: "main", appMode: "general" });
+    expect(rejected.ok).toBe(false);
+    expect(rejected.ok ? undefined : rejected.message).toBe("appMode must be coding or work");
+  });
+
   it("recognises absolute workspace paths on both platforms and rejects bare names", () => {
     // A browser can only report a bare folder name for a picked project, so
     // this predicate is what keeps one out of a createSession request.

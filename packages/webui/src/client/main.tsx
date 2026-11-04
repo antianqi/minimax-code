@@ -26,6 +26,7 @@ import {
   getWebuiBrowserStorage,
 } from "./platform/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
+import { readWebuiAppMode } from "./platform/app-mode.js";
 import { createWebuiComposerStore } from "./features/composer/application/composer-store.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
 import { createWebuiOpenEventChannel } from "./bindings/event-channel-adapter.js";
@@ -205,6 +206,10 @@ function WebuiClientRoot({
           readNoProjectFlag: storage.readNoProjectFlag,
           writeNoProjectFlag: storage.writeNoProjectFlag,
         },
+        // The application mode chosen in 设置 › 通用 › 模式. Read at session
+        // creation, where the runtime resolves it; the host owns the storage and
+        // the application may not read it itself.
+        appModePreference: { read: readWebuiAppMode },
         // The port slices this root cut above. The assembly builds every
         // business owner from them, so the shell composes screens instead of
         // constructing owners.

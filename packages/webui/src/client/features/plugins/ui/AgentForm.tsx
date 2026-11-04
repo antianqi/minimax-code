@@ -8,6 +8,7 @@ import { useState, type ReactElement } from "react";
 
 import {
   readWebuiPluginRow as read,
+  readWebuiAgentModel,
   type WebuiPluginRow as Row,
 } from "../contracts/plugin-rows.js";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
@@ -35,7 +36,7 @@ export function AgentForm({
   );
   const [description, setDescription] = useState(read(editing ?? {}, "description"));
   const [prompt, setPrompt] = useState(read(editing ?? {}, "systemPrompt", "system_prompt"));
-  const [model, setModel] = useState(read(editing ?? {}, "model"));
+  const [model, setModel] = useState(readWebuiAgentModel(editing ?? {}));
   const { errors, validateRequired, clearFieldError } = useWebuiFormValidation();
 
   const save = async () => {
@@ -90,31 +91,25 @@ export function AgentForm({
         )}
       />
       <WebuiField
+        label="模型"
+        control={(props) => (
+          <WebuiModelSelect
+            {...props}
+            value={model}
+            onChange={setModel}
+            formatValue={webuiBareModelValue}
+            placeholder="使用默认模型"
+            defaultLabel="使用默认模型"
+          />
+        )}
+      />
+      <WebuiField
         className="wide"
         label="系统提示词"
         control={(props) => (
           <WebuiTextarea {...props} value={prompt} placeholder="描述 Agent 应如何工作和回应" onChange={(event) => setPrompt(event.currentTarget.value)} />
         )}
       />
-      {/* The model belongs to the initial definition, which only a new agent
-          sends; an edit updates the agent's fields and leaves it alone. The
-          field is the catalogue's own list: a definition stores a model name,
-          so it writes the bare id and offers the empty value back. */}
-      {editing ? null : (
-        <WebuiField
-          label="模型"
-          control={(props) => (
-            <WebuiModelSelect
-              {...props}
-              value={model}
-              onChange={setModel}
-              formatValue={webuiBareModelValue}
-              placeholder="使用默认模型"
-              defaultLabel="使用默认模型"
-            />
-          )}
-        />
-      )}
       <WebuiDialogActions>
         {editing && onChatWithAgent ? (
           <WebuiButton variant="secondary" size="dialog" onClick={() => onChatWithAgent(name)}>

@@ -231,6 +231,9 @@
     -ms-overflow-style: none;
   }
   .webui-plugin-page-scroll::-webkit-scrollbar { display: none; }
+  .webui-plugin-page-scroll:has(.webui-agent-editor) {
+    overflow: hidden;
+  }
   .webui-plugin-category-filter > .webui-mavis-button {
     width: fit-content;
     max-width: 100%;
@@ -257,6 +260,10 @@
     width: 100%;
     max-width: 960px;
     margin: 0;
+  }
+  .webui-plugin-page-content:has(> .webui-agent-editor) {
+    height: 100%;
+    min-height: 0;
   }
   .webui-plugin-page-content > .webui-feedback--empty {
     align-items: center;
@@ -467,10 +474,13 @@
   .webui-agent-editor {
     display: grid;
     width: min(960px, 100%);
-    min-height: 560px;
+    height: 100%;
+    min-height: 0;
     grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     gap: var(--spacing_32);
     margin: 0 auto;
+    overflow: hidden;
   }
   .webui-plugin-management.is-managing .webui-agent-editor {
     width: min(768px, calc(100% - 64px));
@@ -479,8 +489,11 @@
   .webui-agent-list {
     display: flex;
     min-width: 0;
+    min-height: 0;
     flex-direction: column;
     gap: var(--spacing_2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .webui-agent-list-item {
     align-items: center;
@@ -504,7 +517,10 @@
   .webui-agent-detail {
     display: flex;
     min-width: 0;
+    min-height: 0;
     flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .webui-agent-fields {
     display: grid;

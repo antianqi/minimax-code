@@ -140,7 +140,7 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
   await expect(popover).toHaveAttribute("data-webui-motion", "surface");
   await expect(popover).toHaveAttribute("data-webui-motion-state", "enter");
   const skeletons = page.locator('[data-testid="usage-popover-loading"] .webui-skeleton.webui-motion-loading');
-  await expect(skeletons).toHaveCount(8);
+  await expect(skeletons).toHaveCount(4);
   await expect.poll(() => skeletons.first().evaluate((element) => getComputedStyle(element).animationName))
     .toBe("webui-skeleton-pulse");
   const loadingGeometry = await page.locator('[data-testid="usage-popover-loading"] .webui-skeleton-group > .webui-skeleton').evaluateAll((elements) =>
@@ -149,9 +149,9 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
       return { width: rect.width, height: rect.height };
     }),
   );
-  expect(loadingGeometry).toHaveLength(8);
+  expect(loadingGeometry).toHaveLength(4);
   expect(loadingGeometry.every((shape) => shape.width >= 72 && shape.height === 28)).toBe(true);
-  expect(new Set(loadingGeometry.map((shape) => shape.width)).size).toBeGreaterThan(4);
+  expect(new Set(loadingGeometry.map((shape) => shape.width)).size).toBeGreaterThan(2);
   expect(loadingGeometry.slice(1).some((shape, index) => shape.width > loadingGeometry[index].width)).toBe(true);
 
   await page.evaluate(() => window.__fixture.resolveAllPending("getUsageQuota", {}, { signedIn: false }));
@@ -160,6 +160,44 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
   await expect(popover).toHaveAttribute("data-webui-motion-state", "exit");
   expect(await popover.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-motion-surface-exit");
   await expect(popover).toHaveCount(0, { timeout: 500 });
+});
+
+test("usage loading keeps the quota popover at its resolved size", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.delayEvery("getUsageQuota", {}));
+  await openApp(page, "#session=A");
+  await page.evaluate(() => window.__fixture.setUsageQuotaResult({
+    signedIn: true,
+    creditBalance: "4691",
+    quota: {
+      fiveHour: { usedPercent: 100, totalPercent: 100, unlimited: false },
+      weekly: { usedPercent: 54, totalPercent: 100, unlimited: false },
+    },
+  }));
+  await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
+  await page.locator('[data-testid="user-menu-usage"]').click();
+
+  const popover = page.getByTestId("usage-popover");
+  await expect(page.getByTestId("usage-popover-loading")).toBeVisible();
+  const loadingSize = await popover.evaluate((element) => {
+    const { width, height } = element.getBoundingClientRect();
+    return { width, height };
+  });
+
+  await page.evaluate(() => window.__fixture.resolveAllPending("getUsageQuota", {}, {
+    signedIn: true,
+    creditBalance: "4691",
+    quota: {
+      fiveHour: { usedPercent: 100, totalPercent: 100, unlimited: false },
+      weekly: { usedPercent: 54, totalPercent: 100, unlimited: false },
+    },
+  }));
+  await expect(page.getByTestId("usage-popover-content")).toBeVisible();
+  const readySize = await popover.evaluate((element) => {
+    const { width, height } = element.getBoundingClientRect();
+    return { width, height };
+  });
+  expect(Math.abs(loadingSize.width - readySize.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(loadingSize.height - readySize.height)).toBeLessThanOrEqual(1);
 });
 
 test("the legal notice names the account's own documents", async ({ page }) => {

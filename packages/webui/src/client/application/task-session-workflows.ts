@@ -62,6 +62,14 @@ export interface WebuiTaskSessionDeps {
   /** The creation capability. Absent means this host cannot create at all. */
   readonly createSession?: WebuiClientSessionCreator;
   /**
+   * The application mode this client remembers, read at creation time.
+   *
+   * Injected rather than imported: the remembered choice lives in browser
+   * storage, which is the composition root's business, and this workflow stays
+   * free of the platform layer (the layer rule forbids the edge).
+   */
+  readonly readAppMode?: () => "coding" | "work";
+  /**
    * Record the Agent Team choice the created session was started with. Sessions
    * owns that choice, so this asks for the record rather than writing it here.
    */
@@ -234,6 +242,10 @@ export function createWebuiTaskSessionWorkflows(
           name: input.name ?? "main",
           ...(input.workspaceDir !== undefined ? { workspaceDir: input.workspaceDir } : {}),
           teamModeOff: input.teamModeOff,
+          // What the session runs as. The runtime resolves the mode to the
+          // session's prompts and to the capabilities it gates, so a session
+          // created in 通用 › 日常工作 behaves like the Desktop's.
+          ...(deps.readAppMode ? { appMode: deps.readAppMode() } : {}),
         });
       } catch (error) {
         pendingHomeIncarnation = undefined;

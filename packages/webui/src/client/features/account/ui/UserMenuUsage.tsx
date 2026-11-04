@@ -31,7 +31,7 @@ function UsageSkeleton({ loading }: { readonly loading?: boolean }): ReactElemen
       className="webui-user-menu-usage-skeleton"
       data-testid={loading ? "usage-popover-loading" : "usage-popover-pending"}
     >
-      <WebuiSkeletonGroup rows={8} />
+      <WebuiSkeletonGroup rows={4} />
     </WebuiStack>
   );
 }

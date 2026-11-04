@@ -2,6 +2,14 @@ import type { ReactElement } from "react";
 import { IconRobot } from "@tabler/icons-react";
 
 type AgentRecord = Record<string, unknown>;
+type AgentAvatarSize = "tiny" | "compact" | "small" | "large";
+
+const AGENT_AVATAR_SIZE_CLASS: Record<AgentAvatarSize, string> = {
+  tiny: "webui-agent-avatar--tiny",
+  compact: "webui-agent-avatar--compact",
+  small: "webui-agent-avatar--small",
+  large: "webui-agent-avatar--large",
+};
 
 function recordOf(value: unknown): AgentRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -45,12 +53,12 @@ function avatarSource(agent: AgentRecord): string | undefined {
 export function WebuiAgentAvatar({ agent, agentName, size }: {
   readonly agent?: unknown;
   readonly agentName?: string;
-  readonly size: "tiny" | "compact" | "small" | "large";
+  readonly size: AgentAvatarSize;
 }): ReactElement {
   const details = recordOf(agent);
   const source = avatarSource({ ...details, ...(agentName ? { agentName } : {}) });
   return (
-    <span className={`webui-agent-avatar webui-agent-avatar--${size}`} aria-hidden="true">
+    <span className={`webui-agent-avatar ${AGENT_AVATAR_SIZE_CLASS[size]}`} aria-hidden="true">
       {source
         ? <img src={source} alt="" draggable={false} />
         : <IconRobot className="webui-agent-avatar-fallback" aria-hidden="true" />}

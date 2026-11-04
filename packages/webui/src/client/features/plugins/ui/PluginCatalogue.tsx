@@ -10,6 +10,7 @@ import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem } from "../../../ui/menu-item.js";
 import {
   readWebuiPluginRow as read,
+  readWebuiAgentModel,
   type WebuiPluginRow as Row,
 } from "../contracts/plugin-rows.js";
 import { PluginImportDialog } from "./PluginImportDialog.js";
@@ -285,6 +286,9 @@ export function PluginCatalogue({
       "displayName",
       "display_name",
     );
+  const activeAgent = selectedAgent
+    ? filtered.find((item) => nameOf(item) === nameOf(selectedAgent)) ?? filtered[0]
+    : filtered[0];
   const chatWithAgent = async (agent: Row) => {
     if (!onChatWithAgent) return;
     try {
@@ -555,7 +559,7 @@ export function PluginCatalogue({
                 size="row"
                 className="webui-agent-list-item w-full gap-2.5 overflow-hidden"
                 key={nameOf(item)}
-                aria-pressed={selectedAgent === item}
+                aria-pressed={activeAgent !== undefined && nameOf(activeAgent) === nameOf(item)}
                 onClick={() => {
                   attachItemDialog();
                   setEditing(item);
@@ -593,13 +597,13 @@ export function PluginCatalogue({
             <div className="webui-agent-fields">
               <div className="webui-agent-avatar-field">
                 头像
-                <WebuiAgentAvatar agent={selectedAgent} size="large" />
+                <WebuiAgentAvatar agent={activeAgent} size="small" />
               </div>
               <div>
                 名称
                 <span data-testid="webui-agent-detail-name">
                   {read(
-                    selectedAgent ?? {},
+                    activeAgent ?? {},
                     "name",
                     "displayName",
                     "display_name",
@@ -609,30 +613,30 @@ export function PluginCatalogue({
               <div className="webui-agent-model-field">
                 模型
                 <span data-testid="webui-agent-detail-model">
-                  {read(selectedAgent ?? {}, "model") || "—"}
+                  {readWebuiAgentModel(activeAgent ?? {}) || "—"}
                 </span>
               </div>
               <div>
                 描述
                 <span data-testid="webui-agent-detail-description">
-                  {read(selectedAgent ?? {}, "description") || "—"}
+                  {read(activeAgent ?? {}, "description") || "—"}
                 </span>
               </div>
               <div>
                 系统提示词
                 <span data-testid="webui-agent-detail-prompt">
-                  {read(selectedAgent ?? {}, "systemPrompt", "system_prompt")}
+                  {read(activeAgent ?? {}, "systemPrompt", "system_prompt")}
                 </span>
               </div>
               <div className="webui-agent-actions">
-                {selectedAgent ? (
+                {activeAgent ? (
                   <WebuiButton
                     variant="danger"
                     size="compact"
                     onClick={() =>
                       confirmMutation("删除 Agent", {
                         kind: "deleteAgent",
-                        name: nameOf(selectedAgent),
+                        name: nameOf(activeAgent),
                       })
                     }
                   >
@@ -644,21 +648,21 @@ export function PluginCatalogue({
                 <WebuiButton
                   variant="outline"
                   size="compact"
-                  disabled={busy || !selectedAgent}
+                  disabled={busy || !activeAgent}
                   onClick={() => {
                     attachItemDialog();
-                    setEditing(selectedAgent);
+                    setEditing(activeAgent);
                     setDialog("agent");
                   }}
                 >
                   编辑
                 </WebuiButton>
-                {selectedAgent && onChatWithAgent ? (
+                {activeAgent && onChatWithAgent ? (
                   <WebuiButton
                     variant="surface-quiet"
                     size="compact"
                     disabled={busy}
-                    onClick={() => chatWithAgent(selectedAgent)}
+                    onClick={() => chatWithAgent(activeAgent)}
                   >
                     和他对话
                   </WebuiButton>

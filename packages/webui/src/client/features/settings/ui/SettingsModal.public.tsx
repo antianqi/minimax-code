@@ -46,6 +46,12 @@ import { ManagedOverlayBoundary, useDialogLayer } from "../../../ui/overlay-list
 import { useOverlayCoordinator } from "../../../ui/overlay-coordinator.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import {
+  WEBUI_APP_MODE_DEFAULT,
+  WEBUI_APP_MODE_STORAGE_KEY,
+  parseWebuiAppMode,
+  type WebuiAppMode,
+} from "../../../platform/app-mode.js";
 import { WebuiMotion, WebuiPage } from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
@@ -187,6 +193,9 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   const [wrap, setWrap] = useState(() => stored("file_line_wrap", "true", storage) === "true");
   const [newTab, setNewTab] = useState(() => stored("file_open_in_new_tab", "false", storage) === "true");
   const [contextWindow, setContextWindow] = useState(() => stored("webui-context-window-usage", "true", storage) !== "false");
+  // The application mode: what a session created from this client runs as. The
+  // runtime owns what the mode means; this page owns the choice.
+  const [appMode, setAppMode] = useState(() => parseWebuiAppMode(stored(WEBUI_APP_MODE_STORAGE_KEY, WEBUI_APP_MODE_DEFAULT, storage)));
   const [shortcuts, setShortcuts] = useState(() => parseShortcutBindings(storage.getItem(SHORTCUT_STORAGE_KEY)));
   const actualTheme = resolveThemePreference(theme, systemDark);
   useEffect(() => {
@@ -204,6 +213,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
     storage.setItem("file_line_wrap", String(wrap));
     storage.setItem("file_open_in_new_tab", String(newTab));
     storage.setItem("webui-context-window-usage", String(contextWindow));
+    storage.setItem(WEBUI_APP_MODE_STORAGE_KEY, appMode);
     storage.setItem(SHORTCUT_STORAGE_KEY, serializeShortcutBindings(shortcuts));
     dom.dispatchContextWindowUsageChange();
   }, [actualTheme, contextWindow, dom, language, newTab, shortcuts, storage, theme, wrap]);
@@ -294,7 +304,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
               {active === "account" ? <AccountUsageShareAction /> : null}
             </header>
             <WebuiZoneBoundary zone={active === "coding" ? "review" : "settings"}>
-              {active === "desktop" ? <GenericPage theme={theme} setTheme={setTheme} wrap={wrap} setWrap={setWrap} newTab={newTab} setNewTab={setNewTab} contextWindow={contextWindow} setContextWindow={setContextWindow} version={version?.version ?? ""} /> : null}
+              {active === "desktop" ? <GenericPage theme={theme} setTheme={setTheme} wrap={wrap} setWrap={setWrap} newTab={newTab} setNewTab={setNewTab} contextWindow={contextWindow} setContextWindow={setContextWindow} appMode={appMode} setAppMode={setAppMode} version={version?.version ?? ""} /> : null}
               {active === "custom-instructions" ? <PersonalizationSettings {...(onCreateMemorySession ? { onCreateInSession: onCreateMemorySession } : {})} /> : null}
               {active === "shortcuts" ? <ShortcutsSettings bindings={shortcuts} onChange={setShortcuts} onReset={() => setShortcuts(DEFAULT_SHORTCUT_BINDINGS)} /> : null}
               {active === "browser" ? <BrowserSettingsPage /> : null}
@@ -327,13 +337,13 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   );
 }
 
-function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contextWindow, setContextWindow, version }: { readonly theme: string; readonly setTheme: (value: string) => void; readonly wrap: boolean; readonly setWrap: (value: boolean) => void; readonly newTab: boolean; readonly setNewTab: (value: boolean) => void; readonly contextWindow: boolean; readonly setContextWindow: (value: boolean) => void; readonly version: string }): ReactElement {
+function GenericPage({ theme, setTheme, wrap, setWrap, newTab, setNewTab, contextWindow, setContextWindow, appMode, setAppMode, version }: { readonly theme: string; readonly setTheme: (value: string) => void; readonly wrap: boolean; readonly setWrap: (value: boolean) => void; readonly newTab: boolean; readonly setNewTab: (value: boolean) => void; readonly contextWindow: boolean; readonly setContextWindow: (value: boolean) => void; readonly appMode: WebuiAppMode; readonly setAppMode: (value: WebuiAppMode) => void; readonly version: string }): ReactElement {
   return (
     <SettingsPage testId="content-body">
       <SettingsSection title="模式" testId="app-mode-section" bare>
-        <div data-testid="app-mode-options" className="webui-mode-options">
-          <ModeCard testId="app-mode-option-coding" title="适用于编程开发" description="保留技术细节与开发工具" icon="coding" selected />
-          <ModeCard testId="app-mode-option-work" title="适用于日常工作" description="同样强大，减少技术细节干扰" icon="work" />
+        <div data-testid="app-mode-options" className="webui-mode-options" role="radiogroup" aria-label="应用模式">
+          <ModeCard testId="app-mode-option-coding" title="适用于编程开发" description="保留技术细节与开发工具" icon="coding" selected={appMode === "coding"} onSelect={() => setAppMode("coding")} />
+          <ModeCard testId="app-mode-option-work" title="适用于日常工作" description="同样强大，减少技术细节干扰" icon="work" selected={appMode === "work"} onSelect={() => setAppMode("work")} />
         </div>
       </SettingsSection>
       <SettingsSection title="应用" testId="application-section">
@@ -405,9 +415,9 @@ function Appearance({ theme, setTheme }: { readonly theme: string; readonly setT
     </SettingsRow>
   );
 }
-function ModeCard({ testId, title, description, icon, selected = false }: { readonly testId: string; readonly title: string; readonly description: string; readonly icon: string; readonly selected?: boolean }): ReactElement {
+function ModeCard({ testId, title, description, icon, selected = false, onSelect }: { readonly testId: string; readonly title: string; readonly description: string; readonly icon: string; readonly selected?: boolean; readonly onSelect?: () => void }): ReactElement {
   return (
-    <WebuiButton variant="plain" size="regular" type="button" data-testid={testId} data-selected={selected} aria-pressed={selected} disabled className="webui-mode-card">
+    <WebuiButton variant="plain" size="regular" type="button" data-testid={testId} data-selected={selected} aria-pressed={selected} role="radio" aria-checked={selected} onClick={onSelect} className="webui-mode-card">
       <span className="webui-mode-inner">
         <span className="webui-mode-icon">
           <Icon name={icon} size={24} />

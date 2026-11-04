@@ -276,6 +276,117 @@ async function openManagement(page) {
   await page.getByTestId("plugin-create-trigger").click();
 }
 
+test("Agents management shows the first agent and a half-size detail avatar by default", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listAgents", {
+        agents: [
+          { name: "first-agent", displayName: "First Agent", description: "First description", systemPrompt: "First prompt", model: "stub-model" },
+          { name: "second-agent", displayName: "Second Agent", description: "Second description", systemPrompt: "Second prompt" },
+        ],
+      });
+    });
+  });
+  await openManagement(page);
+  await page.locator(".webui-plugin-category-filter button", { hasText: "Agents" }).click();
+
+  await expect(page.getByTestId("webui-agent-detail-name")).toHaveText("first-agent");
+  await expect(page.getByTestId("webui-agent-detail-description")).toHaveText("First description");
+  await expect(page.getByTestId("webui-agent-detail-model")).toHaveText("stub-model");
+  const avatar = page.locator(".webui-agent-detail .webui-agent-avatar");
+  await expect(avatar).toHaveCSS("width", "32px");
+  await expect(avatar).toHaveCSS("height", "32px");
+});
+
+test("Agent add and edit forms show the model picker above the system prompt", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setPluginManagementResult("listAgents", {
+        agents: [{ name: "first-agent", displayName: "First Agent", description: "First description", systemPrompt: "First prompt", model: "stub-model" }],
+      });
+      window.__fixture.setModels([
+        { providerId: "fixture", providerName: "Fixture Provider", modelId: "stub-model", displayName: "Stub Model" },
+      ]);
+    });
+  });
+  await openManagement(page);
+  await page.locator(".webui-plugin-category-filter button", { hasText: "Agents" }).click();
+
+  const dialog = page.locator('[data-webui-dialog-shell="true"][data-overlay-layer="plugin-item-dialog"]');
+  await page.getByRole("button", { name: "First Agent" }).click();
+  await expect(dialog.getByLabel("模型")).toContainText("Stub Model");
+  const editOrder = await dialog.locator(".webui-agent-form").evaluate((form) =>
+    [...form.querySelectorAll("label")].map((label) => label.textContent.trim()),
+  );
+  expect(editOrder.indexOf("模型")).toBeGreaterThanOrEqual(0);
+  expect(editOrder.indexOf("模型")).toBeLessThan(editOrder.indexOf("系统提示词"));
+  await dialog.getByRole("button", { name: "取消" }).click();
+
+  await page.getByTestId("plugin-create-trigger").click();
+  const createMenu = page.getByRole("menu", { name: "创建" });
+  await createMenu.getByRole("menuitem", { name: "创建 Agent" }).click();
+  await expect(dialog.getByLabel("模型")).toBeVisible();
+  const addOrder = await dialog.locator(".webui-agent-form").evaluate((form) =>
+    [...form.querySelectorAll("label")].map((label) => label.textContent.trim()),
+  );
+  expect(addOrder.indexOf("模型")).toBeGreaterThanOrEqual(0);
+  expect(addOrder.indexOf("模型")).toBeLessThan(addOrder.indexOf("系统提示词"));
+});
+
+test("Agents management list and detail scroll independently", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      const longText = Array.from({ length: 200 }, (_, index) => `Synthetic detail paragraph ${index + 1}`).join(". ");
+      window.__fixture.setPluginManagementResult("listAgents", {
+        agents: Array.from({ length: 24 }, (_, index) => ({
+          name: `agent-${String(index + 1).padStart(2, "0")}`,
+          displayName: `Agent ${String(index + 1).padStart(2, "0")}`,
+          description: index === 0 ? longText : `Synthetic description ${index + 1}`,
+          systemPrompt: index === 0 ? longText : `Synthetic prompt ${index + 1}`,
+        })),
+      });
+    });
+  });
+  await openManagement(page);
+  await page.locator(".webui-plugin-category-filter button", { hasText: "Agents" }).click();
+
+  const list = page.locator(".webui-agent-list");
+  const detail = page.locator(".webui-agent-detail");
+  const initial = await page.evaluate(() => {
+    const read = (selector) => {
+      const element = document.querySelector(selector);
+      const style = getComputedStyle(element);
+      return {
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: style.overflowY,
+      };
+    };
+    return {
+      list: read(".webui-agent-list"),
+      detail: read(".webui-agent-detail"),
+    };
+  });
+  expect(initial.list.scrollHeight).toBeGreaterThan(initial.list.clientHeight);
+  expect(initial.detail.scrollHeight).toBeGreaterThan(initial.detail.clientHeight);
+  expect(["auto", "scroll"]).toContain(initial.list.overflowY);
+  expect(["auto", "scroll"]).toContain(initial.detail.overflowY);
+
+  await list.hover();
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await detail.evaluate((element) => element.scrollTop)).toBe(0);
+  const listScrollTop = await list.evaluate((element) => element.scrollTop);
+  await detail.hover();
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => detail.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await list.evaluate((element) => element.scrollTop)).toBe(listScrollTop);
+  expect(await page.locator(".webui-plugin-page-scroll").evaluate((element) => element.scrollTop)).toBe(0);
+});
+
 async function expectCenteredDialog(dialog, page, fieldsSelector, expectedFieldsDisplay = "grid") {
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute("aria-modal", "true");

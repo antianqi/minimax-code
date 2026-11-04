@@ -4717,6 +4717,7 @@
     "packages/webui/test/integration/browser-use-real-input.test.ts",
     "packages/webui/test/integration/capability-surface-baseline.ts",
     "packages/webui/test/integration/cron-desktop-and-webui.test.ts",
+    "packages/webui/test/integration/isolated-chromium-profile.test.ts",
     "packages/webui/test/integration/isolated-chromium-screencast.test.ts",
     "packages/webui/test/integration/isolated-chromium-two-pages.test.ts",
     "packages/webui/test/integration/loopback-harness-path.test.ts",

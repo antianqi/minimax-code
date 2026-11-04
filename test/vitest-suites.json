@@ -536,6 +536,7 @@
       "packages/webui/test/integration/browser-use-real-input.test.ts",
       "packages/webui/test/integration/browser-panel-live-navigation.test.ts",
       "packages/webui/test/integration/isolated-chromium-screencast.test.ts",
+      "packages/webui/test/integration/isolated-chromium-profile.test.ts",
       "packages/webui/test/integration/isolated-chromium-two-pages.test.ts",
       "packages/webui/test/integration/browser-core-agent-actions.test.ts",
       "packages/webui/test/integration/workspace-browser-tab-acceptance.test.ts",

@@ -559,3 +559,29 @@ So the Agent names its browser, and the tabs it opens there are its own:
 A2's proof-first order and the authorization gates do not move. Naming a
 browser is not a way past the switch, and the extension still has to prove
 the installation key before the host sends it a credential.
+
+### A13 — The built-in browser's profile outlives the browser
+
+The built-in browser's profile was a temporary directory: the provider deleted
+it when the browser closed, so a restart handed the person a browser that had
+forgotten every site they had signed into. The isolation was real — this
+profile is the host's, and it is never the person's own browser — but the
+consequence was that the built-in browser could not be used for anything that
+needs a login. The person signed in again after every restart, and the Agent
+came back to a signed-out page.
+
+So the profile is **kept**, and it belongs to the host's data directory like
+any other state the host keeps:
+
+- **The profile survives a restart.** It lives at
+  `browser/isolated-chromium/profile` under the data directory, and closing
+  the browser — or the host — leaves it there. A restart brings the sessions
+  back.
+- **The browser is stopped, not killed.** Chrome writes its state as it goes
+  and flushes the rest when it exits, so the provider asks it to exit and
+  waits; the kill is only the fallback for a browser that does not answer. A
+  profile that is kept but half-written is not a profile that was kept.
+- **The isolation does not move.** This is still the host's own browser: it is
+  never pointed at the person's Chrome profile, and what lives in it is the
+  person's own decision about this browser, not a side effect of the Agent's
+  work in their real browser.

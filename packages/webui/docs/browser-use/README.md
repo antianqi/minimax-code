@@ -47,7 +47,7 @@ still says something is not implemented, that is because it is not — the per-r
 | `packages/webui/src/runtime/browser/authorization.ts` | `implemented` — the surface gate is enforced by the browser service | `06` |
 | `packages/webui/src/runtime/browser/target-registry.ts` | `implemented`, and fed from `provider.onTargetChanged` (F2) | `05` |
 | `packages/webui/src/runtime/browser/browser-service.ts` | `implemented` — owns authorization, providers, the registry and the per-run frame streams | `06` |
-| `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry; it drives one page per web tab, and every page is addressable | `01` |
+| `packages/webui/src/runtime/browser/isolated-chromium/provider.ts` | `implemented` — including the attachment retry; it drives one page per web tab, and every page is addressable. Its profile outlives the browser, so a restart keeps what the person signed into (ADR 0019 A13) | `01` |
 | `packages/browser-core/` | `implemented` — the provider-neutral core that owns the **semantics** of a browser action. The WebUI consumes it on **both** surfaces over a `BrowserTransport` adapter each | `10` |
 | `packages/webui/src/runtime/browser/isolated-chromium/core-transport.ts` | `implemented` — the core's transport over the isolated Chromium's own CDP connection | `10` |
 | `packages/webui/src/server/browser-bridge/core-transport.ts` | `implemented` — the core's transport over the bridge's `cdp` frame, with the extension's pushed visible-tab frame as the screenshot source | `10` |

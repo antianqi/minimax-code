@@ -3,8 +3,13 @@
 // This is the browser the WebUI process launches and owns. It exists so that
 // Browser Use has a browser whose lifetime this process controls: the person
 // does not have to install anything, configure a debugging port or log in
-// anywhere, and the profile is a temporary directory that belongs to this
-// host.
+// anywhere, and the profile is a directory that belongs to this host.
+//
+// The profile is **kept** between runs. It is the browser's own state — the
+// sessions the person signed into, the cookies, the storage — and it is the
+// difference between a browser and a fresh window every time. What it is not
+// is the person's own browser: this one is isolated from that, and its state
+// belongs to the host that owns it.
 //
 // It speaks CDP directly over a `ws` WebSocket. There is no typed DevTools
 // client in the dependency set, and the commands Browser Use needs are a
@@ -280,9 +285,10 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
   /**
    * Launches the browser and opens its first page.
    *
-   * The profile is a fresh directory under this host's data directory: the
-   * browser is isolated from the person's own browser and from any earlier
-   * run, and nothing about it outlives the host.
+   * The profile is a directory under this host's data directory: the browser
+   * is isolated from the person's own browser, and it keeps what it learned
+   * between runs, so a restart does not throw away the sessions the person
+   * signed into.
    */
   static async launch(
     options: WebuiIsolatedChromiumProviderOptions,
@@ -890,18 +896,45 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
     this.#unsubscribe = undefined;
     this.#connection?.close();
     this.#connection = undefined;
-    this.#child?.kill("SIGKILL");
+    await this.#stopBrowser();
+    // The profile is **kept**. It is the browser's state — the sessions the
+    // person signed into — and it belongs to this host's data directory like
+    // any other state the host keeps. Deleting it on every close meant that a
+    // restart threw away every login the person had, which is the opposite of
+    // what a browser is for.
+    //
+    // The browser was stopped politely first, so the profile on disk is what
+    // the browser actually wrote, not what it had not flushed yet.
+  }
+
+  /**
+   * Stops the browser, and lets it stop itself first.
+   *
+   * Chrome writes its state — the cookies, the local storage — as it goes,
+   * and flushes the rest when it exits. A browser that is killed outright
+   * loses whatever it had not written yet, so a profile that outlives the
+   * browser has to be closed rather than killed: keeping the profile is only
+   * worth anything if what is in it is what the browser meant to write.
+   *
+   * The kill is the fallback for a browser that does not answer the polite
+   * request, so a browser that hangs cannot hold the shutdown open.
+   */
+  async #stopBrowser(): Promise<void> {
+    const child = this.#child;
     this.#child = undefined;
-    // The browser was killed a moment ago, and it may still be writing its
-    // profile. A removal that races with those writes fails with ENOTEMPTY, so
-    // it is retried rather than reported as a failure: the profile is a
-    // directory of files the browser owned, and the browser is gone.
-    await rm(this.#userDataDir, {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 100,
-    }).catch(() => undefined);
+    if (!child) return;
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    const exited = new Promise<void>((resolve) => {
+      child.once("exit", () => resolve());
+    });
+    child.kill("SIGTERM");
+    const force = setTimeout(() => child.kill("SIGKILL"), 5_000);
+    force.unref?.();
+    try {
+      await exited;
+    } finally {
+      clearTimeout(force);
+    }
   }
 
   readonly #targetChangeListeners = new Set<

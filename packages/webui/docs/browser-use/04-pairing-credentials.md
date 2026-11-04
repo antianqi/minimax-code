@@ -289,8 +289,11 @@ host, and `chrome.storage.local` in that one browser.
    `options_ui` in the manifest). The dialog links to that page and opens it
    in a new tab: the host names it from the extension's own identity, which it
    learns from the peer's origin, so the page is the right one rather than one
-   the person has to find. A host that has not seen the extension yet cannot
-   name the page, and says so instead of linking somewhere else.
+   the person has to find. A machine can hold more than one build of the
+   extension — each unpacked build has its own id — so a host with no live
+   session to go by names the build it learned most recently. A host that has
+   not seen the extension yet cannot name the page, and says so instead of
+   linking somewhere else.
 4. The extension stores it and never displays it again in full — the options page
    reads it back through a status type that carries a fingerprint and no key
    field at all.

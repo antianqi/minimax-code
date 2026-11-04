@@ -604,6 +604,24 @@ export function parseWebuiBrowserBridgeHostFrame(raw: string): WebuiBrowserBridg
       if (typeof candidate.nonce !== "string") return { ok: false, reason: "ping has no nonce" };
       return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
     }
+    case "open-tab": {
+      // The host asks the extension to open a page in the person's browser.
+      // The extension creates the tab itself — it holds the tabs permission —
+      // and answers with the tab it created.
+      //
+      // This case has to exist. A frame kind the parser does not know is a
+      // protocol violation, and the client ends the session on it: an
+      // extension that cannot parse the frame the host sends would drop the
+      // connection on every request, and the host would report a
+      // disconnection rather than the mismatch that caused it.
+      if (typeof candidate.commandId !== "string" || candidate.commandId.length === 0) {
+        return { ok: false, reason: "open-tab has no command id" };
+      }
+      if (typeof candidate.url !== "string" || candidate.url.length === 0) {
+        return { ok: false, reason: "open-tab has no url" };
+      }
+      return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };
+    }
     case "closed": {
       if (typeof candidate.reason !== "string") return { ok: false, reason: "closed has no reason" };
       return { ok: true, frame: candidate as unknown as WebuiBrowserBridgeHostFrame };

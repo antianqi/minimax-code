@@ -225,6 +225,20 @@ describe("host frame parsing", () => {
     expect(parseWebuiBrowserBridgeHostFrame(JSON.stringify({ kind: "closed", reason: "revoked" }))).toMatchObject({
       ok: true,
     });
+    // The host asks for a page in the person's browser. An extension that
+    // cannot parse the frame drops the connection on every request, and the
+    // host reports a disconnection instead of the mismatch.
+    expect(
+      parseWebuiBrowserBridgeHostFrame(
+        JSON.stringify({ kind: "open-tab", commandId: "c-1", url: "https://example.com/" }),
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      parseWebuiBrowserBridgeHostFrame(JSON.stringify({ kind: "open-tab", commandId: "c-1" })),
+    ).toMatchObject({ ok: false, reason: "open-tab has no url" });
+    expect(
+      parseWebuiBrowserBridgeHostFrame(JSON.stringify({ kind: "open-tab", url: "https://example.com/" })),
+    ).toMatchObject({ ok: false, reason: "open-tab has no command id" });
   });
 
   it("reports an unusable frame instead of guessing", () => {

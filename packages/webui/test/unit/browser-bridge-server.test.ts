@@ -469,27 +469,72 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     client.socket.terminate();
   });
 
-  it("refuses to open a tab, because the extension drives the browser through its debugger", async () => {
+  it("opens a tab in the person's browser, by asking the extension to create it", async () => {
     const harness = await startHarness();
     const client = await pairEdge(harness);
     const provider = harness.bridge.createProvider("edge");
     expect(provider).toBeDefined();
-    announceTarget(client, 4);
-    await settle();
 
-    // The extension drives the person's own browser through `chrome.debugger`,
-    // which cannot open a page in it. The provider knows that without asking:
-    // the capability is missing on this surface, so the request is refused
-    // here rather than spending a round trip to be refused by the extension.
-    // The refusal reaches the caller as `browser_capability_denied`.
+    // The extension holds the `tabs` permission, so it creates the page itself
+    // — in the background, behind the tab the person is looking at — and reports
+    // the tab it created.
+    const answered = (async (): Promise<void> => {
+      const frame = await client.waitFor<{ commandId: string; url: string }>("open-tab");
+      client.socket.send(
+        JSON.stringify({
+          kind: "open-tab-result",
+          commandId: frame.commandId,
+          accepted: true,
+          target: {
+            browserId: BROWSER_ID,
+            targetId: "tab-9",
+            title: "Agent page",
+            url: frame.url,
+            generation: 1,
+          },
+        }),
+      );
+    })();
+
+    const target = await provider!.openTab({ url: "https://example.test/agent" });
+
+    // The answer names the page that was created, so a caller can address it
+    // from the answer alone.
+    expect(target).toEqual({
+      surface: "edge",
+      browserId: BROWSER_ID,
+      targetId: "tab-9",
+      generation: 1,
+    });
+    await answered;
+    client.socket.terminate();
+  });
+
+  it("refuses to open a tab when the extension says the browser could not", async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge");
+    expect(provider).toBeDefined();
+
+    const answered = (async (): Promise<void> => {
+      const frame = await client.waitFor<{ commandId: string }>("open-tab");
+      client.socket.send(
+        JSON.stringify({
+          kind: "open-tab-result",
+          commandId: frame.commandId,
+          accepted: false,
+          error: "the browser refused to create a tab",
+        }),
+      );
+    })();
+
+    // A refusal is a refusal: there is no page to hand back, and a caller that
+    // was given one would act on a page that does not exist.
     const outcome = await provider!
-      .sendCommand(
-        { targetId: TARGET_ID, generation: 4 },
-        "open_tab",
-        { url: "https://example.com/" },
-      )
+      .openTab({ url: "https://example.test/agent" })
       .catch((error: unknown) => error);
     expect(outcome).toMatchObject({ code: "browser_capability_denied" });
+    await answered;
     client.socket.terminate();
   });
 

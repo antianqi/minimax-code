@@ -236,6 +236,8 @@ export class BrowserBridgeSession extends EventEmitter {
   private readonly pendingPings = new Map<string, () => void>();
   /** The counter behind the DevTools command ids. */
   private cdpCommandCounter = 0;
+  /** The counter behind the open-tab command ids. */
+  private openTabCommandCounter = 0;
   /** The counter behind the liveness pings' nonces. */
   private pingCounter = 0;
 
@@ -472,6 +474,101 @@ export class BrowserBridgeSession extends EventEmitter {
     return result;
   }
 
+  /**
+   * Ask the extension to open a tab in the person's browser.
+   *
+   * The deadline, the in-flight cap and the retry policy are the ones the
+   * other commands use: this is a command like any other, and the only
+   * difference is that the extension does the creating. `chrome.debugger`
+   * cannot open a page, but the extension holds the `tabs` permission and can.
+   */
+  async sendOpenTab(
+    url: string,
+    options?: { readonly deadlineMs?: number },
+  ): Promise<BrowserBridgeCommandOutcome> {
+    const commandId = this.nextOpenTabCommandId();
+    if (!this.admitted) {
+      return { kind: "timeout", commandId, reason: "session is not yet admitted" };
+    }
+    if (this.inflight.size >= MAX_INFLIGHT_COMMANDS) {
+      return {
+        kind: "rejected",
+        commandId,
+        reason: "too many in-flight commands on this session",
+      };
+    }
+    const deadline = options?.deadlineMs ?? this.operationDeadlineMs;
+    const deadlineAt = this.now() + deadline;
+    const result = await withBridgeOperationRetry<BrowserBridgeCommandOutcome>(
+      (attempt) => this.singleOpenTabAttempt(commandId, url, attempt, deadlineAt),
+      { deadlineMs: deadline, now: this.now, sleep: this.sleep },
+    );
+    if (result.kind === "timeout" && result.commandId === commandId) {
+      return { kind: "timeout", commandId, reason: result.reason };
+    }
+    return result;
+  }
+
+  private nextOpenTabCommandId(): string {
+    this.openTabCommandCounter += 1;
+    return `open-tab-${this.openTabCommandCounter}`;
+  }
+
+  private async singleOpenTabAttempt(
+    commandId: string,
+    url: string,
+    _attempt: number,
+    deadlineAt: number,
+  ): Promise<
+    | { readonly kind: "success"; readonly value: BrowserBridgeCommandOutcome }
+    | { readonly kind: "transient"; readonly message: string }
+    | { readonly kind: "terminal"; readonly reason: "refused" | "cancelled" | "unknown"; readonly message: string }
+  > {
+    const remaining = deadlineAt - this.now();
+    if (remaining <= 0) {
+      return { kind: "terminal", reason: "unknown", message: "deadline already elapsed" };
+    }
+    try {
+      this.sendFrame({ kind: "open-tab", commandId, url });
+    } catch (error) {
+      return { kind: "transient", message: errorMessage(error) };
+    }
+    const outcome = await new Promise<BrowserBridgeCommandOutcome>((resolve, reject) => {
+      this.inflight.set(commandId, { resolve, reject, deadline: deadlineAt });
+    });
+    // A refusal is an answer, not a transport failure: the extension has
+    // spoken, and the provider turns that answer into the stable error code.
+    return { kind: "success", value: outcome };
+  }
+
+  private async handleOpenTabResult(frame: {
+    readonly kind: "open-tab-result";
+    readonly commandId: string;
+    readonly accepted: boolean;
+    readonly target?: WebuiBrowserBridgeTarget;
+    readonly error?: string;
+  }): Promise<void> {
+    const pending = this.inflight.get(frame.commandId);
+    if (!pending) return;
+    this.inflight.delete(frame.commandId);
+    // An accepted answer without a tab is not an answer: there is no page to
+    // hand back, and a caller that was given one would act on a page that does
+    // not exist.
+    if (frame.accepted && frame.target) {
+      pending.resolve({
+        kind: "accepted",
+        commandId: frame.commandId,
+        result: frame.target,
+      });
+      return;
+    }
+    pending.resolve({
+      kind: "rejected",
+      commandId: frame.commandId,
+      reason: frame.error ?? "the extension did not open a tab",
+    });
+  }
+
   private nextCdpCommandId(): string {
     this.cdpCommandCounter += 1;
     return `cdp-${this.cdpCommandCounter}`;
@@ -614,6 +711,9 @@ export class BrowserBridgeSession extends EventEmitter {
         break;
       case "cdp-result":
         await this.handleCdpResult(frame);
+        break;
+      case "open-tab-result":
+        await this.handleOpenTabResult(frame);
         break;
       case "pong":
         this.handlePong(frame.nonce);

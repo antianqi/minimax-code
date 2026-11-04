@@ -40,6 +40,7 @@ import {
   type WebuiBrowserErrorCode,
   type WebuiBrowserImageFrame,
   type WebuiBrowserInputCommand,
+  type WebuiBrowserTargetId,
   type WebuiBrowserTargetState,
   type WebuiBridgeBrowserSurface,
 } from "../../shared/contracts/browser.js";
@@ -114,6 +115,15 @@ export interface WebuiBridgeSurfaceProvider {
   ): Promise<void>;
   stopImageStream(targetId: string): Promise<void>;
   sendInput(command: WebuiBrowserInputCommand): Promise<void>;
+  /**
+   * Opens a page in the person's browser.
+   *
+   * The extension creates it — it holds the `tabs` permission — and answers
+   * with the page's identity, so a caller can address the page from the answer
+   * alone. The tab opens in the background: the tab the person is looking at
+   * is not taken away from them.
+   */
+  openTab?(params: Record<string, unknown>): Promise<WebuiBrowserTargetId>;
   /**
    * Runs one browser command against a target.
    *
@@ -820,6 +830,31 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
     return this.#state.browserId;
   }
 
+  /**
+   * Opens a page in the person's browser, by asking the extension to create it.
+   *
+   * The refusal this surface used to answer with named `chrome.debugger`'s
+   * limit, and the limit was real — but the extension is more than its
+   * debugger. It holds the `tabs` permission, so it opens the page itself.
+   */
+  async openTab(params: Record<string, unknown> = {}): Promise<WebuiBrowserTargetId> {
+    const url = typeof params.url === "string" ? params.url : "";
+    const outcome = await this.#state.session.sendOpenTab(url);
+    if (outcome.kind === "accepted") {
+      const target = outcome.result as WebuiBrowserBridgeTarget;
+      return {
+        surface: this.surface,
+        browserId: target.browserId || this.#state.browserId,
+        targetId: target.targetId,
+        generation: target.generation,
+      };
+    }
+    if (outcome.kind === "timeout") {
+      throw new WebuiBridgeOperationError("browser_operation_timeout", outcome.reason, true);
+    }
+    throw new WebuiBridgeOperationError("browser_capability_denied", outcome.reason);
+  }
+
   async listTargets(): Promise<readonly WebuiBrowserTargetState[]> {
     const states: WebuiBrowserTargetState[] = [];
     for (const target of this.#state.targets.values()) {
@@ -955,13 +990,9 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
     params: Record<string, unknown>,
   ): Promise<unknown> {
     if (command === "open_tab") {
-      // The extension's debugger cannot open a page in the person's browser.
-      // The refusal names that fact rather than the action's name, because
-      // what is missing is the capability and not the request.
-      throw new WebuiBridgeOperationError(
-        "browser_capability_denied",
-        `The ${this.surface} surface cannot open a tab; it is driven through the extension's debugger, which cannot open a page in the person's browser.`,
-      );
+      // The action creates a page rather than acting on one, so it goes to the
+      // extension's own tab creation rather than through the DevTools channel.
+      return await this.openTab(params);
     }
     if (WEBUI_BROWSER_RESTRICTED_COMMANDS.includes(command as never)) {
       // A restricted action goes through the core. The core's own gate

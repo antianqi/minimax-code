@@ -21,7 +21,7 @@ import type { WebuiBrowserBridgeTarget } from "./protocol.js";
 export const WEBUI_BROWSER_BRIDGE_TARGETS_STORAGE_KEY = "webui.browserBridge.targets.v1";
 
 /** The generation a tab has before any navigation has been observed. */
-const FIRST_GENERATION = 1;
+export const WEBUI_BROWSER_BRIDGE_FIRST_GENERATION = 1;
 
 export interface WebuiBrowserExtensionTab {
   readonly id?: number;
@@ -165,7 +165,7 @@ export function createWebuiBrowserBridgeTargetRegistry(
           title: tab.title ?? "",
           url,
           ...(tab.favIconUrl ? { faviconUrl: tab.favIconUrl } : {}),
-          generation: generations[targetId] ?? FIRST_GENERATION,
+          generation: generations[targetId] ?? WEBUI_BROWSER_BRIDGE_FIRST_GENERATION,
         });
       }
       return targets;
@@ -179,14 +179,18 @@ export function createWebuiBrowserBridgeTargetRegistry(
       if (!tab) return undefined;
       if (isWebuiBrowserBridgePolicyBlockedUrl(tab.url ?? "")) return undefined;
       const generations = await load();
-      return { targetId, tabId, generation: generations[targetId] ?? FIRST_GENERATION };
+      return {
+        targetId,
+        tabId,
+        generation: generations[targetId] ?? WEBUI_BROWSER_BRIDGE_FIRST_GENERATION,
+      };
     },
     async noteCommitted(tabId) {
       const generations = { ...(await load()) };
       const targetId = webuiBrowserBridgeTargetId(tabId);
       // A tab the registry has not seen before is already at the first
       // generation, so its first committed navigation takes it to the second.
-      generations[targetId] = (generations[targetId] ?? FIRST_GENERATION) + 1;
+      generations[targetId] = (generations[targetId] ?? WEBUI_BROWSER_BRIDGE_FIRST_GENERATION) + 1;
       await set(generations);
     },
     async noteRemoved(tabId) {

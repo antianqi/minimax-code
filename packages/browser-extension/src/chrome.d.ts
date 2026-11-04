@@ -29,6 +29,11 @@ interface WebuiBrowserExtensionEvent<Listener> {
 interface WebuiBrowserExtensionTabs {
   query(queryInfo: Record<string, unknown>): Promise<WebuiBrowserExtensionTab[]>;
   get(tabId: number): Promise<WebuiBrowserExtensionTab>;
+  /**
+   * Creates a tab. The extension opens the Agent's pages in the background
+   * (`active: false`), so the tab the person is looking at is not replaced.
+   */
+  create(createProperties: { url: string; active: boolean }): Promise<WebuiBrowserExtensionTab>;
   captureVisibleTab(
     windowId?: number,
     options?: { format?: "png" | "jpeg"; quality?: number },

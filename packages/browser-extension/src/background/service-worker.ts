@@ -19,6 +19,7 @@ import {
   createWebuiBrowserBridgeInputDispatcher,
 } from "../input.js";
 import { createWebuiBrowserBridgeCdpDispatcher } from "../cdp.js";
+import { createWebuiBrowserBridgeTabOpener } from "../tab-opener.js";
 import {
   answerWebuiBrowserBridgeChallengeWithStoredSecrets,
   applyWebuiBrowserBridgePairingCredential,
@@ -130,6 +131,14 @@ async function startBridge(): Promise<void> {
     debugger: chrome.debugger,
     version: WEBUI_BROWSER_BRIDGE_DEBUGGER_VERSION,
   });
+  // The extension can open a page in the person's browser itself: it holds
+  // the `tabs` permission, so `chrome.tabs.create` opens one where
+  // `chrome.debugger` could not.
+  const opener = createWebuiBrowserBridgeTabOpener({
+    browserId,
+    tabs: chrome.tabs,
+    targets,
+  });
   const images = createWebuiBrowserBridgeImageStream({
     browserId,
     capture: chrome.tabs,
@@ -235,6 +244,24 @@ async function startBridge(): Promise<void> {
                   error: outcome.error,
                   ...(outcome.unsupported ? { unsupported: true } : {}),
                 } as const);
+          })
+          .catch(report);
+        return;
+      }
+      case "open-tab": {
+        // The host asks for a page in the person's browser. The extension
+        // creates it in the background and reports the tab it created, so the
+        // tab the person is looking at is not taken away from them.
+        void bridge
+          .runOperation(async () => {
+            const result = await opener.open(frame.url);
+            return {
+              kind: "open-tab-result",
+              commandId: frame.commandId,
+              accepted: result.accepted,
+              ...(result.target ? { target: result.target } : {}),
+              ...(result.error ? { error: result.error } : {}),
+            } as const;
           })
           .catch(report);
         return;

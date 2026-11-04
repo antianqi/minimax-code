@@ -184,6 +184,20 @@ export type WebuiBrowserBridgeClientFrame =
        */
       readonly unsupported?: boolean;
     }
+  | {
+      /**
+       * The answer to an `open-tab` request.
+       *
+       * The extension creates the tab itself — it holds the `tabs`
+       * permission — and reports the tab it created, so the host does not have
+       * to wait for the next target announcement to learn the page's identity.
+       */
+      readonly kind: "open-tab-result";
+      readonly commandId: string;
+      readonly accepted: boolean;
+      readonly target?: WebuiBrowserBridgeTarget;
+      readonly error?: string;
+    }
   | { readonly kind: "pong"; readonly nonce: string };
 
 export type WebuiBrowserBridgeHostFrame =
@@ -209,6 +223,17 @@ export type WebuiBrowserBridgeHostFrame =
       readonly generation: number;
       readonly method: string;
       readonly params: Record<string, unknown>;
+    }
+  | {
+      /**
+       * The host asks the extension to open a tab in the person's browser.
+       *
+       * The extension opens it in the background: the tab the person is
+       * looking at is not taken away from them.
+       */
+      readonly kind: "open-tab";
+      readonly commandId: string;
+      readonly url: string;
     }
   | { readonly kind: "closed"; readonly reason: string };
 

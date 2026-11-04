@@ -8,7 +8,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 

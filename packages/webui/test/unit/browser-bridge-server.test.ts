@@ -496,7 +496,10 @@ describe("WebUI browser bridge — the providers it lends to the browser service
       );
     })();
 
-    const target = await provider!.openTab({ url: "https://example.test/agent" });
+    // The browser opens the page: the extension creates it in the person's
+    // browser. The method is optional on the provider — a surface that cannot
+    // open a page has none — so the test says it is there before it calls it.
+    const target = await provider!.openTab!({ url: "https://example.test/agent" });
 
     // The answer names the page that was created, so a caller can address it
     // from the answer alone.
@@ -531,7 +534,7 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     // A refusal is a refusal: there is no page to hand back, and a caller that
     // was given one would act on a page that does not exist.
     const outcome = await provider!
-      .openTab({ url: "https://example.test/agent" })
+      .openTab!({ url: "https://example.test/agent" })
       .catch((error: unknown) => error);
     expect(outcome).toMatchObject({ code: "browser_capability_denied" });
     await answered;

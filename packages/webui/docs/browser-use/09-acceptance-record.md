@@ -108,18 +108,23 @@ store's browser** — the Chrome Web Store build in Chrome, the Edge Add-ons bui
    the id named only in `MAVIS_BROWSER_CHROME_EXTENSION_IDS`, refuses it. A packaged host that fell
    back to the development allowlist would admit whatever unpacked extension happened to be present,
    which is the identity nobody can rely on.
+5. **A development host needs to be told nothing.** A development host started with no allowlist at
+   all pairs with the extension anyway: the host learns the identity from the extension that proves
+   the installation key, and remembers it. The case runs against a real Edge and a real Chromium.
 
 The **installed package** is checked too, and not by a bridge the test built. The package
-verification starts the real `mcode-webui` from the installed archive, configures it with **both**
-allowlists, and shows that the store identity is admitted on its `/browser-bridge` path while the
+verification builds the package with the store's public key, starts the real `mcode-webui` from the
+installed archive, and shows that the **published** identity is admitted on its `/browser-bridge`
+path with **nothing configured for it** — the package carries that identity, because it is a
+constant of the release. The identity the environment names is admitted alongside it, and the
 development identity is refused. That is the shipped process, running the shipped configuration.
 
 The two entries are configured apart, in the source:
 
-| Entry | File | Allowlist it reads |
+| Entry | File | Identities it admits |
 | --- | --- | --- |
-| Development | `scripts/run-webui-server.mjs` | `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
-| **Packaged** | `release/webui-npm/bin/mcode-webui.mjs` | `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
+| Development | `scripts/run-webui-server.mjs` | the ones it has learned, plus `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
+| **Packaged** | `release/webui-npm/bin/mcode-webui.mjs` | the published identity it was built for, plus `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
 
 The packaged entry passes `packaged: true` to the bridge; the development entry does not.
 

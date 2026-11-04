@@ -322,9 +322,13 @@ describe("the browser bridge, against an adversarial peer", () => {
     chrome.socket.terminate();
   });
 
-  it("refuses a peer that names a browser this host does not admit", async () => {
-    // The chrome surface is not configured here, so a peer that says it is
-    // Chrome is refused rather than attached to the Edge pairing.
+  it("refuses a peer that names a browser whose switch is off", async () => {
+    // The chrome surface is not switched on here, so a peer that says it is
+    // Chrome is refused rather than attached to the Edge pairing. The reason
+    // names the switch rather than the identity, because that is what is
+    // actually wrong: a development host no longer refuses an identity it has
+    // not heard of — it refuses the browser whose switch is off, which is a
+    // fact about the person's settings.
     const harness = await startHarness();
     const client = connectClient(harness);
     await client.opened;
@@ -338,7 +342,7 @@ describe("the browser bridge, against an adversarial peer", () => {
     );
 
     const closed = await client.waitFor<{ reason: string }>("closed", 5_000);
-    expect(closed.reason).toContain("not registered on this host");
+    expect(closed.reason).toContain("browser switch turned off");
     expect(harness.bridge.snapshot().surfaces.edge.connected).toBe(false);
     expect(harness.bridge.snapshot().surfaces.chrome.connected).toBe(false);
     client.socket.terminate();

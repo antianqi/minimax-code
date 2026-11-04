@@ -57,6 +57,12 @@ import { WebuiBridgeCoreTransport } from "./core-transport.js";
 import { BrowserBridgePairing } from "./pairing.js";
 import { BrowserBridgeRegistry } from "./registry.js";
 import { BrowserBridgeSession } from "./session.js";
+import {
+  createFileTrustedExtensionStore,
+  createInMemoryTrustedExtensionStore,
+  trustedExtensionsFile,
+  type TrustedExtensionStore,
+} from "./trusted-extensions.js";
 
 /**
  * The frame budget the bridge listens with.
@@ -165,6 +171,35 @@ export interface BrowserBridgeServerOptions {
   readonly storeExtensionIds?: Readonly<
     Partial<Record<WebuiBridgeBrowserSurface, readonly string[]>>
   >;
+  /**
+   * The directory the host keeps its state in.
+   *
+   * Used for the identities the host has learned from the extensions that
+   * proved the installation key. A host without one keeps them in memory
+   * only, which costs the extensions one extra proof after a restart.
+   */
+  readonly dataDir?: string;
+  /**
+   * Where the learned identities are kept.
+   *
+   * Injected by tests and by a host that wants its own storage. Defaults to
+   * a file under the data directory.
+   */
+  readonly trustedExtensionStore?: TrustedExtensionStore;
+  /**
+   * Whether the host learns the identity of an extension it does not know.
+   *
+   * A development host does: an unpacked build's id is derived from the
+   * folder it was loaded from, so it is different on every machine, and a
+   * name the person has to look up is a name the product should not need.
+   * The identity is learned only after the extension has proved the
+   * surface's installation key, so nothing is admitted on the strength of
+   * its id alone.
+   *
+   * A packaged host does not: the published identity is exact, and this
+   * defaults to the packaged host's answer.
+   */
+  readonly learnUnknownIdentities?: boolean;
 }
 
 /**
@@ -299,6 +334,17 @@ export class BrowserBridgeServer {
   readonly #host: string;
   readonly #dev: boolean;
   readonly #allowedIds = new Map<WebuiBridgeBrowserSurface, ReadonlySet<string>>();
+  /** The identities this host has proved and therefore admits. */
+  readonly #trusted: TrustedExtensionStore;
+  /**
+   * Whether an extension identity the host does not know may still attempt
+   * a handshake.
+   *
+   * A development host says yes, and learns the identity from the extension
+   * that proves the installation key. A packaged host says no: its published
+   * identity is exact.
+   */
+  readonly #learnUnknownIdentities: boolean;
   /** Per-surface live session state, absent when nothing is connected. */
   readonly #surfaces = new Map<WebuiBridgeBrowserSurface, BridgeSurfaceState>();
   /** Why a surface could not be switched on, when it could not be. */
@@ -309,6 +355,15 @@ export class BrowserBridgeServer {
     this.#host = options.host;
     this.packaged = options.packaged === true;
     this.#dev = options.dev;
+    // A development host learns the identity of the extensions that prove
+    // the installation key; a packaged host admits exactly the published
+    // identity it was built for.
+    this.#learnUnknownIdentities = options.learnUnknownIdentities ?? !this.packaged;
+    this.#trusted =
+      options.trustedExtensionStore ??
+      (options.dataDir
+        ? createFileTrustedExtensionStore({ file: trustedExtensionsFile(options.dataDir) })
+        : createInMemoryTrustedExtensionStore());
     const credentialStore =
       options.credentialStore ??
       createPlatformSecureCredentialStore({ serviceName: "mavis-webui-browser-bridge" });
@@ -428,7 +483,9 @@ async readInstallationKey(
       const pairing = this.pairings.get(surface);
       const failure = this.#credentialFailures.get(surface);
       surfaces[surface] = {
-        configured: (this.#allowedIds.get(surface)?.size ?? 0) > 0,
+        configured:
+          (this.#allowedIds.get(surface)?.size ?? 0) > 0 ||
+          this.#trusted.ids(surface).size > 0,
         enabled: pairing?.enabled ?? false,
         connected: this.#surfaces.get(surface)?.live === true,
         ...(pairing?.enabled && pairing.keyId ? { keyId: pairing.keyId } : {}),
@@ -451,6 +508,7 @@ async readInstallationKey(
       pairings: this.pairings,
       host: this.#host,
       dev: this.#dev,
+      learnUnknownIdentities: this.#learnUnknownIdentities,
     });
     if (rejection) return;
     this.server.handleUpgrade(request, socket, head, (ws) => {
@@ -490,6 +548,7 @@ async readInstallationKey(
   /* ---------------------------------------------------------------------- */
 
   #onConnection(ws: WebSocket, request: IncomingMessage): void {
+    const extensionId = parseExtensionOrigin((request.headers.origin ?? "").toLowerCase());
     const candidates = this.#pairingsFor(request);
     if (candidates.length === 0) {
       // Unreachable while admission and this lookup agree; refusing beats
@@ -552,6 +611,13 @@ async readInstallationKey(
       state.surface = surface;
       this.#surfaces.set(surface, state);
       state.live = true;
+      // The peer is admitted, so it proved the installation key or a
+      // credential this host issued. Either way it is an extension this host
+      // has authorised, and a host that learns identities remembers it here:
+      // from now on the identity is admitted without anyone naming it.
+      if (extensionId && this.#learnUnknownIdentities) {
+        this.#trusted.trust(surface, extensionId);
+      }
       void this.registry.registerSession(surface, state.browserId, session).catch(() => {
         state.live = false;
       });
@@ -579,11 +645,33 @@ async readInstallationKey(
   #pairingsFor(request: IncomingMessage): readonly BrowserBridgePairing[] {
     const extensionId = parseExtensionOrigin((request.headers.origin ?? "").toLowerCase());
     if (!extensionId) return [];
+    // A host that learns identities cannot know which surface this peer is on
+    // before the peer says so, and it cannot know the peer's identity at all
+    // until the peer proves the installation key. So every surface is a
+    // candidate, and the peer's own `hello` names the one it is on — which
+    // selects the secret to check against, never the identity to believe.
+    if (this.#learnUnknownIdentities) {
+      return [...this.pairings.values()];
+    }
     const matches: BrowserBridgePairing[] = [];
     for (const pairing of this.pairings.values()) {
       if (pairing.admitsExtensionId(extensionId)) matches.push(pairing);
     }
     return matches;
+  }
+
+  /**
+   * Whether this host admits an extension identity on a surface.
+   *
+   * The configured allowlist and the identities the host has proved are both
+   * admissions: the first is what an operator named, the second is what an
+   * extension earned by proving the installation key.
+   */
+  #admitsExtensionId(pairing: BrowserBridgePairing, extensionId: string): boolean {
+    return (
+      pairing.admitsExtensionId(extensionId) ||
+      this.#trusted.ids(pairing.surface).has(extensionId)
+    );
   }
 
   /**

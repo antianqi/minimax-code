@@ -64,7 +64,14 @@ if (!process.env.WEBUI_SERVER_TSX) {
   // builds belong. The packaged entry
   // (`release/webui-npm/bin/mcode-webui.mjs`) reads the store allowlist and
   // refuses these.
-  const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true });
+  //
+  // The development host does not need that allowlist at all: it learns the
+  // identity of an extension from the extension itself, once that extension
+  // has proved the surface's installation key, and remembers it under the
+  // data directory. An unpacked build's id is derived from the folder it was
+  // loaded from, so it differs on every machine, and asking the person to
+  // name it is asking for something they cannot know.
+  const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true, dataDir });
   await browserBridge.start();
   // The browser adapter is built before the runtime host, because the host is
   // what takes the browser provider: the adapter reads its authorization

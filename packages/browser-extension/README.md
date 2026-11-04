@@ -60,20 +60,24 @@ reports the surface as "not enabled" even though its switch is on:
 sudo apt-get install -y libsecret-tools
 ```
 
-Then start the WebUI so it admits this extension. An unpacked build's identity
-is derived from the directory it was loaded from, so the host has to be told
-which identity it accepts — development mode does not bypass that check, and an
-identity the host does not know is refused:
+Then start the WebUI. An unpacked build's identity is derived from the
+directory it was loaded from, so it is different on every machine — and the
+host does not need to be told what it is. The host learns the identity from
+the extension itself, once the extension has proved the installation key, and
+remembers it:
 
 ```bash
-MAVIS_BROWSER_EDGE_EXTENSION_IDS=<extension-id> pnpm --filter @mavis/webui dev:server
+pnpm --filter @mavis/webui dev:server
 ```
 
-The extension's options page shows its own id and the exact setting line to
-copy, so the id never has to be read out of the browser's extension manager.
-The packaged WebUI entry reads the **store** allowlist instead
-(`MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`), and a locally loaded build is not
-on it — a released package admits the published extension on its own.
+Nothing is configured on the host side, and nothing has to be found out first:
+the id is on the extension's own options page, together with the setting a
+host that pins its extensions would need.
+
+The **packaged** WebUI entry is stricter, on purpose. It admits the published
+extension — the one the store issued — and refuses a locally loaded build
+unless that build's identity is named in the store allowlist
+(`MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`).
 
 Then point the extension at the WebUI host. The extension cannot learn the
 host's address by itself, so an absent origin is reported rather than replaced
@@ -97,10 +101,10 @@ options*:
   the client dials with (a loopback `http:` address, with no path);
 - the **installation key** from the WebUI's Settings page, which is
   write-only: the page shows a fingerprint afterwards and never the key;
-- the **extension id** and the **development host setting** it belongs in,
-  which the page derives from the build it is: a published build says that the
-  released WebUI package already admits it, and a local build says which
-  variable has to carry its id.
+- the **extension id** and the **host setting** it belongs in, which the page
+  derives from the build it is. The page also says that there is nothing to
+  set on the host side: a released package admits the published extension, and
+  a development host learns this extension from the proof.
 
 Saving either one wakes the worker, which re-reads the configuration and
 pairs with the host.

@@ -65,7 +65,7 @@ and it is the current state of both composition roots:
 
 | Entry point | Line | `dev` | Bridge allowlist |
 | --- | --- | --- | --- |
-| `scripts/run-webui-server.mjs` | 67 | `dev: true` | development — `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
+| `scripts/run-webui-server.mjs` | 74 | `dev: true` | development — the identities it has learned, plus `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
 | `release/webui-npm/bin/mcode-webui.mjs` | 93 | `dev: true` | **store** — the published identity the package was built for, plus `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
 
 So on a packaged WebUI today, the generic path already accepts any upgrade that passes the loopback
@@ -95,6 +95,35 @@ The consequence is the one that matters for a released product: **installing the
 requires no extension id, no environment variable and no restart with a hand-written setting.** The
 store allowlist variables remain for a self-hosted store build, and they add to the published
 identity rather than replacing it.
+
+## The development host learns the identity it is given
+
+The same reasoning applies to a development host, and for a stronger reason. An unpacked build's id
+is derived from the directory it was loaded from, so it is **different on every machine and every
+path**: there is no constant to bake in, and a name the person has to go and look up is a name they
+will get wrong. So the development host does not ask for one either.
+
+It learns the identity from the extension, and only from a proof:
+
+- The upgrade gate admits an identity the host does not know. This widens **who may try**, not
+  **who may act**: the peer still has to answer the surface's challenge with the installation key,
+  and a peer that cannot is refused and receives no credential.
+- When the peer proves the installation key — or a credential this host already issued — the host
+  records the identity under `<dataDir>/browser-bridge/trusted-extensions.json` and admits it from
+  then on. The file is written atomically and owner-only, and a file that cannot be read reads as
+  "nothing is trusted yet", which costs the extension one more proof and no secret.
+- The identities are per surface, and the peer's own `hello` still says which browser it is on. The
+  name selects **which secret to check against**, never the identity to believe (ADR 0019, A5).
+
+A **packaged** host does not learn anything: its published identity is exact, and a packaged host
+that admitted unknown origins would stop being the published extension. The development
+allowlist variables still work on a development host, and they add to what it has learned rather
+than replacing it.
+
+The cost of the wider upgrade gate is a peer that connects and then goes quiet: it would hold a
+challenge unanswered. Each pairing therefore caps how many challenges it will have outstanding at
+once (`MAX_OUTSTANDING_CHALLENGES`), and the hello deadline closes the sockets that never introduce
+themselves.
 
 **`implemented`: the bridge admission path never reads `dev`.** The pairing proof is verified
 unconditionally, and the browser switch is checked unconditionally. `admission.ts:135` holds an

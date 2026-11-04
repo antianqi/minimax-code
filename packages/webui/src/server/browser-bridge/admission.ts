@@ -70,6 +70,21 @@ export interface BrowserBridgeAdmissionContext {
    * across all the pairings; tests can substitute a custom matcher.
    */
   readonly isExtensionOrigin?: (origin: string) => string | undefined;
+  /**
+   * Whether an extension identity the host does not know may still attempt
+   * a handshake.
+   *
+   * A development host says yes. An unpacked build's id is derived from the
+   * folder it was loaded from, so it differs on every machine, and asking the
+   * person to name it is asking for something they cannot know. The identity
+   * is learned only after the extension proves the surface's installation
+   * key, so this widens who may *try*, not who may *act*: a peer that cannot
+   * prove the key is refused and receives no credential.
+   *
+   * A packaged host says no. The published identity is exact, and admitting
+   * unknown origins would stop being the published extension.
+   */
+  readonly learnUnknownIdentities?: boolean;
 }
 
 /**
@@ -127,7 +142,12 @@ export function admitBrowserBridgeUpgrade(
   const admitted = [...context.pairings.values()].some((pairing) =>
     pairing.admitsExtensionId(extensionId),
   );
-  if (!admitted) {
+  // A host that learns identities lets an unknown one through this gate, and
+  // no further: the peer still has to prove the installation key before it
+  // is given anything. The gate is a pre-filter (ADR 0019, A2), and this is
+  // the development host saying that the pre-filter cannot be a name the
+  // person has to look up.
+  if (!admitted && !context.learnUnknownIdentities) {
     return reject(socket, 403, "Forbidden Origin");
   }
   // Dev does NOT bypass. The header is on the upgrade so a future wiring

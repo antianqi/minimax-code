@@ -66,11 +66,13 @@ function attachBridge(httpServer: Server, bridge: BrowserBridgeServer | undefine
 async function startHarness(options?: {
   readonly dev?: boolean;
   readonly env?: Record<string, string>;
+  readonly packaged?: boolean;
 }): Promise<Harness & { readonly bridge: BrowserBridgeServer }> {
   const dev = options?.dev ?? true;
   const bridge = new BrowserBridgeServer({
     host: "127.0.0.1",
     dev,
+    ...(options?.packaged ? { packaged: true } : {}),
     credentialStore: createInMemorySecureCredentialStore(),
     env: options?.env ?? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: KNOWN_EDGE_ID },
   });
@@ -239,12 +241,9 @@ describe("WebUI browser bridge — the dedicated upgrade branch", () => {
     const noOrigin = await attemptUpgrade(harness.port, {});
     expect(noOrigin.refused).toBe(true);
 
-    // A real `chrome-extension://` origin whose id is on nobody's allowlist.
-    const unlistedExtension = await attemptUpgrade(harness.port, {
-      origin: `chrome-extension://${UNKNOWN_EXTENSION_ID}/`,
-    });
-    expect(unlistedExtension.refused).toBe(true);
-    expect(unlistedExtension.status).toBe(403);
+    // A real `chrome-extension://` origin whose id is on nobody's allowlist
+    // is a different case, and it is covered below: a development host lets
+    // it try, and refuses it at the proof.
 
     // A forged Host header is the shape of a DNS-rebinding attempt. The host
     // this service bound to is loopback; anything else is refused before the
@@ -289,6 +288,63 @@ describe("WebUI browser bridge — the dedicated upgrade branch", () => {
     client.socket.terminate();
   });
 
+  it("lets a development host try an extension it was told nothing about, and refuses it at the proof", async () => {
+    // A development host does not ask the person to name the extension: an
+    // unpacked build's identity depends on the folder it was loaded from, so
+    // it cannot be known in advance. What the host does instead is refuse the
+    // peer that cannot prove the installation key — the upgrade is a
+    // pre-filter, and the proof is the decision.
+    const harness = await startHarness({ dev: true });
+    const unlisted = await attemptUpgrade(harness.port, {
+      origin: `chrome-extension://${UNKNOWN_EXTENSION_ID}/`,
+    });
+    expect(unlisted.refused).toBe(false);
+
+    // And the peer that gets no further than the challenge holds nothing.
+    const client = connectClient(harness.port, {
+      origin: `chrome-extension://${UNKNOWN_EXTENSION_ID}/`,
+    });
+    await client.opened;
+    client.socket.send(
+      JSON.stringify({
+        kind: "hello",
+        browser: "edge",
+        browserId: "edge-unknown",
+        extensionVersion: "1.0.0",
+        publicKey: await bogusClientPublicKey(),
+      }),
+    );
+    const challenge = await client.waitFor<{ nonce: string; keyId: string }>("challenge");
+    client.socket.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: challenge.keyId,
+        nonce: challenge.nonce,
+        signature: "not-a-valid-hmac",
+      }),
+    );
+    await settle();
+    expect(client.frames.map((frame) => frame.kind)).not.toContain("ready");
+    expect(harness.bridge.createProvider("edge")).toBeUndefined();
+    client.socket.terminate();
+  });
+
+  it("refuses an extension a packaged host was not built for, before it can try", async () => {
+    // The published identity is exact. A packaged host admits that one and
+    // nothing else, and it says so at the gate rather than after a handshake
+    // that could have gone differently.
+    const harness = await startHarness({
+      dev: true,
+      packaged: true,
+      env: { MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS: KNOWN_EDGE_ID },
+    });
+    const unlisted = await attemptUpgrade(harness.port, {
+      origin: `chrome-extension://${UNKNOWN_EXTENSION_ID}/`,
+    });
+    expect(unlisted.refused).toBe(true);
+    expect(unlisted.status).toBe(403);
+  });
+
   it("refuses a bridge upgrade with 404 when no bridge is wired", async () => {
     const httpServer = createServer();
     const wsServer = attachBridge(httpServer, undefined);
@@ -326,18 +382,21 @@ describe("WebUI browser bridge — the dedicated upgrade branch", () => {
     client.socket.terminate();
   });
 
-  it("leaves a surface off when its extension allowlist is empty", async () => {
+  it("leaves a surface off when it was told nothing about any extension", async () => {
     const harness = await startHarness({ dev: true, env: {} });
     const snapshot = harness.bridge.snapshot();
     expect(snapshot.surfaces.edge.configured).toBe(false);
     expect(snapshot.surfaces.chrome.configured).toBe(false);
-    // The pairing still holds its own minted credential, but no extension id
-    // may use it, so admission has nothing to match.
-    const refused = await attemptUpgrade(harness.port, {
+    // The surface's switch is off, so there is no credential to prove and
+    // no session to join. The upgrade may be attempted, and nothing comes of
+    // it: the host holds no session and lends no provider.
+    const attempted = await attemptUpgrade(harness.port, {
       origin: `chrome-extension://${KNOWN_EDGE_ID}/`,
     });
-    expect(refused.refused).toBe(true);
-    expect(refused.status).toBe(403);
+    expect(attempted.refused).toBe(false);
+    await settle();
+    expect(harness.bridge.createProvider("edge")).toBeUndefined();
+    expect(harness.bridge.snapshot().surfaces.edge.connected).toBe(false);
   });
 
   it("does not let a bridge path reach the generic bearer-token admission", async () => {

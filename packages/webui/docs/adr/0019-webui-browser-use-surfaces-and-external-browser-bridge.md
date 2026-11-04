@@ -480,3 +480,37 @@ id it admits. That configuration is now visible where the id is: the
 extension's options page shows its own id and the exact setting line that
 carries it, so a person no longer has to read the id out of the browser's
 extension manager to satisfy the host.
+
+### A11 — A development host learns the identity instead of being told it
+
+A10 settled the published identity: it is a constant of the release, so it is
+baked into the package and the person who installs it configures nothing. The
+development host had the same defect for a different reason, and A6 recorded
+it as a configuration value: an unpacked build's id is derived from the
+directory it was loaded from, so it differs on every machine and every path,
+and asking the person to name it was asking for something they cannot know.
+
+So the development host learns the identity instead, and it learns it from a
+proof rather than from a claim:
+
+- The upgrade gate admits an identity the host does not know. This widens who
+  may **try** the handshake, not who may **act**: the peer still has to
+  answer the surface's challenge with the installation key, and A2's
+  proof-first order still holds — a peer that proves nothing is refused and
+  receives no credential.
+- When the peer proves the installation key, or a credential this host already
+  issued, the host records the identity under
+  `<dataDir>/browser-bridge/trusted-extensions.json` and admits it from then
+  on. The file holds identities, not secrets; it is written atomically and
+  owner-only, and a file that cannot be read reads as "nothing is trusted
+  yet", which costs the extension one more proof and no secret.
+- The identity is still per surface, and the peer's own `hello` still says
+  which browser it is on. A5 stands: the name selects which secret to check
+  against, never the identity to believe.
+
+A **packaged** host learns nothing. Its published identity is exact, and a
+packaged host that admitted unknown origins would stop being the published
+extension — which is the whole of A6 and A10.
+
+The development allowlist variables keep working, and add to what the host has
+learned rather than replacing it. They are no longer required for anything.

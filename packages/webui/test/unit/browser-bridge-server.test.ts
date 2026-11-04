@@ -15,6 +15,8 @@ import { WebSocket } from "ws";
 import {
   BrowserBridgeServer,
   createInMemorySecureCredentialStore,
+  createInMemoryTrustedExtensionStore,
+  type TrustedExtensionStore,
 } from "../../src/server/browser-bridge/index.js";
 import { WebuiWebSocketServer } from "../../src/server/websocket-server.js";
 import { WEBUI_BROWSER_BRIDGE_PATH } from "../../src/shared/contracts/browser-bridge.js";
@@ -44,12 +46,22 @@ afterEach(async () => {
   }
 });
 
-async function startHarness(): Promise<Harness> {
+async function startHarness(
+  options: {
+    readonly env?: Readonly<Record<string, string | undefined>>;
+    readonly packaged?: boolean;
+    readonly trustedExtensionStore?: TrustedExtensionStore;
+  } = {},
+): Promise<Harness> {
   const bridge = new BrowserBridgeServer({
     host: "127.0.0.1",
     dev: true,
+    ...(options.packaged ? { packaged: true } : {}),
+    ...(options.trustedExtensionStore
+      ? { trustedExtensionStore: options.trustedExtensionStore }
+      : {}),
     credentialStore: createInMemorySecureCredentialStore(),
-    env: { MAVIS_BROWSER_EDGE_EXTENSION_IDS: EDGE_EXTENSION_ID },
+    env: options.env ?? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: EDGE_EXTENSION_ID },
   });
   await bridge.start();
   // The bridge does not switch a surface on by itself: the browser switches
@@ -209,9 +221,12 @@ function connectClient(url: string, headers: Record<string, string>): BridgeClie
  * Connect as an allowed extension, answer the challenge with the pairing's own
  * credential, and wait until the host reports the session ready.
  */
-async function pairEdge(harness: Harness): Promise<BridgeClient> {
+async function pairEdge(
+  harness: Harness,
+  extensionId: string = EDGE_EXTENSION_ID,
+): Promise<BridgeClient> {
   const client = connectClient(`ws://127.0.0.1:${harness.port}${WEBUI_BROWSER_BRIDGE_PATH}`, {
-    origin: `chrome-extension://${EDGE_EXTENSION_ID}/`,
+    origin: `chrome-extension://${extensionId}/`,
   });
   await client.opened;
   // A real extension introduces itself; the host reads the instance identity
@@ -742,6 +757,67 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     await provider.close();
     // The bridge owns the session's lifetime, not the provider's.
     expect(harness.bridge.createProvider("edge")).toBeDefined();
+    client.socket.terminate();
+  });
+});
+
+describe("a host that learns identities", () => {
+  it("admits an extension it was told nothing about, and remembers it", async () => {
+    // The identity of an unpacked build is derived from the folder it was
+    // loaded from, so it is different on every machine. A development host
+    // asks the person for nothing: the extension proves the installation key,
+    // and the host learns the identity from that proof.
+    const trusted = createInMemoryTrustedExtensionStore();
+    const harness = await startHarness({ env: {}, trustedExtensionStore: trusted });
+    const unknownId = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
+    const client = await pairEdge(harness, unknownId);
+
+    expect(harness.bridge.snapshot().surfaces.edge.connected).toBe(true);
+    expect([...trusted.ids("edge")]).toContain(unknownId);
+    client.socket.terminate();
+  });
+
+  it("refuses an extension it was not built for, when it is a packaged host", async () => {
+    // The published identity is exact. A packaged host admits that one and
+    // nothing else, so a packaged build cannot be talked into learning.
+    const trusted = createInMemoryTrustedExtensionStore();
+    const harness = await startHarness({
+      env: {},
+      packaged: true,
+      trustedExtensionStore: trusted,
+    });
+    await expect(
+      pairEdge(harness, "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"),
+    ).rejects.toThrow(/403/);
+    expect(trusted.ids("edge").size).toBe(0);
+  });
+
+  it("learns nothing from an extension that cannot prove the installation key", async () => {
+    // The whole point of the design: an identity is learned from a proof, not
+    // from a connection. A peer that proves nothing is refused, and it takes
+    // no place in the store.
+    const trusted = createInMemoryTrustedExtensionStore();
+    const harness = await startHarness({ env: {}, trustedExtensionStore: trusted });
+    const client = connectClient(
+      `ws://127.0.0.1:${harness.port}${WEBUI_BROWSER_BRIDGE_PATH}`,
+      { origin: "chrome-extension://mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm/" },
+    );
+    await client.opened;
+    client.socket.send(
+      JSON.stringify({ kind: "hello", browser: "edge", browserId: BROWSER_ID }),
+    );
+    const challenge = await client.waitFor<{ nonce: string; keyId: string }>("challenge");
+    // A signature that is not the pairing's own: the peer holds no secret.
+    client.socket.send(
+      JSON.stringify({
+        kind: "proof",
+        keyId: challenge.keyId,
+        nonce: challenge.nonce,
+        signature: "not-a-signature",
+      }),
+    );
+    await expect(client.waitFor("ready", 2_000)).rejects.toThrow(/timed out/);
+    expect(trusted.ids("edge").size).toBe(0);
     client.socket.terminate();
   });
 });

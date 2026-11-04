@@ -126,8 +126,8 @@ async function renderIdentity(): Promise<void> {
       : "This is a local build. Its identity comes from the folder it was loaded from, so it differs on every machine.";
   identityNote.textContent =
     kind === "published"
-      ? "The released WebUI package already admits this extension, so there is nothing to set on the host side. The setting below is only for a development WebUI."
-      : "A development WebUI admits only the extensions you name, so start it with the setting below.";
+      ? "Nothing to set on the host side. A released WebUI package admits the published extension, and a development WebUI learns this extension the first time it proves the installation key."
+      : "Nothing to set on the host side. A development WebUI learns this extension the first time it proves the installation key.";
 }
 
 /** Put a value on the clipboard, or say that the clipboard was not there. */

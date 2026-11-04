@@ -38,6 +38,18 @@ import {
 
 const NONCE_BYTES = 32;
 
+/**
+ * How many challenges one pairing will have outstanding at once.
+ *
+ * A challenge is a nonce the host has issued and the peer has not answered.
+ * A peer that connects and then goes quiet holds one, and a host that lets
+ * identities be learned has to assume that some of those peers are not the
+ * extension anyone expected. The cap bounds what such a peer can hold, and
+ * the hello deadline closes the sockets that never even introduced
+ * themselves.
+ */
+const MAX_OUTSTANDING_CHALLENGES = 16;
+
 /** The non-secret metadata for a credential, suitable for surfacing in the UI. */
 export interface BrowserBridgePairingMetadata {
   readonly keyId: string;
@@ -226,6 +238,13 @@ export class BrowserBridgePairing {
       throw new BrowserCredentialStoreUnavailableError(
         "the OS secure credential store is not available",
         `cannot issue challenge for "${this.surface}"`,
+      );
+    }
+    // The cap comes before the nonce is made, so a refused peer costs no
+    // entropy and leaves no trace to clean up.
+    if (this.outstandingNonces.size >= MAX_OUTSTANDING_CHALLENGES) {
+      throw new PairingChallengeLimitError(
+        `browser bridge for "${this.surface}" has too many unanswered challenges`,
       );
     }
     const nonceBytes = this.randomBytesSource(NONCE_BYTES);
@@ -614,6 +633,22 @@ export class PairingSwitchedOffError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PairingSwitchedOffError";
+  }
+}
+
+/**
+ * A typed signal that the pairing refuses because too many challenges are
+ * already unanswered.
+ *
+ * A host that learns identities lets unknown extensions attempt a handshake,
+ * so it has to be able to say no to a peer that keeps taking challenges and
+ * answering none. The peer is closed rather than served, and the reason is
+ * specific so that it is not mistaken for a credential problem.
+ */
+export class PairingChallengeLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PairingChallengeLimitError";
   }
 }
 

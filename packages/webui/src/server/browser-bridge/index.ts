@@ -55,6 +55,7 @@ export {
 
 export {
   BrowserBridgePairing,
+  PairingChallengeLimitError,
   PairingSwitchedOffError,
   type BrowserBridgePairingMetadata,
   type BrowserBridgePairingOptions,
@@ -120,6 +121,14 @@ export {
   type BrowserBridgeSurfaceStatus,
   type BrowserBridgeDispatch,
 } from "./registry.js";
+
+export {
+  createFileTrustedExtensionStore,
+  createInMemoryTrustedExtensionStore,
+  isExtensionId,
+  trustedExtensionsFile,
+  type TrustedExtensionStore,
+} from "./trusted-extensions.js";
 
 export {
   BrowserBridgeServer,

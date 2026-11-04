@@ -357,7 +357,7 @@ export async function startBridge(
   surface: "edge" | "chrome",
   options: {
     readonly packaged?: boolean;
-    readonly allowlist?: "store" | "development" | "both";
+    readonly allowlist?: "store" | "development" | "both" | "none";
   } = {},
 ): Promise<{
   bridge: BrowserBridgeServer;
@@ -371,7 +371,9 @@ export async function startBridge(
       ? `MAVIS_BROWSER_STORE_${browser.toUpperCase()}_EXTENSION_IDS`
       : `MAVIS_BROWSER_${browser.toUpperCase()}_EXTENSION_IDS`;
   const env: Record<string, string> =
-    allowlist === "both"
+    allowlist === "none"
+      ? {}
+      : allowlist === "both"
       ? {
           [variable("development", "edge")]: extensionId,
           [variable("development", "chrome")]: extensionId,

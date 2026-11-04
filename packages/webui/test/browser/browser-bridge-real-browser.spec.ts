@@ -158,6 +158,55 @@ test.describe("the browser bridge, against a real browser", () => {
         await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     });
+
+    test(`the extension pairs with a ${surface} host that was told nothing about it`, async () => {
+      test.setTimeout(180_000);
+      test.skip(
+        !(await isBrowserInstalled(channel)),
+        `the ${channel} browser is not installed on this machine`,
+      );
+      // The configuration a person ends up in when they install the extension
+      // and start the WebUI: nothing is configured. An unpacked build's
+      // identity depends on the folder it was loaded from, so it cannot be
+      // named up front — and it must not have to be. The host learns the
+      // identity from the extension that proves the installation key.
+      const { context, worker, extensionId, profileDir } = await launchWithExtension(channel);
+      const started = await startBridge(extensionId, surface, { allowlist: "none" });
+      const browserVersion = browserVersionOf(context);
+      try {
+        const view = await started.bridge.readInstallationKey(surface);
+        expect(view).toBeDefined();
+
+        await observeAcceptance(
+          SUITE,
+          {
+            surface,
+            browser: channel,
+            browserVersion,
+            entry: "development",
+            case: "the extension pairs with a host that was told nothing about it",
+            settings: () => ({
+              ...bridgeSettings(started.bridge, surface, "development"),
+              build: "development",
+              extensionId,
+              installationKeyProved: true,
+            }),
+            observed:
+              "the extension completed the handshake with no configured identity, and the host reported the surface connected",
+          },
+          async () => {
+            await provision(worker, context, extensionId, started.origin, view!.key);
+            await waitForConnected(started.bridge, surface, true, worker);
+
+            expect(started.bridge.snapshot().surfaces[surface].connected).toBe(true);
+          },
+        );
+      } finally {
+        await started.close();
+        await context.close();
+        await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
+    });
   }
 
   test("each browser lands on its own surface when one identity is listed on both", async () => {

@@ -1,9 +1,9 @@
-import type { ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { useWebuiSessionStream } from "../bindings/use-session-state.js";
 import { useWebuiEventChannelDegraded } from "../bindings/use-connection-health.js";
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import { FeedbackLiveRegion } from "../ui/feedback.js";
-import { WebuiButton } from "../ui/button.js";
+import { useWebuiToast } from "../ui/toast.js";
 
 /**
  * The three states a user can act on.
@@ -52,22 +52,19 @@ export function projectWebuiConnectionState(
 }
 
 const COPY: Readonly<
-  Record<WebuiConnectionState, { readonly label: string; readonly detail: string; readonly tone: string }>
+  Record<WebuiConnectionState, { readonly label: string; readonly detail: string }>
 > = {
   connected: {
     label: "已连接",
     detail: "实时连接正常",
-    tone: "text-text_default_secondary",
   },
   reconnecting: {
     label: "正在重连",
     detail: "连接中断，正在自动恢复",
-    tone: "text-text_label_warning_secondary_default",
   },
   failed: {
     label: "连接失败",
     detail: "已停止接收更新",
-    tone: "text-text_label_danger_secondary_default",
   },
 };
 
@@ -100,9 +97,10 @@ export interface ConnectionStatusProps {
  * rather than opening a second channel, so there is exactly one listener set
  * per session and no new reconnect state to keep in sync.
  *
- * The region renders in all three states and tags itself with
- * `data-connection-state`; whether a healthy connection should be visible or
- * collapsed is the host's layout call, not this component's.
+ * Connection interruptions and failures are announced through the shared
+ * toast, so they never take space from the transcript. A failure keeps its
+ * manual retry action in that toast; whether the healthy connection should be
+ * visible is the host's layout call, not this component's.
  */
 export function ConnectionStatus({
   sessionId,
@@ -125,31 +123,54 @@ export function ConnectionStatus({
       : streamConnection === "reconnecting" || channelDegraded
         ? "reconnecting"
         : "connected";
-  if (hideWhenConnected && connection === "connected") return null;
-  const copy = COPY[connection];
-  // A failure usually carries the server's own reason (`refusal`), and `status`
-  // is the looser status string. Both are preferred over the generic detail so
-  // the user sees the actual cause, and the fallback keeps the region from
-  // rendering an empty line when a phase failed without a recorded reason.
+  const { show, dismiss } = useWebuiToast();
+  const toastIdRef = useRef<string>();
+  const lastNoticeKeyRef = useRef<string>();
+  const retryRef = useRef(onRetry);
+  retryRef.current = onRetry;
   const reason = stream.refusal ?? stream.status;
+  const detail = connection === "failed"
+    ? reason ?? COPY.failed.detail
+    : COPY.reconnecting.detail;
+  const noticeKey = `${sessionId ?? "home"}:${connection}:${detail}:${retryLabel}:${Boolean(onRetry)}`;
+  useEffect(() => {
+    if (connection === "connected") {
+      if (toastIdRef.current) dismiss(toastIdRef.current);
+      toastIdRef.current = undefined;
+      lastNoticeKeyRef.current = undefined;
+      return;
+    }
+    if (lastNoticeKeyRef.current === noticeKey) return;
+    if (toastIdRef.current) dismiss(toastIdRef.current);
+    lastNoticeKeyRef.current = noticeKey;
+    toastIdRef.current = show({
+      tone: connection === "failed" ? "error" : "warning",
+      message: COPY[connection].label,
+      description: detail,
+      ...(connection === "failed" && retryRef.current
+        ? {
+            action: {
+              label: retryLabel,
+              onClick: () => retryRef.current?.(),
+            },
+            durationMs: 0,
+          }
+        : {}),
+      testId: "webui-connection-status-toast",
+      dataAttributes: { "data-connection-state": connection },
+    });
+  }, [connection, detail, dismiss, noticeKey, retryLabel, show]);
+  if (hideWhenConnected && connection === "connected") return null;
+  if (connection !== "connected") return null;
+  const copy = COPY[connection];
   return (
     <FeedbackLiveRegion
       testId="webui-connection-status"
       dataAttributes={{ "data-connection-state": connection }}
-      className={`flex items-center gap-spacing_8 text-size_12 ${copy.tone}${className ? ` ${className}` : ""}`}
+      className={`flex items-center gap-spacing_8 text-size_12 text-text_default_secondary${className ? ` ${className}` : ""}`}
     >
       <span data-testid="webui-connection-status-label">{copy.label}</span>
-      <span data-testid="webui-connection-status-detail">{reason ?? copy.detail}</span>
-      {/* Only the terminal state gets an affordance: `reconnecting` is the
-       * automatic loop already mid-attempt, and a button there would race the
-       * recovery it duplicates. */}
-      {connection === "failed" && onRetry ? (
-        <WebuiButton variant="grouped" size="pill" data-testid="webui-connection-status-retry"
-          onClick={onRetry}
-        >
-          {retryLabel}
-        </WebuiButton>
-      ) : null}
+      <span data-testid="webui-connection-status-detail">{copy.detail}</span>
     </FeedbackLiveRegion>
   );
 }

@@ -11,6 +11,7 @@ import { createWebuiInteractionCommands } from "../../src/client/features/sessio
 import { createWebuiInteractionSessionOwners } from "../../src/client/features/interactions/application/interaction-session-owners.js";
 import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createWebuiInteractionPhaseIntents } from "../../src/client/features/turn/contracts/interaction-phase-intents.js";
+import { WEBUI_HOME_SESSION_KEY } from "../../src/client/application/state.js";
 
 /**
  * The phase intents the composition supplies. They are turn's published contract
@@ -138,6 +139,19 @@ describe("interaction owners are keyed by session", () => {
     await owners.owner("A").refresh();
 
     expect(getPendingQuestionnaire).toHaveBeenCalledWith({ name: "reviewer", sessionId: "A" });
+  });
+
+  it("keeps the home record key out of runtime questionnaire reads", async () => {
+    const store = createWebuiSessionStore();
+    const getPendingQuestionnaire = vi.fn(async () => ({ request: undefined }));
+    const owners = createWebuiInteractionSessionOwners({
+      ...ownerDependencies(store),
+      port: { getPendingQuestionnaire } as never,
+    });
+
+    await owners.owner(WEBUI_HOME_SESSION_KEY, { runtimeSessionId: undefined }).refresh();
+
+    expect(getPendingQuestionnaire).not.toHaveBeenCalled();
   });
 
   it("drops a session's owner on purge and accepts nothing after disposal", async () => {

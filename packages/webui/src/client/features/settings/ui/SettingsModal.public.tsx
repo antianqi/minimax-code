@@ -12,7 +12,7 @@
 // unchanged, and every other settings surface stays in the private sibling.
 
 import { Fragment, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
-import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconMicrophone, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
+import { IconArchive, IconArrowLeft, IconBraces, IconBrowser, IconChartBar, IconCode, IconGitBranch, IconLayoutDashboard, IconLink, IconMessageCircle, IconSearch, IconTrash, IconUserCircle, IconX, IconBook, IconCircle, IconCircleDot } from "@tabler/icons-react";
 import { WebuiSearchField, WebuiSelectMenu, WebuiTextInput } from "../../../ui/field.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
@@ -36,7 +36,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { BrowserSettingsPage } from "../../browser/ui/BrowserSettingsPage.public.js";
 import { ConnectionSettingsPage } from "./ConnectionSettingsPage.js";
-import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, SETTINGS_GROUPS } from "../projection/settings-view.js";
+import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, HIDDEN_SETTINGS_GROUPS, SETTINGS_GROUPS } from "../projection/settings-view.js";
 import type { SettingsTabKey } from "../projection/settings-view.js";
 import { DEFAULT_SHORTCUT_BINDINGS, parseShortcutBindings, serializeShortcutBindings, SHORTCUT_STORAGE_KEY } from "../../../projection/common/shortcuts.js";
 import { ShortcutsSettings } from "./ShortcutsSettings.js";
@@ -59,7 +59,6 @@ import { FeedbackEmpty } from "../../../ui/feedback.js";
 const ICONS = {
   desktop: IconLayoutDashboard,
   browser: IconBrowser,
-  voice: IconMicrophone,
   shortcuts: IconBraces,
   "custom-instructions": IconBook,
   chart: IconChartBar,
@@ -75,9 +74,8 @@ const ICONS = {
 } as const;
 
 function Icon({ name, size = 18 }: { readonly name: string; readonly size?: number }): ReactElement {
-  const voice = name === "voice";
   const Glyph = ICONS[name as keyof typeof ICONS] ?? IconLayoutDashboard;
-  return <Glyph aria-hidden="true" data-testid={voice ? "asr-mic-icon" : undefined} className="webui-settings-icon" size={size} stroke={1.4} />;
+  return <Glyph aria-hidden="true" className="webui-settings-icon" size={size} stroke={1.4} />;
 }
 function stored(key: string, fallback: string, storage: ReturnType<typeof useWebuiBrowserCapabilities>["storage"]): string {
   return storage.getItem(key) ?? fallback;
@@ -235,7 +233,10 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   if (!open) return null;
   const selected = models.find((model) => model.selected);
   const modelValue = selected ? `${selected.providerId}/${selected.modelId}/${selected.variant ?? ""}` : "";
-  const groups = SETTINGS_GROUPS.map((group) => ({
+  // A hidden group takes its tabs out of the column and out of the search
+  // results both: the tabs come from `visibleTabs`, so a search hit inside a
+  // hidden section would otherwise list a nav item the sidebar has dropped.
+  const groups = SETTINGS_GROUPS.filter((group) => !HIDDEN_SETTINGS_GROUPS.includes(group.key)).map((group) => ({
     ...group,
     tabs: visibleTabs.filter((tab) => tab.group === group.key),
   })).filter((group) => group.tabs.length > 0);

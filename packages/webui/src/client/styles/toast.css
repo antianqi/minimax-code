@@ -34,15 +34,13 @@
   .webui-toast {
     display: flex;
     min-width: 0;
-    align-items: flex-start;
-    gap: var(--spacing_8);
+    align-items: center;
+    gap: var(--spacing_12);
     border: 1px solid var(--border_default);
-    /* The rail: the tone's own colour, on the edge the eye reads first. */
-    border-left: 3px solid var(--webui-toast-accent);
-    border-radius: var(--radius_12);
-    padding: var(--spacing_12) var(--spacing_8) var(--spacing_12) var(--spacing_12);
+    border-radius: var(--radius_16);
+    padding: var(--spacing_12);
     background: var(--bg_default_primary);
-    box-shadow: var(--elevation_lg);
+    box-shadow: var(--elevation_md);
     color: var(--text_default_primary);
     pointer-events: auto;
   }
@@ -60,11 +58,25 @@
   }
   .webui-toast-icon {
     display: flex;
+    width: 32px;
+    height: 32px;
     flex: none;
     align-items: center;
     justify-content: center;
-    padding-top: 1px;
+    border-radius: var(--radius_8);
     color: var(--webui-toast-accent);
+  }
+  .webui-toast--info .webui-toast-icon {
+    background: var(--bg_status_blue);
+  }
+  .webui-toast--success .webui-toast-icon {
+    background: var(--bg_status_positive);
+  }
+  .webui-toast--warning .webui-toast-icon {
+    background: var(--bg_status_warning);
+  }
+  .webui-toast--error .webui-toast-icon {
+    background: var(--bg_status_error);
   }
   .webui-toast-body {
     display: flex;
@@ -75,8 +87,9 @@
   }
   .webui-toast-message {
     margin: 0;
-    font-size: 13px;
-    line-height: 18px;
+    font-size: var(--size_14);
+    font-weight: var(--weight_medium);
+    line-height: var(--line_height_20);
     overflow-wrap: anywhere;
   }
   .webui-toast-description {
@@ -92,5 +105,6 @@
   }
   .webui-toast-close {
     flex: none;
+    margin-left: auto;
   }
 }

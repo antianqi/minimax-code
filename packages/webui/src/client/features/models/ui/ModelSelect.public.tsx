@@ -7,12 +7,12 @@
 // with no second copy of the grouping, the ticks or the row order.
 //
 // It names a model as a string, because that is what the definitions and the
-// scheduled tasks store. `formatValue` decides how this call site writes it —
-// a provider-qualified `providerId/modelId` for a scheduled task, a bare model
-// id for an agent definition — and the same function reads the current value
-// back, so the two directions cannot drift. A value the catalogue does not
-// contain is still shown, verbatim: the runtime may offer a model this client
-// has not listed, and hiding the stored name would look like an empty field.
+// scheduled tasks store. The string is always `providerId/modelId`: that is the
+// only form the runtime accepts for a session model, a scheduled task's model
+// and an agent definition's model, and one writer for it means a form cannot
+// disagree with the picker it renders. A value the catalogue does not contain
+// is still shown, verbatim: the runtime may offer a model this client has not
+// listed, and hiding the stored name would look like an empty field.
 //
 // `defaultLabel` is the row that clears the choice, and it is what makes the
 // field optional. Without it the form has to be given a model, and the list has
@@ -29,25 +29,15 @@ import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
 import { groupModelsByProvider } from "../projection/model-picker-rows.js";
 import { WebuiModelListPanel } from "./ModelListPanel.js";
 
-/** How a chosen model is written into the field, and read back out of it. */
-export type WebuiModelValueFormat = (model: WebuiModelEntry) => string;
-
-/** The shape a scheduled task stores: `providerId/modelId`. */
-export function webuiQualifiedModelValue(model: WebuiModelEntry): string {
+/** The stored form of a model: `providerId/modelId`. */
+function qualifiedModelValue(model: WebuiModelEntry): string {
   return `${model.providerId}/${model.modelId}`;
-}
-
-/** The shape an agent definition stores: the model's own id. */
-export function webuiBareModelValue(model: WebuiModelEntry): string {
-  return model.modelId;
 }
 
 export interface WebuiModelSelectProps extends Partial<FieldControlProps> {
   /** The stored model name, or `""` for "the default model". */
   readonly value: string;
   readonly onChange: (value: string) => void;
-  /** Defaults to `providerId/modelId`. */
-  readonly formatValue?: WebuiModelValueFormat;
   /** Shown when nothing is chosen. */
   readonly placeholder?: string;
   /** The row that clears the choice. Omitted, the choice is required. */
@@ -63,7 +53,6 @@ export interface WebuiModelSelectProps extends Partial<FieldControlProps> {
 export function WebuiModelSelect({
   value,
   onChange,
-  formatValue = webuiQualifiedModelValue,
   placeholder = "选择模型",
   defaultLabel,
   controlSize = "regular",
@@ -90,9 +79,11 @@ export function WebuiModelSelect({
   const groups = useMemo(() => groupModelsByProvider(models), [models]);
   const selected = models.find(
     (model) =>
-      formatValue(model) === value ||
-      model.modelId === value ||
-      webuiQualifiedModelValue(model) === value,
+      qualifiedModelValue(model) === value ||
+      // A catalogue row is still matched by its own id, so a stored bare name
+      // or a foreign value from another client is shown rather than looking
+      // like an empty field.
+      model.modelId === value,
   );
   const triggerLabel = selected
     ? selected.displayName ?? selected.modelId
@@ -149,7 +140,7 @@ export function WebuiModelSelect({
             groups={groups}
             selected={selected}
             onSelect={(model) => {
-              onChange(formatValue(model));
+              onChange(qualifiedModelValue(model));
               setOpen(false);
             }}
             {...(defaultLabel

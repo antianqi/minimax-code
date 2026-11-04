@@ -8,12 +8,15 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-export type SettingsTabKey = "desktop" | "shortcuts" | "voice" | "custom-instructions" | "browser" | "usage" | "connection" | "account" | "coding" | "worktree" | "archived";
+export type SettingsTabKey = "desktop" | "shortcuts" | "custom-instructions" | "browser" | "usage" | "connection" | "account" | "coding" | "worktree" | "archived";
 
 export interface SettingsTabDefinition { readonly key: SettingsTabKey; readonly group: "preferences" | "management" | "coding" | "archived"; readonly label: string; readonly icon: string; readonly disabled?: boolean; }
 
+/** The sidebar's sections, in the order they are listed. */
+export type SettingsTabGroupKey = SettingsTabDefinition["group"];
+
 export const DESKTOP_SETTINGS_TABS: readonly SettingsTabDefinition[] = [
-{ key: "desktop", group: "preferences", label: "通用", icon: "desktop" }, { key: "voice", group: "preferences", label: "语音", icon: "voice", disabled: true }, { key: "shortcuts", group: "preferences", label: "快捷键", icon: "shortcuts" }, { key: "custom-instructions", group: "preferences", label: "个性化", icon: "custom-instructions" },
+{ key: "desktop", group: "preferences", label: "通用", icon: "desktop" }, { key: "shortcuts", group: "preferences", label: "快捷键", icon: "shortcuts" }, { key: "custom-instructions", group: "preferences", label: "个性化", icon: "custom-instructions" },
   // The browser switches were under the browser panel, in the tool area. A
   // setting that lives in a panel is a setting nobody finds without opening
   // that panel first, so they are a page of their own — under 偏好, next to
@@ -31,3 +34,12 @@ export function resolveThemePreference(preference: string, systemDark: boolean):
 export function filterSettingsTabs(query: string): readonly SettingsTabDefinition[] { const needle = query.trim().toLowerCase(); return DESKTOP_SETTINGS_TABS.filter((tab) => !needle || `${tab.label} ${tab.key}`.toLowerCase().includes(needle)); }
 
 export const SETTINGS_GROUPS = [{ key: "preferences", label: "偏好" }, { key: "management", label: "管理" }, { key: "coding", label: "编码" }, { key: "archived", label: "归档" }] as const;
+
+/**
+ * Groups the settings sidebar does not list.
+ *
+ * The tabs stay in `DESKTOP_SETTINGS_TABS` and their pages stay mounted behind
+ * the dialog's `active` branch: this hides a section of the column, it does not
+ * retire the feature. Listing a group again means deleting its key here.
+ */
+export const HIDDEN_SETTINGS_GROUPS: readonly SettingsTabGroupKey[] = ["coding"];

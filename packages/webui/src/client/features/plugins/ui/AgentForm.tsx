@@ -3,6 +3,10 @@
 // Its four draft fields used to be four `useState` calls in `PluginCatalogue`,
 // seeded by `beginAgent` there and handed to the dialog as values and setters.
 // The draft now belongs to the form; what leaves it is one typed intent.
+//
+// The model field writes `providerId/modelId`, which is what the runtime's
+// canonical agent.md accepts: a bare model id is rejected as not being in the
+// provider/model form, so this field uses the picker's only format.
 
 import { useState, type ReactElement } from "react";
 
@@ -15,7 +19,7 @@ import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
-import { WebuiModelSelect, webuiBareModelValue } from "../../models/ui/ModelSelect.public.js";
+import { WebuiModelSelect } from "../../models/ui/ModelSelect.public.js";
 
 export interface AgentFormProps {
   readonly editing: Row | undefined;
@@ -97,7 +101,6 @@ export function AgentForm({
             {...props}
             value={model}
             onChange={setModel}
-            formatValue={webuiBareModelValue}
             placeholder="使用默认模型"
             defaultLabel="使用默认模型"
           />

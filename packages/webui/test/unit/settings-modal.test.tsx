@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_IDS, SETTINGS_GROUPS, SETTINGS_ICON_PATHS } from "../../src/client/features/settings/ui/SettingsModal.js";
-import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, resolveThemePreference } from "../../src/client/features/settings/projection/settings-view.js";
+import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, HIDDEN_SETTINGS_GROUPS, resolveThemePreference } from "../../src/client/features/settings/projection/settings-view.js";
 import { DisabledBillingActions, UsageModelSettings } from "../../src/client/features/settings/ui/UsageModelSettings.js";
 import { reorderModelIds } from "../../src/client/features/models/projection/model-reorder.js";
 import { formatResetLabel, getActiveSourceBadge } from "../../src/client/features/models/projection/usage-settings.public.js";
@@ -12,7 +12,6 @@ describe("desktop settings registry", () => {
   it("keeps the electron tab order, labels, and groups", () => {
     expect(DESKTOP_SETTINGS_TABS.map((tab) => [tab.key, tab.group, tab.label])).toEqual([
       ["desktop", "preferences", "通用"],
-      ["voice", "preferences", "语音"],
       ["shortcuts", "preferences", "快捷键"],
       ["custom-instructions", "preferences", "个性化"],
       ["browser", "preferences", "浏览器"],
@@ -29,6 +28,15 @@ describe("desktop settings registry", () => {
     expect(SETTINGS_GROUPS.map((group) => group.key)).toEqual(["preferences", "management", "coding", "archived"]);
     expect(new Set(DESKTOP_SETTINGS_TABS.map((tab) => tab.key)).size).toBe(DESKTOP_SETTINGS_TABS.length);
     for (const group of SETTINGS_GROUPS) expect(DESKTOP_SETTINGS_TABS.some((tab) => tab.group === group.key)).toBe(true);
+  });
+
+  it("hides the 编码 section without retiring its tabs", () => {
+    // Hidden, not removed: the sidebar skips the group, while the registry
+    // keeps both tabs and the dialog keeps both pages. Retiring the section
+    // would delete these entries instead.
+    expect(HIDDEN_SETTINGS_GROUPS).toEqual(["coding"]);
+    expect(DESKTOP_SETTINGS_TABS.filter((tab) => tab.group === "coding").map((tab) => tab.key)).toEqual(["coding", "worktree"]);
+    expect(HIDDEN_SETTINGS_GROUPS.every((group) => SETTINGS_GROUPS.some((entry) => entry.key === group))).toBe(true);
   });
 
   it("resolves system theme against the OS preference", () => {
@@ -139,23 +147,15 @@ describe("injected browser DOM adapter", () => {
 });
 
 describe("account tab gating", () => {
-it("leaves the implemented tabs clickable while the unimplemented tabs stay disabled", () => {
-    // A fully implemented panel must not carry the `disabled` gate the
-    // not-yet-built panels still need. `account` (email row, sign-out button,
-    // sign-out error region), `coding` (workspace review), `worktree` (parallel
-    // experiment branches), `custom-instructions` (profile-wide AGENTS.md
-    // editor) and `shortcuts` (the rebindable composer bindings) are all
-    // built, so all five sit in the ungated group. `connection` joined them
-    // with the SSH host management: it is where Desktop puts `设置 > 连接 > SSH`,
-    // and it now carries the SSH panel. The rest have no content behind them
-    // and clicking one would land on an empty pane.
-    for (const key of ["account", "coding", "worktree", "custom-instructions", "shortcuts", "connection"]) {
-      expect(DESKTOP_SETTINGS_TABS.find((tab) => tab.key === key)?.disabled).toBeUndefined();
-    }
-    for (const key of ["voice"]) {
-      expect(DESKTOP_SETTINGS_TABS.find((tab) => tab.key === key)?.disabled).toBe(true);
-    }
-  });
+it("leaves every tab clickable now that each one has a panel behind it", () => {
+  // 语音 was the last placeholder: it had no page of its own, so it kept
+  // `disabled` while 账户, 代码审查, 工作树, 个性化, 快捷键 and 连接 were built.
+  // The tab is gone, and no entry in the registry carries the gate any more —
+  // re-adding one would mean a clickable label or an empty pane.
+  for (const tab of DESKTOP_SETTINGS_TABS) {
+    expect(tab.disabled).toBeUndefined();
+  }
+});
 
   it("keeps the account tab reachable through the settings search", () => {
     expect(filterSettingsTabs("账户").map((tab) => tab.key)).toContain("account");

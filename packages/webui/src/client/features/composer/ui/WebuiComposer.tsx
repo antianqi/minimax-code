@@ -950,6 +950,11 @@ export function WebuiComposer({
     session: sessionId,
     lastSubmittedText: recordedTurn?.message,
   });
+  // A pending Plan review rejects sends while it owns the session. Keep that
+  // refusal in the stream state, but do not show a transcript error or retry
+  // action for a request the user can send again after the review completes.
+  const hidePlanReviewInProgressRefusal =
+    stream.refusal === "Plan review processing must finish before this request can run";
   const handleRetryResend = () => {
     void composerController.retry({
       refusal: stream.refusal,
@@ -1037,7 +1042,7 @@ export function WebuiComposer({
         paused={sessionId ? queuePaused : false}
         onRemove={(item) => void handleDeleteQueueItem(item)}
       />
-      {stream.refusal ? (
+      {stream.refusal && !hidePlanReviewInProgressRefusal ? (
         <OutputError
           variant="output_error"
           text={stream.refusal}

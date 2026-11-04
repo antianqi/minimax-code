@@ -401,8 +401,11 @@
   .webui-settings-content:has(.webui-usage-model-toolbar) { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
   .webui-settings-content:has(.webui-usage-model-toolbar) > .webui-settings-content-header { position: relative; z-index: 3; flex: 0 0 auto; }
   .webui-settings-content:has(.webui-usage-model-toolbar) > .webui-settings-page { min-height: 0; flex: 1 1 0%; margin-block: 0; overflow: hidden; }
-  .webui-settings-sidebar, .webui-settings-content { scrollbar-width: none; }
-  .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar { display: none; }
+  /* No settings surface draws a scrollbar. The page still scrolls where it has
+   * to — the sidebar, the content column, and the 用量与模型 page's own scroll
+   * container (both its 用量 and 模型 tabs) — the bar itself is just not painted. */
+  .webui-settings-sidebar, .webui-settings-content, .webui-usage-model-scroll { scrollbar-width: none; }
+  .webui-settings-sidebar::-webkit-scrollbar, .webui-settings-content::-webkit-scrollbar, .webui-usage-model-scroll::-webkit-scrollbar { display: none; }
   @media (max-height: 680px) {
     .webui-settings-sidebar { padding-top: 16px; padding-bottom: var(--spacing_12); }
     .webui-settings-back { margin-bottom: var(--spacing_16); }

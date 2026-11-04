@@ -498,11 +498,11 @@ export function WebuiToast({
       <WebuiIconButton
         label="关闭"
         tone="bare"
-        size="micro"
+        size="compact"
         className="webui-toast-close"
         onClick={onDismiss}
       >
-        <IconX size={12} stroke={2} />
+        <IconX size={14} stroke={1.8} />
       </WebuiIconButton>
     </div>
   );

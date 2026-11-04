@@ -104,7 +104,7 @@ async function openSettings(page) {
   await expect(settingsDialog(page)).toBeVisible();
 }
 
-test("the account tab is enabled where the unfinished tabs are still disabled", async ({ page }) => {
+test("the account tab is enabled and the sidebar ships no disabled entry", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);
 
@@ -112,43 +112,37 @@ test("the account tab is enabled where the unfinished tabs are still disabled", 
   await expect(accountTab(page)).toBeEnabled();
   expect(await accountTab(page).textContent()).toBe("账户");
 
-  // The other half, and the reason the assertion above is not vacuous: the nav
-  // really does still ship disabled items, so "enabled" is a fact about this
-  // tab rather than a property of every button in the sidebar. A nav that
-  // silently enabled 语音 would pass the first two lines.
-  //
-  // 代码审查, 工作树 and 快捷键 left this list when their pages were built —
-  // they are real panels now, not empty panes behind a clickable label. 连接
-  // left it with the SSH panel behind it, so 语音 is the one that remains, and
-  // it has no page behind it, which is what the `disabled` gate is still for.
-  await expect(settingsNavItem(page, "voice")).toBeDisabled();
+  // The other half of the claim. 语音 was the last placeholder — a nav label
+  // with no page behind it, kept as `disabled` — and it is gone, so a gated
+  // label anywhere in the sidebar, or a 语音 item that came back, fails here.
+  // 代码审查, 工作树, 快捷键 and 连接 left the same list earlier, each when its
+  // panel was built.
+  await expect(settingsNavItem(page, "voice")).toHaveCount(0);
+  await expect(page.locator(".webui-settings-nav [data-menu-key][disabled]")).toHaveCount(0);
   // The app behind the modal is still mounted: the modal is a `document.body`
   // portal, so it renders over a live app rather than replacing it. A fallback
   // here would mean the crash surface is showing while settings are open.
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
 });
 
-test("the code-review and worktree tabs open their own panels instead of an empty pane", async ({ page }) => {
+test("the 编码 section is not listed in the settings sidebar", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);
 
-  // Same argument as the account tab above, and the reason the unit suite
-  // cannot stand in: `disabled: false` is a flag on the definition, while
-  // "clicking it lands on the page" is the feature. The empty-pane
-  // placeholder is the failure this has to rule out — a clickable label with
-  // nothing behind it is exactly the state these two tabs were in.
-  await expect(settingsNavItem(page, "coding")).toBeEnabled();
-  await settingsNavItem(page, "coding").click();
-  await expect(page.locator('[data-testid="settings-review-page"]')).toBeVisible();
-  // One status marker, and it is the review page's own: with no workspace
-  // selected the page says so instead of rendering a bare heading.
-  await expect(page.locator("[data-webui-review-state]")).toHaveCount(1);
-  await expect(page.locator(".webui-settings-empty-panel")).toHaveCount(0);
-
-  await expect(settingsNavItem(page, "worktree")).toBeEnabled();
-  await settingsNavItem(page, "worktree").click();
-  await expect(page.locator('[data-testid="settings-worktree-page"]')).toBeVisible();
-  await expect(page.locator(".webui-settings-empty-panel")).toHaveCount(0);
+  // The section is hidden, not retired: 代码审查 and 工作树 keep their registry
+  // entries and their pages, and the sidebar is what must stop listing them.
+  // A header left standing with nothing under it, or one nav item of the pair
+  // surviving, fails here — the unit suite can only see the constant.
+  await expect(page.locator(".webui-settings-nav h3", { hasText: "编码" })).toHaveCount(0);
+  await expect(settingsNavItem(page, "coding")).toHaveCount(0);
+  await expect(settingsNavItem(page, "worktree")).toHaveCount(0);
+  // The search reads the same registry, so a hidden tab must not come back
+  // through the box: the sidebar would list an item the column has dropped.
+  const search = page.getByLabel("搜索设置");
+  await search.fill("代码审查");
+  await expect(page.locator(".webui-settings-no-results")).toBeVisible();
+  await expect(settingsNavItem(page, "coding")).toHaveCount(0);
+  await search.fill("");
 });
 
 test("clicking the account tab shows the account panel", async ({ page }) => {

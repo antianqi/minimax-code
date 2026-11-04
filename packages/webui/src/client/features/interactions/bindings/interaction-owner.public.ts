@@ -46,5 +46,7 @@ export function useWebuiInteractionOwner(
     [store],
   );
   const owners = application?.interactions ?? fallback;
-  return owners.owner(webuiInteractionRecordKey(sessionId));
+  return owners.owner(webuiInteractionRecordKey(sessionId), {
+    runtimeSessionId: sessionId,
+  });
 }

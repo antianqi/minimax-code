@@ -30,6 +30,7 @@ import { webuiRailIsDrawer, WEBUI_PROGRESS_PANEL_NARROW_QUERY } from "../ui/layo
 import { useOverlayLayer } from "../ui/overlay-coordinator.js";
 import { WebuiIconButton } from "../ui/button.js";
 import { WebuiMotionSlot, WebuiPage } from "../ui/page.js";
+import { useWebuiToast } from "../ui/toast.js";
 import { WebuiProgressOverviewPanel } from "../features/workspace/ui/WorkspaceProgressPanel.js";
 import {
   getWorkspacePanelSessionState,
@@ -534,6 +535,19 @@ export function WebuiClientFoundationApp(
     usageNoticeKey && usageNoticeKey === dismissedUsageNoticeKey
       ? null
       : usageNotice;
+  const { show: showToast } = useWebuiToast();
+  const fiveHourUsageNoticeKey =
+    visibleUsageNotice?.kind === "five_hour"
+      ? `${visibleUsageNotice.kind}:${visibleUsageNotice.messageKey}`
+      : undefined;
+  useEffect(() => {
+    if (!fiveHourUsageNoticeKey) return;
+    showToast({
+      tone: "warning",
+      message: "五小时配额接近上限。",
+      testId: "conversation-usage-toast",
+    });
+  }, [fiveHourUsageNoticeKey, showToast]);
   const selectedSession = flatSessionsWithChildren.find(
     (session) => session.sessionId === selectedSessionId,
   );
@@ -1257,11 +1271,19 @@ export function WebuiClientFoundationApp(
                 if (!progressPanelFits) return;
                 setProgressPanelOpen((open) => !open);
               }}
-              usageBanner={visibleUsageNotice ? <ConversationUsageBanner
-                notice={visibleUsageNotice}
-                messageText={visibleUsageNotice.kind === "weekly" ? "本周配额接近上限。" : visibleUsageNotice.kind === "five_hour" ? "五小时配额接近上限。" : "本周期视频配额已用尽。"}
-                onDismiss={() => setDismissedUsageNoticeKey(usageNoticeKey)}
-              /> : null}
+              usageBanner={
+                visibleUsageNotice && visibleUsageNotice.kind !== "five_hour" ? (
+                  <ConversationUsageBanner
+                    notice={visibleUsageNotice}
+                    messageText={
+                      visibleUsageNotice.kind === "weekly"
+                        ? "本周配额接近上限。"
+                        : "本周期视频配额已用尽。"
+                    }
+                    onDismiss={() => setDismissedUsageNoticeKey(usageNoticeKey)}
+                  />
+                ) : null
+              }
               connectionStatus={<ConnectionStatus
                 sessionId={selectedSessionId} hideWhenConnected onRetry={retrySessionStream}
                 className="w-full max-w-[743px] justify-center rounded-lg border border-border_default bg-bg_default_secondary px-spacing_8 py-spacing_4"

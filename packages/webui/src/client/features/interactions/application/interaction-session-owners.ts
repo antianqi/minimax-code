@@ -30,8 +30,11 @@ import {
 import type { WebuiVersionCell } from "../../../application/version-cell.js";
 
 export interface WebuiInteractionSessionOwners {
-  /** The owner for one session, created on first touch and then stable. */
-  readonly owner: (sessionId: string) => WebuiInteractionCoordinator;
+  /** The owner for one state-record key, created on first touch and then stable. */
+  readonly owner: (
+    recordKey: string,
+    options?: { readonly runtimeSessionId?: string },
+  ) => WebuiInteractionCoordinator;
   readonly sessions: () => readonly string[];
   /** Drop one session's owner and fence (purge / session delete). */
   readonly purge: (sessionId: string) => void;
@@ -73,14 +76,17 @@ export function createWebuiInteractionSessionOwners(deps: {
   let disposed = false;
 
   return {
-    owner: (sessionId) => {
-      const existing = owners.get(sessionId);
+    owner: (recordKey, options) => {
+      const existing = owners.get(recordKey);
       if (existing) return existing;
       // The narrow writers: this session's interaction slice and its stream
       // phase, and nothing else in the record. Both come from the assembly, which
       // is what holds the store these slices live in.
-      const commands = deps.commandsFor(sessionId);
-      const streams = deps.readPhaseIntents(sessionId);
+      const commands = deps.commandsFor(recordKey);
+      const streams = deps.readPhaseIntents(recordKey);
+      const runtimeSessionId = options === undefined
+        ? recordKey
+        : options.runtimeSessionId;
       // The fence is this session's: a reply for this session cannot fence
       // another session's pending read, and the converse holds too.
       const pendingVersionRef: WebuiVersionCell = { current: 0 };
@@ -93,10 +99,10 @@ export function createWebuiInteractionSessionOwners(deps: {
         },
         streams,
         pendingVersionRef,
-        sessionId,
-        agentName: () => readAgentName?.(sessionId) ?? "main",
+        sessionId: runtimeSessionId,
+        agentName: () => readAgentName?.(recordKey) ?? "main",
       });
-      owners.set(sessionId, owner);
+      owners.set(recordKey, owner);
       return owner;
     },
     sessions: () => [...owners.keys()],

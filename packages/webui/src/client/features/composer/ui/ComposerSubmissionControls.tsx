@@ -41,7 +41,7 @@ export function WebuiComposerModePills({
       {goalActive ? (
         <WebuiButton
           variant="accent-toggle"
-          size="content"
+          size="inline"
           aria-pressed={true}
           aria-label="取消目标模式"
           data-testid="composer-goal-mode"
@@ -55,7 +55,7 @@ export function WebuiComposerModePills({
       {planActive ? (
         <WebuiButton
           variant="accent-toggle"
-          size="content"
+          size="inline"
           type="button"
           aria-pressed="true"
           aria-label="退出计划模式"

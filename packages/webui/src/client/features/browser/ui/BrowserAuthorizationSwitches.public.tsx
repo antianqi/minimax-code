@@ -194,7 +194,7 @@ export function BrowserInstallationKey({ readKey }: BrowserInstallationKeyProps)
     <SettingsSection
       title="浏览器桥接安装密钥"
       testId="browser-installation-key"
-      hint="扩展需要这把密钥才能完成配对。打开对应浏览器的开关后在此查看，并粘贴到扩展的选项页。"
+      hint="扩展需要这把密钥才能完成配对。打开对应浏览器的开关后在此查看，并粘贴到扩展的选项页：浏览器扩展管理页（edge://extensions 或 chrome://extensions）里找到「MiniMax Code Browser Bridge」，点「扩展选项」。"
     >
       {BRIDGE_SURFACES.map(({ surface, title }) => (
         <SettingsRow

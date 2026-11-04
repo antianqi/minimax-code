@@ -24,7 +24,8 @@
         gap: 0.5rem;
         align-items: center;
       }
-      #stored {
+      #stored,
+      #origin-stored {
         color: #555;
       }
       #status:empty {
@@ -35,9 +36,21 @@
   <body>
     <h1>Browser Bridge</h1>
     <p>
-      Paste the installation key shown in the WebUI Settings for this browser.
-      It is stored in this browser only, and is never shown again in full.
+      This browser connects to a local WebUI. Set that WebUI's address, then
+      paste the installation key it shows in its own Settings page.
     </p>
+    <label for="bridge-origin">WebUI address</label>
+    <input
+      id="bridge-origin"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="http://127.0.0.1:8787"
+    />
+    <div class="row">
+      <button id="save-origin" type="button">Save address</button>
+    </div>
+    <p id="origin-stored"></p>
     <label for="installation-key">Installation key</label>
     <input id="installation-key" type="password" autocomplete="off" spellcheck="false" />
     <div class="row">

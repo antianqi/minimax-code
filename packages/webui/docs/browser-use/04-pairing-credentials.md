@@ -29,7 +29,7 @@ All of this is `implemented` in
 | OS | Mechanism | Command actually run | Availability test |
 | --- | --- | --- | --- |
 | macOS | login Keychain via the `security` CLI | write: `security add-generic-password -s <service> -a <keyId> -U -w` (value on **stdin**); read: `security find-generic-password -s <service> -a <keyId> -w` | `security help` exits 0 (`credential-store.ts:329`) |
-| Linux | freedesktop Secret Service via `secret-tool` | write: `secret-tool store --label=WebUI Browser Bridge service <svc> key <keyId>` (value on **stdin**); read: `secret-tool lookup …`; delete: `secret-tool clear …` | `secret-tool --version` exits 0 (`credential-store.ts:402`) |
+| Linux | freedesktop Secret Service via `secret-tool` | write: `secret-tool store --label=WebUI Browser Bridge service <svc> key <keyId>` (value on **stdin**); read: `secret-tool lookup …`; delete: `secret-tool clear …` | `secret-tool search service <svc> key <probe>` exits 0 (`credential-store.ts:415`) — `secret-tool` has no `--version` flag, so probing with it reports a working store as unavailable |
 | Windows | **DPAPI through PowerShell** — a `ConvertTo-SecureString` / `ConvertFrom-SecureString` round trip. The encrypted blob is written under `%LOCALAPPDATA%\WebUI\browser-bridge\<service>\bridge-<keyId>.blob` | `powershell.exe -NoProfile -NonInteractive -Command <script>`, plaintext in on **stdin** and out on **stdout** (`credential-store.ts:511`) | the script writes `$PSVersionTable.PSVersion.Major`; exit 0 means available (`credential-store.ts:556`) |
 | Other / unknown | none | — | `isAvailable()` returns `false`; `save()` throws `BrowserCredentialStoreUnavailableError` |
 

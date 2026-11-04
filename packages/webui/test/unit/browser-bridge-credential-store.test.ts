@@ -73,6 +73,24 @@ describe("WebUI bridge credential store", () => {
     expect(await store.isAvailable()).toBe(false);
   });
 
+  it("probes the Secret Service with a command secret-tool actually has", async () => {
+    // `secret-tool` has no `--version` flag: on libsecret-tools 0.21 it
+    // prints its usage and exits 2. Probing with it made a working store
+    // report itself unavailable, and the bridge then refused to mint an
+    // installation key for a browser the person had switched on — reported
+    // to them as "not enabled" rather than as the failure it was.
+    const os = createFakeOsPlatform();
+    const store = createPlatformSecureCredentialStore({
+      serviceName: "webui-browser-bridge",
+      platformOverride: "linux" as NodeJS.Platform,
+      runCommand: os.run,
+    });
+    expect(await store.isAvailable()).toBe(true);
+    const probe = os.calls.find((call) => call.command === "secret-tool");
+    expect(probe?.args[0]).toBe("search");
+    expect(probe?.args).not.toContain("--version");
+  });
+
   it("throws a typed error when no OS store is available and writes nothing to disk", async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), "bridge-credential-store-"));
     const before = await listFilesRecursive(tmp);
@@ -242,7 +260,12 @@ function createFakeOsPlatform(): FakeOsPlatform {
     calls.push({ command, args: [...args], stdin });
     const script = args.join(" ");
     // Availability probes.
-    if (args.includes("help") || args.includes("--version") || script.includes("PSVersionTable")) {
+    if (
+      args.includes("help") ||
+      args.includes("--version") ||
+      args[0] === "search" ||
+      script.includes("PSVersionTable")
+    ) {
       return { stdout: "1\n", stderr: "", exitCode: 0 };
     }
     const key = keyFor(command, args);

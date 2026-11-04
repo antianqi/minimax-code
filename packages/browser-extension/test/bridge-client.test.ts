@@ -94,6 +94,11 @@ class FakeSocket implements WebuiBrowserBridgeSocket {
     this.handlers?.onOpen();
   }
 
+  /** The platform's own failure, which the browser fires before the close. */
+  error(cause: unknown): void {
+    this.handlers?.onError(cause);
+  }
+
   receive(frame: WebuiBrowserBridgeHostFrame): void {
     this.handlers?.onMessage(JSON.stringify(frame));
   }
@@ -143,7 +148,9 @@ interface Harness {
  * proof arrives. Leaving it false models a bridge that is not coming back inside
  * the operation's deadline.
  */
-function createHarness(options: { respondWith?: boolean; respondEverySocket?: boolean } = {}): Harness {
+function createHarness(
+  options: { respondWith?: boolean; respondEverySocket?: boolean; failWith?: string } = {},
+): Harness {
   const clock = new FakeClock();
   const sockets: FakeSocket[] = [];
   const errors: WebuiBrowserBridgeError[] = [];
@@ -158,6 +165,13 @@ function createHarness(options: { respondWith?: boolean; respondEverySocket?: bo
     createSocket: () => {
       const socket = new FakeSocket(clock.time);
       sockets.push(socket);
+      const failure = options.failWith;
+      if (failure !== undefined) {
+        // What the platform does when the connection cannot be made: an
+        // error, and then a close.
+        queueMicrotask(() => socket.error(new Error(failure)));
+        return socket;
+      }
       if (options.respondWith === false || (sockets.length > 1 && options.respondEverySocket !== true)) {
         // Stays `connecting` and then drops, which is what a bridge that is not
         // listening looks like from this side.
@@ -293,6 +307,21 @@ describe("pairing over the bridge", () => {
     await settle();
 
     expect(harness.hostFrames).toEqual([command]);
+  });
+});
+
+describe("a connection that cannot be made", () => {
+  it("reports the failure at once instead of waiting for the operation deadline", async () => {
+    // Without the platform's own error event the failure was invisible: the
+    // browser fired "error" and then "close", only the close reached the
+    // client, and the person learned nothing until the operation deadline
+    // fifteen seconds away.
+    const harness = createHarness({ failWith: "connect ECONNREFUSED 127.0.0.1:8787" });
+    harness.client.start();
+    await settle();
+    expect(harness.errors).toHaveLength(1);
+    expect(harness.errors[0]!.message).toContain("ECONNREFUSED");
+    expect(harness.errors[0]!.code).toBe("browser_provider_failed");
   });
 });
 

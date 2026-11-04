@@ -84,6 +84,15 @@ export interface WebuiBrowserBridgeSocketHandlers {
   onOpen(): void;
   onMessage(data: string): void;
   onClose(): void;
+  /**
+   * The socket failed.
+   *
+   * A connection that cannot be made fires this: a host that is not
+   * listening, a bridge that refuses the upgrade. It is reported rather than
+   * swallowed, because the person is waiting for an answer and the only
+   * other one is the operation deadline fifteen seconds away.
+   */
+  onError(cause: unknown): void;
 }
 
 export interface WebuiBrowserBridgeSocket {
@@ -104,6 +113,17 @@ export function webuiBrowserBridgeWebSocketFactory(url: string): WebuiBrowserBri
       socket.addEventListener("open", () => handlers.onOpen());
       socket.addEventListener("message", (event: MessageEvent) => handlers.onMessage(String(event.data)));
       socket.addEventListener("close", () => handlers.onClose());
+      // Without this the platform's own failure is invisible to the client:
+      // the browser fires "error" and then "close", and only the close would
+      // reach it — which says the connection dropped, not that it was never
+      // established.
+      //
+      // The platform does not say *why* a WebSocket failed (it withholds the
+      // reason on purpose), so the cause is replaced with the one thing the
+      // person can act on: the address that was tried.
+      socket.addEventListener("error", () =>
+        handlers.onError(new Error(`the WebUI could not be reached at ${url}`)),
+      );
     },
   };
 }
@@ -379,6 +399,15 @@ export class WebuiBrowserBridgeClient {
             this.handleDropped();
           },
         );
+      },
+      onError: (cause: unknown) => {
+        this.options.onError?.(this.asError(cause));
+        // The socket is released before it is closed, so the close that
+        // follows is not handled twice: the handler below only acts on a
+        // socket the client still holds.
+        if (this.socket === socket) this.socket = undefined;
+        socket.close();
+        this.handleDropped();
       },
       onMessage: (data) => {
         const keyPair = handshake;

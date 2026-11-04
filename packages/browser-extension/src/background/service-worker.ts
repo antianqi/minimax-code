@@ -30,6 +30,11 @@ import {
   type WebuiBrowserBridgePairingCredential,
 } from "../pairing.js";
 import { WEBUI_BROWSER_BRIDGE_RECONNECT_MESSAGE } from "../protocol.js";
+import {
+  readWebuiBrowserBridgeOrigin,
+  WEBUI_BROWSER_BRIDGE_LAST_ERROR_STORAGE_KEY,
+  WEBUI_BROWSER_BRIDGE_STATUS_STORAGE_KEY,
+} from "../settings.js";
 import type {
   WebuiBrowserBridgeClientFrame,
   WebuiBrowserBridgeError,
@@ -40,14 +45,8 @@ import {
   webuiBrowserBridgeTargetGenerationStore,
 } from "../targets.js";
 
-/** The `chrome.storage.local` key the bridge origin lives under. */
-const ORIGIN_STORAGE_KEY = "webui.browserBridge.origin";
-
 /** The `chrome.storage.local` key this browser's stable identity lives under. */
 const BROWSER_ID_STORAGE_KEY = "webui.browserBridge.browserId";
-
-/** Where the last failure is parked for a diagnostics surface to read. */
-const LAST_ERROR_STORAGE_KEY = "webui.browserBridge.lastError";
 
 /**
  * How often the panel's image stream captures.
@@ -290,6 +289,12 @@ async function startBridge(): Promise<void> {
       );
     },
     onStatus: (status) => {
+      // The status is parked beside the last failure, so a surface that is
+      // waiting for an answer — the options page — can read what happened
+      // without having to ask the worker.
+      void chrome.storage.session
+        .set({ [WEBUI_BROWSER_BRIDGE_STATUS_STORAGE_KEY]: status })
+        .catch(() => undefined);
       if (status !== "connected") return;
       void publishTargets().catch(report);
       void streamImages();
@@ -322,7 +327,9 @@ function resultFrame(
  * collects extension logs, and neither belongs there.
  */
 async function report(error: WebuiBrowserBridgeError): Promise<void> {
-  await chrome.storage.session.set({ [LAST_ERROR_STORAGE_KEY]: { ...error, at: Date.now() } });
+  await chrome.storage.session.set({
+    [WEBUI_BROWSER_BRIDGE_LAST_ERROR_STORAGE_KEY]: { ...error, at: Date.now() },
+  });
 }
 
 async function resolveBrowserId(): Promise<string> {
@@ -334,8 +341,7 @@ async function resolveBrowserId(): Promise<string> {
 }
 
 async function resolveOrigin(): Promise<string | undefined> {
-  const stored = (await chrome.storage.local.get(ORIGIN_STORAGE_KEY))[ORIGIN_STORAGE_KEY];
-  return typeof stored === "string" && stored.length > 0 ? stored : undefined;
+  return readWebuiBrowserBridgeOrigin(chrome.storage.local);
 }
 
 /**

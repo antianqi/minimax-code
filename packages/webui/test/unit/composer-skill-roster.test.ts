@@ -60,25 +60,38 @@ const ROSTER = {
 };
 
 describe("the composer's skill pool", () => {
-  it("is read from the runtime roster, scoped by agent and session", async () => {
+  it("is read from the runtime roster, scoped by the session", async () => {
     const { catalogue, calls } = catalogueWith(ROSTER);
-    await catalogue.runtimeSkills({ agentName: "mavis", sessionId: "session-a" });
+    await catalogue.runtimeSkills({
+      sessionId: "session-a",
+      workspaceDir: "/workspace/project",
+    });
     // The roster is the list a turn can load. The management catalogue is a
     // different list — paged, user-facing, and without the plugin skills — and
     // reading it here is what left the palette short.
     expect(calls).toHaveLength(1);
     expect(calls[0]?.action).toBe("listRuntimeSkills");
     expect(calls[0]?.input).toMatchObject({
-      agentName: "mavis",
       sessionId: "session-a",
+      workspaceDir: "/workspace/project",
       // The plugin skills are part of the roster the agent can run.
       includePluginSkills: true,
     });
   });
 
+  it("names no agent, because the runtime resolves the session's own", async () => {
+    const { catalogue, calls } = catalogueWith(ROSTER);
+    await catalogue.runtimeSkills({ sessionId: "session-a" });
+    // Naming an agent could only contradict the session: the runtime resolves
+    // the agent from the session itself, and a name it does not know (the
+    // shell's placeholder for "no session" is one) makes the runtime answer
+    // with an empty roster. The read must therefore stay silent about it.
+    expect(calls[0]?.input).not.toHaveProperty("agentName");
+  });
+
   it("maps a roster row into the summary the palette renders", async () => {
     const { catalogue } = catalogueWith(ROSTER);
-    const skills = await catalogue.runtimeSkills({ agentName: "mavis" });
+    const skills = await catalogue.runtimeSkills({ sessionId: "session-a" });
     expect(skills).toEqual([
       {
         name: "ask-matt",
@@ -106,44 +119,34 @@ describe("the composer's skill pool", () => {
         { name: "off", enabled: false },
       ],
     });
-    const skills = await catalogue.runtimeSkills({ agentName: "mavis" });
+    const skills = await catalogue.runtimeSkills({ sessionId: "session-a" });
     expect(skills.map((skill) => skill.name)).toEqual(["on"]);
   });
 
   it("reads each scope once, and reads another scope when it comes", async () => {
     const { catalogue, calls } = catalogueWith(ROSTER);
-    await catalogue.runtimeSkills({ agentName: "mavis", sessionId: "session-a" });
-    await catalogue.runtimeSkills({ agentName: "mavis", sessionId: "session-a" });
+    await catalogue.runtimeSkills({ sessionId: "session-a" });
+    await catalogue.runtimeSkills({ sessionId: "session-a" });
     // The same scope is one answer, so the second reader joins the first read
     // instead of asking the runtime again.
     expect(calls).toHaveLength(1);
     // Another session is another roster: the workspace's own skills differ.
-    await catalogue.runtimeSkills({ agentName: "mavis", sessionId: "session-b" });
+    await catalogue.runtimeSkills({ sessionId: "session-b" });
     expect(calls).toHaveLength(2);
     expect(calls[1]?.input).toMatchObject({ sessionId: "session-b" });
   });
 
-  it("drops the written agent's slots and keeps the other agents'", async () => {
+  it("drops every slot when a skill is written", async () => {
     const { catalogue, calls } = catalogueWith(ROSTER);
-    await catalogue.runtimeSkills({ agentName: "mavis" });
-    await catalogue.runtimeSkills({ agentName: "worker" });
+    await catalogue.runtimeSkills({ sessionId: "session-a" });
+    await catalogue.runtimeSkills({ sessionId: "session-b" });
     expect(calls).toHaveLength(2);
-    catalogue.invalidateSkills("mavis");
-    await catalogue.runtimeSkills({ agentName: "mavis" });
-    // The written agent's slot is stale; the other agent's slot still stands,
-    // because a write for one agent says nothing about another's roster.
-    expect(calls).toHaveLength(3);
-    await catalogue.runtimeSkills({ agentName: "worker" });
-    expect(calls).toHaveLength(3);
-  });
-
-  it("drops every slot when a write names no agent", async () => {
-    const { catalogue, calls } = catalogueWith(ROSTER);
-    await catalogue.runtimeSkills({ agentName: "mavis" });
     catalogue.invalidateSkills();
-    await catalogue.runtimeSkills({ agentName: "mavis" });
-    // A write that cannot be attributed to an agent may have changed the
-    // default agent's roster, so nothing may be served from the cache.
-    expect(calls).toHaveLength(2);
+    await catalogue.runtimeSkills({ sessionId: "session-a" });
+    await catalogue.runtimeSkills({ sessionId: "session-b" });
+    // A skill write can change any session's roster, and a slot holds a
+    // session's roster without naming the agent behind it, so nothing may be
+    // served from the cache after one.
+    expect(calls).toHaveLength(4);
   });
 });

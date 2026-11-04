@@ -883,15 +883,6 @@ export function createWebuiApplication(
   const composerPluginCatalogue = createWebuiComposerPluginCatalogue({
     actions: createWebuiPluginActions(slices.plugins),
   });
-  /**
-   * The agent a skill write was aimed at, or `undefined` for the runtime-wide
-   * default. The catalogue keys its skill reads by exactly this, so this is what
-   * decides which slot goes stale and which ones survive.
-   */
-  const mutatedAgentName = (input: unknown): string | undefined => {
-    const value = (input as { readonly agentName?: unknown } | null | undefined)?.agentName;
-    return typeof value === "string" ? value : undefined;
-  };
   const pluginWorkflows = createWebuiPluginWorkflows({
     port: slices.plugins,
     onMutated: (action, input) => {
@@ -903,7 +894,7 @@ export function createWebuiApplication(
       // agents' slots survive — re-reading them would cost a round trip to
       // learn nothing.
       if (SKILL_CATALOGUE_ACTIONS.has(action)) {
-        composerPluginCatalogue.invalidateSkills(mutatedAgentName(input));
+        composerPluginCatalogue.invalidateSkills();
       }
     },
   });

@@ -147,7 +147,7 @@ function highlightFileLine(line: string, language: string | undefined): string |
   }
 }
 
-function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSelect, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: (path: string) => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
+function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSelect, onOpenOutsideFile, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: (path: string) => void; readonly onOpenOutsideFile?: (path: string) => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
   const [expanded, setExpanded] = useState(defaultOpen);
   // The diff could not be loaded: the failure is said once, as a toast, and is
   // not drawn in the layout.
@@ -181,7 +181,7 @@ function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSe
           /* The file is outside the workspace, so its content is not shown. The
            * entry stays in the list: the file name and the counts are the part a
            * person can still act on. */
-          ? <p className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>
+          ? <div className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace"><p>{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>{onOpenOutsideFile && (file.file.startsWith("/") || /^[a-z]:[\\/]/iu.test(file.file)) ? <WebuiButton variant="quiet-highlight" size="content" type="button" data-testid="turn-review-open-outside-file" onClick={() => onOpenOutsideFile(file.file)}>在文件查看器中打开</WebuiButton> : null}</div>
           /* 加载中的差异是一条播报；播报通道交给共享契约，类名不变，样式继续命中。 */
       : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${lines.length * 19.8}px` }}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
         if (row.kind === "hunk" || row.kind === "noNewline") {
@@ -229,6 +229,7 @@ export const WebuiDiffFileSection = memo(WebuiDiffFileSectionView, (previous, ne
   && previous.loading === next.loading
   && previous.error === next.error
   && previous.onSelect === next.onSelect
+  && previous.onOpenOutsideFile === next.onOpenOutsideFile
   && previous.defaultOpen === next.defaultOpen
   && previous.diffLayout === next.diffLayout
   && previous.showContext === next.showContext,
@@ -329,6 +330,9 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   const reviewDiffs = queryState.reviewDiffs;
   const reviewSearch = queryState.reviewSearch;
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+  const activeTurnReviewSessionId = activeTab?.content.kind === "review" && activeTab.content.source === "turn"
+    ? activeTab.content.sessionId
+    : undefined;
   const activeWebTab = activeTab && activeTab.content.kind === "web"
     ? { id: activeTab.id, content: activeTab.content }
     : undefined;
@@ -920,7 +924,13 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
     </div> : null}
     {tab === "review" && activeTab?.content.kind === "review" && activeTab.content.source === "turn" ? <div className="webui-turn-review" data-testid="turn-review-panel" data-session-id={activeTab.content.sessionId} data-message-id={activeTab.content.messageId} data-turn-id={activeTab.content.turnId} data-change-set-id={activeTab.content.changeSetId}>
       <WebuiInline gap="medium" justify="between" className="webui-turn-review-summary"><span>本轮改动</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{turnReviewFiles.reduce((sum, file) => sum + file.additions, 0)}</span>{turnReviewFiles.some((file) => file.deletions > 0) ? <span className="webui-diff-del">-{turnReviewFiles.reduce((sum, file) => sum + file.deletions, 0)}</span> : null}</span></WebuiInline>
-      {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={`${file.file}:${reviewSectionsExpanded ?? "default"}`} file={file} selected={selectedReviewPath === file.file} defaultOpen={reviewSectionsExpanded ?? true} diffLayout={reviewDiffLayout} showContext={reviewShowContext} />)}</div> : <FeedbackEmpty className="webui-turn-review-empty" title={"本轮没有可审查的文件差异。"} />}
+      {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={`${file.file}:${reviewSectionsExpanded ?? "default"}`} file={file} selected={selectedReviewPath === file.file} defaultOpen={reviewSectionsExpanded ?? true} diffLayout={reviewDiffLayout} showContext={reviewShowContext} onOpenOutsideFile={(path) => {
+        if (!activeTurnReviewSessionId) return;
+        const normalized = path.replace(/\\/gu, "/");
+        const separator = normalized.lastIndexOf("/");
+        if (separator <= 0 || !basenamePath(normalized)) return;
+        dispatch({ type: "open-file", sessionId: activeTurnReviewSessionId, workspaceDir: normalized.slice(0, separator), path: basenamePath(normalized) });
+      }} />)}</div> : <FeedbackEmpty className="webui-turn-review-empty" title={"本轮没有可审查的文件差异。"} />}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
     {browserTab ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={browserTab.id} data-inactive={!activeWebTab ? "true" : undefined} aria-hidden={!activeWebTab}>

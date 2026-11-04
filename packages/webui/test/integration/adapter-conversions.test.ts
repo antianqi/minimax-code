@@ -255,7 +255,7 @@ describe("adapter translations against the real host", () => {
   it(
     "reads a workspace file, refuses a missing one with its own message, and falls back to this package's archive reader",
     async () => {
-      await withHost({}, async ({ port, workspaceDir }) => {
+      await withHost({}, async ({ port, workspaceDir, dataDir }) => {
         const found = await port.readWorkspaceFile({ workspaceDir, path: "tracked.txt" });
         expect(found).toMatchObject({ type: "text", content: "tracked\n" });
 
@@ -270,6 +270,16 @@ describe("adapter translations against the real host", () => {
         const resolved = await port.readWorkspaceFile({ workspaceDir, path: "nested.txt" });
         expect(resolved).toMatchObject({ content: "nested\n" });
         expect((resolved as { resolvedPath?: string }).resolvedPath).toBe("sub/nested.txt");
+
+        // A turn diff can name a session artifact outside the selected
+        // workspace. Opening it in the file viewer uses its containing
+        // directory as the explicit read root, which the real host must read.
+        const outsideDir = join(dataDir, "session-artifacts", "generated");
+        await mkdir(outsideDir, { recursive: true });
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg"><title>outside artifact</title></svg>';
+        await writeFile(join(outsideDir, "flower.svg"), svg, "utf8");
+        const outsideRead = await port.readWorkspaceFile({ workspaceDir: outsideDir, path: "flower.svg" });
+        expect(outsideRead).toMatchObject({ type: "binary", mimeType: "image/svg+xml" });
 
         // The v2 host exposes no archive reader, so this exercises the fallback to
         // `runtime/workspace-archive.ts` through the real port.

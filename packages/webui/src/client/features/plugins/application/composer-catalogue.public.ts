@@ -49,31 +49,33 @@ export interface WebuiComposerPluginCatalogue {
     scope?: WebuiComposerSkillScope,
   ) => Promise<readonly WebuiComposerSkillSummary[]>;
   /**
+   * A skill write can change any session's roster, so every skill slot goes.
+   *
+   * The roster a session shows is the roster of the agent that session runs,
+   * and the catalogue cannot tell which agent that is: the runtime resolves it
+   * from the session, so a slot holds a session's roster without naming the
+   * agent behind it. A write aimed at one agent therefore cannot be told
+   * apart from a write aimed at another.
+   */
+  readonly invalidateSkills: () => void;
+  /**
    * The installed-plugin read is stale. Every slot goes, because a plugin write
    * can add, remove, rename or reconfigure any of them.
    */
   readonly invalidatePlugins: () => void;
-  /**
-   * One agent's skill read is stale. Slots for other agents survive: a plugin
-   * write does not answer a different agent's runtime, so re-reading them would
-   * cost a round trip to learn nothing.
-   *
-   * A write that names no agent cannot be attributed to one, so every slot
-   * goes in that case: the default agent's roster may have changed, and the
-   * runtime-wide slot is the one that reads it.
-   */
-  readonly invalidateSkills: (agentName?: string) => void;
 }
 
 /**
  * What a roster read is scoped by.
  *
- * The agent names whose skills are read; the session names the workspace they
- * are read for. The workspace may also be given on its own, for a read that
- * has no session yet (the home composer).
+ * The session names the roster: the runtime resolves that session's agent and
+ * its working directory from the session itself, so a read that named an agent
+ * could only contradict it — and a name that is not an agent the runtime knows
+ * (the shell's placeholder for "no session" is one) makes the runtime answer
+ * with an empty roster. The workspace may also be given on its own, for a read
+ * that has no session yet (the home composer).
  */
 export interface WebuiComposerSkillScope {
-  readonly agentName?: string;
   readonly sessionId?: string;
   readonly workspaceDir?: string;
 }

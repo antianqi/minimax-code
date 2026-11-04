@@ -157,6 +157,32 @@ test("Tab completes the slash palette's highlighted suggestion", async ({ page }
   await expect(input).toBeFocused();
 });
 
+test("the mode pill keeps its mode mark and shows a close mark on hover", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.click();
+  await input.fill("/plan ");
+  await input.press("Enter");
+
+  const pill = page.locator('[data-testid="composer-plan-mode"]');
+  await expect(pill).toBeVisible();
+  // At rest the leading glyph says which mode is running.
+  await expect(pill.locator("svg.tabler-icon-calendar-event")).toBeVisible();
+  await expect(pill.locator("svg.tabler-icon-x")).toBeHidden();
+  await expect(pill.locator("> span").last()).toHaveText("计划");
+
+  await pill.hover();
+  // Under the pointer that same slot becomes the close mark — leaving the mode
+  // is the pill's only action — and both glyphs share one box, so the label
+  // does not move. (The goal pill renders from the same component.)
+  await expect(pill.locator("svg.tabler-icon-x")).toBeVisible();
+  await expect(pill.locator("svg.tabler-icon-calendar-event")).toBeHidden();
+
+  await pill.click();
+  await expect(page.locator('[data-testid="composer-plan-mode"]')).toHaveCount(0);
+});
+
 test("/compact from the slash palette reaches the runtime with its instruction", async ({ page }) => {
   await openApp(page, "#session=A");
 

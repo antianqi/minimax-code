@@ -64,7 +64,6 @@ function text(row: Record<string, unknown>, key: string): string {
  */
 function skillSlotKey(scope: WebuiComposerSkillScope | undefined): string {
   return JSON.stringify([
-    scope?.agentName ?? "",
     scope?.sessionId ?? "",
     scope?.workspaceDir ?? "",
   ]);
@@ -134,7 +133,7 @@ export function createWebuiComposerPluginCatalogue(deps: {
   // agent's roster differs per workspace, and a session names the workspace.
   const skillReads = new Map<
     string,
-    { readonly agentName?: string; readonly read: Promise<readonly WebuiComposerSkillSummary[]> }
+    { readonly read: Promise<readonly WebuiComposerSkillSummary[]> }
   >();
 
   return {
@@ -176,22 +175,15 @@ export function createWebuiComposerPluginCatalogue(deps: {
       pluginReads.clear();
     },
 
-    invalidateSkills: (agentName) => {
-      // A write that names an agent only makes that agent's slots stale. A
-      // write that names none cannot be attributed, so every slot goes: the
-      // default agent's roster may have changed with it.
-      if (agentName === undefined) {
-        skillReads.clear();
-        return;
-      }
-      for (const [key, slot] of skillReads) {
-        if (slot.agentName === agentName) skillReads.delete(key);
-      }
+    invalidateSkills: () => {
+      // A skill write can change any session's roster, and a slot holds a
+      // session's roster without naming the agent behind it, so every slot
+      // goes: the catalogue cannot tell which agent a session runs.
+      skillReads.clear();
     },
 
     runtimeSkills: (scope) => {
       if (disposed) return disposedRead();
-      const agentName = scope?.agentName;
       const key = skillSlotKey(scope);
       const started = skillReads.get(key);
       if (started) return started.read;
@@ -202,7 +194,6 @@ export function createWebuiComposerPluginCatalogue(deps: {
       // without the plugin skills — and it is what the management page reads.
       const request = actions
         .invoke("listRuntimeSkills", {
-          ...(agentName ? { agentName } : {}),
           ...(scope?.sessionId ? { sessionId: scope.sessionId } : {}),
           ...(scope?.workspaceDir ? { workspaceDir: scope.workspaceDir } : {}),
           // The plugin skills are part of the roster the agent can run, so they
@@ -226,7 +217,7 @@ export function createWebuiComposerPluginCatalogue(deps: {
           // not re-enter the cache afterwards.
           if (disposed) skillReads.delete(key);
         });
-      skillReads.set(key, { agentName, read: request });
+      skillReads.set(key, { read: request });
       return request;
     },
 

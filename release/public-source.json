@@ -4682,7 +4682,6 @@
     "packages/webui/test/browser/support/rendering-integrity.json",
     "packages/webui/test/browser/support/rendering-integrity.mjs",
     "packages/webui/test/browser/terminal-cross-page.spec.mjs",
-    "packages/webui/test/browser/tmp-explore.spec.mjs",
     "packages/webui/test/browser/toast.spec.mjs",
     "packages/webui/test/browser/transcript-scroll.spec.mjs",
     "packages/webui/test/browser/transcript.spec.mjs",

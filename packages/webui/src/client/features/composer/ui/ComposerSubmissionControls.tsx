@@ -11,6 +11,7 @@
 // composer keeps the mode and submission logic.
 
 import {
+  WebuiIconClose,
   WebuiIconCommandGoal,
   WebuiIconCommandPlan,
   WebuiIconSend,
@@ -45,10 +46,17 @@ export function WebuiComposerModePills({
           aria-pressed={true}
           aria-label="取消目标模式"
           data-testid="composer-goal-mode"
+          className="webui-composer-mode-pill"
           disabled={goalSubmitting || interactionBlocked}
           onClick={onCancelGoal}
         >
-          <WebuiIconCommandGoal />
+          {/* The mode's own mark at rest, the close mark while the pill is
+              hovered or focused: leaving the mode is the pill's only action.
+              Both share one box, so the label does not shift. */}
+          <span className="webui-composer-mode-pill-glyph">
+            <WebuiIconCommandGoal className="webui-composer-mode-pill-mark" />
+            <WebuiIconClose className="webui-composer-mode-pill-close" />
+          </span>
           <span>目标</span>
         </WebuiButton>
       ) : null}
@@ -60,10 +68,16 @@ export function WebuiComposerModePills({
           aria-pressed="true"
           aria-label="退出计划模式"
           data-testid="composer-plan-mode"
+          className="webui-composer-mode-pill"
           disabled={interactionBlocked}
           onClick={onCancelPlan}
         >
-          <WebuiIconCommandPlan />
+          {/* Same rule as the goal pill: mode mark at rest, close mark on hover
+              or focus, one box so the label never moves. */}
+          <span className="webui-composer-mode-pill-glyph">
+            <WebuiIconCommandPlan className="webui-composer-mode-pill-mark" />
+            <WebuiIconClose className="webui-composer-mode-pill-close" />
+          </span>
           <span>计划</span>
         </WebuiButton>
       ) : null}

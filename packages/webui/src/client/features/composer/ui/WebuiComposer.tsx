@@ -541,12 +541,18 @@ export function WebuiComposer({
     readonly WebuiSlashSkillSummary[]
   > => {
     if (!pluginCatalogue) return Promise.reject(new Error("技能目录暂不可用"));
-    // The roster is read for THIS session's agent and workspace. The runtime
-    // resolves a session's working directory from the session itself, so the
-    // session id is what brings the workspace's own skills into the roster;
-    // the agent names whose roster is read.
-    return pluginCatalogue.runtimeSkills({ agentName, sessionId });
-  }, [pluginCatalogue, agentName, sessionId]);
+    // The roster is read for the session the composer is on. The runtime
+    // resolves that session's agent and working directory from the session
+    // itself, so the read names NO agent: the shell's agent name is a
+    // placeholder until the session list arrives ("main" is not an agent the
+    // runtime knows), and a roster read that names an unknown agent comes
+    // back empty. With no session the runtime answers with its default
+    // agent's roster.
+    return pluginCatalogue.runtimeSkills({
+      ...(sessionId ? { sessionId } : {}),
+      ...(workspaceDir ? { workspaceDir } : {}),
+    });
+  }, [pluginCatalogue, sessionId, workspaceDir]);
 
   useEffect(() => {
     if (composerMenu !== "skills") return;

@@ -54,6 +54,49 @@ test("the diff card reads its turn through the review owner", async ({ page }) =
   await expect.poll(() => requests(page, "getTurnDiff")).toBeGreaterThan(0);
 });
 
+test("an outside-workspace review entry opens that file in the workspace viewer on request", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  const outsidePath = "/synthetic/session-artifacts/generated/flower.svg";
+  await page.evaluate((path) => {
+    window.__fixture.setPage("A", {
+      messages: [{
+        msgId: "outside-review",
+        role: "assistant",
+        msgContent: "已修改",
+        timestamp: 1_700_000_000_500,
+        fileChanges: [{ file: path, additions: 1, deletions: 0 }],
+        changeSetId: "outside-cs",
+        sourceMessageId: "outside-review",
+        turnDiffStatus: "active",
+      }],
+      hasMore: false,
+    });
+    window.__fixture.setTurnDiff({
+      status: "active",
+      changeSetId: "outside-cs",
+      sourceMessageId: "outside-review",
+      canUndo: false,
+      canReapply: false,
+      fileChanges: [{ file: path, additions: 1, deletions: 0, diff: "@@ -0,0 +1 @@\\n+synthetic withheld body" }],
+    });
+  }, outsidePath);
+  await switchSession(page, "B");
+  await switchSession(page, "A");
+  await page.getByTestId("turn-diff-review").click();
+
+  const unavailable = page.getByTestId("turn-review-outside-workspace");
+  await expect(unavailable).toContainText("该文件在工作区之外，内容未展示。");
+  await expect(unavailable).not.toContainText("synthetic withheld body");
+  await unavailable.getByTestId("turn-review-open-outside-file").click();
+
+  const preview = page.getByTestId("workspace-file-preview");
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText("export const answer = 42;");
+  const read = await page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "readWorkspaceFile").at(-1));
+  expect(read.body).toEqual({ workspaceDir: "/synthetic/session-artifacts/generated", path: "flower.svg" });
+});
+
 test("a revert the owner settles is what the card shows", async ({ page }) => {
   await openSessionWithDiff(page);
   const card = page.locator('[data-testid="turn-diff-card"]');

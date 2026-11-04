@@ -70,7 +70,10 @@ The personal skill list is read through `listManageableSkills` on purpose: the r
 excludes disabled entries, and the management list must include them so one can be turned back on.
 
 The composer's roster is read through `listRuntimeSkills`, which is a different list: it is what
-the agent can run, and it carries the plugin skills and the workspace's own skills.
+the agent can run, and it carries the plugin skills and the workspace's own skills. The read names the
+session, not an agent: the runtime resolves the session's agent from the session itself, and an agent
+name it does not know (the shell's placeholder for "no session" is one) makes the runtime answer with an
+empty roster.
 
 ### Surface `apps` — the mini-app catalogue (1)
 

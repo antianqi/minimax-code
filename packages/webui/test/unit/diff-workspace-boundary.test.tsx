@@ -216,4 +216,18 @@ describe("the workspace review panel shows what is withheld instead of the conte
     expect(markup).toContain("+1");
     expect(markup).toContain("-1");
   });
+
+  it("offers an explicit file-viewer link for an outside absolute file", () => {
+    const markup = renderToStaticMarkup(
+      createElement(WebuiDiffFileSection, {
+        file: projectWebuiDiffFile(outsideFile, WORKSPACE),
+        selected: true,
+        onOpenOutsideFile: () => undefined,
+      }),
+    );
+
+    expect(markup).toContain('data-testid="turn-review-open-outside-file"');
+    expect(markup).toContain("在文件查看器中打开");
+    expect(markup).not.toContain(BODY_MARKER);
+  });
 });

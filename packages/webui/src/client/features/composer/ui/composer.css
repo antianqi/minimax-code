@@ -14,6 +14,27 @@
     container: webui-composer / inline-size;
   }
 
+  /* The goal / plan mode pill's leading glyph.
+   *
+   * At rest it is the mode's own mark — that is what tells the reader which
+   * mode is running. While the pointer is over the pill, or it holds keyboard
+   * focus, it becomes the close mark, because leaving the mode is the pill's
+   * only action. Both glyphs share one 18px grid cell: swapping them cannot
+   * move the label, and the pill keeps its size under the pointer. */
+  .webui-composer-mode-pill-glyph {
+    display: grid;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    place-items: center;
+  }
+  .webui-composer-mode-pill-glyph > svg { grid-area: 1 / 1; }
+  .webui-composer-mode-pill-close { display: none; }
+  .webui-composer-mode-pill:hover .webui-composer-mode-pill-close,
+  .webui-composer-mode-pill:focus-visible .webui-composer-mode-pill-close { display: block; }
+  .webui-composer-mode-pill:hover .webui-composer-mode-pill-mark,
+  .webui-composer-mode-pill:focus-visible .webui-composer-mode-pill-mark { display: none; }
+
   .webui-composer-mascot {
     position: absolute;
     z-index: 1;

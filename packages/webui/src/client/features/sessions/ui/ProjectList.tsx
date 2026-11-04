@@ -158,14 +158,8 @@ export function ProjectList({
       <>
         <FeedbackAnnouncement message="正在加载项目和会话" />
         <div className="webui-project-list-skeleton" aria-hidden="true">
-          {[92, 100, 84, 100, 72, 94, 80, 100, 88, 96, 76].map((width, index) => (
-            <WebuiSkeleton
-              key={index}
-              variant="shape"
-              width={`${width}%`}
-              height={36}
-              className="webui-project-list-skeleton-row"
-            />
+          {Array.from({ length: 11 }, (_, index) => (
+            <WebuiSkeleton key={index} />
           ))}
         </div>
       </>

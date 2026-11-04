@@ -2,8 +2,8 @@
 // viewport is still loading history: `chat-skeleton` for ongoing sessions and
 // `greeting-skeleton` for fresh / no-history cases.
 //
-// The line widths (8 primary + 4 secondary) are fixed. The shared skeleton
-// class owns the pulse cadence and reduced-motion behavior.
+// The transcript owns bubble alignment, column width and spacing. The shared
+// skeleton owns every bar's visual style and loading pulse.
 //
 // The 736px content column below MUST track `.webui-session-layout
 // .message-list`'s `max-width` in `shell.css`. These skeletons stand in for
@@ -11,11 +11,11 @@
 // transcript jump sideways when the real content lands.
 // `webui-w0-css-structure.test.ts` asserts the two stay in lockstep.
 //
-// The skeleton geometry stays local; loading motion stays shared.
+// Only transcript layout stays local; loading appearance stays shared.
 
 import type { CSSProperties } from "react";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiSkeleton } from "../../../ui/page.js";
+import { WebuiSkeleton, WebuiSkeletonGroup } from "../../../ui/page.js";
 
 /**
  * Matches `.webui-session-layout .message-list`'s `max-width` in `shell.css`.
@@ -24,29 +24,6 @@ import { WebuiSkeleton } from "../../../ui/page.js";
  */
 export const SKELETON_CONTENT_MAX_WIDTH_PX = 736;
 
-const LINE_WIDTHS: readonly string[] = [
-  "76%",
-  "53%",
-  "63%",
-  "35%",
-  "53%",
-  "35%",
-  "73%",
-  "53%",
-];
-
-const SECONDARY_WIDTHS: readonly string[] = ["76%", "53%", "63%", "35%"];
-
-const fadeMask: CSSProperties = {
-  maskImage: "linear-gradient(180deg, black 0%, transparent 100%)",
-  WebkitMaskImage: "linear-gradient(180deg, black 0%, transparent 100%)",
-};
-
-function SkeletonBar(props: { width: string | number; height: number; rounded?: string }): React.JSX.Element {
-  const { width, height, rounded = "0.5rem" } = props;
-  return <WebuiSkeleton variant="shape" style={{ width, height, borderRadius: rounded }} />;
-}
-
 export function ChatSkeleton(): React.JSX.Element {
   return (
     <WebuiStack className="flex-1 overflow-hidden" data-testid="chat-skeleton">
@@ -54,18 +31,12 @@ export function ChatSkeleton(): React.JSX.Element {
         style={{ maxWidth: `${SKELETON_CONTENT_MAX_WIDTH_PX}px` }}
       >
         <WebuiInline justify="end">
-          <SkeletonBar width={280} height={48} rounded="1rem" />
+          <WebuiSkeleton />
         </WebuiInline>
         <WebuiStack className="mt-5">
-          <WebuiStack className="webui-transcript-skeleton-lines">
-            {LINE_WIDTHS.map((width, index) => (
-              <SkeletonBar key={`a${index}`} width={width} height={22} />
-            ))}
-          </WebuiStack>
-          <WebuiStack gap="small" className="mt-2" style={fadeMask}>
-            {SECONDARY_WIDTHS.map((width, index) => (
-              <SkeletonBar key={`b${index}`} width={width} height={24} />
-            ))}
+          <WebuiSkeletonGroup rows={8} />
+          <WebuiStack gap="small" className="mt-2">
+            <WebuiSkeletonGroup rows={4} />
           </WebuiStack>
         </WebuiStack>
       </WebuiStack>
@@ -80,17 +51,11 @@ export function GreetingSkeleton(): React.JSX.Element {
         className="mx-auto"
         style={{ maxWidth: `${SKELETON_CONTENT_MAX_WIDTH_PX}px` }}
       >
-        <SkeletonBar width={40} height={40} rounded="9999px" />
+        <WebuiSkeleton />
         <WebuiStack className="mt-4">
-          <WebuiStack className="webui-transcript-skeleton-lines">
-            {LINE_WIDTHS.map((width, index) => (
-              <SkeletonBar key={`a${index}`} width={width} height={22} />
-            ))}
-          </WebuiStack>
-          <WebuiStack gap="small" className="mt-2" style={fadeMask}>
-            {SECONDARY_WIDTHS.map((width, index) => (
-              <SkeletonBar key={`b${index}`} width={width} height={24} />
-            ))}
+          <WebuiSkeletonGroup rows={8} />
+          <WebuiStack gap="small" className="mt-2">
+            <WebuiSkeletonGroup rows={4} />
           </WebuiStack>
         </WebuiStack>
       </WebuiStack>

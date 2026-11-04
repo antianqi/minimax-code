@@ -23,10 +23,7 @@ function projectSkeleton(node: ReactNode): ReactNode {
     if (child === null || child === undefined || typeof child === "boolean")
       return null;
     if (typeof child === "string" || typeof child === "number") {
-      const width = `${Math.min(92, Math.max(18, String(child).length * 4))}%`;
-      return (
-        <WebuiSkeleton key={`text-${index}`} variant="text" width={width} />
-      );
+      return <WebuiSkeleton key={`text-${index}`} />;
     }
     if (!isValidElement<HTMLAttributes<HTMLElement>>(child)) return child;
     if (child.type === Fragment) {
@@ -39,41 +36,22 @@ function projectSkeleton(node: ReactNode): ReactNode {
       return (
         <WebuiSkeleton
           key={child.key}
-          variant="shape"
-          className={`webui-page-skeleton-shape ${child.props.className ?? ""}`}
-          style={skeletonLayoutStyle(child.props.style)}
         />
       );
     }
     const nested = child.props.children;
     if (nested === undefined || nested === null) {
-      const variant = ["button", "input", "select", "textarea"].includes(
-        child.type,
-      )
-        ? "control"
-        : "shape";
       return (
         <WebuiSkeleton
           key={child.key}
-          variant={variant}
-          className={`webui-page-skeleton-shape ${child.props.className ?? ""}`}
-          style={skeletonLayoutStyle(child.props.style)}
         />
       );
     }
-    const skeletonControl =
-      child.type === "button" ||
-      child.type === "a" ||
-      child.props.role === "button";
     return cloneElement(child, {
       "aria-hidden": true,
-      ...(skeletonControl
-        ? { "data-webui-page-skeleton-control": "true" }
-        : {}),
       className: [
         child.props.className,
         "webui-page-skeleton-node",
-        skeletonControl ? "webui-motion-loading" : "",
       ]
         .filter(Boolean)
         .join(" "),
@@ -440,100 +418,16 @@ export const WebuiDisclosure = forwardRef<HTMLElement, WebuiDisclosureProps>(
   },
 );
 
-export type WebuiSkeletonVariant =
-  "circle" | "control" | "rect" | "shape" | "text";
-
-const SKELETON_VARIANT_CLASS: Record<WebuiSkeletonVariant, string> = {
-  circle: "webui-skeleton--circle",
-  control: "webui-skeleton--control",
-  rect: "webui-skeleton--rect",
-  shape: "webui-skeleton--shape",
-  text: "webui-skeleton--text",
-};
-
 export interface WebuiSkeletonProps {
-  readonly variant?: WebuiSkeletonVariant;
-  readonly width?: string | number;
-  readonly height?: string | number;
-  readonly className?: string;
-  readonly style?: CSSProperties;
   readonly testId?: string;
 }
-
-const SKELETON_LAYOUT_PROPERTIES = new Set([
-  "aspectRatio",
-  "blockSize",
-  "flex",
-  "flexBasis",
-  "gridArea",
-  "gridColumn",
-  "gridRow",
-  "height",
-  "inlineSize",
-  "justifySelf",
-  "margin",
-  "marginBlock",
-  "marginBlockEnd",
-  "marginBlockStart",
-  "marginBottom",
-  "marginInline",
-  "marginInlineEnd",
-  "marginInlineStart",
-  "marginLeft",
-  "marginRight",
-  "marginTop",
-  "maxBlockSize",
-  "maxHeight",
-  "maxInlineSize",
-  "maxWidth",
-  "minBlockSize",
-  "minHeight",
-  "minInlineSize",
-  "minWidth",
-  "width",
-]);
-
-function skeletonLayoutStyle(style?: CSSProperties): CSSProperties | undefined {
-  if (!style) return undefined;
-  const layout = Object.fromEntries(
-    Object.entries(style).filter(([property]) =>
-      SKELETON_LAYOUT_PROPERTIES.has(property),
-    ),
-  ) as CSSProperties;
-  return Object.keys(layout).length === 0 ? undefined : layout;
-}
-
-function cssLength(value: string | number): string {
-  return typeof value === "number" ? `${value}px` : value;
-}
-
-/** Shared skeleton shape and pulse. Callers supply geometry, never animation rules. */
-export function WebuiSkeleton({
-  variant = "text",
-  width,
-  height,
-  className,
-  style: inheritedStyle,
-  testId,
-}: WebuiSkeletonProps): ReactElement {
-  const style: CSSProperties = {
-    ...inheritedStyle,
-    ...(width === undefined ? {} : { inlineSize: cssLength(width) }),
-    ...(height === undefined ? {} : { blockSize: cssLength(height) }),
-  };
+/** The public skeleton bar. Its appearance is intentionally not configurable by callers. */
+export function WebuiSkeleton({ testId }: WebuiSkeletonProps): ReactElement {
   return (
     <span
       aria-hidden="true"
-      className={[
-        "webui-skeleton",
-        "webui-motion-loading",
-        SKELETON_VARIANT_CLASS[variant],
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      className="webui-skeleton webui-motion-loading"
       data-testid={testId}
-      style={style}
     />
   );
 }
@@ -541,22 +435,16 @@ export function WebuiSkeleton({
 /** A common group for a page body whose data has not arrived yet. */
 export function WebuiSkeletonGroup({
   rows = 3,
-  className,
 }: {
   readonly rows?: number;
-  readonly className?: string;
 }): ReactElement {
   return (
     <div
       aria-hidden="true"
-      className={["webui-skeleton-group", className].filter(Boolean).join(" ")}
+      className="webui-skeleton-group"
     >
       {Array.from({ length: Math.max(0, rows) }, (_, index) => (
-        <WebuiSkeleton
-          key={index}
-          variant="text"
-          className={index === rows - 1 ? "webui-skeleton--short" : undefined}
-        />
+        <WebuiSkeleton key={index} />
       ))}
     </div>
   );

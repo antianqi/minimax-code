@@ -52,7 +52,7 @@ export const WebuiTextInput = forwardRef<HTMLInputElement, WebuiTextInputProps>(
     className,
   ].filter(Boolean).join(" ");
   if (useWebuiPageLoading()) {
-    return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape ${classes}`} style={props.style} />;
+    return <WebuiSkeleton />;
   }
   return <input {...props} ref={ref} className={classes} />;
 });
@@ -70,7 +70,7 @@ export const WebuiTextarea = forwardRef<
   WebuiTextareaProps
 >(function WebuiTextarea({ controlSize = "regular", appearance = "default", className, rows = 12, ...props }, ref): ReactElement {
   if (useWebuiPageLoading()) {
-    return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-control webui-control--multiline ${controlSize === "compact" ? "webui-control--compact" : ""} ${controlSize === "large" ? "webui-control--large" : ""} ${controlSize === "document" ? "webui-control--document" : ""} ${appearance === "document" ? "webui-control--document-appearance" : ""} ${className ?? ""}`} style={props.style} />;
+    return <WebuiSkeleton />;
   }
   return <textarea {...props} rows={rows} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
 });
@@ -200,7 +200,7 @@ export const WebuiCheckbox = forwardRef<
   HTMLInputElement,
   Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & { readonly className?: string }
 >(function WebuiCheckbox({ className, ...props }, ref): ReactElement {
-  if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-checkbox ${className ?? ""}`} style={props.style} />;
+  if (useWebuiPageLoading()) return <WebuiSkeleton />;
   return <input {...props} ref={ref} type="checkbox" className={["webui-checkbox", "webui-motion-feedback", className].filter(Boolean).join(" ")} />;
 });
 
@@ -208,7 +208,7 @@ export const WebuiRadio = forwardRef<
   HTMLInputElement,
   Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type"> & { readonly className?: string }
 >(function WebuiRadio({ className, ...props }, ref): ReactElement {
-  if (useWebuiPageLoading()) return <WebuiSkeleton variant="shape" className={`webui-page-skeleton-shape webui-radio ${className ?? ""}`} style={props.style} />;
+  if (useWebuiPageLoading()) return <WebuiSkeleton />;
   return <input {...props} ref={ref} type="radio" className={["webui-radio", "webui-motion-feedback", className].filter(Boolean).join(" ")} />;
 });
 
@@ -256,8 +256,6 @@ export function WebuiSearchField({
   if (useWebuiPageLoading()) {
     return (
       <WebuiSkeleton
-        variant="shape"
-        className={`webui-page-skeleton-shape webui-search-field${className ? ` ${className}` : ""}`}
         testId={testId}
       />
     );

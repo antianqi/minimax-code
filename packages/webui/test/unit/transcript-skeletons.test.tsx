@@ -27,20 +27,18 @@ describe("TranscriptSkeletons", () => {
     // cannot drift back to a hard-coded value.
     expect(html).toContain(`max-width:${SKELETON_CONTENT_MAX_WIDTH_PX}px`);
     expect(html).not.toContain("mx-auto");
-    expect(html).toContain("webui-skeleton--shape");
+    expect(html).toContain("webui-skeleton");
     expect(html).toContain("webui-motion-loading");
   });
 
-  it("ChatSkeleton uses the desktop line widths (8 primary + 4 secondary)", () => {
+  it("ChatSkeleton keeps its transcript-specific loading layout", () => {
     const html = renderToStaticMarkup(createElement(ChatSkeleton));
-    // Eight 22px bars in the primary block, four 24px bars in the secondary
-    // block (8 primary entries, 4 secondary).
+    // The chat bubble plus eight primary rows and four secondary rows.
     expect(countByClass(html, "webui-motion-loading")).toBe(13);
-    expect((html.match(/height:22px/g) ?? []).length).toBe(8);
-    expect((html.match(/height:24px/g) ?? []).length).toBe(4);
+    expect((html.match(/class="webui-skeleton webui-motion-loading"/g) ?? []).length).toBe(13);
   });
 
-  it("GreetingSkeleton uses the rounded-40 avatar instead of the user bubble", () => {
+  it("GreetingSkeleton uses the shared bar style inside its own layout", () => {
     const html = renderToStaticMarkup(createElement(GreetingSkeleton));
     expect(html).toContain('data-testid="greeting-skeleton"');
     // The column width comes from the shared constant rather than a literal,
@@ -48,19 +46,9 @@ describe("TranscriptSkeletons", () => {
     // cannot drift back to a hard-coded value.
     expect(html).toContain(`max-width:${SKELETON_CONTENT_MAX_WIDTH_PX}px`);
     expect(html).toContain("mx-auto");
-    // The avatar uses `border-radius:9999px` (full circle). React serialises
-    // numeric pixels with units.
-    expect(html).toContain("border-radius:9999px");
+    expect(html).toContain("webui-skeleton webui-motion-loading");
   });
 
-  it("Both skeletons apply the gradient mask to the secondary block", () => {
-    const chat = renderToStaticMarkup(createElement(ChatSkeleton));
-    const greeting = renderToStaticMarkup(createElement(GreetingSkeleton));
-    for (const html of [chat, greeting]) {
-      expect(html).toContain("mask-image:linear-gradient(180deg");
-      expect(html).toContain("transparent 100%)");
-    }
-  });
 });
 
 describe("Agent activity disclosure", () => {

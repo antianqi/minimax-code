@@ -186,22 +186,13 @@ export function FeedbackSkeleton({
   label = "正在加载",
   rows = 3,
   testId,
-  widths,
-  maxWidth,
-  rowHeight,
-  rowRadius,
+  columns = 1,
 }: {
   readonly label?: string;
   readonly rows?: number;
   readonly testId?: string;
-  /** Optional percentage widths that repeat across the placeholder rows. */
-  readonly widths?: readonly number[];
-  /** Optional maximum width for the shared placeholder body, in pixels. */
-  readonly maxWidth?: number;
-  /** Optional height for each placeholder row, in pixels. */
-  readonly rowHeight?: number;
-  /** Optional corner radius for each placeholder row, in pixels. */
-  readonly rowRadius?: number;
+  /** Number of columns in the shared placeholder layout. */
+  readonly columns?: number;
 }): ReactElement {
   return (
     <div className="webui-feedback webui-feedback--skeleton" data-testid={testId}>
@@ -211,19 +202,10 @@ export function FeedbackSkeleton({
       <div
         aria-hidden="true"
         className="webui-feedback-skeleton-body"
-        style={maxWidth === undefined ? undefined : { maxWidth }}
+        data-columns={Math.max(1, Math.min(4, Math.floor(columns)))}
       >
         {Array.from({ length: rows }, (_, index) => (
-          <WebuiSkeleton
-            key={index}
-            variant="text"
-            className={index === rows - 1 ? "webui-skeleton--short" : undefined}
-            style={{
-              ...(widths?.length ? { width: `${Math.max(0, Math.min(100, widths[index % widths.length]))}%` } : {}),
-              ...(rowHeight === undefined ? {} : { height: rowHeight }),
-              ...(rowRadius === undefined ? {} : { borderRadius: rowRadius }),
-            }}
-          />
+          <WebuiSkeleton key={index} />
         ))}
       </div>
     </div>

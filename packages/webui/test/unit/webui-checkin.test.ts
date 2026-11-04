@@ -14,6 +14,7 @@ import {
   claimSigninOperation,
 } from "../../src/server/operation/operations.js";
 import { SigninCard } from "../../src/client/features/account/ui/UserMenuSignin.js";
+import { FeedbackSkeleton } from "../../src/client/ui/feedback.js";
 
 const PANEL = {
   scene: SigninPanelScene.Active,
@@ -227,7 +228,6 @@ describe("check-in operations", () => {
 function renderCard(props: Partial<Parameters<typeof SigninCard>[0]> = {}): string {
   return renderToStaticMarkup(
     createElement(SigninCard, {
-      loading: false,
       claiming: false,
       animatedDay: null,
       onClaim: () => undefined,
@@ -239,13 +239,23 @@ function renderCard(props: Partial<Parameters<typeof SigninCard>[0]> = {}): stri
 }
 
 describe("SigninCard desktop parity", () => {
-  it("renders the skeleton while loading without a panel", () => {
-    const html = renderCard({ loading: true });
-    expect(html).toContain('data-testid="signin-card-skeleton"');
+  it("uses the shared two-column skeleton for the initial panel load", () => {
+    const html = renderToStaticMarkup(
+      createElement(FeedbackSkeleton, {
+        rows: 8,
+        columns: 2,
+        testId: "signin-card-loading",
+      }),
+    );
+    expect(html).toContain('data-testid="signin-card-loading"');
     expect(html).toContain("webui-skeleton");
-    expect(html).not.toContain("signin-progress");
-    expect(html).not.toContain('data-testid="signin-day-1"');
-    expect(html).not.toContain('data-testid="signin-day-reward-1"');
+    expect(html).toContain('data-columns="2"');
+    const userMenu = readFileSync(
+      new URL("../../src/client/features/account/ui/UserMenu.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(userMenu).toContain("<FeedbackSkeleton");
+    expect(userMenu).not.toContain("loading={signin.loading}");
   });
 
   it("says the failure through the toast, and keeps the card's own layout", () => {

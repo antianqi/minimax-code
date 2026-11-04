@@ -168,6 +168,30 @@ export function sourceMotionOwnershipProblems(file, text) {
   );
   const problems = [];
 
+  if (file.startsWith("features/") || file.startsWith("shell/")) {
+    function inspectSkeletonProps(node) {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const tagName = node.tagName.getText(sourceFile);
+        const forbidden = tagName === "WebuiSkeleton"
+          ? new Set(["variant", "width", "height", "className", "style", "animated", "animation"])
+          : tagName === "WebuiSkeletonGroup"
+            ? new Set(["variant", "width", "height", "className", "style", "animated", "animation"])
+            : tagName === "FeedbackSkeleton"
+              ? new Set(["variant", "width", "height", "widths", "maxWidth", "rowHeight", "rowRadius", "className", "style", "animated", "animation"])
+              : undefined;
+        for (const attribute of node.attributes.properties) {
+          if (!ts.isJsxAttribute(attribute)) continue;
+          const name = attribute.name.getText(sourceFile);
+          if (forbidden?.has(name)) {
+            problems.push(`${file}: ${tagName}.${name} is a shared skeleton visual; business code may supply layout only`);
+          }
+        }
+      }
+      ts.forEachChild(node, inspectSkeletonProps);
+    }
+    inspectSkeletonProps(sourceFile);
+  }
+
   function collectStringLiterals(node, target) {
     if (ts.isStringLiteralLike(node)) {
       target.push(node.text);
@@ -404,6 +428,9 @@ async function checkMotionOwnership(inventory) {
   for await (const file of glob("**/*.css", { cwd: clientRoot })) {
     const text = readFileSync(path.join(clientRoot, file), "utf8");
     const stylesheet = text.replace(/\/\*[\s\S]*?\*\//gu, "");
+    if (file !== "styles/motion.css" && /[^{}]*\.webui-skeleton(?:[\s.#:[>+~]|$)[^{}]*\{/u.test(stylesheet)) {
+      problems.push(`${file}: skeleton appearance belongs to shared styles/motion.css; business styles may define layout around it only`);
+    }
     problems.push(...featureRotationOwnershipProblems(file, stylesheet));
     problems.push(...featureSmoothScrollOwnershipProblems(file, stylesheet));
     problems.push(...featureInteractionTransformOwnershipProblems(file, stylesheet));

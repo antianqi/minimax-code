@@ -40,6 +40,7 @@ import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem, WebuiMenuSeparator } from "../../../ui/menu-item.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { FeedbackSkeleton } from "../../../ui/feedback.js";
 import { WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
@@ -468,7 +469,6 @@ export function UserMenu({
                 as="div"
                 kind="dialog"
                 present={signinOpen}
-                loading={signin.loading}
                 motion={{
                   kind: "surface",
                   state: "enter",
@@ -478,19 +478,34 @@ export function UserMenu({
                 role="dialog"
                 aria-label={SIGNIN.title}
               >
-                  <SigninCard
-                    panel={signin.panel}
-                    loading={signin.loading}
-                    claiming={signin.claiming}
-                    error={signin.error}
-                    animatedDay={animatedDay}
-                    onClaim={claim}
-                    onRetry={loadSignin}
-                    onNavigateToUsage={() => {
-                      setSigninOpen(false);
-                      loadUsage();
-                    }}
-                  />
+                  {signin.loading && !signin.panel ? (
+                    <section
+                      data-testid="signin-card-skeleton"
+                      aria-label={SIGNIN.title}
+                      className="signin-card-container"
+                    >
+                      <div className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
+                        <FeedbackSkeleton
+                          rows={8}
+                          columns={2}
+                          testId="signin-card-loading"
+                        />
+                      </div>
+                    </section>
+                  ) : (
+                    <SigninCard
+                      panel={signin.panel}
+                      claiming={signin.claiming}
+                      error={signin.error}
+                      animatedDay={animatedDay}
+                      onClaim={claim}
+                      onRetry={loadSignin}
+                      onNavigateToUsage={() => {
+                        setSigninOpen(false);
+                        loadUsage();
+                      }}
+                    />
+                  )}
               </WebuiPage>
             </div>
             <div

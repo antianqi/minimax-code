@@ -197,10 +197,10 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
         <WebuiStack gap="small" className="px-3 py-2" aria-busy="true" data-testid="settings-usage-reset-card-loading">
             {[0, 1, 2].map((row) => <WebuiInline key={row} justify="between" className="w-full py-2">
               <WebuiStack gap="small" className="w-1/2">
-                <WebuiSkeleton variant="text" width={`${[62, 48, 56][row]}%`} />
-                <WebuiSkeleton variant="text" width={`${[38, 32, 42][row]}%`} />
+                <WebuiSkeleton />
+                <WebuiSkeleton />
               </WebuiStack>
-              <WebuiSkeleton variant="control" width={68} height={24} />
+              <WebuiSkeleton />
             </WebuiInline>)}
         </WebuiStack>
       ) : cards.items.length === 0 ? (
@@ -364,10 +364,10 @@ function ResetCardHistoryDialog({
           <WebuiStack gap="small" className="py-2" aria-busy="true" data-testid="settings-usage-reset-card-history-loading">
             {[0, 1, 2].map((row) => <WebuiInline key={row} justify="between" className="w-full py-2">
               <WebuiStack gap="small" className="w-1/2">
-                <WebuiSkeleton variant="text" width={`${[52, 64, 44][row]}%`} />
-                <WebuiSkeleton variant="text" width={`${[34, 40, 29][row]}%`} />
+                <WebuiSkeleton />
+                <WebuiSkeleton />
               </WebuiStack>
-              <WebuiSkeleton variant="text" width={row === 1 ? 76 : 58} />
+              <WebuiSkeleton />
             </WebuiInline>)}
           </WebuiStack>
         ) : history.items.length === 0 ? (

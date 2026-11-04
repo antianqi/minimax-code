@@ -1,9 +1,6 @@
 /* transcript — moved out of styles/shell.css; rules kept in their original relative order. */
 @layer components {
 
-  /* Keep transcript placeholder lines on the shared skeleton clearance rhythm. */
-  .webui-transcript-skeleton-lines { gap: var(--spacing_8); }
-
   .webui-context-usage-anchor { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; }
   .webui-context-usage-trigger { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: var(--icon_default_tertiary); }
   .webui-context-usage-trigger:hover, .webui-context-usage-trigger[aria-expanded="true"] { background: var(--bg_interaction_tertiary_hover); color: var(--icon_default_secondary); }

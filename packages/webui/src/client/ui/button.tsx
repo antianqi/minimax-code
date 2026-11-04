@@ -184,6 +184,8 @@ export interface WebuiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
   /** Show shared blocking loading feedback while this action is pending. */
   readonly loading?: boolean;
   readonly loadingLabel?: string;
+  /** Project this button into the page skeleton only when its owner opts in. */
+  readonly skeletonOnPageLoading?: boolean;
   readonly onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<unknown>;
 }
 
@@ -197,7 +199,7 @@ export interface WebuiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
 // Forwarded refs are part of the contract, not an extra: a button that opens a
 // dropdown is a trigger, and a trigger has to hand its element to the popup.
 export const WebuiButton = forwardRef<HTMLButtonElement, WebuiButtonProps>(function WebuiButton(
-  { variant, size = "regular", contentGap, className, children, type = "button", loading = false, loadingLabel, onClick, disabled = false, ...rest },
+  { variant, size = "regular", contentGap, className, children, type = "button", loading = false, loadingLabel, skeletonOnPageLoading = false, onClick, disabled = false, ...rest },
   ref,
 ): ReactElement {
   const classes = buttonClasses(variant, size, className, contentGap);
@@ -205,7 +207,7 @@ export const WebuiButton = forwardRef<HTMLButtonElement, WebuiButtonProps>(funct
   const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
     actionLoading.track(() => onClick?.(event));
   };
-  if (useWebuiPageLoading()) {
+  if (useWebuiPageLoading() && skeletonOnPageLoading) {
     return <WebuiSkeletonProjection><button type={type} className={classes} style={rest.style}>{children}</button></WebuiSkeletonProjection>;
   }
   return (
@@ -234,6 +236,8 @@ export interface WebuiButtonLinkProps
   /** The caller's layout only — never the control's states or appearance. */
   readonly className?: string;
   readonly children?: ReactNode;
+  /** Project this link into the page skeleton only when its owner opts in. */
+  readonly skeletonOnPageLoading?: boolean;
 }
 
 /**
@@ -246,8 +250,8 @@ export interface WebuiButtonLinkProps
  * it as the class string of a business that owned it.
  */
 export const WebuiButtonLink = forwardRef<HTMLAnchorElement, WebuiButtonLinkProps>(
-  function WebuiButtonLink({ variant, size = "regular", contentGap, className, children, ...rest }, ref): ReactElement {
-    if (useWebuiPageLoading()) {
+  function WebuiButtonLink({ variant, size = "regular", contentGap, className, children, skeletonOnPageLoading = false, ...rest }, ref): ReactElement {
+    if (useWebuiPageLoading() && skeletonOnPageLoading) {
       return <WebuiSkeletonProjection><a className={buttonClasses(variant, size, className, contentGap)} style={rest.style}>{children}</a></WebuiSkeletonProjection>;
     }
     return (
@@ -272,6 +276,8 @@ export interface WebuiIconButtonProps
   readonly children?: ReactNode;
   readonly loading?: boolean;
   readonly loadingLabel?: string;
+  /** Project this button into the page skeleton only when its owner opts in. */
+  readonly skeletonOnPageLoading?: boolean;
   readonly onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<unknown>;
 }
 
@@ -284,7 +290,7 @@ export interface WebuiIconButtonProps
  */
 export const WebuiIconButton = forwardRef<HTMLButtonElement, WebuiIconButtonProps>(
   function WebuiIconButton(
-    { label, tone = "surface", size = "regular", className, children, type = "button", loading = false, loadingLabel, onClick, disabled = false, ...rest },
+    { label, tone = "surface", size = "regular", className, children, type = "button", loading = false, loadingLabel, skeletonOnPageLoading = false, onClick, disabled = false, ...rest },
     ref,
   ): ReactElement {
     const actionLoading = useFeedbackActionLoading(loading);
@@ -304,7 +310,7 @@ export const WebuiIconButton = forwardRef<HTMLButtonElement, WebuiIconButtonProp
     ]
       .filter(Boolean)
       .join(" ");
-    if (useWebuiPageLoading()) {
+    if (useWebuiPageLoading() && skeletonOnPageLoading) {
       return <WebuiSkeletonProjection><button type={type} className={classes} style={rest.style}>{children}</button></WebuiSkeletonProjection>;
     }
     return (

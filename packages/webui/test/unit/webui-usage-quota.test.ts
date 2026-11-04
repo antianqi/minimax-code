@@ -314,15 +314,14 @@ describe("UsagePanel states", () => {
   it("shows the animated skeleton while loading", () => {
     const html = render({ status: "loading" });
     expect(html).toContain('data-testid="usage-popover-loading"');
-    expect(html).toContain("webui-user-menu-usage-skeleton-bar--a");
-    expect(html).toContain("webui-skeleton--shape");
+    expect(html).toContain("webui-skeleton");
     expect(html).toContain("webui-motion-loading");
   });
 
   it("shows the same shared animated skeleton before the first load", () => {
     const html = render({ status: "idle" });
     expect(html).toContain('data-testid="usage-popover-pending"');
-    expect(html).toContain("webui-skeleton--shape");
+    expect(html).toContain("webui-skeleton");
     expect(html).toContain("webui-motion-loading");
   });
 

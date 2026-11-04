@@ -62,7 +62,7 @@ test("session rail loading uses solid shared pulse skeletons", async ({ page }) 
   expect(styles.every((style) => style.backgroundColor === skeletonColor)).toBe(true);
   expect(styles.every((style) => style.backgroundImage === "none")).toBe(true);
   expect(geometry).toHaveLength(11);
-  expect(geometry.every((rect) => rect.height === 36)).toBe(true);
+  expect(geometry.every((rect) => rect.height === 28)).toBe(true);
   expect(geometry.slice(1).every((rect, index) => rect.top - geometry[index].bottom >= 8)).toBe(true);
   await expect(rail.locator(".webui-page-skeleton-node, .webui-page-skeleton-shape")).toHaveCount(0);
   await expect(rail.locator('[data-webui-rail-brand] button')).toBeVisible();

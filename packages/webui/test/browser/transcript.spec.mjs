@@ -172,12 +172,14 @@ test("A history is never rendered during B's delayed first page", async ({ page 
   const skeletonColumnLeft = await page.locator('[data-testid="chat-skeleton"] > .webui-stack').evaluate((element) => element.getBoundingClientRect().left);
   const messageListLeft = await page.locator('[data-webui-message-list="true"]').evaluate((element) => element.getBoundingClientRect().left);
   expect(Math.abs(skeletonColumnLeft - messageListLeft)).toBeLessThanOrEqual(1);
-  const skeletonLines = await page.locator(".webui-transcript-skeleton-lines .webui-skeleton").evaluateAll((elements) => elements.map((element) => {
+  const skeletonLines = await page.locator('[data-testid="chat-skeleton"] .webui-skeleton-group').first().locator(":scope > .webui-skeleton").evaluateAll((elements) => elements.map((element) => {
     const rect = element.getBoundingClientRect();
-    return { top: rect.top, bottom: rect.bottom };
+    return { top: rect.top, bottom: rect.bottom, width: rect.width };
   }));
   expect(skeletonLines).toHaveLength(8);
   expect(skeletonLines.slice(1).every((line, index) => line.top - skeletonLines[index].bottom >= 8)).toBe(true);
+  expect(new Set(skeletonLines.map((line) => line.width)).size).toBeGreaterThan(4);
+  expect(skeletonLines.slice(1).some((line, index) => line.width > skeletonLines[index].width)).toBe(true);
   await expect(page.getByText("History A synthetic")).toHaveCount(0);
   await expect(page.getByText("History B synthetic")).toHaveCount(0);
 

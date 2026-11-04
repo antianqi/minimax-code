@@ -171,10 +171,10 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
       {!state.unavailable && !state.listing.loading && rows.length === 0 ? <FeedbackEmpty title="暂无已安装的 Mini App" /> : null}
       <div className="webui-miniapp-launcher-grid">
         {state.listing.loading && rows.length === 0 ? Array.from({ length: 6 }, (_, index) => <div className="webui-miniapp-launcher-loading-card" key={`loading-${index}`} aria-hidden="true">
-          <WebuiSkeleton variant="text" width="56%" />
-          <WebuiSkeleton variant="shape" className="webui-miniapp-launcher-loading-icon" testId="miniapp-launcher-loading-skeleton" />
-          <WebuiSkeleton variant="text" width="82%" />
-          <WebuiSkeleton variant="text" width="44%" />
+          <WebuiSkeleton testId="miniapp-launcher-loading-skeleton" />
+          <WebuiSkeleton />
+          <WebuiSkeleton />
+          <WebuiSkeleton />
         </div>) : null}
         {rows.map((row) => {
           const running = row.enabled && row.status === "running";

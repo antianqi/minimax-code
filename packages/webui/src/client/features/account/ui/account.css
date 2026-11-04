@@ -243,26 +243,8 @@
     border-radius: var(--radius_8);
   }
   .webui-user-menu-usage-skeleton-line {
+    width: 100%;
     min-width: 0;
-  }
-  .webui-user-menu-usage-skeleton-bar {
-    flex: 0 0 auto;
-  }
-  .webui-user-menu-usage-skeleton-bar--a {
-    width: 64px;
-    height: 14px;
-  }
-  .webui-user-menu-usage-skeleton-bar--b {
-    width: 32px;
-    height: 14px;
-  }
-  .webui-user-menu-usage-skeleton-bar--c {
-    width: 96px;
-    height: 12px;
-  }
-  .webui-user-menu-usage-skeleton-bar--d {
-    width: 56px;
-    height: 12px;
   }
 
   /* ---- Daily check-in card ----

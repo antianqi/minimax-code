@@ -27,7 +27,6 @@ const categories: readonly { id: PluginManagementArea; label: string }[] = [
   { id: "mcp", label: "MCP" },
   { id: "agents", label: "Agents" },
 ];
-const MANAGEMENT_SKELETON_WIDTHS = [100, 70, 82, 46, 70, 46] as const;
 
 export function PluginManagementFilters({
   area,
@@ -111,10 +110,6 @@ export function PluginManagementList({
   return loading ? (
     <FeedbackSkeleton
       rows={12}
-      widths={MANAGEMENT_SKELETON_WIDTHS}
-      maxWidth={334}
-      rowHeight={35}
-      rowRadius={18}
       testId="plugin-management-skeleton"
     />
   ) : rows.length === 0 ? (

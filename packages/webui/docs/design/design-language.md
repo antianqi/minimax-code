@@ -414,11 +414,10 @@ contract owns; if no published size fits, the size is the contract's to add.
   `FeedbackAnnouncement`, and an action that must be awaited uses `FeedbackLoadingOverlay` through the
   control's `loading` contract rather than a business-drawn spinner. `FeedbackError` provides a named
   inline layout for an error message with a retry action; callers do not add flex utilities to recreate
-  it. `FeedbackSkeleton` takes `rows`, `widths`, `maxWidth`, `rowHeight` and `rowRadius` so a wider or
-  denser placeholder body stays the same contract; a caller that needs a different shape composes
-  `WebuiSkeleton` instead of writing pulse rules. All loading placeholders use the one solid-color pulse
-  and the shared reduced-motion policy — the account usage skeleton is an example of that treatment, not
-  an exception to it.
+  it. `FeedbackSkeleton` takes only row and column counts for its layout. Business code must not pass
+  visual parameters to a skeleton or author local loading animation. `WebuiSkeleton` is a fixed public
+  bar with no style props; `WebuiSkeletonGroup` controls only the stacked row count. All surfaces share
+  its height, rounded corners, neutral fill, varied-width sequence, pulse and reduced-motion policy.
 - **The toast** — `WebuiToast` owns the card a transient notice is drawn in: the surface's fill, the
   hairline border, the 12px radius, the elevation, and the rail in the tone's colour that says which
   kind of notice this is. The host is drawn against the viewport and takes no room from the page, so
@@ -447,18 +446,15 @@ contract; `client/ui/page.tsx` implements it.
   runs, `motion` names a motion family and state, and `onExitComplete` is the point at which the caller
   may unmount. The caller keeps its DOM structure, content, geometry, business state and lifetime;
   adopting `WebuiPage` never means moving that structure into a shared component.
-- **The skeleton is projected from the layout the caller already wrote.** While `loading` is true,
-  `WebuiPage` replaces its children's text with text skeletons whose widths follow the label they
-  replace, images and icons with shapes, and controls with transparent shapes that keep their box —
-  so the page does not describe its loading state in a second, page-specific skeleton tree. Shared
-  structural components project their own part through `WebuiSkeletonProjection`, and a composed page
-  therefore covers structures it did not project node by node. The projection is decoration:
-  `aria-hidden` on the skeleton, one `role="status"` label for the reader.
-- **A loading placeholder is one shape vocabulary.** `WebuiSkeleton` owns `variant` (`text`, `control`,
-  `rect`, `shape`, `circle`, `pulse`), `width`, `height` and `animated`; `WebuiSkeletonGroup` owns a
-  stacked body of text rows; `FeedbackSkeleton` owns the labelled collection placeholder. None of them
-  exposes a pulse rule: the animation is `webui-skeleton-pulse` on the loading family, shared by every
-  skeleton in the client.
+- **The skeleton is projected through the caller's layout.** While `loading` is true, `WebuiPage`
+  replaces textual and leaf content with the same fixed public bar; structural wrappers retain their
+  placement, grid and spacing. Business code may own this loading layout, but cannot change bar width,
+  height, radius, fill or animation. The projection is decoration: `aria-hidden` on the skeleton and
+  one `role="status"` label for the reader.
+- **A loading placeholder has one visual contract.** `WebuiSkeleton` renders a fixed rounded bar,
+  `WebuiSkeletonGroup` controls a stacked row count, and `FeedbackSkeleton` controls a row and column
+  count with the shared accessible label. Their public APIs expose no visual-style or animation
+  parameters. The common CSS owns varied bar lengths, dimensions, fill, pulse and reduced-motion policy.
 
 ## Motion
 

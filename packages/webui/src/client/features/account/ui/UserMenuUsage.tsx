@@ -28,24 +28,12 @@ function UsageSkeleton({ loading }: { readonly loading?: boolean }): ReactElemen
   const bars = () => (
     <>
       <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
-        <WebuiSkeleton
-          variant="shape"
-          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--a"
-        />
-        <WebuiSkeleton
-          variant="shape"
-          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--b"
-        />
+        <WebuiSkeleton />
+        <WebuiSkeleton />
       </WebuiInline>
       <WebuiInline gap="small" className="webui-user-menu-usage-skeleton-line" justify="between">
-        <WebuiSkeleton
-          variant="shape"
-          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--c"
-        />
-        <WebuiSkeleton
-          variant="shape"
-          className="webui-user-menu-usage-skeleton-bar webui-user-menu-usage-skeleton-bar--d"
-        />
+        <WebuiSkeleton />
+        <WebuiSkeleton />
       </WebuiInline>
     </>
   );

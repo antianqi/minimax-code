@@ -132,13 +132,24 @@ describe("the button contract", () => {
     expect(markup).toContain('aria-label="Close"');
   });
 
-  it("projects every shared button-like control through the common page skeleton", () => {
+  it("keeps shared button-like controls out of page skeletons unless their owner opts in", () => {
+    const defaultMarkup = renderToStaticMarkup(
+      <WebuiSkeletonProjection loading>
+        <>
+          <WebuiButton variant="secondary">Button</WebuiButton>
+          <WebuiIconButton label="Icon">O</WebuiIconButton>
+          <WebuiButtonLink variant="grouped" href="/default">Link</WebuiButtonLink>
+        </>
+      </WebuiSkeletonProjection>,
+    );
+    expect(defaultMarkup).not.toContain('data-webui-page-skeleton-control="true"');
+
     const markup = renderToStaticMarkup(
       <WebuiSkeletonProjection loading>
         <>
-          <WebuiButton variant="secondary">Projected button</WebuiButton>
-          <WebuiIconButton label="Projected icon">O</WebuiIconButton>
-          <WebuiButtonLink variant="grouped" href="/projected">Projected link</WebuiButtonLink>
+          <WebuiButton variant="secondary" skeletonOnPageLoading>Projected button</WebuiButton>
+          <WebuiIconButton label="Projected icon" skeletonOnPageLoading>O</WebuiIconButton>
+          <WebuiButtonLink variant="grouped" href="/projected" skeletonOnPageLoading>Projected link</WebuiButtonLink>
         </>
       </WebuiSkeletonProjection>,
     );

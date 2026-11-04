@@ -222,7 +222,6 @@
   .webui-miniapp-launcher-grid { display: grid; overflow: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; }
   .webui-miniapp-launcher-card { position: relative; display: flex; width: 80%; min-width: 0; justify-self: center; flex-direction: column; border: 1px solid color-mix(in srgb, var(--border_light) 62%, transparent); border-radius: 20px; background: color-mix(in srgb, var(--bg_default_primary) 52%, transparent); padding: 12px; text-align: left; }
   .webui-miniapp-launcher-loading-card { display: flex; width: 80%; min-width: 0; justify-self: center; flex-direction: column; align-items: flex-start; gap: 12px; border: 1px solid color-mix(in srgb, var(--border_light) 62%, transparent); border-radius: 20px; background: color-mix(in srgb, var(--bg_default_primary) 52%, transparent); padding: 12px; }
-  .webui-miniapp-launcher-loading-icon { width: 80%; height: auto; aspect-ratio: 1; align-self: center; border-radius: 16px; }
   .webui-miniapp-launcher-open, .webui-miniapp-launcher-face { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: stretch; gap: 12px; border: 0; background: transparent; color: var(--text_default_primary); text-align: left; }
   .webui-miniapp-launcher-open { cursor: pointer; padding: 0; }
   .webui-miniapp-launcher-open:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 4px; border-radius: 12px; }

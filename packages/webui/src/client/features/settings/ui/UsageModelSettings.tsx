@@ -63,35 +63,35 @@ const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
 
 function UsageQuotaSkeleton(): ReactElement {
   return <WebuiStack gap="roomy" className="w-full" aria-busy="true" data-testid="settings-usage-quota-loading">
-    <SettingsSection bare title={<WebuiSkeleton variant="text" width={84} />}>
+    <SettingsSection bare title={<WebuiSkeleton />}>
       <WebuiStack gap="medium" className="w-full py-1">
         {[0, 1].map((row) => <WebuiInline key={row} justify="between" className="w-full py-1">
           <WebuiStack gap="small" className="w-1/2">
-            <WebuiSkeleton variant="text" width={row === 0 ? "68%" : "54%"} />
-            <WebuiSkeleton variant="text" width={row === 0 ? "42%" : "36%"} />
+            <WebuiSkeleton />
+            <WebuiSkeleton />
           </WebuiStack>
-          <WebuiSkeleton variant="text" width={row === 0 ? 88 : 64} />
+          <WebuiSkeleton />
         </WebuiInline>)}
       </WebuiStack>
     </SettingsSection>
-    <SettingsSection bare title={<WebuiSkeleton variant="text" width={56} />}>
+    <SettingsSection bare title={<WebuiSkeleton />}>
       <WebuiStack gap="medium" className="w-full py-1">
         {[0, 1].map((row) => <WebuiInline key={row} justify="between" className="w-full py-1">
           <WebuiStack gap="small" className="w-1/2">
-            <WebuiSkeleton variant="text" width={row === 0 ? "58%" : "46%"} />
-            <WebuiSkeleton variant="text" width={row === 0 ? "34%" : "40%"} />
+            <WebuiSkeleton />
+            <WebuiSkeleton />
           </WebuiStack>
           <WebuiStack gap="small" className="items-end">
-            <WebuiSkeleton variant="text" width={row === 0 ? 72 : 92} />
-            <WebuiSkeleton variant="text" width={52} />
+            <WebuiSkeleton />
+            <WebuiSkeleton />
           </WebuiStack>
         </WebuiInline>)}
       </WebuiStack>
     </SettingsSection>
-    <SettingsSection bare title={<WebuiSkeleton variant="text" width={48} />}>
+    <SettingsSection bare title={<WebuiSkeleton />}>
       <WebuiStack gap="small" className="w-full py-1">
-        <WebuiSkeleton variant="text" width="42%" />
-        <WebuiSkeleton variant="text" width="27%" />
+        <WebuiSkeleton />
+        <WebuiSkeleton />
       </WebuiStack>
     </SettingsSection>
   </WebuiStack>;
@@ -99,13 +99,13 @@ function UsageQuotaSkeleton(): ReactElement {
 
 function ApiKeySkeleton(): ReactElement {
   return <WebuiStack gap="medium" className="w-full" aria-busy="true" data-testid="settings-usage-api-key-loading">
-    <WebuiSkeleton variant="text" width="72%" />
+    <WebuiSkeleton />
     <WebuiInline justify="between" className="w-full py-1">
       <WebuiStack gap="small" className="w-1/2">
-        <WebuiSkeleton variant="text" width="64%" />
-        <WebuiSkeleton variant="text" width="38%" />
+        <WebuiSkeleton />
+        <WebuiSkeleton />
       </WebuiStack>
-      <WebuiSkeleton variant="control" width={92} height={28} />
+      <WebuiSkeleton />
     </WebuiInline>
   </WebuiStack>;
 }
@@ -113,13 +113,13 @@ function ApiKeySkeleton(): ReactElement {
 function ProviderListSkeleton(): ReactElement {
   return <WebuiStack gap="medium" className="w-full" aria-busy="true" data-testid="settings-usage-provider-loading">
     {[0, 1].map((provider) => <WebuiStack key={provider} gap="small" className="w-full">
-      <WebuiSkeleton variant="text" width={provider === 0 ? 88 : 112} height={20} className="ml-4" />
+      <WebuiSkeleton />
       <WebuiStack gap="medium" className="w-full py-1 pl-4">
         {[0, 1, 2].map((model) => <WebuiInline key={model} justify="between" className="w-full py-1">
-          <WebuiSkeleton variant="text" width={`${[44, 58, 36][model]}%`} />
+          <WebuiSkeleton />
           <WebuiInline gap="small" className="items-center">
-            <WebuiSkeleton variant="circle" width={16} height={16} />
-            <WebuiSkeleton variant="control" width={36} height={20} />
+            <WebuiSkeleton />
+            <WebuiSkeleton />
           </WebuiInline>
         </WebuiInline>)}
       </WebuiStack>
@@ -371,13 +371,13 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
             <WebuiInline gap="large" className="min-h-[64px] w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div><span className="block text-[14px] leading-5">积分</span><span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">剩余 {quotaView.purchasedCredits !== undefined && quotaView.freeCredits !== undefined ? `${formatWebuiCredits(quotaView.purchasedCredits)} + ${formatWebuiCredits(quotaView.freeCredits)}` : formatWebuiCredits(quotaView.creditBalance)}</span></div></WebuiInline>
         </SettingsSection>
         {quotaData ? <SettingsSection title="用量" testId="settings-usage-limits">{([["5 小时限额", quotaData.fiveHour], ["周限额", quotaData.weekly], ...(quotaData.video ? [["视频限额", quotaData.video] as const] : [])] as const).map(([label, window]) => { const value = recordOf(window); const usedPercent = typeof value.usedPercent === "number" ? value.usedPercent : undefined; const usedCount = typeof value.usedCount === "number" ? value.usedCount : undefined; const totalCount = typeof value.totalCount === "number" ? value.totalCount : undefined; const percent = Math.round(usedPercent ?? (totalCount ? (usedCount ?? 0) / totalCount * 100 : 0)); const resetAtMs = typeof value.resetAtMs === "number" ? value.resetAtMs : undefined; const reset = resetLabel(resetAtMs); return <WebuiStack key={label} gap="small" justify="center" className="min-h-[72px] overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><WebuiInline gap="small" justify="between"><span className="text-[14px] font-normal leading-5 text-text_default_primary">{label}</span><span className="shrink-0 text-[13px] leading-5 text-text_default_secondary">{window.unlimited ? "无限制" : usedCount !== undefined ? `${usedCount}/${totalCount ?? 0}` : `${usedPercent ?? 0}% / 100%`}</span></WebuiInline><FeedbackProgress label={label} value={percent} className="w-full" trackClassName="bg-bg_interaction_tertiary_press" fillClassName="bg-text_default_primary" />{reset ? <span className="text-[12px] font-normal leading-4 text-text_default_secondary">{reset}</span> : null}</WebuiStack>; })}</SettingsSection> : null}
-        <SettingsSection bare={creditLoading} title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditLoading ? <WebuiInline justify="between" className="min-h-[48px] w-full px-3 py-1" aria-busy="true" data-testid="settings-usage-credit-fallback-loading"><WebuiSkeleton variant="text" width="64%" /><WebuiSkeleton variant="control" width={50} height={24} /></WebuiInline> : creditResolved ? <WebuiInline gap="medium" justify="between" className="min-h-[48px] w-full px-3 py-1" data-testid="settings-usage-credit-fallback"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></WebuiInline> : null}</SettingsSection>
+        <SettingsSection bare={creditLoading} title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditLoading ? <WebuiInline justify="between" className="min-h-[48px] w-full px-3 py-1" aria-busy="true" data-testid="settings-usage-credit-fallback-loading"><WebuiSkeleton /><WebuiSkeleton /></WebuiInline> : creditResolved ? <WebuiInline gap="medium" justify="between" className="min-h-[48px] w-full px-3 py-1" data-testid="settings-usage-credit-fallback"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></WebuiInline> : null}</SettingsSection>
         <UsageResetCards account={account} state={accountState.resetCards} />
       </>}
     </WebuiStack> : null}
 
     {sourceTab === "minimax-api" ? <WebuiStack as="section" gap="small" className="w-full pt-1" aria-busy={apiLoading || undefined} data-testid="settings-minimax-api-panel">
-      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span>{apiLoading ? <WebuiSkeleton variant="shape" data-testid="settings-usage-api-key-status-loading" className="h-5 w-12 rounded-[6px]" /> : <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span>}</WebuiInline>
+      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span>{apiLoading ? <WebuiSkeleton testId="settings-usage-api-key-status-loading" /> : <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span>}</WebuiInline>
       {apiError ? <SettingsErrorNotice message={apiError} action={{ label: "重试", onClick: () => void loadApiStatus() }} /> : null}
       {apiLoading ? <ApiKeySkeleton /> : <>
         <WebuiInline gap="medium" align="start"><WebuiField className="min-w-0 flex-[1_0_0]" label="API Key" required error={keyErrors.apiKey} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" value={apiKey} onChange={(event) => { setApiKey(event.target.value); clearFieldError("apiKey"); }} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} />} /><IconButton label="测试连通性" disabled={testingKey} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>

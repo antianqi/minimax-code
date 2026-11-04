@@ -225,29 +225,34 @@
   }
   .webui-skeleton {
     display: block;
-    max-width: 100%;
+    width: min(72%, 320px);
+    min-width: 72px;
+    height: 28px;
+    min-height: 28px;
+    flex: 0 1 auto;
     overflow: hidden;
+    border-radius: var(--radius_16);
     background-color: var(--border_default);
     background-image: none;
     box-shadow: none;
   }
-  .webui-skeleton--text { height: 12px; border-radius: var(--radius_4); }
-  .webui-skeleton--control { height: 36px; border-radius: var(--radius_8); }
   .webui-skeleton.webui-motion-loading,
-  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"].webui-motion-loading {
+  .webui-page-skeleton-node.webui-motion-loading {
     animation-name: webui-skeleton-pulse;
     animation-timing-function: ease-in-out;
   }
-  .webui-skeleton--rect { min-height: 48px; border-radius: var(--radius_8); }
-  .webui-skeleton--shape { border-radius: var(--radius_4); }
-  .webui-skeleton--circle { width: 32px; height: 32px; border-radius: var(--radius_full); }
-  .webui-skeleton--short { width: 60%; }
   .webui-skeleton-group { display: flex; min-width: 0; flex-direction: column; gap: var(--spacing_8); }
+  .webui-skeleton:nth-child(8n + 1) { width: 88%; }
+  .webui-skeleton:nth-child(8n + 2) { width: 62%; }
+  .webui-skeleton:nth-child(8n + 3) { width: 72%; }
+  .webui-skeleton:nth-child(8n + 4) { width: 44%; }
+  .webui-skeleton:nth-child(8n + 5) { width: 62%; }
+  .webui-skeleton:nth-child(8n + 6) { width: 44%; }
+  .webui-skeleton:nth-child(8n + 7) { width: 84%; }
+  .webui-skeleton:nth-child(8n) { width: 58%; }
   .webui-page { min-width: 0; min-height: 0; color: var(--text_default_primary); }
   .webui-page-skeleton-node { pointer-events: none !important; color: transparent !important; }
   .webui-page-skeleton-node:not([data-webui-page-skeleton-surface="true"]) { background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
-  .webui-page-skeleton-node[data-webui-page-skeleton-control="true"] { background-color: var(--border_default) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; }
-  .webui-page-skeleton-shape { display: block !important; pointer-events: none !important; color: transparent !important; background-color: var(--border_default) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; }
   .webui-page-loading-status {
     position: absolute;
     width: 1px;

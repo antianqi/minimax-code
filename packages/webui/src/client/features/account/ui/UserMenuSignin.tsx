@@ -18,7 +18,7 @@ import { WebuiSpinner } from "../../../ui/feedback.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiSkeleton, WebuiTooltip } from "../../../ui/page.js";
+import { WebuiTooltip } from "../../../ui/page.js";
 
 export interface SigninState {
   readonly loading: boolean;
@@ -272,34 +272,6 @@ function SigninCreditsInfo({
   );
 }
 
-/** Check-in loading surface: paired bars without placeholder day states or values. */
-function SigninCardSkeleton(): ReactElement {
-  const groups = [
-    ["44%", "72%"],
-    ["36%", "62%"],
-    ["52%", "78%"],
-    ["40%", "68%"],
-  ] as const;
-  return (
-    <section
-      data-testid="signin-card-skeleton"
-      aria-label={SIGNIN.title}
-      className="signin-card-container"
-    >
-      <div className="signin-card-surface relative rounded-2xl border-[0.5px] border-border_default bg-bg_grouped_secondary p-3 text-text_default_primary">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 px-1 py-2">
-          {groups.map(([shortWidth, longWidth], index) => (
-            <WebuiStack key={index} gap="small">
-              <WebuiSkeleton variant="shape" width={shortWidth} height={12} />
-              <WebuiSkeleton variant="shape" width={longWidth} height={12} />
-            </WebuiStack>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /**
  * The daily check-in card: its DOM, classes and copy.
  *
@@ -308,7 +280,6 @@ function SigninCardSkeleton(): ReactElement {
  */
 export function SigninCard({
   panel,
-  loading,
   claiming,
   error,
   animatedDay,
@@ -317,7 +288,6 @@ export function SigninCard({
   onNavigateToUsage,
 }: {
   readonly panel?: WebuiSigninPanelView;
-  readonly loading: boolean;
   readonly claiming: boolean;
   readonly error?: string;
   readonly animatedDay: number | null;
@@ -329,12 +299,10 @@ export function SigninCard({
   // failure is not a reason to hide the panel, and the toast carries the
   // retry the card used to hold.
   useWebuiToastError(panel && error ? error : undefined);
-  useWebuiToastError(!panel && !loading ? error ?? SIGNIN.error : undefined, {
+  useWebuiToastError(!panel ? error ?? SIGNIN.error : undefined, {
     action: { label: SIGNIN.retry, onClick: onRetry },
     testId: "signin-card-error",
   });
-
-  if (loading && !panel) return <SigninCardSkeleton />;
 
   const displayPanel = panel;
   const streak = displayPanel ? getCurrentSigninStreak(displayPanel.days) : 0;

@@ -282,6 +282,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         if (!deps.commandWorkflows.canRunCommand) return { kind: "ignored" };
         const captured = captureInput();
         commandsBySession.set(sessionKey, { running: true, name: resolved.command.name });
+        // A command is submitted once its owner has accepted execution. Clear
+        // that exact draft revision before awaiting the host, just like a send;
+        // later typing is a newer revision and remains untouched.
+        consumeDraft(captured);
         publish();
         try {
           const request: WebuiRunCommandRequest = {
@@ -294,7 +298,6 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           const result = await deps.commandWorkflows.runCommand(request);
           const output = typeof result.output === "string" ? result.output : JSON.stringify(result.data ?? result, null, 2);
           commandsBySession.set(sessionKey, { running: true, name: resolved.command.name, output });
-          consumeDraft(captured);
           publish();
           return { kind: "command-completed", output };
         } catch (error) {
@@ -305,6 +308,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           const commandState = commandsBySession.get(sessionKey);
           commandsBySession.set(sessionKey, {
             running: false,
+            ...(commandState?.name === undefined ? {} : { name: commandState.name }),
             ...(commandState?.output === undefined ? {} : { output: commandState.output }),
           });
           publish();

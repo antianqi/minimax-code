@@ -201,6 +201,11 @@ export function WebuiClientFoundationApp(
   // lifetime — and builds nothing of its own; a missing one is an assembly
   // error rather than a second composition with different inputs.
   const application = requireApplication(useWebuiApplicationOptional());
+  const composerCommandSnapshot = useSyncExternalStore(
+    application.composerController.subscribe,
+    application.composerController.getSnapshot,
+    application.composerController.getSnapshot,
+  );
   const {
     label,
     sessionPage,
@@ -1332,6 +1337,18 @@ export function WebuiClientFoundationApp(
                   onReset={() => application.transcriptHistory.refreshPage(selectedSessionId)}
                 ><WebuiSessionTranscript
                   sessionId={selectedSessionId}
+                  compactionRunning={
+                    composerCommandSnapshot.inspectionSessionId === selectedSessionId &&
+                    composerCommandSnapshot.commandName === "compact" &&
+                    composerCommandSnapshot.commandRunning
+                  }
+                  {...(
+                    composerCommandSnapshot.inspectionSessionId === selectedSessionId &&
+                    composerCommandSnapshot.commandName === "compact" &&
+                    composerCommandSnapshot.commandOutput !== undefined
+                      ? { compactionOutput: composerCommandSnapshot.commandOutput }
+                      : {}
+                  )}
                   workspaceDir={selectedSession?.workspaceDir}
                   onOpenFile={openTranscriptFile}
                   onOpenTurnReview={openTranscriptTurnReview}

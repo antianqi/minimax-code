@@ -64,6 +64,17 @@ describe("Agent activity disclosure", () => {
     expect(live).toContain('data-webui-motion-state="expand"');
   });
 
+  it("names the reasoning with the brain glyph", () => {
+    // The reasoning block is the one place the reader is told "this is the model
+    // thinking"; it carries a brain for that. Sparkles belonged to the model
+    // picker, and reading it beside a fold of prose said nothing about thinking.
+    const html = renderToStaticMarkup(
+      createElement(WebuiThinkingBlock, { text: "Reasoning", summaryLabel: "思考过程", showDetailHeading: true }),
+    );
+    expect(html).toContain("tabler-icon-brain");
+    expect(html).not.toContain("tabler-icon-sparkles");
+  });
+
   it("keeps the final answer visible when the process disclosure is collapsed", () => {
     const html = renderToStaticMarkup(createElement(WebuiTurnProcess, {
       active: false,

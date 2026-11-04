@@ -183,6 +183,28 @@ test("the mode pill keeps its mode mark and shows a close mark on hover", async 
   await expect(page.locator('[data-testid="composer-plan-mode"]')).toHaveCount(0);
 });
 
+test("the skill row under the 技能 divider carries the shared skill glyph", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.click();
+  await input.pressSequentially("/");
+
+  const menu = commandMenu(page);
+  await expect(menu).toBeVisible();
+  // One glyph for skills: a per-name icon table used to give four names a
+  // bespoke mark and every other skill the generic one, which read as "this
+  // one is special" for a reason the reader cannot see. The fixture's roster
+  // has a single skill, so one puzzle glyph is the whole section.
+  const skillRows = menu.locator('[data-webui-command-section="skills"] ~ [role="option"]');
+  await expect(skillRows).toHaveCount(1);
+  await expect(skillRows.locator("svg.tabler-icon-puzzle")).toHaveCount(1);
+  // And no row above the divider borrows the skill glyph.
+  await expect(
+    menu.locator('[role="option"]').filter({ has: page.locator("svg.tabler-icon-puzzle") }),
+  ).toHaveCount(1);
+});
+
 test("/compact from the slash palette reaches the runtime with its instruction", async ({ page }) => {
   await openApp(page, "#session=A");
 
@@ -208,6 +230,9 @@ test("/compact from the slash palette reaches the runtime with its instruction",
 });
 
 test("pressing Enter sends an exact /compact command", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.delayNext("runCommand", { command: "compact" });
+  });
   await openApp(page, "#session=A");
 
   const input = composer(page);
@@ -217,6 +242,16 @@ test("pressing Enter sends an exact /compact command", async ({ page }) => {
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
     (request) => request.operation === "runCommand" && request.body.command === "compact",
   ))).toHaveLength(1);
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
+    (request) => request.operation === "runCommand" && request.body.command === "compact",
+  ))).toBe(true);
+  await expect(input).toHaveValue("");
+  await expect(page.locator('[data-webui-transcript="A"] [data-webui-command-running]')).toContainText("正在压缩会话");
+  await page.evaluate(() => window.__fixture.resolve(
+    "runCommand",
+    { command: "compact" },
+    { handled: true, output: "Compaction completed. Messages: 2 → 1" },
+  ));
   const run = await page.evaluate(() => window.__fixture.requests.find(
     (request) => request.operation === "runCommand" && request.body.command === "compact",
   ));
@@ -247,7 +282,7 @@ test("a completed /compact result stays with its original session after New Task
 
   await expect(page.locator("[data-webui-command-output]")).toHaveCount(0);
   await switchSession(page, "A");
-  await expect(page.locator("[data-webui-command-output]")).toHaveText("Compaction completed. Messages: 2 → 1");
+  await expect(page.locator('[data-webui-transcript="A"] [data-webui-command-output]')).toHaveText("Compaction completed. Messages: 2 → 1");
 });
 
 test("/compact shows progress while running and confirms the result", async ({ page }) => {
@@ -265,14 +300,26 @@ test("/compact shows progress while running and confirms the result", async ({ p
   await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
     (request) => request.operation === "runCommand" && request.body.command === "compact",
   ))).toBe(true);
-  await expect(page.getByRole("status")).toContainText("正在执行 /compact");
+  const progress = page.locator('[data-webui-transcript="A"] [data-webui-command-running]');
+  await expect(progress).toContainText("正在压缩会话");
+  await expect(progress.locator(".webui-feedback-spinner")).toBeVisible();
+  await expect(page.locator("[data-webui-command-running]")).toHaveCount(1);
+  await expect(
+    page.locator('[data-webui-message-list="true"]').locator(":scope > *").last(),
+  ).toHaveAttribute("data-webui-command-running", "true");
 
   await page.evaluate(() => window.__fixture.resolve(
     "runCommand",
     { command: "compact" },
-    { handled: true, output: "压缩已完成" },
+    { handled: true, output: "Compaction completed.\nMessages: 2 → 1\nTokens: 41557 → 41032" },
   ));
-  await expect(page.locator("[data-webui-command-output]")).toHaveText("压缩已完成");
+  const result = page.locator('[data-webui-transcript="A"] [data-webui-command-output]');
+  const summary = "Compaction completed. · Messages: 2 → 1 · Tokens: 41557 → 41032";
+  await expect(result).toHaveText(summary);
+  await expect(result).toHaveAttribute("title", summary);
+  await expect(result).toHaveCSS("white-space", "nowrap");
+  await expect(page.locator('[data-webui-transcript="A"] [role="separator"]')).toBeVisible();
+  await expect(result).toBeVisible();
   await expect(input).toHaveValue("");
 });
 

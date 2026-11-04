@@ -8,6 +8,7 @@ import {
   WEBUI_SKILL_FIXTURES,
 } from "../../src/client/features/composer/ui/slash-palette.js";
 import { WEBUI_COMMAND_DESCRIPTORS } from "../../src/runtime/commands/descriptors.js";
+import { WebuiIconSkillGeneric } from "../../src/client/shell/icons.js";
 import {
   applyWebuiSlashLiteMode,
   isWebuiRunnableCommand,
@@ -321,6 +322,29 @@ describe("WebUI slash palette — skill fixtures", () => {
       "codebase-design",
       "diagnosing-bugs",
     ]);
+  });
+
+  it("gives every skill the same icon, whatever its name", async () => {
+    // The palette is a list of commands, so a skill row carries one generic
+    // glyph: a per-name table marked four arbitrary names as special and left
+    // every other skill looking different for no reason the reader can see.
+    const fromFixtures = (await resolveWebuiSlashSkills()).skills
+      // The resolver also returns the plugin registry (deploy-website), which
+      // sits in the default section and keeps its own glyph — only the rows
+      // under the 技能 divider are skills.
+      .filter((entry) => entry.paletteSection === "skills")
+      .map((entry) => entry.icon);
+    expect(new Set(fromFixtures).size).toBe(1);
+    const fromHarness = [
+      "ask-matt",
+      "code-review",
+      "codebase-design",
+      "diagnosing-bugs",
+      "some-other-skill",
+    ].map((name) => slashSkillSummaryToEntry({ name }).icon);
+    expect(new Set(fromHarness).size).toBe(1);
+    expect(fromHarness[0]).toBe(fromFixtures[0]);
+    expect(fromHarness[0]).toBe(WebuiIconSkillGeneric);
   });
 
   it("marks every skill entry as supported so the popover row is clickable", async () => {

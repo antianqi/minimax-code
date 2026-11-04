@@ -28,10 +28,6 @@ import {
   WebuiIconModel,
   WebuiIconNewTask,
   WebuiIconSites,
-  WebuiIconSkillAskMatt,
-  WebuiIconSkillCodebaseDesign,
-  WebuiIconSkillCodeReview,
-  WebuiIconSkillDiagnosingBugs,
   WebuiIconSkillGeneric,
 } from "../../../shell/icons.js";
 
@@ -239,7 +235,7 @@ export const WEBUI_SKILL_FIXTURES: readonly SlashCommandEntry[] = [
     description: "Ask which skill or flow fits your situation.",
     source_type: 1,
     source_kind: "plugin",
-    icon: WebuiIconSkillAskMatt,
+    icon: WebuiIconSkillGeneric,
     paletteSection: "skills",
     supported: true,
   },
@@ -251,7 +247,7 @@ export const WEBUI_SKILL_FIXTURES: readonly SlashCommandEntry[] = [
       "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards and Spec.",
     source_type: 1,
     source_kind: "plugin",
-    icon: WebuiIconSkillCodeReview,
+    icon: WebuiIconSkillGeneric,
     paletteSection: "skills",
     supported: true,
   },
@@ -263,7 +259,7 @@ export const WEBUI_SKILL_FIXTURES: readonly SlashCommandEntry[] = [
       "Shared vocabulary for designing deep modules. Use when the user wants to introduce, redesign, or reshape a module's interface.",
     source_type: 1,
     source_kind: "plugin",
-    icon: WebuiIconSkillCodebaseDesign,
+    icon: WebuiIconSkillGeneric,
     paletteSection: "skills",
     supported: true,
   },
@@ -275,7 +271,7 @@ export const WEBUI_SKILL_FIXTURES: readonly SlashCommandEntry[] = [
       "Diagnosis loop for hard bugs and performance regressions. Use when the user reports something broken, throwing, or slow.",
     source_type: 1,
     source_kind: "plugin",
-    icon: WebuiIconSkillDiagnosingBugs,
+    icon: WebuiIconSkillGeneric,
     paletteSection: "skills",
     supported: true,
   },
@@ -415,23 +411,14 @@ export function slashSkillSummaryToEntry(
     description: skill.description ?? "",
     source_type: 1,
     ...(skill.sourceKind ? { source_kind: skill.sourceKind } : {}),
-    icon: iconForSkillName(name),
+    // One icon for every skill: the palette is a list of commands, and a
+    // per-name glyph says "this one is special" about whichever four names the
+    // table happened to know. A skill's identity is its name, which the row
+    // already shows.
+    icon: WebuiIconSkillGeneric,
     paletteSection: "skills",
     supported: true,
   };
-}
-
-const SKILL_ICON_BY_NAME: Record<string, WebuiIconComponent> = {
-  "ask-matt": WebuiIconSkillAskMatt,
-  "code-review": WebuiIconSkillCodeReview,
-  "codebase-design": WebuiIconSkillCodebaseDesign,
-  "diagnosing-bugs": WebuiIconSkillDiagnosingBugs,
-};
-
-type WebuiIconComponent = (props: { className?: string }) => ReactElement;
-
-function iconForSkillName(name: string): WebuiIconComponent {
-  return SKILL_ICON_BY_NAME[name] ?? WebuiIconSkillGeneric;
 }
 
 /**

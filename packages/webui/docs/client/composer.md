@@ -15,6 +15,10 @@ needs its own behavioural evidence — browser or assembled-application, per
 | Mention and slash | Mention retained until an explicit command; slash derived from draft and caret | Recreate caret, index and listeners | Selection/dismiss controls the range; no universal switch or submit reset |
 | Send and newline keys | The bindable keys are the stored bindings, not a rule in the component; the settings page owns the change | The stored binding is read when a key is pressed, so a rebinding takes effect without a remount | 发送消息 submits and 换行 breaks the line; a press that names neither binding is left to the browser; an open IME composition belongs to the composition |
 
+Runnable slash commands clear the captured draft as soon as execution starts; newer typing remains
+in the composer. `/compact` progress and its one-line completion summary appear at the bottom of the
+matching session's transcript. Other command output remains with the composer.
+
 ## Where the pieces live
 
 - The surface is `client/features/composer/ui/WebuiComposer.tsx`, with the editor staging, menus,

@@ -397,6 +397,7 @@ export function WebuiComposer({
   const commandOutput = controllerSnapshot.commandOutput;
   const commandRunning = controllerSnapshot.commandRunning;
   const commandName = controllerSnapshot.commandName;
+  const compactCommand = commandName === "compact";
   // The staged attachments and URL references are the composer's own state, kept
   // by its owner module and read from the same snapshot as the queue.
   const attachments = composerSnapshot.staging.attachments;
@@ -1058,7 +1059,7 @@ export function WebuiComposer({
           {...(retryPlan.kind === "resend" ? { onRetry: handleRetryResend } : {})}
         />
       ) : null}
-      {commandOutput ? (
+      {commandOutput && !compactCommand ? (
         <pre
           className="mt-3 w-full whitespace-pre-wrap text-text_default_secondary text-size_12 leading-line_height_16"
           data-webui-command-output="true"
@@ -1066,7 +1067,7 @@ export function WebuiComposer({
           {commandOutput}
         </pre>
       ) : null}
-      {commandRunning ? (
+      {commandRunning && !compactCommand ? (
         <p
           role="status"
           aria-live="polite"

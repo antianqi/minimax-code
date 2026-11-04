@@ -47,6 +47,7 @@ import {
   useWebuiTranscriptScroll,
 } from "../bindings/use-transcript-scroll.js";
 import { WebuiButton } from "../../../ui/button.js";
+import { WebuiSpinner } from "../../../ui/feedback.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
@@ -156,6 +157,8 @@ function WebuiSessionTranscriptView({
   sessionId,
   initialMessages,
   transcriptCommands,
+  compactionRunning = false,
+  compactionOutput,
   answerPlanBuild,
   workspaceDir,
   onOpenFile,
@@ -164,6 +167,8 @@ function WebuiSessionTranscriptView({
 }: {
   readonly sessionId: string;
   readonly initialMessages?: WebuiClientMessagePage;
+  readonly compactionRunning?: boolean;
+  readonly compactionOutput?: string;
   readonly workspaceDir?: string;
   readonly onOpenFile?: (input: { readonly sessionId: string; readonly workspaceDir: string; readonly reference: WebuiMessageFileReference }) => void;
   readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
@@ -262,6 +267,7 @@ function WebuiSessionTranscriptView({
     turns,
     showEmptyState,
   } = view;
+  const compactionSummary = compactionOutput?.replace(/\s*\r?\n\s*/gu, " · ").trim();
   // The scroll binding owns the viewport, the auto-follow policy and the pin.
   const { releaseAutoFollow } = useWebuiTranscriptScroll({
     transcriptRef,
@@ -550,6 +556,32 @@ function WebuiSessionTranscriptView({
         (!liveAssistantView.thinking?.trim() || liveActivityAtTranscriptLevel) ? (
           <div className="webui-session-stream-status" data-webui-live-thinking="true">
             <ActivityIndicator showLabel labelOverride="思考中…" />
+          </div>
+        ) : null}
+        {compactionRunning ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-2 flex w-full min-w-0 items-center gap-spacing_4 text-text_default_secondary text-size_13 leading-line_height_20"
+            data-webui-command-running="true"
+          >
+            <WebuiSpinner size="compact" className="shrink-0" />
+            <span>正在压缩会话…</span>
+          </div>
+        ) : compactionSummary ? (
+          <div className="mt-2 w-full min-w-0" data-webui-compaction-result="true">
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              className="mb-2 h-px w-full bg-border_default"
+            />
+            <p
+              className="w-full truncate text-text_default_secondary text-size_12 leading-line_height_16"
+              data-webui-command-output="true"
+              title={compactionSummary}
+            >
+              {compactionSummary}
+            </p>
           </div>
         ) : null}
       </WebuiStack>

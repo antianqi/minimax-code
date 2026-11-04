@@ -8,7 +8,7 @@
 // `WebuiToolResults`.
 
 import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { IconBrowser, IconBrain, IconCode, IconFile, IconHammer, IconHexagon, IconListCheck, IconMusic, IconPhoto, IconRobot, IconSearch, IconSparkles, IconSquares, IconTarget, IconTerminal2, IconVideo, IconWorld } from "@tabler/icons-react";
+import { IconBrowser, IconBrain, IconCode, IconFile, IconHammer, IconHexagon, IconListCheck, IconMusic, IconPhoto, IconRobot, IconSearch, IconSquares, IconTarget, IconTerminal2, IconVideo, IconWorld } from "@tabler/icons-react";
 import { ActivityIndicator } from "./ActivityIndicator.js";
 import {
   WebuiIconChevronDown,
@@ -151,7 +151,7 @@ function WebuiToolIcon({ category }: { readonly category: ReturnType<typeof tool
     command: IconTerminal2, file: IconFile, code: IconCode, search: IconSearch,
     web: IconWorld, browser: IconBrowser, logo: IconHexagon, memory: IconBrain,
     image: IconPhoto, video: IconVideo, music: IconMusic, tool: IconHammer,
-    task: IconListCheck, bot: IconRobot, goal: IconTarget, thinking: IconSparkles,
+    task: IconListCheck, bot: IconRobot, goal: IconTarget, thinking: IconBrain,
     combine: IconSquares,
   } as const;
   const Glyph = icons[category];

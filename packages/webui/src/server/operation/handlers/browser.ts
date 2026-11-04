@@ -245,6 +245,10 @@ export function createBrowserHandlerEntries(
               keyId: view.keyId,
               key: view.key,
               fingerprint: view.fingerprint,
+              // The extension the key belongs to, and the page it is pasted
+              // on. The person does not have to match the two by hand.
+              ...(view.extensionId ? { extensionId: view.extensionId } : {}),
+              ...(view.optionsUrl ? { optionsUrl: view.optionsUrl } : {}),
             }
           : {
               present: false as const,

@@ -281,11 +281,16 @@ host, and `chrome.storage.local` in that one browser.
 
 1. Switch the surface on in WebUI Settings. That provisions the installation key
    and mints a fresh pairing credential.
-2. Open the key in Settings (**查看密钥** for Edge or Chrome). This is the one
-   place the key leaves the OS secure store, and it is the person's own tab; the
-   key's purpose is to defeat a local *process*, not the person.
-3. Open the extension's options page (`options.html`, wired as `options_ui` in
-   the manifest) and paste it.
+2. Open the key in Settings (**查看密钥** for Edge or Chrome). A dialog opens
+   with the key, its fingerprint and a copy action. This is the one place the
+   key leaves the OS secure store, and it is the person's own tab; the key's
+   purpose is to defeat a local *process*, not the person.
+3. Paste it into the extension's options page (`options.html`, wired as
+   `options_ui` in the manifest). The dialog links to that page and opens it
+   in a new tab: the host names it from the extension's own identity, which it
+   learns from the peer's origin, so the page is the right one rather than one
+   the person has to find. A host that has not seen the extension yet cannot
+   name the page, and says so instead of linking somewhere else.
 4. The extension stores it and never displays it again in full — the options page
    reads it back through a status type that carries a fingerprint and no key
    field at all.

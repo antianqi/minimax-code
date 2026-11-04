@@ -19,6 +19,8 @@
 import { describe, expect, it } from "vitest";
 import { useMemo } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import {
   WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
@@ -156,6 +158,70 @@ describe("the 浏览器 page offers the extension package", () => {
 
     expect(markup).toContain('data-testid="browser-extension-package-unavailable"');
     expect(markup).not.toContain('data-testid="browser-extension-package-download"');
+  });
+});
+
+describe("the browser page's actions are the shared button", () => {
+  it("renders the key reveal and the download as the shared button contract", () => {
+    const markup = renderToStaticMarkup(
+      <WebuiPortSlicesProvider
+        slices={
+          {
+            browser: {
+              browserExtensionPackageUrl: () =>
+                "http://127.0.0.1:8787/browser-extension?token=fixture-token",
+            },
+          } as never
+        }
+      >
+        <BrowserSettingsPage />
+      </WebuiPortSlicesProvider>,
+    );
+
+    // The appearance belongs to the shared contract rather than to this page:
+    // a row action that re-authors its own classes is a row action that
+    // drifts from every other settings row. The contract's own names are
+    // what the markup carries — the secondary variant's class, and the row
+    // action's size.
+    const reveal =
+      /<button[^>]*data-testid="browser-installation-key-edge-reveal"[^>]*>/u.exec(markup)?.[0] ??
+      "";
+    expect(reveal).toContain("webui-mavis-button");
+    expect(reveal).toContain("webui-mavis-button-gray");
+    expect(reveal).toContain("webui-mavis-button-compact");
+
+    const download =
+      /<a[^>]*data-testid="browser-extension-package-download"[^>]*>/u.exec(markup)?.[0] ?? "";
+    expect(download).toContain("webui-mavis-button");
+    expect(download).toContain("webui-mavis-button-gray");
+    expect(download).toContain("webui-mavis-button-compact");
+  });
+});
+
+describe("the installation key's dialog", () => {
+  const source = readFileSync(
+    fileURLToPath(
+      new URL(
+        "../../src/client/features/browser/ui/BrowserAuthorizationSwitches.public.tsx",
+        import.meta.url,
+      ),
+    ),
+    "utf8",
+  );
+
+  it("holds the fingerprint, the key, a copy action and the extension's page", () => {
+    // The dialog needs a portal target, which a static render has none of, so
+    // what it holds is read from the source — the way the catalogue's dialogs
+    // are checked.
+    expect(source).toContain('data-testid="browser-installation-key-fingerprint"');
+    expect(source).toContain('data-testid="browser-installation-key-value"');
+    expect(source).toContain('data-testid="browser-installation-key-copy"');
+    expect(source).toContain('data-testid="browser-installation-key-options-link"');
+  });
+
+  it("is the shared dialog, and its link opens the extension's page in a new tab", () => {
+    expect(source).toContain("<WebuiDialog");
+    expect(source).toContain('target="_blank"');
   });
 });
 

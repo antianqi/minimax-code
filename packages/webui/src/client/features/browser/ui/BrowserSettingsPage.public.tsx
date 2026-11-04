@@ -112,8 +112,8 @@ function BrowserExtensionPackage({
             download
             target="_blank"
             rel="noreferrer"
-            variant="quiet-secondary"
-            size="inline"
+            variant="secondary"
+            size="compact"
             data-testid="browser-extension-package-download"
           >
             下载最新扩展包

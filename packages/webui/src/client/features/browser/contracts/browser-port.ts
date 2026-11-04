@@ -132,6 +132,20 @@ export type WebuiBrowserInstallationKeyResult =
       readonly keyId: string;
       readonly key: string;
       readonly fingerprint: string;
+      /**
+       * The extension this key belongs to, when the host knows it.
+       *
+       * The person pastes the key into that extension's own page, so naming it
+       * is what keeps the two halves of the pairing together.
+       */
+      readonly extensionId?: string;
+      /**
+       * The extension's options page, where the key is pasted.
+       *
+       * Absent when the host has not seen the extension: the page cannot be
+       * named for an extension whose identity the host does not know.
+       */
+      readonly optionsUrl?: string;
     };
 
 /** What `sendBrowserInput` answers. */

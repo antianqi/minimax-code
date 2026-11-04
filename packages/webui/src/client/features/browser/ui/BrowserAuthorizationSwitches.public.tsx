@@ -31,6 +31,10 @@
 
 import { useCallback, useState, type ReactElement } from "react";
 import { WebuiTextInput } from "../../../ui/field.js";
+import { WebuiDialog } from "../../../ui/dialog.js";
+import { WebuiStack } from "../../../ui/layout-primitives.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
+import { useWebuiToast } from "../../../ui/toast.js";
 import {
   WEBUI_BROWSER_AUTHORIZATION_DEFAULT,
   type WebuiBrowserAuthorization,
@@ -43,7 +47,7 @@ import type {
 } from "../contracts/browser-port.js";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch.js";
 import { SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
-import { WebuiButton } from "../../../ui/button.js";
+import { WebuiButton, WebuiButtonLink } from "../../../ui/button.js";
 
 const SURFACE_ROWS: readonly { readonly surface: WebuiBrowserSurface; readonly title: string; readonly description: string }[] = [
   {
@@ -145,8 +149,17 @@ export interface BrowserInstallationKeyProps {
 
 interface RevealedKey {
   readonly surface: WebuiBridgeBrowserSurface;
+  /** The browser's name, so the dialog says which browser it is about. */
+  readonly title: string;
   readonly key: string;
   readonly fingerprint: string;
+  /**
+   * The extension's own page, where the key is pasted.
+   *
+   * Absent when the host has not seen the extension: the page cannot be named
+   * for an extension whose identity the host does not know.
+   */
+  readonly optionsUrl?: string;
 }
 
 const BRIDGE_SURFACES = [
@@ -155,7 +168,7 @@ const BRIDGE_SURFACES = [
 ] as const satisfies readonly { readonly surface: WebuiBridgeBrowserSurface; readonly title: string }[];
 
 /**
- * The installation key, shown once so the person can paste it into the
+ * The installation key, shown in a dialog so the person can paste it into the
  * extension.
  *
  * This is the one place the key leaves the host's OS secure store, and it is
@@ -167,6 +180,7 @@ export function BrowserInstallationKey({ readKey }: BrowserInstallationKeyProps)
   const [revealed, setRevealed] = useState<RevealedKey | undefined>();
   const [notProvisioned, setNotProvisioned] = useState<readonly WebuiBridgeBrowserSurface[]>([]);
   const [busy, setBusy] = useState(false);
+  const toast = useWebuiToast();
 
   const reveal = useCallback(
     async (surface: WebuiBridgeBrowserSurface): Promise<void> => {
@@ -175,26 +189,37 @@ export function BrowserInstallationKey({ readKey }: BrowserInstallationKeyProps)
       try {
         const result = await readKey({ surface });
         if (result.present) {
-          setRevealed({ surface: result.surface, key: result.key, fingerprint: result.fingerprint });
+          setRevealed({
+            surface: result.surface,
+            title:
+              BRIDGE_SURFACES.find((entry) => entry.surface === result.surface)?.title ??
+              result.surface,
+            key: result.key,
+            fingerprint: result.fingerprint,
+            ...(result.optionsUrl ? { optionsUrl: result.optionsUrl } : {}),
+          });
           setNotProvisioned((prior) => prior.filter((entry) => entry !== surface));
           return;
         }
         // Not an error: the surface has never been switched on, so there is
         // nothing provisioned and nothing to paste.
         setNotProvisioned((prior) => (prior.includes(surface) ? prior : [...prior, surface]));
-        setRevealed((prior) => (prior?.surface === surface ? undefined : prior));
+      } catch (reason) {
+        // A read that failed carries the host's reason, and it is the only
+        // thing the person can act on.
+        toast.error(reason instanceof Error ? reason.message : String(reason));
       } finally {
         setBusy(false);
       }
     },
-    [readKey],
+    [readKey, toast],
   );
 
   return (
     <SettingsSection
       title="浏览器桥接安装密钥"
       testId="browser-installation-key"
-      hint="扩展需要这把密钥才能完成配对。打开对应浏览器的开关后在此查看，并粘贴到扩展的选项页：浏览器扩展管理页（edge://extensions 或 chrome://extensions）里找到「MiniMax Code Browser Bridge」，点「扩展选项」。"
+      hint="扩展需要这把密钥才能完成配对。打开对应浏览器的开关后在此查看密钥，复制到扩展的选项页即可。"
     >
       {BRIDGE_SURFACES.map(({ surface, title }) => (
         <SettingsRow
@@ -203,15 +228,13 @@ export function BrowserInstallationKey({ readKey }: BrowserInstallationKeyProps)
           description={
             notProvisioned.includes(surface)
               ? "该浏览器尚未启用，没有可复制的密钥。"
-              : revealed?.surface === surface
-                ? `指纹 ${revealed.fingerprint}`
-                : "查看并复制这把密钥。"
+              : "查看并复制这把密钥。"
           }
           testId={`browser-installation-key-${surface}-row`}
         >
           <WebuiButton
-            variant="quiet-secondary"
-            size="inline"
+            variant="secondary"
+            size="compact"
             data-testid={`browser-installation-key-${surface}-reveal`}
             disabled={!readKey || busy}
             onClick={() => {
@@ -223,24 +246,118 @@ export function BrowserInstallationKey({ readKey }: BrowserInstallationKeyProps)
         </SettingsRow>
       ))}
       {revealed ? (
-        <SettingsRow
-          title="复制用密钥"
-          description="粘贴到扩展的选项页后即可配对。密钥只保存在这台浏览器的本地存储中。"
-          testId="browser-installation-key-value-row"
-        >
+        <BrowserInstallationKeyDialog
+          revealed={revealed}
+          onClose={() => setRevealed(undefined)}
+        />
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+/**
+ * The key, in a dialog, with the extension's page beside it.
+ *
+ * The key is pasted into the extension's own options page, so the dialog holds
+ * the two halves of the pairing together: the fingerprint — which that page
+ * shows back — and the key itself, with a copy action and a link to the page.
+ * The link opens in a new tab because the person has to paste the key into
+ * the page the link opens, and the dialog is where they come back to.
+ */
+function BrowserInstallationKeyDialog({
+  revealed,
+  onClose,
+}: {
+  readonly revealed: RevealedKey;
+  readonly onClose: () => void;
+}): ReactElement {
+  const { dom } = useWebuiBrowserCapabilities();
+  const toast = useWebuiToast();
+
+  const copy = useCallback(async (): Promise<void> => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard) {
+        // The clipboard can be absent, and the key is still the person's to
+        // copy: the fallback copies it through a hidden field.
+        dom.copyTextFallback(revealed.key);
+      } else {
+        await navigator.clipboard.writeText(revealed.key);
+      }
+      toast.success("安装密钥已复制。");
+    } catch {
+      toast.error("复制失败，请手动选中密钥复制。");
+    }
+  }, [dom, revealed.key, toast]);
+
+  return (
+    <WebuiDialog
+      id={`browser-installation-key-${revealed.surface}`}
+      open
+      title={`${revealed.title} 安装密钥`}
+      onClose={onClose}
+      width="compact"
+      portalTarget={dom.portalTarget()}
+      testId="browser-installation-key-dialog"
+    >
+      <WebuiStack gap="medium">
+        <div className="flex flex-col gap-1">
+          <span className="text-[13px] text-text_default_secondary">指纹</span>
           <WebuiTextInput
             appearance="bare"
             controlSize="dense"
             textSize="small"
             textTone="secondary"
-            className="w-auto font-mono"
+            className="w-full font-mono"
+            readOnly
+            data-testid="browser-installation-key-fingerprint"
+            value={revealed.fingerprint}
+            aria-label={`${revealed.surface} installation key fingerprint`}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[13px] text-text_default_secondary">安装密钥</span>
+          <WebuiTextInput
+            appearance="bare"
+            controlSize="dense"
+            textSize="small"
+            textTone="secondary"
+            className="w-full font-mono"
             readOnly
             data-testid="browser-installation-key-value"
             value={revealed.key}
             aria-label={`${revealed.surface} installation key`}
           />
-        </SettingsRow>
-      ) : null}
-    </SettingsSection>
+          <WebuiButton
+            variant="secondary"
+            size="compact"
+            className="w-fit"
+            data-testid="browser-installation-key-copy"
+            onClick={() => {
+              void copy();
+            }}
+          >
+            复制密钥
+          </WebuiButton>
+        </div>
+        {revealed.optionsUrl ? (
+          <WebuiButtonLink
+            href={revealed.optionsUrl}
+            target="_blank"
+            rel="noreferrer"
+            variant="quiet-secondary"
+            size="inline"
+            className="w-fit"
+            data-testid="browser-installation-key-options-link"
+          >
+            打开扩展选项页
+          </WebuiButtonLink>
+        ) : (
+          <p className="text-[13px] text-text_default_secondary">
+            这个扩展还没有连接过这台主机，主机不知道它的选项页地址。请在浏览器的扩展管理页里找到「MiniMax Code Browser
+            Bridge」，点「扩展选项」后粘贴密钥。
+          </p>
+        )}
+      </WebuiStack>
+    </WebuiDialog>
   );
 }

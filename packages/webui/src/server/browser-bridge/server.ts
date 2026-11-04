@@ -44,10 +44,11 @@ import {
   type WebuiBrowserTargetState,
   type WebuiBridgeBrowserSurface,
 } from "../../shared/contracts/browser.js";
-import type {
-  WebuiBrowserBridgeImageFrame,
-  WebuiBrowserBridgeInstallationKeyView,
-  WebuiBrowserBridgeTarget,
+import {
+  webuiBrowserBridgeExtensionOptionsUrl,
+  type WebuiBrowserBridgeImageFrame,
+  type WebuiBrowserBridgeInstallationKeyView,
+  type WebuiBrowserBridgeTarget,
 } from "../../shared/contracts/browser-bridge.js";
 import {
   createPlatformSecureCredentialStore,
@@ -254,6 +255,14 @@ interface BridgeSurfaceState {
    * happen to be in.
    */
   surface: WebuiBridgeBrowserSurface | undefined;
+  /**
+   * The identity the peer connected with, when it has one.
+   *
+   * It is the extension's own id — the one its origin carries — and it is what
+   * lets the Settings page name the extension's own page, where the
+   * installation key is pasted.
+   */
+  extensionId: string | undefined;
   readonly session: BrowserBridgeSession;
   /** The instance identity, from the extension's `hello` frame. */
   browserId: string;
@@ -490,7 +499,38 @@ async readInstallationKey(
   ): Promise<WebuiBrowserBridgeInstallationKeyView | undefined> {
     const pairing = this.pairings.get(surface);
     if (!pairing) return undefined;
-    return pairing.installationKeyForDisplay();
+    const view = await pairing.installationKeyForDisplay();
+    if (!view) return undefined;
+    const page = this.#extensionPage(surface);
+    return page
+      ? { ...view, extensionId: page.extensionId, optionsUrl: page.optionsUrl }
+      : view;
+  }
+
+  /**
+   * The extension's own page for one surface, when this host knows it.
+   *
+   * The live session's identity comes first: it is the extension the person
+   * is working with right now. The identities this host has proved come
+   * next, and the ones an operator configured last — the last two only when
+   * there is exactly one of them, because a page named for the wrong
+   * extension is worse than no page at all.
+   */
+  #extensionPage(
+    surface: WebuiBridgeBrowserSurface,
+  ): { readonly extensionId: string; readonly optionsUrl: string } | undefined {
+    const live = this.#surfaces.get(surface)?.extensionId;
+    const trusted = [...this.#trusted.ids(surface)];
+    const configured = [...(this.#allowedIds.get(surface) ?? [])];
+    const extensionId =
+      live ??
+      (trusted.length === 1 ? trusted[0] : undefined) ??
+      (configured.length === 1 ? configured[0] : undefined);
+    if (!extensionId) return undefined;
+    return {
+      extensionId,
+      optionsUrl: webuiBrowserBridgeExtensionOptionsUrl(extensionId),
+    };
   }
 
   /**
@@ -586,6 +626,7 @@ async readInstallationKey(
     });
     const state: BridgeSurfaceState = {
       surface: undefined,
+      extensionId: undefined,
       session,
       browserId: "",
       live: false,
@@ -632,6 +673,9 @@ async readInstallationKey(
         return;
       }
       state.surface = surface;
+      // The identity the peer connected with. It is what lets the Settings
+      // page link to the extension's own page, where the key is pasted.
+      state.extensionId = extensionId;
       this.#surfaces.set(surface, state);
       state.live = true;
       // The peer is admitted, so it proved the installation key or a

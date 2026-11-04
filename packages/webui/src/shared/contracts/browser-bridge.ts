@@ -417,6 +417,19 @@ export function webuiBrowserBridgeInstallationKeyId(surface: string): string {
   return `webui-browser-bridge-installation-${surface}-v1`;
 }
 
+/**
+ * The extension's own options page, as a URL.
+ *
+ * The page belongs to the extension — it is `options_ui.page` in its
+ * manifest — and it is the only place the installation key can be pasted. The
+ * id is the extension's identity, and the host learns it from the peer's
+ * origin; an unpacked build's id is derived from the folder it was loaded from,
+ * so the host can only name the page for an extension it has seen.
+ */
+export function webuiBrowserBridgeExtensionOptionsUrl(extensionId: string): string {
+  return `chrome-extension://${extensionId.toLowerCase()}/options.html`;
+}
+
 /** The one installation key for a surface, as the Settings surface receives it. */
 export interface WebuiBrowserBridgeInstallationKeyView {
   /** The surface the key belongs to. */
@@ -430,6 +443,20 @@ export interface WebuiBrowserBridgeInstallationKeyView {
    * "a key is stored" without ever displaying it again.
    */
   readonly fingerprint: string;
+  /**
+   * The extension this surface's key belongs to, when the host knows it.
+   *
+   * It is the identity the key is pasted into, so the person does not have to
+   * match a key to a browser by reading both sides.
+   */
+  readonly extensionId?: string;
+  /**
+   * The extension's options page, where the key is pasted.
+   *
+   * Absent when the host has not seen the extension yet: the page cannot be
+   * named for an extension whose identity the host does not know.
+   */
+  readonly optionsUrl?: string;
 }
 
 /**

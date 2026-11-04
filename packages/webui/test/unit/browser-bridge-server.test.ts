@@ -499,6 +499,20 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     expect((error as Error).message).toContain("Settings");
   });
 
+  it("names the extension the key belongs to, and the page to paste it on", async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+
+    // The key is pasted into the extension's own options page, so the read
+    // says which extension that is and where its page is. The person does not
+    // have to match the two by hand.
+    const view = await harness.bridge.readInstallationKey("edge");
+
+    expect(view?.extensionId).toBe(EDGE_EXTENSION_ID);
+    expect(view?.optionsUrl).toBe(`chrome-extension://${EDGE_EXTENSION_ID}/options.html`);
+    client.socket.terminate();
+  });
+
   it("stops answering once the extension session goes away", async () => {
     const harness = await startHarness();
     const client = await pairEdge(harness);

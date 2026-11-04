@@ -4309,6 +4309,7 @@
     "packages/webui/src/client/global.d.ts",
     "packages/webui/src/client/index.html",
     "packages/webui/src/client/main.tsx",
+    "packages/webui/src/client/platform/app-mode.ts",
     "packages/webui/src/client/platform/browser-dom.ts",
     "packages/webui/src/client/platform/connection-health.ts",
     "packages/webui/src/client/platform/event-channel.ts",

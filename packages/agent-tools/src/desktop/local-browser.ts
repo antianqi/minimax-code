@@ -596,7 +596,9 @@ async function executeBrowserAction(
             errorCode === 'background_render_operation_timeout' ||
             errorCode === 'background_render_queue_timeout'
           ? 'BROWSER_OPERATION_TIMEOUT'
-          : errorCode;
+          : errorCode === 'browser_extension_disconnected'
+            ? 'BROWSER_EXTENSION_DISCONNECTED'
+            : errorCode;
     const structuredCode = normalizedErrorCode ?? /^([A-Z][A-Z0-9_]+):/u.exec(message)?.[1];
     const label =
       isRecord(error) && typeof error.label === 'string'

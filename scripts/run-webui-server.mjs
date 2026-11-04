@@ -34,6 +34,7 @@ if (!process.env.WEBUI_SERVER_TSX) {
 } else {
   const os = await import("node:os");
   const path = await import("node:path");
+  const { readFileSync } = await import("node:fs");
   const { createWebuiRuntimeHost, createHarnessPortFromHost, createBrowserAdapter, WebuiTerminalManager } =
     await import("../packages/webui/src/runtime/index.ts");
   const {
@@ -42,7 +43,7 @@ if (!process.env.WEBUI_SERVER_TSX) {
     createMiniAppProxyRegistry,
     createMiniAppPresenter,
   } = await import("../packages/webui/src/server/index.ts");
-  const { BrowserBridgeServer } =
+  const { BrowserBridgeServer, WebuiBrowserExtensionPackage } =
     await import("../packages/webui/src/server/browser-bridge/index.ts");
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
@@ -71,7 +72,38 @@ if (!process.env.WEBUI_SERVER_TSX) {
   // data directory. An unpacked build's id is derived from the folder it was
   // loaded from, so it differs on every machine, and asking the person to
   // name it is asking for something they cannot know.
-  const browserBridge = new BrowserBridgeServer({ host: "127.0.0.1", dev: true, dataDir });
+  /**
+   * The extension build this host speaks to.
+   *
+   * The peer announces its own version in the handshake, and the two are
+   * compared when a command comes back unanswered: an extension older than
+   * this build cannot read the frames this build sends and hangs up rather
+   * than refusing them, so the version is what lets the host say "your
+   * extension is older than this build" instead of "it timed out".
+   */
+  function readExtensionVersion() {
+    try {
+      const manifest = JSON.parse(
+        readFileSync(
+          new URL("../packages/browser-extension/manifest.json", import.meta.url),
+          "utf8",
+        ),
+      );
+      return typeof manifest.version === "string" && manifest.version.trim()
+        ? manifest.version.trim()
+        : undefined;
+    } catch {
+      // A host with no extension package has no version to hold the peer to.
+      return undefined;
+    }
+  }
+  const extensionVersion = readExtensionVersion();
+  const browserBridge = new BrowserBridgeServer({
+    host: "127.0.0.1",
+    dev: true,
+    dataDir,
+    ...(extensionVersion ? { expectedExtensionVersion: extensionVersion } : {}),
+  });
   await browserBridge.start();
   // The browser adapter is built before the runtime host, because the host is
   // what takes the browser provider: the adapter reads its authorization
@@ -132,6 +164,16 @@ const port = createHarnessPortFromHost(assembled.host, {
     dev: true,
     clientDir,
     browserBridge,
+    // The person downloads the extension from Settings, and the package has to
+    // be the one this host speaks to: the sources are here, so the build is
+    // redone when they are newer than what was built.
+    browserExtensionPackage: new WebuiBrowserExtensionPackage({
+      packageDir: path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../packages/browser-extension",
+      ),
+      scratchDir: path.join(dataDir, "tmp"),
+    }),
     // The service closes every Mini App proxy on the way down; a leaked listener
     // holds a plugin's derived port, which would make that Mini App unstartable.
     miniappProxies,

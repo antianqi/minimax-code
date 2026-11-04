@@ -218,6 +218,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchMiniAppAgentTurn,
     watchMiniAppAgentObservations,
     workspaceFileUrl,
+    browserExtensionUrl,
     miniappStandaloneUrl,
     watchEvents,
   } = createWebuiWire(options);
@@ -289,6 +290,10 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
         operation: {...body.operation},
       }),
     workspaceFileUrl,
+    // The extension package is a download rather than an operation: the route
+    // answers with the archive itself, so the client needs the URL and not a
+    // reply to unwrap.
+    browserExtensionPackageUrl: browserExtensionUrl,
     readWorkspaceArchive: (body) => request(READ_WORKSPACE_ARCHIVE_OPERATION_NAME, body),
     extractWorkspaceArchive: (body) => request(EXTRACT_WORKSPACE_ARCHIVE_OPERATION_NAME, body),
     createTerminal: (body) => request(CREATE_TERMINAL_OPERATION_NAME, body),

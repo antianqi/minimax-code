@@ -9,9 +9,11 @@ import { credentialMatches, type WebuiCredential } from "../credentials.js";
 import { admitHttpRequest } from "../access-policy.js";
 import { rejectHttp, parseHttpUrl } from "./responses.js";
 import { serveClientAsset } from "./client-assets.js";
+import { serveBrowserExtensionPackage } from "./browser-extension.js";
 import { handleSessionTransfer, handleSessionImport } from "./session-transfer.js";
 import { serveWorkspaceFile } from "./workspace-file.js";
 import type { WebuiHarnessPort } from "../../runtime/port.js";
+import type { WebuiBrowserExtensionPackage } from "../browser-bridge/extension-package.js";
 
 export interface WebuiHttpRouterContext {
   readonly host: string;
@@ -22,6 +24,13 @@ export interface WebuiHttpRouterContext {
   readonly credential: WebuiCredential;
   readonly dev: boolean;
   readonly clientDir: string | undefined;
+  /**
+   * The extension package this host offers for download.
+   *
+   * Absent when this host carries no extension: the route then says so
+   * rather than serving an empty package.
+   */
+  readonly browserExtensionPackage?: WebuiBrowserExtensionPackage;
   readonly port: WebuiHarnessPort;
 }
 
@@ -64,6 +73,19 @@ export async function serveHttpRequest(
   // inherits them rather than re-implementing them.
   if (url.pathname === "/workspace-file") {
     await serveWorkspaceFile(request, response, url);
+    return;
+  }
+  // The extension package is a download the person takes away: the browser
+  // cannot install an extension for them, so the host hands them the build
+  // this host speaks to. It answers HEAD as well as GET, for the same reason
+  // the workspace-file route does, and it sits after the loopback, origin and
+  // credential checks so it inherits them.
+  if (url.pathname === "/browser-extension") {
+    await serveBrowserExtensionPackage(
+      request,
+      response,
+      context.browserExtensionPackage,
+    );
     return;
   }
   if (request.method !== "GET") {

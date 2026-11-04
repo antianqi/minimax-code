@@ -539,6 +539,7 @@
       "packages/webui/test/integration/isolated-chromium-two-pages.test.ts",
       "packages/webui/test/integration/browser-core-agent-actions.test.ts",
       "packages/webui/test/integration/workspace-browser-tab-acceptance.test.ts",
+      "packages/webui/test/unit/browser-extension-package.test.ts",
       "packages/webui/test/unit/browser-bridge-server.test.ts",
       "packages/webui/test/unit/browser-bridge-trusted-extensions.test.ts",
       "packages/webui/test/unit/browser-bridge-upgrade.test.ts",

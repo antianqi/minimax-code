@@ -42,6 +42,7 @@ import {
 } from "./http-server.js";
 import { WebuiWebSocketServer } from "./websocket-server.js";
 import type { BrowserBridgeServer } from "./browser-bridge/server.js";
+import type { WebuiBrowserExtensionPackage } from "./browser-bridge/extension-package.js";
 import type { MiniAppProxyRegistry } from "./miniapp/proxy-registry.js";
 import { serveHttpRequest, type WebuiHttpRouterContext } from "./http/router.js";
 
@@ -178,6 +179,13 @@ export interface WebuiServiceOptions {
    */
   readonly clientDir?: string;
   /**
+   * The extension package this host offers for download.
+   *
+   * Optional: a host with no extension to offer answers the download route
+   * with a refusal rather than with an empty package.
+   */
+  readonly browserExtensionPackage?: WebuiBrowserExtensionPackage;
+  /**
    * The Mini App loopback listeners the operation registry holds.
    *
    * The registry creates them (`createMiniAppProxyRegistry`), and this service
@@ -206,6 +214,7 @@ export class WebuiService {
   private readonly credential: WebuiCredential;
   private readonly dev: boolean;
   private readonly clientDirOverride: string | undefined;
+  private readonly browserExtensionPackage: WebuiBrowserExtensionPackage | undefined;
   private readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
   private readonly httpServer: Server;
   private readonly wsServer: WebuiWebSocketServer;
@@ -243,6 +252,7 @@ export class WebuiService {
     // widened by a stray `WEBUI_DEV=1` in the environment.
     this.dev = options.dev ?? readEnvFlag("WEBUI_DEV");
     this.clientDirOverride = options.clientDir;
+    this.browserExtensionPackage = options.browserExtensionPackage;
     this.operations = withRegistryDerivedAvailability(options.operations, options.port);
     this.terminal = options.terminal;
     this.browserBridge = options.browserBridge;
@@ -266,6 +276,9 @@ export class WebuiService {
       credential: this.credential,
       dev: this.dev,
       clientDir: this.clientDirOverride,
+      ...(this.browserExtensionPackage
+        ? { browserExtensionPackage: this.browserExtensionPackage }
+        : {}),
       port: this.port,
     };
     this.httpServer.on("upgrade", this.wsServer.handleUpgrade);

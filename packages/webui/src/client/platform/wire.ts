@@ -238,6 +238,15 @@ export interface WebuiWire {
   /** The one HTTP route, built from the same base and token as the socket. */
   workspaceFileUrl(input: { readonly workspaceDir: string; readonly path: string }): string;
   /**
+   * The browser extension package this host produces, as a download.
+   *
+   * The route is admitted like every other document — the service checks the
+   * token on it — so the link carries it. The package is the build this host
+   * speaks to, so the person loads the extension this build can talk to
+   * rather than one they happened to download earlier.
+   */
+  browserExtensionUrl(): string;
+  /**
    * The standalone Mini App's page, built from the same base and token.
    *
    * The page route is admitted like every other document — the service checks the
@@ -928,6 +937,15 @@ export function createWebuiWire({
     return `${base}/workspace-file?${query.toString()}`;
   }
 
+  function browserExtensionUrl(): string {
+    // Same base rule as `workspaceFileUrl`: the socket URL carries the token,
+    // the route checks it, and `ws:`/`wss:` share a prefix so one
+    // substitution reaches `http:`/`https:`.
+    const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
+    const query = new URLSearchParams({ token });
+    return `${base}/browser-extension?${query.toString()}`;
+  }
+
   return {
     request,
     stream,
@@ -941,6 +959,7 @@ export function createWebuiWire({
     watchMiniAppAgentTurn,
     watchMiniAppAgentObservations,
     workspaceFileUrl,
+    browserExtensionUrl,
     miniappStandaloneUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
   };

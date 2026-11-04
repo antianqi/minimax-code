@@ -5053,6 +5053,15 @@
       "home": "outside"
     },
     {
+      "path": "server/browser-bridge/extension-package.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "server/browser-bridge/index.ts",
       "layers": [
         "server"
@@ -5144,6 +5153,15 @@
     },
     {
       "path": "server/http/client-assets.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/http/browser-extension.ts",
       "layers": [
         "server"
       ],

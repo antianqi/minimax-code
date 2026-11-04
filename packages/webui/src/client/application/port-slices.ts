@@ -161,6 +161,7 @@ const BROWSER_KEYS = [
   "closeBrowserWebTab",
   "listBrowserCapabilities",
   "getBrowserInstallationKey",
+  "browserExtensionPackageUrl",
 ] as const satisfies readonly (keyof BrowserPort)[];
 
 const COMPOSER_KEYS = [

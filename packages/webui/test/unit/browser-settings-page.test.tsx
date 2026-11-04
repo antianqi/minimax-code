@@ -32,6 +32,7 @@ import { PersonalizationSettings } from "../../src/client/features/settings/ui/P
 import { DESKTOP_SETTINGS_TABS } from "../../src/client/features/settings/projection/settings-view.js";
 import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 import { WebuiSettingsWorkflowsProvider } from "../../src/client/bindings/use-query-state.js";
+import { WebuiPortSlicesProvider } from "../../src/client/bindings/port-slices-context.js";
 
 /** The settings page's own owner, so the 个性化 page renders as it does in the app. */
 function PersonalizationHost() {
@@ -119,6 +120,42 @@ describe("the 浏览器 page carries the settings", () => {
     ]) {
       expect(markup).toMatch(new RegExp(`<button[^>]*data-testid="${id}"[^>]*disabled=""`, "u"));
     }
+  });
+});
+
+describe("the 浏览器 page offers the extension package", () => {
+  it("downloads the package this host produces", () => {
+    const markup = renderToStaticMarkup(
+      <WebuiPortSlicesProvider
+        slices={
+          {
+            browser: {
+              browserExtensionPackageUrl: () =>
+                "http://127.0.0.1:8787/browser-extension?token=fixture-token",
+            },
+          } as never
+        }
+      >
+        <BrowserSettingsPage />
+      </WebuiPortSlicesProvider>,
+    );
+
+    expect(markup).toContain('data-testid="browser-extension-package"');
+    // The link carries the token, because the route is admitted like every
+    // other document the host serves.
+    expect(markup).toContain(
+      'href="http://127.0.0.1:8787/browser-extension?token=fixture-token"',
+    );
+    expect(markup).toContain("下载最新扩展包");
+  });
+
+  it("says so when this host carries no extension at all", () => {
+    // A host with no package has nothing to download, and says that rather
+    // than offering a link that answers with a refusal.
+    const markup = renderToStaticMarkup(<BrowserSettingsPage />);
+
+    expect(markup).toContain('data-testid="browser-extension-package-unavailable"');
+    expect(markup).not.toContain('data-testid="browser-extension-package-download"');
   });
 });
 

@@ -22,6 +22,8 @@
 //     so the headline test can prove it is absent.
 //   * `server.ts` — the bridge's own WebSocket server, its per-surface
 //     pairings and the providers it lends to the browser service.
+//   * `extension-package.ts` — the extension build this host offers the
+//     person for download, rebuilt when the sources are newer than the build.
 
 export {
   bridgeBackgroundReconnectDelayMs,
@@ -138,3 +140,9 @@ export {
   type BrowserBridgeServerSurfaceStatus,
   type WebuiBridgeSurfaceProvider,
 } from "./server.js";
+
+export {
+  WebuiBrowserExtensionPackage,
+  type WebuiBrowserExtensionArchive,
+  type WebuiBrowserExtensionPackageOptions,
+} from "./extension-package.js";

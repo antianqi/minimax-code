@@ -78,7 +78,20 @@ export type BrowserBridgeCommandOutcome =
        */
       readonly unsupported?: boolean;
     }
-  | { readonly kind: "timeout"; readonly commandId: string; readonly reason: string };
+  | { readonly kind: "timeout"; readonly commandId: string; readonly reason: string }
+  | {
+      /**
+       * The session went away while the command was in flight.
+       *
+       * It is not a timeout: nothing was late, the peer was gone. The caller
+       * has to be able to tell "the browser did not answer in time" from "the
+       * browser hung up", because the second one usually means the extension
+       * is older than the host that is talking to it.
+       */
+      readonly kind: "disconnected";
+      readonly commandId: string;
+      readonly reason: string;
+    };
 
 /** Frames the host receives from the extension, exposed via the session. */
 export interface BrowserBridgeSessionEvents {
@@ -223,6 +236,14 @@ export class BrowserBridgeSession extends EventEmitter {
         readonly publicKey?: WebuiBrowserBridgeEcdhPublicKey;
         /** The browser the peer says it runs in. */
         readonly browser: string;
+        /**
+         * The build the peer announced.
+         *
+         * It is what turns "the extension may be out of date" into a fact: the
+         * host knows which build it speaks to, and the peer says which build
+         * it is.
+         */
+        readonly extensionVersion?: string;
       }
     | undefined;
   /** Why the session closed, captured for `closed` emission. */
@@ -393,6 +414,11 @@ export class BrowserBridgeSession extends EventEmitter {
   /** Why the session closed, if it has. */
   get lastCloseReason(): BrowserBridgeSessionCloseReason | undefined {
     return this.closeReason;
+  }
+
+  /** The build the peer announced, when it announced one. */
+  get peerExtensionVersion(): string | undefined {
+    return this.helloFrame?.extensionVersion;
   }
 
   /**
@@ -688,6 +714,12 @@ export class BrowserBridgeSession extends EventEmitter {
           this.helloFrame = {
             publicKey: isEcdhPublicKey(frame.publicKey) ? frame.publicKey : undefined,
             browser: frame.browser,
+            // A peer that announces no build is a peer this host cannot hold
+            // to one, and an absent version is not evidence of anything.
+            extensionVersion:
+              typeof frame.extensionVersion === "string" && frame.extensionVersion.trim()
+                ? frame.extensionVersion.trim()
+                : undefined,
           };
           // The pairing is settled here, before the challenge goes out: the
           // challenge is signed by the pairing, so the host has to know which
@@ -940,6 +972,25 @@ export class BrowserBridgeSession extends EventEmitter {
     }
   }
 
+  /**
+   * Why the commands that were in flight never got an answer.
+   *
+   * The socket went away and the command was not late. "Session closed before
+   * reply" said neither of those: it reads like the browser was slow, so the
+   * caller waits again — and the wait is what turns a five-minute fix into an
+   * afternoon.
+   */
+  private disconnectReason(): string {
+    const reason = this.closeReason ?? { kind: "remote" };
+    if (reason.kind === "remote") {
+      return "the browser extension closed the connection before answering";
+    }
+    if (reason.kind === "host_error") {
+      return `the browser extension connection was closed by the host: ${reason.error}`;
+    }
+    return `the browser extension session ended: ${describeClose(reason)}`;
+  }
+
   private teardown(): void {
     if (this.helloTimer) {
       clearTimeout(this.helloTimer);
@@ -960,7 +1011,7 @@ export class BrowserBridgeSession extends EventEmitter {
       this.activeChallenge = undefined;
     }
     for (const [commandId, pending] of this.inflight.entries()) {
-      pending.resolve({ kind: "timeout", commandId, reason: "session closed before reply" });
+      pending.resolve({ kind: "disconnected", commandId, reason: this.disconnectReason() });
     }
     this.inflight.clear();
     for (const resolver of this.pendingPings.values()) resolver();

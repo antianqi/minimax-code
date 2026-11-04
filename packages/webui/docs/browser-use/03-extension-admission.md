@@ -239,6 +239,25 @@ path.
 | **The peer is authenticated against a local process** | `implemented` — the `Origin` header still selects the allowlisted extension id, and it is no longer the thing that decides. A peer must additionally prove possession of the **installation key** before the host hands over a pairing credential, and a peer that proves only a credential this host already issued receives no credential at all. A local process can spoof the origin and supply its own ECDH key, but it holds neither secret, so no `pair` frame is sent to it. See [`04-pairing-credentials.md`](04-pairing-credentials.md) |
 | **The specific refusal says what is missing** | `implemented` — `BrowserBridgeProofRefusal` distinguishes `switched_off`, `unknown_nonce`, `unknown_key_id`, `installation_key_mismatch`, `pairing_credential_mismatch` and `no_peer_public_key`, and each maps to its own stable `closed`-frame reason text in `describeRefusal` (`session.ts`). A generic "pairing proof failed" would leave the person unable to tell "paste your installation key" from "your host rotated". |
 
+## Updating the extension, and what loading a new build costs
+
+**`implemented`.** The browser does not install an extension for the person: a store install needs
+their own click in the store, and an unpacked install needs developer mode and a folder they pick.
+What the host can do is make sure the package they get is the one this build speaks to, because a
+stale extension is the failure that reads like a network timeout and costs an afternoon.
+
+| Element | State |
+| --- | --- |
+| The host builds the extension when its sources are newer than its build | `implemented` — `ensureCurrentBuild`, `packages/webui/src/server/browser-bridge/extension-package.ts` |
+| The package is served as a download, behind the per-start credential | `implemented` — `GET /browser-extension`, `packages/webui/src/server/http/browser-extension.ts`; the name carries the version, so two packages are told apart |
+| The person is offered it in one place | `implemented` — 浏览器 → 下载最新扩展包, `packages/webui/src/client/features/browser/ui/BrowserSettingsPage.public.tsx` |
+| A host with no extension says so | `implemented` — the route answers `404`, never an empty archive, because an empty package reads like a download that worked |
+
+Loading the package costs one thing, and the Settings page says so: an unpacked extension's id is
+derived from the folder it is loaded from, so a new folder is a **new identity**. The person pairs
+it again with the installation key from the same Settings page, and the development host learns the
+new identity from that proof rather than from a configuration the person cannot know.
+
 ## Related
 
 | Concern | Document |

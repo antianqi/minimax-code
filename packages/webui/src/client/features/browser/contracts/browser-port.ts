@@ -283,4 +283,15 @@ export interface BrowserPort {
   readonly getBrowserInstallationKey?: (request: {
     readonly surface: WebuiBridgeBrowserSurface;
   }) => Promise<WebuiBrowserInstallationKeyResult>;
+  /**
+   * The URL of the extension package this host produces.
+   *
+   * The browser will not install an extension for the person — a store install
+   * needs their own click, and an unpacked install needs developer mode and a
+   * folder they pick — so the host's part is to hand them the package this
+   * build speaks to. The URL is built by the transport rather than by a
+   * component, because only the transport knows the per-start token the route
+   * checks.
+   */
+  readonly browserExtensionPackageUrl?: () => string;
 }

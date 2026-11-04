@@ -151,6 +151,16 @@ export interface BrowserBridgeServerOptions {
    * cycle.
    */
   readonly dev: boolean;
+  /**
+   * The extension build this host speaks to.
+   *
+   * The peer announces its own build in the handshake, and the two are
+   * compared when a command comes back unanswered. An extension older than
+   * the one this build ships cannot read the frames this build sends and
+   * hangs up rather than refusing them, so the version is what turns "the
+   * extension may be out of date" into a fact the person can act on.
+   */
+  readonly expectedExtensionVersion?: string;
   /** The OS secure credential store. Tests inject an in-memory one. */
   readonly credentialStore?: SecureCredentialStore;
   /** Maximum inbound frame size in bytes. */
@@ -343,6 +353,8 @@ export class BrowserBridgeServer {
 
   readonly #host: string;
   readonly #dev: boolean;
+  /** The build this host speaks to, when it knows one. */
+  readonly #expectedExtensionVersion: string | undefined;
   readonly #allowedIds = new Map<WebuiBridgeBrowserSurface, ReadonlySet<string>>();
   /** The identities this host has proved and therefore admits. */
   readonly #trusted: TrustedExtensionStore;
@@ -365,6 +377,7 @@ export class BrowserBridgeServer {
     this.#host = options.host;
     this.packaged = options.packaged === true;
     this.#dev = options.dev;
+    this.#expectedExtensionVersion = options.expectedExtensionVersion;
     // A development host learns the identity of the extensions that prove
     // the installation key; a packaged host admits exactly the published
     // identity it was built for.
@@ -539,7 +552,7 @@ async readInstallationKey(
   createProvider(surface: WebuiBridgeBrowserSurface): WebuiBridgeSurfaceProvider | undefined {
     const state = this.#surfaces.get(surface);
     if (!state || !state.live) return undefined;
-    return new BridgeProvider(surface, state, this.registry);
+    return new BridgeProvider(surface, state, this.registry, this.#expectedExtensionVersion);
   }
 
   /** Release the sessions and shut the bridge's WebSocket server down. */
@@ -794,6 +807,14 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
   readonly #state: BridgeSurfaceState;
   readonly #registry: BrowserBridgeRegistry;
   /**
+   * The build this host speaks to, when it knows one.
+   *
+   * It is what the peer's announced version is compared against, so a command
+   * that comes back unanswered can say "the extension you have is older than
+   * this build" instead of "it timed out".
+   */
+  readonly #expectedExtensionVersion: string | undefined;
+  /**
    * The Browser Core the bridged tabs are driven through.
    *
    * The core is provider-neutral: it owns the action set, the element
@@ -810,10 +831,12 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
     surface: WebuiBridgeBrowserSurface,
     state: BridgeSurfaceState,
     registry: BrowserBridgeRegistry,
+    expectedExtensionVersion?: string,
   ) {
     this.#state = state;
     this.#registry = registry;
     this.surface = surface;
+    this.#expectedExtensionVersion = expectedExtensionVersion;
     this.#core = new BrowserCore({
       provider: `webui-bridge-${surface}`,
       version: 1,
@@ -848,6 +871,13 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
         targetId: target.targetId,
         generation: target.generation,
       };
+    }
+    if (outcome.kind === "disconnected") {
+      throw new WebuiBridgeOperationError(
+        "browser_extension_disconnected",
+        this.#disconnectMessage(outcome.reason),
+        true,
+      );
     }
     if (outcome.kind === "timeout") {
       throw new WebuiBridgeOperationError("browser_operation_timeout", outcome.reason, true);
@@ -930,10 +960,43 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
   async sendInput(command: WebuiBrowserInputCommand): Promise<void> {
     const outcome = await this.#registry.dispatch(command);
     if (outcome.kind === "accepted") return;
+    if (outcome.kind === "disconnected") {
+      throw new WebuiBridgeOperationError(
+        "browser_extension_disconnected",
+        this.#disconnectMessage(outcome.reason),
+        true,
+      );
+    }
     if (outcome.kind === "timeout") {
       throw new WebuiBridgeOperationError("browser_operation_timeout", outcome.reason, true);
     }
     throw new WebuiBridgeOperationError(this.#codeForRefused(command), outcome.reason);
+  }
+
+  /**
+   * What the caller is told when the extension hung up mid-command.
+   *
+   * The peer announced its build in the handshake and this host knows the
+   * build it ships, so the two can be compared: when the peer's is older, the
+   * message says so. "It timed out" would send the reader looking for a
+   * network problem that is not there — the usual cause is an extension that
+   * cannot read the frames this build sends and hangs up rather than
+   * refusing them.
+   */
+  #disconnectMessage(reason: string): string {
+    const peer = this.#state.session.peerExtensionVersion;
+    const expected = this.#expectedExtensionVersion;
+    if (peer && expected && isOlderExtensionVersion(peer, expected)) {
+      return (
+        `The browser extension (version ${peer}) closed the connection before answering; ` +
+        `this build speaks to version ${expected}. Download the latest extension package ` +
+        `from Settings and load it in the browser.`
+      );
+    }
+    return (
+      `${reason.charAt(0).toUpperCase()}${reason.slice(1)}. It may be out of date: ` +
+      `download the latest extension package from Settings and load it in the browser.`
+    );
   }
 
   /**
@@ -1020,6 +1083,13 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
       params: wire.params,
     });
     if (outcome.kind === "accepted") return outcome.result;
+    if (outcome.kind === "disconnected") {
+      throw new WebuiBridgeOperationError(
+        "browser_extension_disconnected",
+        this.#disconnectMessage(outcome.reason),
+        true,
+      );
+    }
     if (outcome.kind === "timeout") {
       throw new WebuiBridgeOperationError(
         "browser_operation_timeout",
@@ -1157,6 +1227,13 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
       params,
     });
     if (outcome.kind === "accepted") return outcome.result;
+    if (outcome.kind === "disconnected") {
+      throw new WebuiBridgeOperationError(
+        "browser_extension_disconnected",
+        this.#disconnectMessage(outcome.reason),
+        true,
+      );
+    }
     if (outcome.kind === "timeout") {
       throw new WebuiBridgeOperationError(
         "browser_operation_timeout",
@@ -1266,4 +1343,33 @@ function toText(data: unknown): string {
 /** Reduce a failure to one safe line. Never includes credential material. */
 function describe(error: unknown): string {
   return error instanceof Error ? error.message.split("\n")[0] ?? "unknown error" : String(error);
+}
+
+/**
+ * Whether the peer's build is older than the one this host speaks to.
+ *
+ * The comparison is deliberately narrow: it answers "yes" only for two plain
+ * dotted numbers where the peer's is smaller. A version this host cannot
+ * read is not evidence of anything, and an extension newer than the build the
+ * host ships is not out of date.
+ */
+function isOlderExtensionVersion(peer: string, expected: string): boolean {
+  const left = versionParts(peer);
+  const right = versionParts(expected);
+  if (!left || !right) return false;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const peerPart = left[index] ?? 0;
+    const expectedPart = right[index] ?? 0;
+    if (peerPart === expectedPart) continue;
+    return peerPart < expectedPart;
+  }
+  return false;
+}
+
+/** The dotted numbers of a version, or `undefined` when it is not one. */
+function versionParts(version: string): readonly number[] | undefined {
+  const trimmed = version.trim();
+  if (!/^\d+(?:\.\d+)*$/u.test(trimmed)) return undefined;
+  return trimmed.split(".").map((part) => Number(part));
 }

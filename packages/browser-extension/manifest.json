@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MiniMax Code Browser Bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pairs this browser with a local MiniMax Code WebUI host so the person and the Agent can operate the same browser session.",
   "minimum_chrome_version": "116",
   "background": {

@@ -51,6 +51,7 @@ async function startHarness(
     readonly env?: Readonly<Record<string, string | undefined>>;
     readonly packaged?: boolean;
     readonly trustedExtensionStore?: TrustedExtensionStore;
+    readonly expectedExtensionVersion?: string;
   } = {},
 ): Promise<Harness> {
   const bridge = new BrowserBridgeServer({
@@ -59,6 +60,9 @@ async function startHarness(
     ...(options.packaged ? { packaged: true } : {}),
     ...(options.trustedExtensionStore
       ? { trustedExtensionStore: options.trustedExtensionStore }
+      : {}),
+    ...(options.expectedExtensionVersion
+      ? { expectedExtensionVersion: options.expectedExtensionVersion }
       : {}),
     credentialStore: createInMemorySecureCredentialStore(),
     env: options.env ?? { MAVIS_BROWSER_EDGE_EXTENSION_IDS: EDGE_EXTENSION_ID },
@@ -437,6 +441,62 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     expect(targets[0]?.title).toBe("Example");
     expect(targets[0]?.status).toBe("open");
     client.socket.terminate();
+  });
+
+  it("reports an extension that hangs up as a disconnection, and names the build it is behind", async () => {
+    const harness = await startHarness({ expectedExtensionVersion: "2.0.0" });
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge")!;
+    announceTarget(client, 1);
+    await settle();
+
+    // The command is in flight when the extension goes away: the socket dies
+    // without an answer. Nothing was late, so this is not a timeout — and the
+    // difference is what tells the reader to update the extension rather than
+    // to wait longer for a browser that is not there.
+    const pending = provider
+      .sendCommand(
+        { targetId: TARGET_ID, generation: 1 },
+        "Page.navigate",
+        { url: "https://example.com/" },
+      )
+      .catch((error: unknown) => error);
+    await client.waitForCommand("Page.navigate", 0);
+    client.socket.terminate();
+
+    const error = await pending;
+    expect(error).toMatchObject({ code: "browser_extension_disconnected" });
+    // The peer announced 1.0.0 and this host speaks to 2.0.0, so the message
+    // names both: which side is behind is a fact here, not a guess.
+    expect((error as Error).message).toContain("1.0.0");
+    expect((error as Error).message).toContain("2.0.0");
+    expect((error as Error).message).toContain("Settings");
+  });
+
+  it("says the extension may be out of date when the host does not know its own build", async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge")!;
+    announceTarget(client, 1);
+    await settle();
+
+    const pending = provider
+      .sendCommand(
+        { targetId: TARGET_ID, generation: 1 },
+        "Page.navigate",
+        { url: "https://example.com/" },
+      )
+      .catch((error: unknown) => error);
+    await client.waitForCommand("Page.navigate", 0);
+    client.socket.terminate();
+
+    const error = await pending;
+    expect(error).toMatchObject({ code: "browser_extension_disconnected" });
+    // Without a version to compare, the report says what it knows: the
+    // connection went away, and an extension behind this build looks exactly
+    // like this.
+    expect((error as Error).message).toContain("out of date");
+    expect((error as Error).message).toContain("Settings");
   });
 
   it("stops answering once the extension session goes away", async () => {

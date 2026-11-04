@@ -368,6 +368,15 @@ export const WEBUI_BROWSER_ERROR_CODES = [
   "browser_provider_unavailable",
   /** The operation exceeded its deadline. */
   "browser_operation_timeout",
+  /**
+   * The extension's connection went away while the command was in flight.
+   *
+   * It is not a timeout: nothing was late. The usual cause is an extension
+   * older than the host it is talking to — it cannot read the frames this
+   * build sends and hangs up rather than saying so — so the caller is told to
+   * update the extension instead of waiting longer.
+   */
+  "browser_extension_disconnected",
   /** The pairing credential was rejected or has been revoked. */
   "browser_pairing_rejected",
   /** No OS secure store was available for a credential that must not be stored in a file. */

@@ -18,7 +18,9 @@
 
 import { useCallback, useEffect, type ReactElement } from "react";
 
-import { SettingsPage } from "../../../ui/settings-layout.js";
+import { SettingsPage, SettingsRow, SettingsSection } from "../../../ui/settings-layout.js";
+import { WebuiButtonLink } from "../../../ui/button.js";
+import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import {
   useWebuiBrowserAuthorization,
   useWebuiBrowserAuthorizationState,
@@ -32,6 +34,9 @@ import {
 export function BrowserSettingsPage(): ReactElement {
   const owner = useWebuiBrowserAuthorization();
   const state = useWebuiBrowserAuthorizationState();
+  // The package is the host's, and the host knows where it is: the port builds
+  // the URL because only it knows the token the route checks.
+  const packageUrl = useWebuiPortSlice("browser")?.browserExtensionPackageUrl?.();
 
   // The read is the owner's, and it is asked for once per mount: a second
   // caller re-reads the same answer rather than keeping a second copy of it.
@@ -62,6 +67,61 @@ export function BrowserSettingsPage(): ReactElement {
       <BrowserInstallationKey
         readKey={state?.canReadInstallationKey && owner ? owner.readInstallationKey : undefined}
       />
+      <BrowserExtensionPackage packageUrl={packageUrl} />
     </SettingsPage>
+  );
+}
+
+/**
+ * The extension package, as the settings page offers it.
+ *
+ * The browser will not install an extension for the person: a store install
+ * needs their own click, and an unpacked install needs developer mode and a
+ * folder they pick. What the host can do is hand them the package this build
+ * produces, so the extension they load is one this build can talk to — a
+ * mismatch between the two reads like a network timeout and costs an
+ * afternoon.
+ *
+ * The link opens in a new tab on purpose. A download that succeeds leaves the
+ * page alone, and one that fails opens the host's own refusal beside it
+ * rather than replacing the settings the person was reading.
+ */
+function BrowserExtensionPackage({
+  packageUrl,
+}: {
+  readonly packageUrl?: string;
+}): ReactElement {
+  return (
+    <SettingsSection
+      title="浏览器扩展包"
+      testId="browser-extension-package"
+      hint="扩展由你手动加载，浏览器不会替人安装。"
+    >
+      <SettingsRow
+        title="下载最新扩展包"
+        description={
+          packageUrl
+            ? "下载这个构建对应的扩展包，解压后在浏览器的扩展管理页用「加载已解压的扩展程序」加载它。换个目录加载会改变扩展的身份，需要用新的安装密钥重新配对。"
+            : "当前运行时没有随附浏览器扩展，没有可下载的扩展包。"
+        }
+        testId="browser-extension-package-row"
+      >
+        {packageUrl ? (
+          <WebuiButtonLink
+            href={packageUrl}
+            download
+            target="_blank"
+            rel="noreferrer"
+            variant="quiet-secondary"
+            size="inline"
+            data-testid="browser-extension-package-download"
+          >
+            下载最新扩展包
+          </WebuiButtonLink>
+        ) : (
+          <span data-testid="browser-extension-package-unavailable">不可用</span>
+        )}
+      </SettingsRow>
+    </SettingsSection>
   );
 }

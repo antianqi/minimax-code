@@ -186,6 +186,19 @@ describe("the browser input connection", () => {
   });
 });
 
+describe("the browser extension download", () => {
+  it("is addressed by the socket's own base and token", () => {
+    const transport = transportWith(ControllableSocket);
+
+    // The route is admitted like every other document the host serves, so the
+    // link carries the per-start token; and the base is the socket's own with
+    // `ws:` turned into `http:`, because the two share a prefix.
+    expect(transport.browserExtensionPackageUrl()).toBe(
+      "http://127.0.0.1:1/browser-extension?token=fixture-token",
+    );
+  });
+});
+
 describe("the shared request envelope", () => {
   it("writes one request frame naming the operation, with a fresh id", async () => {
     const transport = transportWith(ControllableSocket);

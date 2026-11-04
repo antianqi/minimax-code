@@ -57,6 +57,9 @@ const EXPECTED: Record<
     "watchBrowserFrames", "watchBrowserWebTabs", "openBrowserWebTab", "closeBrowserWebTab",
     "listBrowserCapabilities",
     "getBrowserInstallationKey",
+    // The extension package the host offers for download. It is a URL rather
+    // than an operation: the route answers with the archive itself.
+    "browserExtensionPackageUrl",
   ],
   miniapp: [
     "listMiniApps", "openMiniApp", "stopMiniApp",

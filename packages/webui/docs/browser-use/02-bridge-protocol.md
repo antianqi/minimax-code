@@ -324,6 +324,19 @@ effect the user already sees.
 On deadline expiry the operation reports `browser_operation_timeout` from the pinned error-code set
 (`packages/webui/src/shared/contracts/browser.ts`).
 
+**A disconnect is not a timeout.** When the session goes away while a command is in flight, the
+command did not run out of time — the peer hung up. The host reports that as its own code,
+`browser_extension_disconnected`, because the two call for opposite responses: a timeout is worth
+retrying and a disconnect is not. The usual cause of a disconnect is an extension older than the
+host it is talking to — it cannot read the frames this build sends, so it closes the socket rather
+than refusing them, and the host used to read that as a timeout.
+
+The peer announces its build in the `hello` frame (`extensionVersion`), and the host knows the
+build it ships (`expectedExtensionVersion`, read from the extension's own `manifest.json` by the
+composition root). When the two disagree the message names both versions, so "your extension is
+behind" is a fact rather than a guess; when the host does not know its own build, the message says
+the extension *may* be out of date and points at the download in Settings.
+
 **`measured`, in part.** A real Chrome and a real Edge had the extension's service worker
 terminated while an image stream was running: the host saw the session drop, the surface went
 down, and the bridge was usable again as soon as the worker woke. The 250 ms → 4 s ladder and the

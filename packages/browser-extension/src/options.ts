@@ -226,6 +226,16 @@ async function onSaveOrigin(): Promise<void> {
     return;
   }
   await renderOrigin();
+  // The page knows what is still missing, so it says it rather than waking
+  // the worker into a failure the person has to interpret. The order of the
+  // two settings is the order of the two steps.
+  const stored = await webuiBrowserBridgeInstallationKeyStatus(
+    webuiBrowserBridgeInstallationKeyStore(chrome.storage.local),
+  );
+  if (!stored.stored) {
+    say("Address saved. Now paste the installation key from the WebUI's Settings page and save it.");
+    return;
+  }
   say("Address saved. Connecting to the WebUI…");
   await wake();
 }
@@ -244,6 +254,14 @@ async function onSave(): Promise<void> {
   // the DOM is the one place this page could leak it.
   input.value = "";
   await renderStored();
+  // Same rule the other way round: without an address the extension has
+  // nothing to dial, and the worker would answer that with a failure about
+  // an origin instead of a sentence about what to do next.
+  const origin = await readWebuiBrowserBridgeOrigin(chrome.storage.local);
+  if (!origin) {
+    say("Key saved. Now set the WebUI address above and save it — the extension cannot connect without one.");
+    return;
+  }
   say("Saved. Connecting to the WebUI…");
   await wake();
 }

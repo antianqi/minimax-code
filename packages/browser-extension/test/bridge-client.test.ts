@@ -454,6 +454,22 @@ describe("operation deadline", () => {
     expect(attemptTimes.slice(7, 9)).toEqual([30000, 30000]);
   });
 
+  it("does not report the cancellation of a deliberate stop as a failure", async () => {
+    // The person switched the browser off, or the host closed the session and
+    // said why. Whoever stopped it already reported the reason, and the host
+    // reason is the one the person can act on. Parking the cancellation on top
+    // of it would replace "the key does not match this host" with "the client
+    // stopped", which says nothing at all.
+    const harness = createHarness();
+    await connect(harness);
+    void harness.client.publish({ kind: "targets", targets: [] }).catch(() => undefined);
+    harness.client.stop();
+    await settle();
+    expect(harness.errors.map((error) => error.code)).not.toContain(
+      "browser_operation_cancelled",
+    );
+  });
+
   it("fails everything still waiting when the person switches the browser off", async () => {
     const harness = createHarness();
     await connect(harness);

@@ -240,8 +240,12 @@ async function startBridge(): Promise<void> {
         return;
       }
       case "closed": {
-        void report({ code: "browser_pairing_rejected", message: frame.reason, retryable: false });
+        // The client is stopped first and the host reason is written after
+        // it, so the reason is the last thing parked. That reason is what the
+        // person can act on — the switch is off, the key does not match this
+        // host — and it must not end up buried under a local cancellation.
         bridge.stop();
+        void report({ code: "browser_pairing_rejected", message: frame.reason, retryable: false });
         return;
       }
       default: {
@@ -328,6 +332,14 @@ function resultFrame(
  * collects extension logs, and neither belongs there.
  */
 async function report(error: WebuiBrowserBridgeError): Promise<void> {
+  // A cancellation is not a failure, and this is the one place a failure is
+  // parked. A cancellation says the client was stopped on purpose — the
+  // person turned the browser off, or the host closed the session and said
+  // why — and whoever stopped it already reported the reason. Parking the
+  // cancellation here would put "the client stopped" on top of the reason
+  // the person can act on, which is how a real refusal ("the key does not
+  // match this host") ends up looking like a mystery.
+  if (error.code === "browser_operation_cancelled") return;
   await chrome.storage.session.set({
     [WEBUI_BROWSER_BRIDGE_LAST_ERROR_STORAGE_KEY]: { ...error, at: Date.now() },
   });

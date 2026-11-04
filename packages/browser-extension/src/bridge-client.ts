@@ -288,7 +288,7 @@ export class WebuiBrowserBridgeClient {
     // A deadline can fire while the caller is still awaiting the body, so the
     // rejection is reported through `onError` as well rather than being left as
     // an unhandled rejection until the caller gets there.
-    settled.catch((error: WebuiBrowserBridgeError) => this.options.onError?.(error));
+    settled.catch((error: WebuiBrowserBridgeError) => this.reportFailure(error));
     try {
       const frame = await body();
       await this.waitForSession(operation.deadlineAt - this.clock.now(), () => this.timeoutError());
@@ -305,6 +305,21 @@ export class WebuiBrowserBridgeClient {
       this.operations.delete(operation);
     }
     await settled;
+  }
+
+  /**
+   * Reports a failure, unless it is a cancellation.
+   *
+   * A cancellation is not a failure. It says the client was stopped on
+   * purpose: the person turned the browser off, or the host closed the
+   * session and said why. Whoever stopped it already reported the reason, and
+   * the host reason is the one the person can act on. Parking the
+   * cancellation on top of it would replace "the key does not match this
+   * host" with "the client stopped", which says nothing at all.
+   */
+  private reportFailure(error: WebuiBrowserBridgeError): void {
+    if (error.code === "browser_operation_cancelled") return;
+    this.options.onError?.(error);
   }
 
   private registerOperation(): InFlightOperation {

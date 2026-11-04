@@ -514,3 +514,48 @@ extension — which is the whole of A6 and A10.
 
 The development allowlist variables keep working, and add to what the host has
 learned rather than replacing it. They are no longer required for anything.
+
+### A12 — The Agent names its browser, and an external browser's tabs are the run's own group
+
+A8 made the panel's tab and the run's selection two cells, and A4 made the
+selection run-scoped: the Agent acts on the page its own run selected. What
+that left open was **which browser** a run acts on. The answer was "the
+surface its selection is on", and the only way a run ever held a selection was
+`open_tab` — which always opened in the isolated Chromium, because the
+external surfaces refused it. So an Edge or a Chrome could be paired,
+authorized and driven by the panel, and still be unreachable from the Agent's
+own tools.
+
+The refusal was right about the debugger and wrong about the extension.
+`chrome.debugger` cannot create a page in the person's browser, so an action
+that goes through the debugger cannot open one. But the extension is not only
+a debugger: it holds the `tabs` permission and can open a tab in the
+person's browser itself. What was missing was a frame that asks it to.
+
+So the Agent names its browser, and the tabs it opens there are its own:
+
+- **A browser tool call may name the browser it means** — `edge` or `chrome`.
+  A call that names none acts on the browser the run has selected, and where
+  the run has selected nothing that is the built-in browser: the one whose
+  tabs the panel shows, so the person and the Agent stay on one session.
+  Naming a browser is the Agent's own choice, and it moves nothing else — the
+  switch for that browser still decides whether it may be used at all, and a
+  browser that is not connected still has no provider.
+- **The tabs a run opens in an external browser are that run's group, and the
+  host keeps the group.** It is deliberately *not* a browser-native tab group:
+  a native group would need the `tabGroups` permission, and a permission
+  change makes the browser disable the extension until the person grants it
+  again. The host-side group needs no new permission and no new consent, and
+  it is the same bookkeeping the built-in browser already has.
+- **The extension opens the group's tabs in the background.** `open_tab` on an
+  external surface becomes a request to the extension, which creates the tab
+  with `chrome.tabs.create({ active: false })` and answers with the new
+  tab's identity. The tab opens behind the one the person is looking at:
+  opening a page never takes their window away from them.
+- **A run acts on one tab of its group.** A run that named `edge` acts on the
+  tab it last opened there; a run whose group is empty has to open one first,
+  and the browser — not the host — decides whether that is possible.
+
+A2's proof-first order and the authorization gates do not move. Naming a
+browser is not a way past the switch, and the extension still has to prove
+the installation key before the host sends it a credential.

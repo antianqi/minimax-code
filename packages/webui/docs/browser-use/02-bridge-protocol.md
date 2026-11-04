@@ -42,6 +42,7 @@ extension is the only side that answers one.
 | `targets` | The targets the extension can reach, each with `browserId`, `targetId`, `title`, `url`, `generation` |
 | `frame` | One `WebuiBrowserBridgeImageFrame`: `browserId`, `targetId`, `generation`, base64 `data`, `format`, `sequence` |
 | `input-result` | `commandId`, `accepted`, optional `error` |
+| `open-tab-result` | `commandId`, `accepted`, the new tab's identity (`browserId`, `targetId`, `generation`, `title`, `url`) or an `error` |
 | `pong` | The `nonce` answering a `ping` |
 
 ### Host → client (`WebuiBrowserBridgeHostFrame`)
@@ -52,6 +53,7 @@ extension is the only side that answers one.
 | `challenge` | `nonce`, `algorithm`, `keyId` (the pairing credential), `installationKeyId` (the anchor a first pairing proves) |
 | `ready` | `sessionId` — the bridge session is admitted |
 | `input` | `commandId` and a `WebuiBrowserBridgeInputCommand` |
+| `open-tab` | `commandId` and the `url` to open — the host asks the extension to create a tab in the person's browser |
 | `ping` | `nonce` — the liveness check. The host sends one every ten seconds once the session is admitted, and closes the session when the pong does not come: a socket can look open long after the browser behind it is gone, and the extension's reconnect ladder is what picks the session back up |
 | `closed` | `reason` |
 
@@ -348,6 +350,28 @@ while an image stream is running, by closing its target — which is what the br
 reclaims an idle worker. The host sees the session drop, the surface goes down, the worker is
 woken by the next event, and a DevTools command against the live tab answers again afterwards.
 See [`09-acceptance-record.md`](09-acceptance-record.md).
+
+### Opening a tab in the person's browser — `required`
+
+`chrome.debugger` cannot create a page in the person's browser, and the bridge used to
+refuse `open_tab` on the external surfaces for exactly that reason. The refusal was about
+the debugger; the extension is more than a debugger. It holds the `tabs` permission, so it
+can create a tab itself — and it can create it in the background, behind the tab the person
+is looking at.
+
+The host asks for that with one frame, and the extension answers with another:
+
+- **host → extension**: `{ kind: "open-tab"; commandId; url }`
+- **extension → host**: `{ kind: "open-tab-result"; commandId; accepted; target?; error? }`
+
+The extension creates the tab with `chrome.tabs.create({ url, active: false })`, reports the
+new tab in its next `targets` frame, and answers the request with the new tab's identity so
+the host does not have to wait for that frame. The host records the tab as one of the
+requesting run's own tabs — the group [ADR 0019](../adr/0019-webui-browser-use-surfaces-and-external-browser-bridge.md)
+A12 describes — and makes it that run's selection.
+
+The tab opens in the background on purpose: a person who is looking at their own tab does
+not lose it because the Agent opened a page in the same browser.
 
 ## Related
 

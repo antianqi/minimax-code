@@ -13,12 +13,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
       "installationKeyProved": true
     },
     "observed": "the handshake completed and the host reported the surface connected",
     "result": "pass",
-    "at": "2026-11-04T01:36:18.070Z",
+    "at": "2026-11-04T03:10:14.215Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -36,12 +36,35 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
       "installationKeyProved": false
     },
     "observed": "the host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-11-04T01:36:18.381Z",
+    "at": "2026-11-04T03:10:14.579Z",
+    "os": "linux 7.0.0-38-generic",
+    "suite": "real-browser"
+  },
+  {
+    "surface": "chrome",
+    "browser": "chromium",
+    "browserVersion": "153.0.8010.12",
+    "entry": "development",
+    "case": "the extension pairs with a host that was told nothing about it",
+    "settings": {
+      "surface": "chrome",
+      "surfaceSwitch": true,
+      "otherSurfaceSwitch": false,
+      "isolatedChromium": "not carried by the bridge",
+      "fullCdp": "enforced in the runtime service, not in the bridge",
+      "allowlist": "development",
+      "build": "development",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
+      "installationKeyProved": true
+    },
+    "observed": "the extension completed the handshake with no configured identity, and the host reported the surface connected",
+    "result": "pass",
+    "at": "2026-11-04T03:10:14.907Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -59,12 +82,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
       "installationKeyProved": true
     },
     "observed": "the handshake completed and the host reported the surface connected",
     "result": "pass",
-    "at": "2026-11-04T01:36:18.796Z",
+    "at": "2026-11-04T03:10:15.300Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -82,12 +105,35 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development",
       "build": "development",
-      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
       "installationKeyProved": false
     },
     "observed": "the host refused the extension and reported no connected surface",
     "result": "pass",
-    "at": "2026-11-04T01:36:19.196Z",
+    "at": "2026-11-04T03:10:15.706Z",
+    "os": "linux 7.0.0-38-generic",
+    "suite": "real-browser"
+  },
+  {
+    "surface": "edge",
+    "browser": "msedge",
+    "browserVersion": "155.0.4283.62",
+    "entry": "development",
+    "case": "the extension pairs with a host that was told nothing about it",
+    "settings": {
+      "surface": "edge",
+      "surfaceSwitch": true,
+      "otherSurfaceSwitch": false,
+      "isolatedChromium": "not carried by the bridge",
+      "fullCdp": "enforced in the runtime service, not in the bridge",
+      "allowlist": "development",
+      "build": "development",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
+      "installationKeyProved": true
+    },
+    "observed": "the extension completed the handshake with no configured identity, and the host reported the surface connected",
+    "result": "pass",
+    "at": "2026-11-04T03:10:16.125Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   },
@@ -105,12 +151,12 @@
       "fullCdp": "enforced in the runtime service, not in the bridge",
       "allowlist": "development, on both surfaces",
       "build": "development",
-      "extensionId": "dejpmdkbdhkjjhkjkodimegojblnglde",
+      "extensionId": "mdbfmgllfnkmfambfjjnfchmhkphiggk",
       "installationKeyProved": true
     },
     "observed": "both browsers were connected, each on its own surface, and each surface's provider belonged to that surface",
     "result": "pass",
-    "at": "2026-11-04T01:36:19.832Z",
+    "at": "2026-11-04T03:10:16.750Z",
     "os": "linux 7.0.0-38-generic",
     "suite": "real-browser"
   }

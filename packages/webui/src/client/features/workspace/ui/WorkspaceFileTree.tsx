@@ -4,7 +4,7 @@
 
 import { memo, type ReactElement, type ReactNode } from "react";
 import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.js";
-import { WebuiIconChevronRight, WebuiIconFile } from "../../../shell/icons.js";
+import { WebuiIconChevronRight, WebuiIconFileForName } from "../../../shell/icons.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
@@ -52,7 +52,7 @@ function FileTreeView({ files, onOpen, expandedPaths, loadingPaths, directoryErr
           <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
             <WebuiIconChevronRight className="inline size-3" />
           </WebuiMotionSlot>
-        ) : <WebuiIconFile className="inline size-3" />} <span className="min-w-0 flex-1 truncate">{file.name}</span>
+        ) : <WebuiIconFileForName fileName={file.name} className="inline size-3" />} <span className="min-w-0 flex-1 truncate">{file.name}</span>
       </WebuiButton>
       {file.type === "directory" ? <WebuiDisclosure as="div" open={expanded} mountOnOpen className="webui-file-tree-disclosure">
         <div className="webui-file-tree-children">

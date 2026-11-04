@@ -1167,6 +1167,8 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await composer.fill("/goal Keep this synthetic goal active.");
     await composer.press("Enter");
     await browserExpect(page.getByTestId("thread-goal-banner")).toContainText("Keep this synthetic goal active.");
+    await browserExpect(page.getByText("Synthetic goal progress acknowledged.")).toBeVisible({ timeout: 30_000 });
+    await browserExpect(page.locator('[data-webui-goal-message="true"]')).toHaveCount(1);
     await expect.poll(async () => await port.getGoal({ sessionId })).toMatchObject({
       objective: "Keep this synthetic goal active.",
       status: "active",

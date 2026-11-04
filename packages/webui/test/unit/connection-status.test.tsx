@@ -78,36 +78,17 @@ describe("ConnectionStatus", () => {
     expect(markup).toContain('data-testid="webui-connection-status"');
   });
 
-  it("shows the reconnecting state once the stream enters that phase", () => {
+  it("keeps a reconnect silent: a recovering link is not the reader's business", () => {
+    // A reconnect retries itself within a few hundred milliseconds. Announcing
+    // it put a notice on screen at every page load and every tab wake, so the
+    // region renders nothing at all while the loop is mid-attempt.
     const sessionId = seed("cs-reconnect", { phase: "reconnecting" });
-    const markup = renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />);
-    expect(markup).toContain('data-connection-state="reconnecting"');
-    expect(markup).toContain("正在重连");
+    expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />)).toBe("");
   });
 
-  it("shows the failed state for an errored phase", () => {
+  it("keeps a failure out of the inline region too: the toast is its surface", () => {
     const sessionId = seed("cs-error", { phase: "error" });
-    expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />))
-      .toContain('data-connection-state="failed"');
-  });
-
-  it("prefers the server's refusal reason over the generic failure detail", () => {
-    const sessionId = seed("cs-refused", { phase: "refused", refusal: "凭据已失效" });
-    const markup = renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />);
-    expect(markup).toContain("凭据已失效");
-    expect(markup).not.toContain("已停止接收更新");
-  });
-
-  it("falls back to the status string when no refusal was recorded", () => {
-    const sessionId = seed("cs-status", { phase: "error", status: "会话已被服务端关闭" });
-    expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />))
-      .toContain("会话已被服务端关闭");
-  });
-
-  it("keeps the generic detail when a failure recorded no reason at all", () => {
-    const sessionId = seed("cs-bare", { phase: "error" });
-    const markup = renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />);
-    expect(markup).toContain("已停止接收更新");
+    expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />)).toBe("");
   });
 
   it("keys the home screen when no session is selected", () => {
@@ -119,12 +100,14 @@ describe("ConnectionStatus", () => {
     const sessionId = "cs-live";
     expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />))
       .toContain('data-connection-state="connected"');
-    store.updateSession(sessionId, (current) => ({
-      ...current,
-      stream: { ...current.stream, phase: "reconnecting" },
-    }));
-    expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />))
-      .toContain('data-connection-state="reconnecting"');
+    // Both trouble phases collapse to the same inline answer: nothing.
+    for (const phase of ["reconnecting", "refused"] as const) {
+      store.updateSession(sessionId, (current) => ({
+        ...current,
+        stream: { ...current.stream, phase },
+      }));
+      expect(renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} />)).toBe("");
+    }
   });
 
   it("appends a host class name without dropping its own", () => {
@@ -145,39 +128,24 @@ describe("ConnectionStatus host layout calls", () => {
     expect(markup).toBe("");
   });
 
-  it("still renders the attention states under hideWhenConnected", () => {
-    // The prop is a layout call on the healthy state only: both states that
-    // need the reader collapse for nobody.
-    const reconnecting = seed("cs-hide-reconnect", { phase: "reconnecting" });
-    expect(
-      renderToStaticMarkup(<ConnectionStatus sessionId={reconnecting} hideWhenConnected />),
-    ).toContain('data-connection-state="reconnecting"');
-    const failed = seed("cs-hide-failed", { phase: "refused", refusal: "连接被重置" });
-    expect(
-      renderToStaticMarkup(<ConnectionStatus sessionId={failed} hideWhenConnected />),
-    ).toContain('data-connection-state="failed"');
+  it("renders no attention state inline, whatever the phase", () => {
+    // `hideWhenConnected` is a layout call on the healthy state only; every
+    // troubled phase leaves the region empty because its surface is the toast.
+    for (const phase of ["reconnecting", "refused", "error"] as const) {
+      const sessionId = seed(`cs-hide-${phase}`, { phase });
+      expect(
+        renderToStaticMarkup(<ConnectionStatus sessionId={sessionId} hideWhenConnected />),
+      ).toBe("");
+    }
   });
 
-  it("offers the retry button only in the failed state, and only when wired", () => {
-    const retry = () => {};
-    // No callback, no button — a host without a recovery path must not offer
-    // one (the same rule the rail's pin/star buttons follow).
-    const failedUnwired = seed("cs-retry-unwired", { phase: "refused" });
+  it("keeps the retry affordance out of the inline region", () => {
+    // The button belongs to the failure toast (`connection-status.spec.mjs`
+    // proves it end to end); a second copy here would offer two arms for one
+    // recovery.
+    const failed = seed("cs-retry-wired", { phase: "refused" });
     expect(
-      renderToStaticMarkup(<ConnectionStatus sessionId={failedUnwired} onRetry={retry} />),
-    ).toContain('data-testid="webui-connection-status-retry"');
-    expect(
-      renderToStaticMarkup(<ConnectionStatus sessionId={failedUnwired} />),
-    ).not.toContain("webui-connection-status-retry");
-    // Reconnecting is the automatic loop mid-attempt; a button there would
-    // race the recovery it duplicates.
-    const reconnecting = seed("cs-retry-reconnect", { phase: "reconnecting" });
-    expect(
-      renderToStaticMarkup(<ConnectionStatus sessionId={reconnecting} onRetry={retry} />),
-    ).not.toContain("webui-connection-status-retry");
-    // The healthy state never carries it either.
-    expect(
-      renderToStaticMarkup(<ConnectionStatus sessionId="cs-retry-ok" onRetry={retry} />),
+      renderToStaticMarkup(<ConnectionStatus sessionId={failed} onRetry={() => {}} />),
     ).not.toContain("webui-connection-status-retry");
   });
 
@@ -210,19 +178,16 @@ describe("ConnectionStatus and the idle event channel", () => {
     token = undefined;
   });
 
-  it("shows 正在重连 when the event channel degrades while the stream is idle", () => {
-    // The shape to pin: no turn running (phase idle, which alone reads as
-    // connected) while the always-on watcher's link is down. Before the
-    // merge this rendered nothing at all.
+  it("stays silent while the event channel is down and the stream is idle", () => {
+    // A degraded idle link is the transport reconnecting on its own, so it
+    // reads as nothing: no label, no detail, no toast source. The health
+    // store still tracks it for whoever needs the diagnostic.
     token = registerWebuiEventWatcher();
     markWebuiEventWatcherHealthy(token);
     markWebuiEventWatcherDown(token);
-    const markup = renderToStaticMarkup(
-      <ConnectionStatus sessionId="cs-idle-degraded" hideWhenConnected />,
-    );
-    expect(markup).toContain('data-connection-state="reconnecting"');
-    expect(markup).toContain("正在重连");
-    expect(markup).toContain("连接中断，正在自动恢复");
+    expect(
+      renderToStaticMarkup(<ConnectionStatus sessionId="cs-idle-degraded" hideWhenConnected />),
+    ).toBe("");
   });
 
   it("stays hidden when the channel is merely booting or healthy again", () => {
@@ -234,18 +199,13 @@ describe("ConnectionStatus and the idle event channel", () => {
     expect(renderToStaticMarkup(<ConnectionStatus sessionId="cs-healthy" hideWhenConnected />)).toBe("");
   });
 
-  it("keeps a terminal stream failure outranking a degraded channel", () => {
+  it("announces neither the failure nor the degraded channel inline", () => {
     token = registerWebuiEventWatcher();
     markWebuiEventWatcherHealthy(token);
     markWebuiEventWatcherDown(token);
     const failed = seed("cs-both", { phase: "refused", refusal: "连接被重置" });
-    // Both signals are live; the region must name the failure (with its
-    // reason and its retry affordance), not the recoverable reconnect.
-    const markup = renderToStaticMarkup(
-      <ConnectionStatus sessionId={failed} hideWhenConnected onRetry={() => {}} />,
-    );
-    expect(markup).toContain('data-connection-state="failed"');
-    expect(markup).toContain("连接被重置");
-    expect(markup).toContain('data-testid="webui-connection-status-retry"');
+    expect(
+      renderToStaticMarkup(<ConnectionStatus sessionId={failed} hideWhenConnected onRetry={() => {}} />),
+    ).toBe("");
   });
 });

@@ -317,6 +317,10 @@ const root: Root = createRoot(rootElement);
 const browserCapabilities = {
   dom: createWebuiBrowserDom(globalThis.document, globalThis.window),
   storage: createWebuiBrowserStorage(getWebuiBrowserStorage()),
+  // The runtime's data directory is a fact about this host: the composition
+  // root is the one place that may read the injected config, and the surfaces
+  // that need it read it from the capabilities.
+  ...(runtimeConfig.dataDir ? { dataDir: runtimeConfig.dataDir } : {}),
 };
 // The route decides which composition this document is. A standalone Mini App is
 // the same client with a different shell, so it reads its plugin and session from

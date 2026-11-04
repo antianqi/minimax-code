@@ -318,7 +318,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   /** The width the person asked for, read the same way. */
   const panelWidthRef = useRef<number>();
   panelWidthRef.current = panelWidth;
-  const { dom } = useWebuiBrowserCapabilities();
+  const { dom, dataDir } = useWebuiBrowserCapabilities();
   // Query truth lives in the owner; this component reads its snapshot and
   // submits query commands. Display state — active tab, expansion, search box,
   // code mode — stays here.
@@ -551,7 +551,10 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   // are rendered: a file outside the workspace keeps its name and its counts,
   // and loses the body that would have shown its content.
   const turnReviewFiles = activeTab?.content.kind === "review" && activeTab.content.source === "turn"
-    ? projectWebuiDiffFiles(activeTab.content.files, activeTab.content.workspaceDir)
+    ? projectWebuiDiffFiles(activeTab.content.files, activeTab.content.workspaceDir, {
+      dataDir,
+      sessionId: activeTab.content.sessionId,
+    })
     : [];
   const reviewFileCount = activeTab?.content.kind !== "review" ? 0
     : activeTab.content.source === "turn" ? turnReviewFiles.length

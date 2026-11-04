@@ -7,6 +7,46 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => { if (message.type() === "error") console.error("BROWSER_CONSOLE_ERROR", message.text()); });
 });
 
+test("a goal update does not duplicate its persisted goal message", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{
+      msgId: "persisted-goal-entry",
+      role: "user",
+      msgContent: "Keep this goal active.",
+      source: "thread-goal",
+      timestamp: 1_700_000_000_006,
+    }],
+    hasMore: false,
+  }));
+  await openApp(page, "#session=A");
+  await expect(page.locator('[data-webui-goal-message="true"]')).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "watchEvents",
+  ))).toBe(true);
+  const goalEntry = page.locator('[data-webui-goal-message="true"]');
+
+  await page.evaluate(() => window.__fixture.emitEvent({
+    type: "thread_goal.updated",
+    payload: {
+      goal: {
+        sessionId: "A",
+        goalId: "goal-1",
+        objective: "Keep this goal active.",
+        status: "active",
+        tokensUsed: 1,
+        turnsUsed: 1,
+        timeUsedSeconds: 1,
+        updatedAt: 1_700_000_000_007,
+      },
+    },
+    timestamp: 1_700_000_000_007,
+    source: "synthetic",
+  }));
+
+  await expect(goalEntry).toHaveCount(1);
+  await expect(goalEntry).toHaveAttribute("data-message-id", "persisted-goal-entry");
+});
+
 test("assistant image attachments use the shared button feedback motion", async ({ page }) => {
   await configureFixture(page, () => window.__fixture.setPage("A", {
     messages: [{

@@ -48,6 +48,21 @@ describe("workspace file tree rows", () => {
     expect(markup).not.toContain("Invalid Date");
   });
 
+  it("names each file with the glyph its extension earns", () => {
+    const markup = renderTree([
+      { path: "src/index.ts", name: "index.ts", type: "file", size: 10, modifiedAt: MODIFIED_AT },
+      { path: "src/main.java", name: "main.java", type: "file", size: 10, modifiedAt: MODIFIED_AT },
+      { path: "NOTICE", name: "NOTICE", type: "file", size: 10, modifiedAt: MODIFIED_AT },
+    ]);
+
+    // The tree used to draw one generic file for every row; a ts file, a Java
+    // file and an extension-less one are now told apart by their glyph.
+    expect(markup).toContain("tabler-icon-file-type-ts");
+    // Java has no Tabler brand mark, so it borrows the coffee cup.
+    expect(markup).toContain("tabler-icon-coffee");
+    expect(markup).toContain("tabler-icon-file");
+  });
+
   it("keeps the row contract and renders expanded directories through the shared disclosure", () => {
     const markup = renderTree(
       [

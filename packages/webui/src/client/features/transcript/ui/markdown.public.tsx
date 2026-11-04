@@ -1,6 +1,7 @@
 import { marked, type Token } from "marked";
 import katex from "katex";
 import { isWebuiMermaidFence, WebuiMermaid } from "./webui-mermaid.js";
+import { WebuiIconFileForName } from "../../../shell/icons.js";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
@@ -19,9 +20,12 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import {
   createElement,
+  createContext,
   Fragment,
   memo,
+  useContext,
   useRef,
+  useState,
   type CSSProperties,
   type ReactElement,
   type ReactNode,
@@ -165,11 +169,74 @@ export function isSafeWebuiMarkdownHref(href: string): boolean {
   return !/^[a-z][a-z\d+.-]*:/iu.test(value);
 }
 
+/**
+ * The emoji a model writes in front of a file name it links to. The link draws
+ * the real file-type glyph, so this is only used to notice that the text
+ * already carries the model's own emoji and suppress a second mark.
+ */
+function fileReferenceEmoji(extension: string | undefined): string {
+  if (extension === "py") return "🐍";
+  if (["svg", "png", "jpg", "jpeg", "gif", "webp", "avif"].includes(extension ?? "")) return "🖼️";
+  if (["ts", "tsx", "js", "jsx", "mjs", "cjs"].includes(extension ?? "")) return "📘";
+  return "📄";
+}
+
+/**
+ * Serves the bytes of a workspace file to the reader. Absent when this reader
+ * has no such transport, in which case a file link stays just a link.
+ */
+type WebuiWorkspaceFileUrlBuilder = (path: string) => string;
+
+const WebuiWorkspaceFileUrlContext = createContext<WebuiWorkspaceFileUrlBuilder | undefined>(undefined);
+
+/** Makes file links in its subtree able to draw the picture they point at. */
+export function WebuiWorkspaceFileUrlProvider({ build, children }: { readonly build?: WebuiWorkspaceFileUrlBuilder; readonly children: ReactNode }): ReactElement {
+  return <WebuiWorkspaceFileUrlContext.Provider value={build}>{children}</WebuiWorkspaceFileUrlContext.Provider>;
+}
+
+/** The formats a browser paints on its own, so the transcript can show them. */
+const WEBUI_INLINE_MEDIA_KINDS: Readonly<Record<string, "image" | "video">> = {
+  png: "image", jpg: "image", jpeg: "image", gif: "image", webp: "image", avif: "image", bmp: "image", ico: "image",
+  svg: "image", mp4: "video", webm: "video", ogv: "video",
+};
+
+export function webuiInlineMediaKind(fileName: string): "image" | "video" | undefined {
+  const name = fileName.replace(/\\/gu, "/").split("/").at(-1) ?? fileName;
+  if (!name.includes(".")) return undefined;
+  return WEBUI_INLINE_MEDIA_KINDS[name.split(".").at(-1)?.toLowerCase() ?? ""];
+}
+
+function WebuiMessageFileMedia({ kind, path }: { readonly kind: "image" | "video"; readonly path: string }): ReactElement | null {
+  const build = useContext(WebuiWorkspaceFileUrlContext);
+  const [failed, setFailed] = useState(false);
+  const url = build?.(path) ?? "";
+  if (!url || failed) return null;
+  const name = path.replace(/\\/gu, "/").split("/").at(-1) ?? path;
+  // Deliberately not lazy: before the bytes arrive an image has no intrinsic
+  // size, so a lazy one lays out at zero height and the viewport check never
+  // fires — it would wait for a size it can only get by loading.
+  return (
+    <span className="webui-message-file-media" data-webui-file-media={kind}>
+      {kind === "video"
+        ? <video src={url} aria-label={name} controls playsInline preload="metadata" onError={() => setFailed(true)} />
+        : <img src={url} alt={name} decoding="async" onError={() => setFailed(true)} />}
+    </span>
+  );
+}
+
+/**
+ * Draws the picture or clip a file reference points at, or nothing when the
+ * path is not media or the host cannot serve bytes. Both the link in the prose
+ * and the delivered-file row call this, so the decision lives in one place.
+ */
+export function WebuiFileMedia({ path }: { readonly path: string }): ReactElement | null {
+  const kind = webuiInlineMediaKind(path);
+  return kind ? <WebuiMessageFileMedia kind={kind} path={path} /> : null;
+}
+
 function fileReferenceAnchor(key: string, value: string, reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>, onOpenFile: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void, showIcon = true): ReactElement {
-  const name = reference.path.split("/").at(-1) ?? reference.path;
-  const extension = name.split(".").at(-1)?.toLowerCase();
-  const icon = extension === "py" ? "🐍" : ["svg", "png", "jpg", "jpeg", "gif", "webp", "avif"].includes(extension ?? "") ? "🖼️" : ["ts", "tsx", "js", "jsx", "mjs", "cjs"].includes(extension ?? "") ? "📘" : "📄";
-  return <a key={key} className="webui-message-file-link" href={value} title={reference.path} data-webui-file-reference={reference.path} onClick={(event) => { event.preventDefault(); onOpenFile(reference); }}>{showIcon ? <span aria-hidden="true">{icon}</span> : null}<span>{name}</span></a>;
+  const name = reference.path.replace(/\\/gu, "/").split("/").at(-1) ?? reference.path;
+  return <Fragment key={key}><a className="webui-message-file-link" href={value} title={reference.path} data-webui-file-reference={reference.path} onClick={(event) => { event.preventDefault(); onOpenFile(reference); }}>{showIcon ? <span aria-hidden="true"><WebuiIconFileForName fileName={name} /></span> : null}<span>{name}</span></a><WebuiFileMedia path={reference.path} /></Fragment>;
 }
 
 function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void, workspaceDir?: string, lexBareText = true): ReactNode[] {
@@ -201,7 +268,7 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
     if (token.type === "link") {
       const fileReference = onOpenFile ? parseWebuiMessageFileReference(token.href, workspaceDir) : undefined;
       const extension = fileReference?.path.split("/").at(-1)?.split(".").at(-1)?.toLowerCase();
-      const fileIcon = extension === "py" ? "🐍" : ["svg", "png", "jpg", "jpeg", "gif", "webp", "avif"].includes(extension ?? "") ? "🖼️" : ["ts", "tsx", "js", "jsx", "mjs", "cjs"].includes(extension ?? "") ? "📘" : "📄";
+      const fileIcon = fileReferenceEmoji(extension);
       const previousToken = tokens?.[index - 1];
       const hasExistingIcon = previousToken?.type === "text" && (previousToken as Token & { readonly text: string }).text.trim() === fileIcon;
       return isSafeWebuiMarkdownHref(token.href) ? (

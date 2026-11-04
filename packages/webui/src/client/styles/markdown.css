@@ -30,6 +30,9 @@
   }
   .webui-message-file-link { display: inline-flex; align-items: baseline; gap: 5px; color: var(--text_default_accent); text-decoration: none; }
   .webui-message-file-link:hover { text-decoration: underline; }
+  .webui-message-file-media { display: block; margin-block-start: 6px; max-width: min(100%, 420px); }
+  .webui-message-file-media img,
+  .webui-message-file-media video { display: block; max-width: 100%; height: auto; border-radius: 8px; }
   .webui-markdown > * {
     min-width: 0;
     margin-block-start: 0;

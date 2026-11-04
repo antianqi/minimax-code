@@ -91,7 +91,9 @@ is the sole decision record for Mini App hosting. ADR 0021 records the model pic
 with two states, and the cascade it replaces. ADR 0024 records the client-side workspace boundary
 for a diff body: a diff entry outside the workspace keeps its name and its counts and loses its
 content, the boundary is lexical, and a diff whose workspace root the client does not know is not
-withheld. ADR 0025 records the layout as adapting to the width it has: the surface's width is a
+withheld. The boundary has two trusted roots — the workspace and the session's own artifacts
+directory, where the runtime writes that session's products — and the second is bounded to this
+session's directory inside the runtime's own data directory. ADR 0025 records the layout as adapting to the width it has: the surface's width is a
 budget that the conversation column keeps a floor of while the tool regions give way, no region
 reserves layout width it is not using, every shape change answers to one threshold contract shared
 by the stylesheet and the resize logic, and the zones degrade differently. ADR 0026 records the

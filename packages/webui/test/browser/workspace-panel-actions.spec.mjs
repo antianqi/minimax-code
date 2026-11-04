@@ -29,6 +29,19 @@ async function openFilePanel(page) {
   return tree;
 }
 
+test("the file tree names each row with its own type glyph", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  const tree = await openFilePanel(page);
+
+  // The tree used to draw one generic file for every row. The fixture's a.ts is
+  // a TypeScript file, so its row carries the TS mark — read from the row's own
+  // glyph, not from the tree's markup in general.
+  const row = tree.getByRole("button", { name: /a\.ts/u });
+  await expect(row.locator("svg.tabler-icon-file-type-ts")).toHaveCount(1);
+  await expect(row.locator("svg.tabler-icon-file")).toHaveCount(0);
+});
+
 test("the panel opens a file, closes the tab, and keeps its place across a session switch", async ({
   page,
 }) => {

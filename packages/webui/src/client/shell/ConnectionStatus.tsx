@@ -1,36 +1,28 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import { useWebuiSessionStream } from "../bindings/use-session-state.js";
-import { useWebuiEventChannelDegraded } from "../bindings/use-connection-health.js";
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import { FeedbackLiveRegion } from "../ui/feedback.js";
 import { useWebuiToast } from "../ui/toast.js";
 
 /**
- * The three states a user can act on.
+ * The connection states a user can act on.
  *
- * Two signals feed this, and they are deliberately kept apart:
+ * `projectWebuiConnectionState` projects the turn stream's own phase, which the
+ * reconnect paths in `stream.ts` and `SessionComposer.tsx` drive. That
+ * projection still names `reconnecting`, because the loop really is in that
+ * phase; this component simply does not announce it.
  *
- * - `projectWebuiConnectionState` still projects **only** the turn stream's own
- *   phase, which the reconnect paths in `stream.ts` and `SessionComposer.tsx`
- *   drive. It says nothing about a link that is not carrying a turn.
- * - `useWebuiEventChannelDegraded` is the **transport-level** signal, and it
- *   exists because the projection above cannot answer that question. The
- *   long-lived `watchEvents` socket marks itself healthy on an ack and degraded
- *   on `close`, and the component merges the two: failed beats reconnecting
- *   beats connected.
+ * Reconnect attempts are deliberately silent. A recovering link is normal
+ * traffic — the loop retries on its own within a few hundred milliseconds, and
+ * a notice for it appears on every page load, every tab wake and every short
+ * gap, then vanishes before the reader has decided whether to act. The idle
+ * watcher's degraded signal is silent for the same reason. Nothing is announced
+ * until the loop gives up, at which point 「连接失败」 is true and the retry
+ * affordance is worth its space.
  *
- * What the channel signal covers, and what it still does not. The watcher
- * socket sends a periodic liveness probe, so a silently dead (half-open) link
- * — one that would never deliver a close event — is forced to reconnect once
- * the probe timeout runs out, and reads as reconnecting while it does. A
- * watcher that was never accepted is degraded by the 30 s startup grace
- * instead of staying unknown forever, and immediately when the channel goes
- * fatal. The remaining gap is deliberate: a fatal channel still borrows the
- * reconnecting copy — 「正在自动恢复」 is not literally true there, since fatal
- * never retries on its own — and offers no retry button, because that state's
- * only exits are an explicit `health.reconnect()` (no UI consumer yet) or a
- * fresh subscription; wiring either into this component would change the
- * merge semantics below, so it is left out rather than half-added.
+ * A gap this leaves: a fatally degraded event channel retries nothing on its
+ * own either, and its only exits are an explicit `health.reconnect()` (no UI
+ * consumer yet) or a fresh subscription.
  */
 export type WebuiConnectionState = "connected" | "reconnecting" | "failed";
 
@@ -51,16 +43,13 @@ export function projectWebuiConnectionState(
   return "connected";
 }
 
+/** The copy for the two states that render; `reconnecting` has none by design. */
 const COPY: Readonly<
-  Record<WebuiConnectionState, { readonly label: string; readonly detail: string }>
+  Record<Exclude<WebuiConnectionState, "reconnecting">, { readonly label: string; readonly detail: string }>
 > = {
   connected: {
     label: "已连接",
     detail: "实时连接正常",
-  },
-  reconnecting: {
-    label: "正在重连",
-    detail: "连接中断，正在自动恢复",
   },
   failed: {
     label: "连接失败",
@@ -110,31 +99,20 @@ export function ConnectionStatus({
   retryLabel = "重试连接",
 }: ConnectionStatusProps): ReactElement | null {
   const stream = useWebuiSessionStream(sessionId);
-  // Two independent signals, merged: the selected session's stream phase (a
-  // turn that failed mid-flight) and the event channel's health (the
-  // always-on watcher, which is the only live link while the page is idle).
-  // Either one saying "trouble" shows the region; a terminal stream failure
-  // outranks a degraded-but-retrying channel.
-  const streamConnection = projectWebuiConnectionState(stream.phase);
-  const channelDegraded = useWebuiEventChannelDegraded();
-  const connection =
-    streamConnection === "failed"
-      ? "failed"
-      : streamConnection === "reconnecting" || channelDegraded
-        ? "reconnecting"
-        : "connected";
+  // Only a terminal failure is announced. A reconnect attempt is the loop
+  // doing its job, so it stays silent — and it must not read as 已连接 either,
+  // which is why the phase is projected whole and each surface picks its state.
+  const connection = projectWebuiConnectionState(stream.phase);
   const { show, dismiss } = useWebuiToast();
   const toastIdRef = useRef<string>();
   const lastNoticeKeyRef = useRef<string>();
   const retryRef = useRef(onRetry);
   retryRef.current = onRetry;
   const reason = stream.refusal ?? stream.status;
-  const detail = connection === "failed"
-    ? reason ?? COPY.failed.detail
-    : COPY.reconnecting.detail;
+  const detail = reason ?? COPY.failed.detail;
   const noticeKey = `${sessionId ?? "home"}:${connection}:${detail}:${retryLabel}:${Boolean(onRetry)}`;
   useEffect(() => {
-    if (connection === "connected") {
+    if (connection !== "failed") {
       if (toastIdRef.current) dismiss(toastIdRef.current);
       toastIdRef.current = undefined;
       lastNoticeKeyRef.current = undefined;
@@ -144,10 +122,10 @@ export function ConnectionStatus({
     if (toastIdRef.current) dismiss(toastIdRef.current);
     lastNoticeKeyRef.current = noticeKey;
     toastIdRef.current = show({
-      tone: connection === "failed" ? "error" : "warning",
-      message: COPY[connection].label,
+      tone: "error",
+      message: COPY.failed.label,
       description: detail,
-      ...(connection === "failed" && retryRef.current
+      ...(retryRef.current
         ? {
             action: {
               label: retryLabel,

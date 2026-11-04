@@ -9,9 +9,15 @@ the entry reaches the client with that file's content attached, and the client u
 the diff card's own review panel and the workspace review panel both put the patch text on screen.
 
 The **WebUI client** now draws that boundary. A diff entry whose path resolves outside the
-workspace root keeps its name, its status and its added/deleted line counts, and loses its body —
+trusted roots keeps its name, its status and its added/deleted line counts, and loses its body —
 the diff text, the patch hunks, the file's content. The entry itself stays in the list, and the
 surface says what is withheld instead of showing it.
+
+There are **two trusted roots**: the session's workspace, and the session's own artifacts
+directory — the place the runtime writes this session's own products, the plan document above
+all. The second root is not a relaxation of the first. It is the same rule asked in the terms
+the Desktop client asks it in: a file is shown when the client can place it, and the artifacts
+directory belongs to the session that wrote it.
 
 ## Why the boundary is drawn here
 
@@ -29,6 +35,34 @@ This is a **mitigation with a stated scope**, not a replacement for the upstream
 fix also stopped the content from being *collected*; the client-side boundary stops it from being
 *shown*. The content still travels between the runtime and the browser for an out-of-workspace
 file. Closing that gap properly needs the upstream change.
+
+## Two trusted roots
+
+The workspace is not the only root the client trusts. The runtime writes a session's own
+products into the session's own history directory:
+
+    <dataDir>/v2/sessions/<YYYY>/<MM>/<DD>/<HH-mm-ss-SSS>-session_<base64url(sessionId)>/artifacts/plan.md
+
+That directory is outside the workspace, but it is this session's own output, and the Desktop
+client opens such a file with the file's own directory as its read root. A WebUI that withheld
+its body would show less than the Desktop client shows for the same session, so a file in that
+directory keeps its body too.
+
+The client names the directory from what it already has. The runtime does not hand the history
+directory to the client, but the directory name carries the session's identity: the
+`session_<base64url(sessionId)>` segment is a deterministic encoding of the session id, so a
+path carrying **this** session's segment belongs to this session. The date segments are the
+session's creation time and do not have to be known — a path carrying the right session segment
+is the right session's directory whatever its date says.
+
+The trust is bounded on purpose. The directory has to be inside the runtime's own data
+directory, the layout has to be the one the runtime writes, and the session segment has to be
+*this* session's. Another session's artifacts directory is outside the boundary, and so is a
+directory that merely looks like one.
+
+The data directory reaches the client as a **capability the host hands over**: the composition
+root reads it from the injected runtime config and passes it with the browser capabilities, so a
+presentation never reads a global to learn where the runtime keeps its data.
 
 ## The rule is lexical
 

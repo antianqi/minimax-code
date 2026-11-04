@@ -13,6 +13,7 @@
 // whenever the group knows one.
 
 import { useId, useState, type ReactElement } from "react";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { WebuiIconChevronDown, WebuiIconDiffFile, WebuiIconDiffSummary } from "../../../shell/icons.js";
 import type { WebuiTurnDiffView } from "../../../../shared/contracts/session.js";
 import type { WebuiDiffState } from "../../review/contracts/review-view.js";
@@ -48,6 +49,9 @@ export function WebuiDiffCard({
   readonly initialState?: Partial<WebuiDiffState>;
   readonly onReview?: (view: WebuiTurnDiffView, selectedPath?: string) => void;
 }): ReactElement | null {
+  // The runtime's data directory, handed over by the host: the boundary has
+  // to name this session's own artifacts directory to place a file in it.
+  const { dataDir } = useWebuiBrowserCapabilities();
   // Presentation, owned here and nowhere else: the expansion and review-panel
   // state are local.
   const [expanded, setExpanded] = useState(initialState?.expanded ?? false);
@@ -107,7 +111,10 @@ export function WebuiDiffCard({
   // The workspace boundary is applied to the entries themselves, not to the
   // markup below: a file outside the workspace arrives here without a body, so
   // there is nothing for the renderer to leak even if it forgets to ask.
-  const files = projectWebuiDiffFiles(view.fileChanges, workspaceDir);
+  const files = projectWebuiDiffFiles(view.fileChanges, workspaceDir, {
+    dataDir,
+    sessionId,
+  });
   const shown = files.slice(0, 3);
   const extraFiles = files.slice(3);
   const totalAdded = files.reduce((sum, file) => sum + file.additions, 0);

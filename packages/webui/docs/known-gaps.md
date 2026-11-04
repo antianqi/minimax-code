@@ -262,6 +262,15 @@ Two further limits are stated rather than hidden, and both are deliberate:
   entries are shown as they are, because a check that hid everything it could not place would hide
   ordinary content too.
 
+The boundary has **two trusted roots** now: the workspace, and the session's own artifacts
+directory — the place the runtime writes this session's products, the plan document above all. A
+file in that directory is outside the workspace but is this session's own output, and the
+Desktop client opens it with the file's own directory as its read root, so the WebUI keeps its
+body too. The second root is bounded: the directory has to be inside the runtime's own data
+directory, laid out the way the runtime writes it, and carrying **this** session's id. Another
+session's artifacts directory, and a directory that merely looks like one, are outside the
+boundary as before.
+
 The upstream half of this is still open: the fix that stopped the runtime from *collecting* an
 out-of-workspace file's content was reverted in PR #240 because it changed a package this fork may
 not change, so the content still travels between the runtime and the browser. The client stops it

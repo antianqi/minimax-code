@@ -6,6 +6,12 @@ import {
   IconCalendarEvent, IconCaretRightFilled, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
   IconChevronRight, IconClipboard, IconCode, IconCopy, IconDeviceMobile, IconDots,
   IconDownload, IconEdit, IconFile, IconFileCode, IconFileImport, IconFolder, IconFolderPlus,
+  IconBrandGolang, IconBrandPython, IconBrandSvelte, IconCoffee,
+  IconFileTypeBmp, IconFileTypeCss, IconFileTypeCsv, IconFileTypeDoc, IconFileTypeDocx,
+  IconFileTypeHtml, IconFileTypeJpg, IconFileTypeJs, IconFileTypeJsx, IconFileTypePdf,
+  IconFileTypePhp, IconFileTypePng, IconFileTypePpt, IconFileTypeRs, IconFileTypeSql,
+  IconFileTypeSvg, IconFileTypeTs, IconFileTypeTsx, IconFileTypeTxt, IconFileTypeVue,
+  IconFileTypeXls, IconFileTypeXml, IconFileTypeZip, IconJson, IconMarkdown, IconPhoto,
   IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconHome, IconInfoCircle, IconLayoutDashboard, IconMaximize,
   IconLayoutSidebar, IconMapPin, IconMessage, IconMessageCircle, IconMessageQuestion,
   IconMinimize, IconPaperclip, IconPin, IconPinFilled, IconPuzzle, IconRefresh, IconSearch,
@@ -68,7 +74,49 @@ export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactEle
 export function WebuiIconModel({ className }: WebuiIconProps): ReactElement { return glyph(IconSparkles, className); }
 export function WebuiIconFile({ className }: WebuiIconProps): ReactElement { return glyph(IconFile, className); }
 export function WebuiIconDiffSummary({ className }: WebuiIconProps): ReactElement { return glyph(IconGitCompare, className); }
-export function WebuiIconDiffFile({ className }: WebuiIconProps & { readonly fileName?: string }): ReactElement { return glyph(IconFileCode, className); }
+
+/**
+ * One glyph per file kind, keyed by extension.
+ *
+ * Java has no Tabler brand mark, so it borrows the coffee cup; anything absent
+ * here falls back to the generic file glyph rather than inventing a shape.
+ * Tabler has no `IconFileTypePy` either — Python's brand mark is the honest one.
+ */
+const FILE_TYPE_ICONS: Readonly<Record<string, IconComponent>> = {
+  ts: IconFileTypeTs, tsx: IconFileTypeTsx, mts: IconFileTypeTs, cts: IconFileTypeTs,
+  js: IconFileTypeJs, mjs: IconFileTypeJs, cjs: IconFileTypeJs, jsx: IconFileTypeJsx,
+  vue: IconFileTypeVue, svelte: IconBrandSvelte,
+  html: IconFileTypeHtml, htm: IconFileTypeHtml,
+  css: IconFileTypeCss, scss: IconFileTypeCss, less: IconFileTypeCss,
+  json: IconJson, md: IconMarkdown, mdx: IconMarkdown,
+  py: IconBrandPython, go: IconBrandGolang, rs: IconFileTypeRs, java: IconCoffee,
+  php: IconFileTypePhp, sql: IconFileTypeSql, xml: IconFileTypeXml, csv: IconFileTypeCsv,
+  txt: IconFileTypeTxt, log: IconFileTypeTxt,
+  pdf: IconFileTypePdf, doc: IconFileTypeDoc, docx: IconFileTypeDocx,
+  xls: IconFileTypeXls, xlsx: IconFileTypeXls, ppt: IconFileTypePpt, pptx: IconFileTypePpt,
+  zip: IconFileTypeZip, gz: IconFileTypeZip, tar: IconFileTypeZip, rar: IconFileTypeZip, "7z": IconFileTypeZip,
+  svg: IconFileTypeSvg, png: IconFileTypePng, jpg: IconFileTypeJpg, jpeg: IconFileTypeJpg, bmp: IconFileTypeBmp,
+  gif: IconPhoto, webp: IconPhoto, avif: IconPhoto, ico: IconPhoto,
+  sh: IconTerminal2, bash: IconTerminal2, zsh: IconTerminal2,
+};
+
+export interface WebuiFileIconProps extends WebuiIconProps {
+  /** A path or a bare file name; only its extension is read. */
+  readonly fileName?: string;
+}
+
+/** The type glyph for a file name, or the generic file glyph when it has none. */
+export function WebuiIconFileForName({ fileName, className }: WebuiFileIconProps): ReactElement {
+  const name = (fileName ?? "").replace(/\\/gu, "/").split("/").at(-1) ?? "";
+  const extension = name.includes(".") ? name.split(".").at(-1)?.toLowerCase() : undefined;
+  const Icon = (extension ? FILE_TYPE_ICONS[extension] : undefined) ?? IconFile;
+  return glyph(Icon, className);
+}
+
+/** A file inside a diff or a stat row: the same glyph the name earns. */
+export function WebuiIconDiffFile({ className, fileName }: WebuiFileIconProps): ReactElement {
+  return <WebuiIconFileForName className={className} fileName={fileName} />;
+}
 export function WebuiIconSend({ className }: WebuiIconProps): ReactElement { return glyph(IconArrowUp, className); }
 export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement { return glyph(IconFolder, className); }
 export function WebuiIconSession({ className }: WebuiIconProps): ReactElement { return glyph(IconMessage, className); }

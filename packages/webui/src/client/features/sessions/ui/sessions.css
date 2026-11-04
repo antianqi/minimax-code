@@ -162,11 +162,17 @@
     gap: var(--spacing_8);
     padding: 0 var(--spacing_8);
     text-align: left;
+    /* The two section headers name groups the same way the 工作区 label above
+     * them does, so they are set at that label's size and the chevron scales
+     * with the text. Only the header text and its glyph follow that size: the
+     * row's own height and every row it discloses keep theirs. */
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
   }
   .webui-project-section-toggle > svg {
-    width: 16px;
-    height: 16px;
-    flex: 0 0 16px;
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
   }
   .webui-project-section-toggle[data-webui-rail-section-id="projects"] {
     margin-top: var(--spacing_8);

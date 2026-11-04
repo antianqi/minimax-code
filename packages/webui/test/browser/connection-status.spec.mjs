@@ -1,20 +1,24 @@
-// The connection banner, end to end against the built client.
+// Connection notices, end to end against the built client.
 //
-// The unit suite covers the projection and the region's own markup; what only
-// a real browser proves is the chain the Q-1 fix assembled:
+// Only one state is announced: a terminal failure. Reconnect attempts are
+// silent, because they retry themselves within a few hundred milliseconds and
+// a notice for them appeared at every page load and every tab wake. What only a
+// real browser proves here:
 //
-//   1. The shell actually mounts the region — before the fix the component
-//      existed with zero consumers, so no phase ever reached the page.
-//   2. A dropped stream socket shows 正在重连 while the loop's automatic
-//      resume attempt is in flight, and disappears when it lands.
-//   3. A failure with nothing to resume from shows 连接失败 with the real
-//      reason, and the 重试连接 button reopens the stream — the recovered
-//      loop then delivers frames, which is the "actually recovers" half a
-//      banner that only repaints cannot prove.
+//   1. The shell mounts the component, so the failure really reaches the page.
+//   2. A dropped stream that the loop can resume shows nothing — no region, no
+//      toast, no 重连 text — and the resumed frames still land appending to the
+//      same turn.
+//   3. An idle disconnect between turns is equally silent, through several
+//      retry loops and after the link returns.
+//   4. A failure with nothing to resume from shows 连接失败 with the real
+//      reason, and 重试连接 reopens the stream — the recovered loop then
+//      delivers frames, which is the "actually recovers" half a banner that
+//      only repaints cannot prove.
 //
 // Mechanism: the fixture's `delayEvery` holds the automatic resume request
-// pending, which is what makes the transient `reconnecting` window observable
-// instead of racing past between two Playwright calls.
+// pending, which is what keeps a reconnect observable long enough to assert its
+// silence instead of racing past between two Playwright calls.
 
 import { expect } from "@playwright/test";
 
@@ -25,18 +29,21 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => { if (message.type() === "error") console.error("BROWSER_CONSOLE_ERROR", message.text()); });
 });
 
-function banner(page) {
+/** The inline region, which only ever carries the healthy state. */
+function region(page) {
   return page.locator('[data-testid="webui-connection-status"]');
 }
 
-test("a dropped stream shows 正在重连 on the page and clears when the resume lands", async ({ page }) => {
+/** The failure notice; the only place a connection problem is announced. */
+function failureToast(page) {
+  return page.locator('[data-testid="webui-connection-status-toast"]');
+}
+
+test("a dropped stream stays silent, and the resumed frames still land", async ({ page }) => {
   await openApp(page, "#session=A");
 
-  // Healthy first: no banner for a working connection — 已连接 earns zero
-  // pixels in the shell's layout, and this is the negative that makes the
-  // assertions below mean "appeared", not "was always there".
   await startTurn(page, "A", "hello");
-  await expect(banner(page)).toHaveCount(0);
+  await expect(region(page)).toHaveCount(0);
 
   // Record a cursor, so the drop has something to resume from.
   await emitStream(page, "A", {
@@ -47,21 +54,62 @@ test("a dropped stream shows 正在重连 on the page and clears when the resume
     }),
   });
 
-  // Hold the automatic resume so `reconnecting` is a stable observable state
-  // rather than a microtask the assertion has to win a race against.
+  // Hold the automatic resume so the reconnect window is long enough to prove
+  // that nothing is drawn during it.
   await page.evaluate(() => window.__fixture.delayEvery("resumeSession", { id: "A" }));
   await dropStream(page, "A");
 
-  const region = banner(page);
-  await expect(region).toBeVisible();
-  await expect(region).toHaveAttribute("data-connection-state", "reconnecting");
-  await expect(region).toContainText("正在重连");
+  // Several retry loops' worth of silence: no region, no toast, and no 重连
+  // wording anywhere on the page.
+  await page.waitForTimeout(600);
+  await expect(region(page)).toHaveCount(0);
+  await expect(failureToast(page)).toHaveCount(0);
+  await expect(page.getByText(/正在重连|重连中/u)).toHaveCount(0);
 
-  // Release the resume; finish the recovered stream. The banner leaves with
-  // the failure, not with a timeout.
+  // Release the resume; the recovered stream keeps appending to the same turn.
   await page.evaluate(() => window.__fixture.resolve("resumeSession", { id: "A" }, { stream: true }));
-  await emitStream(page, "A", { dataJson: "[DONE]" });
-  await expect(banner(page)).toHaveCount(0);
+  await emitStream(page, "A", {
+    dataJson: JSON.stringify({
+      type: "agent_message_chunk",
+      agent_message_chunk: { msgId: "m1", msgContent: "部分回答，恢复了" },
+    }),
+  });
+  await expect(page.getByText(/部分回答，恢复了/u)).toBeVisible();
+  await expect(failureToast(page)).toHaveCount(0);
+});
+
+test("an idle disconnect between turns is silent through the outage and after it", async ({ page }) => {
+  await openApp(page, "#session=A");
+
+  // Idle and healthy: nothing shown.
+  await expect(region(page)).toHaveCount(0);
+
+  // Every live socket dropped and new connections gated shut: a server that
+  // went away between turns. Nothing is announced — the transport reconnects
+  // on its own.
+  await page.evaluate(() => {
+    window.__fixture.gateSockets(false);
+    window.__fixture.dropAll();
+  });
+  await page.waitForTimeout(600);
+  await expect(region(page)).toHaveCount(0);
+  await expect(failureToast(page)).toHaveCount(0);
+  await expect(page.getByText(/正在重连|重连中/u)).toHaveCount(0);
+
+  // The server returns; the watcher's own reconnect is accepted and still
+  // nothing was ever announced.
+  await page.evaluate(() => window.__fixture.gateSockets(true));
+  await page.waitForTimeout(300);
+  await expect(failureToast(page)).toHaveCount(0);
+
+  // A second outage behaves the same way, so recovery did not leave a notice
+  // stuck behind.
+  await page.evaluate(() => {
+    window.__fixture.gateSockets(false);
+    window.__fixture.dropAll();
+  });
+  await page.waitForTimeout(600);
+  await expect(failureToast(page)).toHaveCount(0);
 });
 
 test("an unresumable drop shows 连接失败 with its reason, and 重试连接 delivers again", async ({ page }) => {
@@ -73,23 +121,23 @@ test("an unresumable drop shows 连接失败 with its reason, and 重试连接 d
   await startTurn(page, "A", "hello");
   await dropStream(page, "A");
 
-  const region = banner(page);
-  await expect(region).toBeVisible();
-  await expect(region).toHaveAttribute("data-connection-state", "failed");
-  await expect(region).toContainText("连接失败");
+  const toast = failureToast(page);
+  await expect(toast).toBeVisible();
+  await expect(toast).toHaveAttribute("data-connection-state", "failed");
+  await expect(toast).toContainText("连接失败");
   // The real reason, not the generic detail: the transport's own message for
   // a socket that died mid-stream.
-  await expect(region).toContainText("WebUI connection closed before [DONE]");
+  await expect(toast).toContainText("WebUI connection closed before [DONE]");
 
   // The manual arm. One click reopens the stream from persisted history…
-  const retry = page.locator('[data-testid="webui-connection-status-retry"]');
+  const retry = toast.getByRole("button", { name: /重试连接/u });
   await expect(retry).toBeVisible();
   await retry.click();
-  await expect(banner(page)).toHaveCount(0);
+  await expect(failureToast(page)).toHaveCount(0);
 
   // …and the recovered subscription actually delivers: a frame emitted on the
-  // reopened stream lands in the transcript. A banner that only repaints
-  // would pass everything above.
+  // reopened stream lands in the transcript. A notice that only repaints would
+  // pass everything above.
   await emitStream(page, "A", {
     cursor: "c2",
     dataJson: JSON.stringify({
@@ -108,46 +156,4 @@ test("an unresumable drop shows 连接失败 with its reason, and 重试连接 d
   }));
   await emitStream(page, "A", { dataJson: "[DONE]" });
   await expect(page.getByText("重试后恢复的回复")).toBeVisible();
-});
-
-test("an idle disconnect between turns shows 正在重连 and clears when the link returns", async ({ page }) => {
-  await openApp(page, "#session=A");
-
-  // Idle and healthy: no banner — the stream phase alone reads connected and
-  // the event channel holds its link. This negative is what makes the next
-  // assertion "appeared", not "was always there".
-  const banner = page.locator('[data-testid="webui-connection-status"]');
-  await expect(banner).toHaveCount(0);
-
-  // The idle-disconnect shape (Q-b): no turn running, every live socket
-  // dropped, new connections gated shut — a server that went away between
-  // turns. Before the fix this produced no visible signal at all (reproduced
-  // against the unfixed build: banner count 0, no role=alert, no 重连 text
-  // anywhere on the page).
-  await page.evaluate(() => {
-    window.__fixture.gateSockets(false);
-    window.__fixture.dropAll();
-  });
-  await expect(banner).toBeVisible();
-  await expect(banner).toHaveAttribute("data-connection-state", "reconnecting");
-  await expect(banner).toContainText("正在重连");
-
-  // It stays: the transport's 250ms reconnect loop keeps hitting the gate,
-  // and an honest signal does not blink out while the outage holds.
-  await page.waitForTimeout(600);
-  await expect(banner).toBeVisible();
-
-  // The server returns; the watcher's own reconnect (no manual action) is
-  // accepted and the banner leaves on its own.
-  await page.evaluate(() => window.__fixture.gateSockets(true));
-  await expect(banner).toHaveCount(0);
-
-  // And the state machine repeats: a second outage shows again, so recovery
-  // did not wedge the signal off.
-  await page.evaluate(() => {
-    window.__fixture.gateSockets(false);
-    window.__fixture.dropAll();
-  });
-  await expect(banner).toBeVisible();
-  await expect(banner).toHaveAttribute("data-connection-state", "reconnecting");
 });

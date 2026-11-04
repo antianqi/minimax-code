@@ -102,15 +102,11 @@ test("a session switch keeps the retained goal while its re-read is unanswered",
   await expect.poll(() => bannerText(page)).toContain("B 的保留目标");
 
   const objective = page.getByTestId("thread-goal-banner-objective");
-  const disclosure = page.getByTestId("thread-goal-objective-disclosure");
+  await expect(objective).not.toHaveRole("button");
+  await expect(objective).not.toHaveAttribute("aria-expanded");
   await objective.click();
-  await expect(disclosure).toHaveAttribute("data-webui-motion", "disclosure");
-  await expect(disclosure).toHaveAttribute("data-webui-motion-state", "expand");
-  await expect(page.getByTestId("thread-goal-objective-expanded")).toBeVisible();
-  await objective.click();
-  await expect(disclosure).toHaveAttribute("aria-hidden", "true");
-  await expect(disclosure).toHaveAttribute("inert", "");
-  await expect.poll(() => disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
+  await expect(page.getByTestId("thread-goal-objective-disclosure")).toHaveCount(0);
+  await expect(page.getByTestId("thread-goal-objective-expanded")).toHaveCount(0);
 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.getByTestId("thread-goal-banner-clear").click();
@@ -131,4 +127,38 @@ test("a session switch keeps the retained goal while its re-read is unanswered",
   await clearDialog.getByRole("button", { name: "取消" }).click();
   await expect.poll(() => page.evaluate(() => window.__goalDialogExitEnded)).toBe(true);
   await expect(clearDialog).toHaveCount(0);
+});
+
+test("goal title stays by the leading status and actions clear the composer mascot", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 765 });
+  await configureFixture(page, controlGoalCapability);
+  await openApp(page, "#session=A");
+  await expect(page.getByTestId("thread-goal-banner-objective")).toHaveText("A 的目标");
+
+  const geometry = await page.evaluate(() => {
+    const rect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const { x, y, right, bottom, width, height } = element.getBoundingClientRect();
+      return { x, y, right, bottom, width, height };
+    };
+    const objective = document.querySelector('[data-testid="thread-goal-banner-objective"]');
+    const range = document.createRange();
+    range.selectNodeContents(objective);
+    const text = range.getBoundingClientRect();
+    return {
+      banner: rect('[data-testid="thread-goal-banner"]'),
+      row: rect(".webui-goal-banner-row"),
+      leading: rect(".webui-goal-banner-leading"),
+      title: { x: text.x, right: text.right },
+      objectiveGroup: rect(".webui-goal-banner-objective-group"),
+      objective: rect('[data-testid="thread-goal-banner-objective"]'),
+      content: rect(".webui-goal-banner-content-row"),
+      usage: rect(".webui-goal-usage"),
+      actions: rect('[data-testid="thread-goal-banner-actions-slot"]'),
+      mascot: rect(".webui-composer-mascot"),
+    };
+  });
+  expect(geometry.title.x - geometry.leading.right).toBeLessThanOrEqual(48);
+  expect(geometry.actions.right).toBeLessThanOrEqual(geometry.mascot.x);
 });

@@ -33,7 +33,11 @@ import {
   projectWebuiDiffFiles,
   WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE,
 } from "../../src/client/projection/common/diff-workspace-boundary.js";
+import { isWebuiPathWithinSessionArtifacts } from "../../src/client/projection/common/session-artifacts-boundary.js";
 import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.js";
+import { WebuiBrowserCapabilitiesProvider } from "../../src/client/bindings/browser-capabilities.js";
+import { EMPTY_WEBUI_BROWSER_DOM } from "../../src/client/platform/browser-dom.js";
+import { createWebuiBrowserStorage } from "../../src/client/platform/storage.js";
 import { WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
 import type { WebuiFileDiffInfoView } from "../../src/shared/contracts/session.js";
 
@@ -60,6 +64,23 @@ const outsideFile: WebuiFileDiffInfoView = {
   status: "modified",
   diff: BODY,
 };
+
+/* The runtime writes a session's products -- the plan document above all --
+ * into the session's own history directory, which is outside the workspace:
+ *
+ *   <dataDir>/v2/sessions/<YYYY>/<MM>/<DD>/<HH-mm-ss-SSS>-session_<base64url(sessionId)>/artifacts/plan.md
+ *
+ * The session id below is a real one, and the directory name is the real name
+ * of its directory: the encoded segment is base64url of the id, the way the
+ * runtime writes it. A path carrying that segment belongs to that session,
+ * whatever its date segments say. */
+const SESSION_ID = "mvs_6cbe13589997426bb304e4fc258bffbd";
+const DATA_DIR = "/home/user/.minimax";
+const SESSION_DIR =
+  "2026/11/04/07-51-45-349-session_bXZzXzZjYmUxMzU4OTk5NzQyNmJiMzA0ZTRmYzI1OGJmZmJk";
+const artifactsDir = `${DATA_DIR}/v2/sessions/${SESSION_DIR}/artifacts`;
+const planFile = `${artifactsDir}/plan.md`;
+const sessionRoots = { dataDir: DATA_DIR, sessionId: SESSION_ID };
 
 describe("the projection removes the body of a file outside the workspace", () => {
   it("keeps the body of a file whose path is relative to the workspace", () => {
@@ -139,6 +160,77 @@ describe("the projection removes the body of a file outside the workspace", () =
   });
 });
 
+describe("the session's own artifacts directory is a second trusted root", () => {
+  const roots = sessionRoots;
+
+  it("keeps the body of a file in the session's own artifacts directory", () => {
+    const entry = projectWebuiDiffFile(
+      { file: planFile, additions: 85, deletions: 0, status: "added", diff: BODY },
+      WORKSPACE,
+      roots,
+    );
+
+    expect(entry.withinWorkspace).toBe(true);
+    expect(entry.diff).toBe(BODY);
+  });
+
+  it("keeps the body of a file below the artifacts directory", () => {
+    expect(isWebuiPathWithinSessionArtifacts(`${artifactsDir}/notes/summary.md`, roots)).toBe(true);
+  });
+
+  it("does not trust another session's artifacts directory", () => {
+    const otherSession = `${DATA_DIR}/v2/sessions/2026/11/04/09-00-00-000-session_bXZzXzJjYjhlMTM4OTk5NzQyNmJiMzA0ZTRmYzI1OGJmZmJk/artifacts/plan.md`;
+
+    expect(isWebuiPathWithinSessionArtifacts(otherSession, roots)).toBe(false);
+    const entry = projectWebuiDiffFile(
+      { file: otherSession, additions: 1, deletions: 0, diff: BODY },
+      WORKSPACE,
+      roots,
+    );
+    expect(entry.withinWorkspace).toBe(false);
+    expect(entry.diff).toBeUndefined();
+  });
+
+  it("does not trust a directory that only looks like the artifacts directory", () => {
+    // The same shape, outside the runtime's data directory: nothing places it
+    // as this session's own output.
+    const forged = `/tmp/v2/sessions/${SESSION_DIR}/artifacts/plan.md`;
+
+    expect(isWebuiPathWithinSessionArtifacts(forged, roots)).toBe(false);
+    const entry = projectWebuiDiffFile(
+      { file: forged, additions: 1, deletions: 0, diff: BODY },
+      WORKSPACE,
+      roots,
+    );
+    expect(entry.withinWorkspace).toBe(false);
+    expect(entry.diff).toBeUndefined();
+  });
+
+  it("does not trust a path that walks out of the artifacts directory", () => {
+    expect(isWebuiPathWithinSessionArtifacts(`${artifactsDir}/../../../../etc/hostname`, roots)).toBe(false);
+  });
+
+  it("does not trust a file that is the artifacts directory's neighbour", () => {
+    const neighbour = `${DATA_DIR}/v2/sessions/${SESSION_DIR}/messages.jsonl`;
+
+    expect(isWebuiPathWithinSessionArtifacts(neighbour, roots)).toBe(false);
+  });
+
+  it("trusts nothing without a data directory or a session id", () => {
+    expect(isWebuiPathWithinSessionArtifacts(planFile, { sessionId: SESSION_ID })).toBe(false);
+    expect(isWebuiPathWithinSessionArtifacts(planFile, { dataDir: DATA_DIR })).toBe(false);
+  });
+
+  it("keeps the body of an ordinary outside file when the roots are absent", () => {
+    // Without the trusted roots the boundary is the one it was: the workspace
+    // and nothing else.
+    const entry = projectWebuiDiffFile(outsideFile, WORKSPACE);
+
+    expect(entry.withinWorkspace).toBe(false);
+    expect(entry.diff).toBeUndefined();
+  });
+});
+
 describe("the diff card shows what is withheld instead of the content", () => {
   const renderCard = (file: WebuiFileDiffInfoView, workspaceDir?: string): string =>
     renderToStaticMarkup(
@@ -183,6 +275,35 @@ describe("the diff card shows what is withheld instead of the content", () => {
     expect(markup).toContain(BODY_MARKER);
     expect(markup).not.toContain(WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE);
   });
+
+  it("shows the body of a file in the session's own artifacts directory", () => {
+    // The card reads the runtime's data directory from the capabilities the
+    // host hands it, so the test serves the page one.
+    const markup = renderToStaticMarkup(
+      createElement(WebuiBrowserCapabilitiesProvider, {
+        value: {
+          dom: EMPTY_WEBUI_BROWSER_DOM,
+          storage: createWebuiBrowserStorage(undefined),
+          dataDir: DATA_DIR,
+        },
+        children: createElement(WebuiDiffCard, {
+          sessionId: SESSION_ID,
+          workspaceDir: WORKSPACE,
+          initialView: {
+            status: "active",
+            changeSetId: "changes-1",
+            fileChanges: [
+              { file: planFile, additions: 85, deletions: 0, status: "added", diff: BODY },
+            ],
+          },
+          initialState: { unsupported: false, busy: false, expanded: false, reviewing: true },
+        }),
+      }),
+    );
+
+    expect(markup).toContain(BODY_MARKER);
+    expect(markup).not.toContain(WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE);
+  });
 });
 
 describe("the workspace review panel shows what is withheld instead of the content", () => {
@@ -215,6 +336,24 @@ describe("the workspace review panel shows what is withheld instead of the conte
     expect(markup).toContain("/etc/outside.conf");
     expect(markup).toContain("+1");
     expect(markup).toContain("-1");
+  });
+
+  it("shows the body of a file in the session's own artifacts directory", () => {
+    const markup = renderToStaticMarkup(
+      createElement(WebuiDiffFileSection, {
+        file: projectWebuiDiffFile(
+          { file: planFile, additions: 85, deletions: 0, status: "added", diff: BODY },
+          WORKSPACE,
+          sessionRoots,
+        ),
+        selected: true,
+      }),
+    );
+
+    // The body is syntax-highlighted here, so the marker is split
+    // across spans: the added line is what says the body was rendered.
+    expect(markup).toContain("webui-turn-review-line--addition");
+    expect(markup).not.toContain(WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE);
   });
 
   it("offers an explicit file-viewer link for an outside absolute file", () => {

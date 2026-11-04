@@ -351,7 +351,11 @@ describe("right workspace panel navigation", () => {
   it("does not wrap a Markdown file link in a second generated file link", () => {
     const markup = renderToStaticMarkup(createElement(WebuiMarkdown, { source: "[src/index.ts](src/index.ts)", onOpenFile: () => undefined }));
     expect(markup.match(/<a\b/gu)).toHaveLength(1);
-    expect(markup).toContain('data-webui-file-reference="src/index.ts"><span aria-hidden="true">📘</span><span>index.ts</span></a>');
+    // The link names the file twice: the type glyph in the leading span (a TS
+    // mark for index.ts) and the basename as text.
+    expect(markup).toContain('data-webui-file-reference="src/index.ts"><span aria-hidden="true"><svg');
+    expect(markup).toContain('tabler-icon-file-type-ts');
+    expect(markup).toContain('</span><span>index.ts</span></a>');
   });
 
   it("scrolls the requested file line into view and focuses it after loading", () => {

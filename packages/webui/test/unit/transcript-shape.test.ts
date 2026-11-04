@@ -187,6 +187,54 @@ describe("live transcript timeline merge", () => {
     expect(messages[0]?.msgContent).toBe("live");
   });
 
+  it("does not render an event projection beside the persisted goal entry it represents", () => {
+    const messages = projectWebuiTranscriptMessages(
+      {
+        messages: [{
+          msgId: "goal-entry-message",
+          role: "user",
+          msgContent: "Keep this goal active.",
+          kind: "goal",
+        }],
+      },
+      [{
+        id: "thread-goal-goal-1",
+        role: "user",
+        answer: "Keep this goal active.",
+        thinking: "",
+        isGoal: true,
+      }],
+    );
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.msgId).toBe("goal-entry-message");
+  });
+
+  it("prefers a matching live goal entry regardless of event order", () => {
+    const goalEntry = {
+      id: "live-goal-entry",
+      role: "user" as const,
+      answer: "Keep this goal active.",
+      thinking: "",
+      isGoal: true,
+    };
+    const eventProjection = {
+      id: "thread-goal-goal-1",
+      role: "user" as const,
+      answer: "Keep this goal active.",
+      thinking: "",
+      isGoal: true,
+    };
+
+    for (const streamMessages of [
+      [eventProjection, goalEntry],
+      [goalEntry, eventProjection],
+    ]) {
+      const messages = projectWebuiTranscriptMessages({ messages: [] }, streamMessages);
+      expect(messages.map((message) => message.msgId)).toEqual(["live-goal-entry"]);
+    }
+  });
+
   it("does not resurrect a deleted stream-only message after the turn settles", () => {
     const messages = projectWebuiTranscriptMessages(
       { messages: [{ msgId: "user-1", role: "user", msgContent: "kept" }] },

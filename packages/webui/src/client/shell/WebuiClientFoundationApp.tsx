@@ -1350,6 +1350,7 @@ export function WebuiClientFoundationApp(
                       : {}
                   )}
                   workspaceDir={selectedSession?.workspaceDir}
+                  workspaceFileUrl={workspacePort.workspaceFileUrl}
                   onOpenFile={openTranscriptFile}
                   onOpenTurnReview={openTranscriptTurnReview}
                   {...(initialMessages ? { initialMessages } : {})}

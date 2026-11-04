@@ -46,6 +46,10 @@ export function projectWebuiTranscriptMessages(
     (message): message is WebuiClientMessage =>
       message !== null && typeof message === "object" && typeof message.msgId === "string",
   );
+  const persistedGoalEntries = messages.filter(
+    (message) => message.role === "user" &&
+      (message.kind === "goal" || message.source === "thread-goal"),
+  );
   const indexById = new Map(messages.map((message, index) => [message.msgId, index]));
   const refreshIndexes = (from: number) => {
     for (let index = from; index < messages.length; index += 1)
@@ -53,6 +57,20 @@ export function projectWebuiTranscriptMessages(
   };
   for (let streamIndex = 0; streamIndex < streamMessages.length; streamIndex += 1) {
     const stream = streamMessages[streamIndex]!;
+    // Goal lifecycle events also project a synthetic user bubble. A goal-entry
+    // turn may already have its own durable or live user message with a
+    // different id, so keep that actionable message and omit only the matching
+    // event projection. Check the full stream up front so the result does not
+    // depend on which of the two identities arrived first.
+    if (stream.isGoal && stream.id.startsWith("thread-goal-")) {
+      const hasGoalEntry = persistedGoalEntries.some(
+        (message) => message.msgContent === stream.answer,
+      ) || streamMessages.some(
+        (message) => message.id !== stream.id && message.role === "user" &&
+          message.isGoal && message.answer === stream.answer,
+      );
+      if (hasGoalEntry) continue;
+    }
     const index = indexById.get(stream.id);
     // Once a turn is settled, the refreshed persisted page is authoritative.
     // A rewind can delete a message that is still present in stream state; do

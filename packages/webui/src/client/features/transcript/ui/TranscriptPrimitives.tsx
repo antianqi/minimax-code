@@ -475,7 +475,7 @@ export function WebuiTurnProcess({
           <WebuiButton
             variant="quiet-subtle"
             size="inline"
-            className="group/turn-process flex items-center gap-1 py-1 text-center text-sm font-normal leading-5 tracking-normal"
+            className="group/turn-process flex items-center gap-1 px-0 py-1 text-left text-sm font-normal leading-5 tracking-normal"
             aria-expanded={contentExpanded}
             aria-controls={disclosureId}
             data-testid="turn-process-trigger"

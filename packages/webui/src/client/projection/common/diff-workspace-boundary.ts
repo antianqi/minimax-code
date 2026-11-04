@@ -14,6 +14,20 @@
 // (`features/transcript/projection/message-file-reference.ts`), extended to
 // resolve `..` and to compare absolute paths segment by segment.
 //
+// There are two trusted roots, and a file is inside the boundary when it is
+// inside either of them:
+//
+//  * the session's workspace, which is where the work is supposed to happen;
+//  * the session's own artifacts directory, where the runtime puts the
+//    session's own products -- the plan document above all. It is outside the
+//    workspace, but it belongs to this session, and the Desktop client opens
+//    such a file with the file's own directory as its read root. The client
+//    names that directory from the session id it already holds
+//    (`session-artifacts-boundary.ts`).
+//
+// No other directory is trusted: a file outside the workspace and outside the
+// session's own artifacts is still outside the boundary.
+//
 // Two boundaries this does not close, stated rather than papered over:
 //
 //  * A symlink inside the workspace that points outside it resolves outside,
@@ -26,6 +40,11 @@
 //    hide ordinary content as well, which is the worse failure.
 
 import type { WebuiFileDiffInfoView } from "../../../shared/contracts/session.js";
+import { isAbsolutePath, resolveSegments } from "./paths.js";
+import {
+  isWebuiPathWithinSessionArtifacts,
+  type WebuiSessionArtifactsRoots,
+} from "./session-artifacts-boundary.js";
 
 /**
  * What replaces the body of a file the boundary keeps out.
@@ -45,56 +64,16 @@ export const WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE =
  */
 export interface WebuiDiffFileEntry extends WebuiFileDiffInfoView {
   /**
-   * Whether the entry's path stays inside the workspace root.
+   * Whether the entry's path stays inside a trusted root.
    *
-   * `true` when the root is unknown: without a root there is no boundary to
-   * judge against, and an entry that cannot be placed must not be hidden for
-   * it.
+   * The trusted roots are the session's workspace and the session's own
+   * artifacts directory; a file in either of them keeps its body.
+   *
+   * `true` when the workspace root is unknown: without a root there is no
+   * boundary to judge against, and an entry that cannot be placed must not be
+   * hidden for it.
    */
   readonly withinWorkspace: boolean;
-}
-
-/** A path spelled with posix separators, whatever the host wrote. */
-function toPosixPath(value: string): string {
-  return value.replace(/\\/gu, "/");
-}
-
-/**
- * A Windows drive letter, lowercased so `C:` and `c:` name one drive.
- */
-function driveLetter(segment: string): string | undefined {
-  return /^[a-z]:$/iu.test(segment) ? segment.toLowerCase() : undefined;
-}
-
-/**
- * The path's segments, with `.` dropped and `..` applied.
- *
- * `..` is applied against the segments collected so far, so `a/../b` is `b`
- * and `../b` is nothing at all — the second cannot be placed under any root,
- * which is what makes it out of bounds. The root's own segments are not part
- * of the stack: climbing one level above the root is the case this module
- * exists for, and a path that does it is refused rather than clamped back
- * inside.
- */
-function resolveSegments(value: string): string[] | undefined {
-  const segments: string[] = [];
-  const parts = toPosixPath(value).split("/");
-  for (const [index, part] of parts.entries()) {
-    if (!part || part === ".") continue;
-    if (part === "..") {
-      if (segments.length === 0) return undefined;
-      segments.pop();
-      continue;
-    }
-    segments.push(index === 0 ? (driveLetter(part) ?? part) : part);
-  }
-  return segments;
-}
-
-/** Whether a path is spelled as an absolute path. */
-function isAbsolutePath(value: string): boolean {
-  const posix = toPosixPath(value);
-  return posix.startsWith("/") || /^[a-z]:\//iu.test(posix);
 }
 
 /**
@@ -131,6 +110,23 @@ export function isWebuiDiffPathWithinWorkspace(
 }
 
 /**
+ * Whether a path is inside the boundary a diff entry is judged against.
+ *
+ * The workspace is the root the work happens in, and the session's own
+ * artifacts directory is the root the runtime writes the session's products
+ * to. A path in either of them is inside the boundary.
+ */
+export function isWebuiDiffPathWithinBoundary(
+  workspaceDir: string | undefined,
+  filePath: string,
+  trusted?: WebuiSessionArtifactsRoots,
+): boolean {
+  if (isWebuiDiffPathWithinWorkspace(workspaceDir, filePath)) return true;
+  if (!trusted) return false;
+  return isWebuiPathWithinSessionArtifacts(filePath, trusted);
+}
+
+/**
  * Project one diff entry for display.
  *
  * The entry keeps everything that traces the change — the file, its status,
@@ -141,8 +137,9 @@ export function isWebuiDiffPathWithinWorkspace(
 export function projectWebuiDiffFile(
   file: WebuiFileDiffInfoView,
   workspaceDir: string | undefined,
+  trusted?: WebuiSessionArtifactsRoots,
 ): WebuiDiffFileEntry {
-  if (isWebuiDiffPathWithinWorkspace(workspaceDir, file.file)) {
+  if (isWebuiDiffPathWithinBoundary(workspaceDir, file.file, trusted)) {
     return { ...file, withinWorkspace: true };
   }
   return {
@@ -164,6 +161,7 @@ export function projectWebuiDiffFile(
 export function projectWebuiDiffFiles(
   files: readonly WebuiFileDiffInfoView[] | undefined,
   workspaceDir: string | undefined,
+  trusted?: WebuiSessionArtifactsRoots,
 ): readonly WebuiDiffFileEntry[] {
-  return (files ?? []).map((file) => projectWebuiDiffFile(file, workspaceDir));
+  return (files ?? []).map((file) => projectWebuiDiffFile(file, workspaceDir, trusted));
 }

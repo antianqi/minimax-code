@@ -5,7 +5,7 @@
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { IconChevronUp } from "@tabler/icons-react";
 import { ChatSkeleton } from "./TranscriptSkeletons.js";
-import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder, MessagePassiveLoadingPlaceholder } from "./ActivityIndicator.js";
+import { ActivityIndicator, MessageAfterQueryStreamingPlaceholder } from "./ActivityIndicator.js";
 import { TurnNavigator, type TurnNavigatorPreview, type TurnSummary } from "./TurnNavigator.js";
 import { MessageItem } from "./MessageItem.js";
 import { formatWebuiMessageTimestamp } from "../projection/message-timestamp.js";
@@ -46,6 +46,7 @@ import {
   transcriptViewport,
   useWebuiTranscriptScroll,
 } from "../bindings/use-transcript-scroll.js";
+import { WebuiWorkspaceFileUrlProvider } from "./markdown.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiSpinner } from "../../../ui/feedback.js";
 
@@ -161,6 +162,7 @@ function WebuiSessionTranscriptView({
   compactionOutput,
   answerPlanBuild,
   workspaceDir,
+  workspaceFileUrl,
   onOpenFile,
   onOpenTurnReview,
   onOpenPlanFile,
@@ -170,6 +172,8 @@ function WebuiSessionTranscriptView({
   readonly compactionRunning?: boolean;
   readonly compactionOutput?: string;
   readonly workspaceDir?: string;
+  /** Serves a workspace file's bytes, so a linked image or clip can be drawn in place. */
+  readonly workspaceFileUrl?: (input: { readonly workspaceDir: string; readonly path: string }) => string;
   readonly onOpenFile?: (input: { readonly sessionId: string; readonly workspaceDir: string; readonly reference: WebuiMessageFileReference }) => void;
   readonly onOpenTurnReview?: (command: Extract<WorkspacePanelCommand, { type: "open-turn-review" }>) => void;
   readonly onOpenPlanFile?: (input: { readonly sessionId: string; readonly path: string; readonly content: string }) => void;
@@ -320,7 +324,14 @@ function WebuiSessionTranscriptView({
         });
       }
     : undefined;
+  // A new function each render is fine: the media elements it feeds only reload
+  // when the URL itself changes.
+  const buildFileUrl = workspaceFileUrl && workspaceDir
+    ? (path: string) => workspaceFileUrl({ workspaceDir, path })
+    : undefined;
+
   return (
+    <WebuiWorkspaceFileUrlProvider build={buildFileUrl}>
     <section
       ref={transcriptRef}
       aria-label="Transcript"
@@ -533,9 +544,6 @@ function WebuiSessionTranscriptView({
             </Fragment>
           );
         })}
-        {streamPhase === "reconnecting" ? (
-          <MessagePassiveLoadingPlaceholder label="重连中…" />
-        ) : null}
         {turnLive && !liveAssistantMessages.length &&
         (streamPhase === "streaming" || streamPhase === "waiting") ? (
           stream.messages.some((message) => message.role === "user") && streamPhase === "waiting" ? (
@@ -595,6 +603,7 @@ function WebuiSessionTranscriptView({
         onTickActivate={(turnId) => activateNavigatorTick(turnId)}
       />
     </section>
+    </WebuiWorkspaceFileUrlProvider>
   );
 }
 

@@ -95,7 +95,7 @@ function MessageItemView({
   onOpenFile,
   onOpenTurnReview,
 }: MessageItemProps): ReactElement {
-  const { dom } = useWebuiBrowserCapabilities();
+  const { dom, dataDir } = useWebuiBrowserCapabilities();
   // Narrowing: historical view can read historical-only fields; live view
   // can read live-only fields. The union member types live in
   // `transcript-shape.ts`.
@@ -221,9 +221,9 @@ function MessageItemView({
   const handleOpenTurnReview = useCallback(
     (review: WebuiTurnDiffView, selectedPath?: string) => {
       if (!sessionId || !workspaceDir) return;
-      onOpenTurnReview?.({ type: "open-turn-review", sessionId, workspaceDir, messageId, assistantMessageId: review.sourceMessageId ?? assistantMessageId ?? messageId, ...(turnId ? { turnId } : {}), ...(review.changeSetId ? { changeSetId: review.changeSetId } : {}), files: projectWebuiDiffFiles(review.fileChanges, workspaceDir), ...(selectedPath ? { selectedPath } : {}) });
+      onOpenTurnReview?.({ type: "open-turn-review", sessionId, workspaceDir, messageId, assistantMessageId: review.sourceMessageId ?? assistantMessageId ?? messageId, ...(turnId ? { turnId } : {}), ...(review.changeSetId ? { changeSetId: review.changeSetId } : {}), files: projectWebuiDiffFiles(review.fileChanges, workspaceDir, { dataDir, sessionId }), ...(selectedPath ? { selectedPath } : {}) });
     },
-    [assistantMessageId, messageId, onOpenTurnReview, sessionId, turnId, workspaceDir],
+    [assistantMessageId, dataDir, messageId, onOpenTurnReview, sessionId, turnId, workspaceDir],
   );
   const actionProps = {
     role,

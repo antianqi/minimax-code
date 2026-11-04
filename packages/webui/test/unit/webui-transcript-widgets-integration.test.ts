@@ -379,8 +379,12 @@ describe("WebUI transcript widget wiring", () => {
     expect(html).toContain("思考中…");
   });
 
-  it("renders MessagePassiveLoadingPlaceholder while reconnecting", () => {
+  it("says nothing while reconnecting", () => {
+    // The transcript used to show 重连中… here. A reconnect is the loop
+    // retrying on its own, so the turn area stays as it was instead of
+    // announcing a state the reader cannot act on.
     const html = sessionShell({ streamingPhase: "reconnecting" });
-    expect(html).toMatch(/data-testid="message-passive-loading-(placeholder|status)"/);
+    expect(html).not.toContain("重连");
+    expect(html).not.toMatch(/data-testid="message-passive-loading-(placeholder|status)"/);
   });
 });

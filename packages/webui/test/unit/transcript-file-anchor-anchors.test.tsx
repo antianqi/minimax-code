@@ -20,7 +20,7 @@ import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.public.js";
+import { WebuiMarkdown, WebuiWorkspaceFileUrlProvider, webuiInlineMediaKind } from "../../src/client/features/transcript/ui/markdown.public.js";
 import {
   parseWebuiMessageFileReference,
   type WebuiMessageFileReference,
@@ -72,7 +72,10 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
 
     // The line number is not left in the prose: the anchor labels the basename
     // and the surrounding sentence is untouched.
-    expect(visibleText(html)).toBe("See 📘file.ts for the failing case.");
+    // The glyph is an SVG, so it contributes no text: what the reader sees in
+    // the sentence is the label alone.
+    expect(visibleText(html)).toBe("See file.ts for the failing case.");
+    expect(html).toContain("tabler-icon-file-type-ts");
   });
 
   it("carries the parsed reference on the anchor and intercepts the click", () => {
@@ -165,5 +168,57 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
   it("does not nest an anchor inside a rendered Markdown link", () => {
     const html = render("https://example.com/a/b", () => undefined);
     expect(html.match(/<a\b/gu)).toHaveLength(1);
+  });
+});
+
+// The transcript can now draw the picture or clip a file link points at. The
+// bytes are served by the host through `workspaceFileUrl`, which arrives as a
+// context value: without one, a link stays a link.
+describe("media file links", () => {
+  const build = (path: string) => `/workspace/file?path=${encodeURIComponent(path)}`;
+
+  function renderServed(source: string): string {
+    return renderToStaticMarkup(
+      createElement(WebuiWorkspaceFileUrlProvider, {
+        build,
+        children: createElement(WebuiMarkdown, { source, onOpenFile: () => undefined }),
+      }),
+    );
+  }
+
+  it("draws a linked image under its own link, the link intact", () => {
+    const html = renderServed("See `out/chart.png` for the shape.");
+    expect(html).toContain('data-webui-file-media="image"');
+    expect(html).toContain(`<img src="${build("out/chart.png")}"`);
+    expect(html).toContain('alt="chart.png"');
+    expect(html).toContain('data-webui-file-reference="out/chart.png"');
+  });
+
+  it("draws an SVG as an image and an MP4 as a control-bearing video", () => {
+    expect(renderServed("`assets/logo.svg`")).toContain('data-webui-file-media="image"');
+    const clip = renderServed("`out/demo.mp4`");
+    expect(clip).toContain('data-webui-file-media="video"');
+    expect(clip).toContain("<video");
+    expect(clip).toContain("controls");
+  });
+
+  it("leaves a source file as a plain link", () => {
+    const html = renderServed("`src/main.ts`");
+    expect(html).toContain('data-webui-file-reference="src/main.ts"');
+    expect(html).not.toContain("data-webui-file-media");
+  });
+
+  it("keeps the link and draws nothing when the reader cannot serve bytes", () => {
+    const html = render("See `out/chart.png`.", () => undefined);
+    expect(html).toContain('data-webui-file-reference="out/chart.png"');
+    expect(html).not.toContain("<img");
+  });
+
+  it("decides by the extension, not by a substring of the path", () => {
+    expect(webuiInlineMediaKind("out/Photo.JPG")).toBe("image");
+    expect(webuiInlineMediaKind("out/clip.webm")).toBe("video");
+    expect(webuiInlineMediaKind("src/png-notes.ts")).toBeUndefined();
+    expect(webuiInlineMediaKind("out/notes.txt")).toBeUndefined();
+    expect(webuiInlineMediaKind("out/no-extension")).toBeUndefined();
   });
 });

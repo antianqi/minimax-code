@@ -5,6 +5,17 @@ import { createWebuiBrowserStorage, type WebuiBrowserStorage } from "../platform
 export interface WebuiBrowserCapabilities {
   readonly dom: WebuiBrowserDom;
   readonly storage: WebuiBrowserStorage;
+  /**
+   * The runtime's data directory, when the host served the page with one.
+   *
+   * It is a fact about the host the page is talking to, not a browser
+   * capability, but it reaches the surfaces the same way: the composition
+   * root reads it from the injected runtime config and hands it over, so a
+   * presentation never reads a global to learn where the runtime keeps its
+   * data. A surface that needs it -- the diff boundary, which has to name a
+   * session's own artifacts directory -- reads it from here.
+   */
+  readonly dataDir?: string;
 }
 
 const emptyCapabilities: WebuiBrowserCapabilities = {

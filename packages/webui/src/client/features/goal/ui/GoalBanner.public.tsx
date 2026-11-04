@@ -20,7 +20,6 @@ import type { WebuiGoalCommands } from "../contracts/goal-port.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
-import { WebuiDisclosure } from "../../../ui/page.js";
 import { WebuiDialog } from "../../../ui/dialog.js";
 import {
   WebuiIconCommandGoal,
@@ -115,7 +114,6 @@ export function WebuiGoalBanner({
   readonly interactionBlocked?: boolean;
 } & WebuiGoalCommands): ReactElement | null {
   const { dom } = useWebuiBrowserCapabilities();
-  const [objectiveExpanded, setObjectiveExpanded] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [updated, setUpdated] = useState(false);
   const [dismissedGoalKey, setDismissedGoalKey] = useState<string>();
@@ -127,7 +125,6 @@ export function WebuiGoalBanner({
    * clear's own failure. */
   useWebuiToastError(confirmClear ? undefined : error, { testId: "thread-goal-error" });
   useEffect(() => {
-    setObjectiveExpanded(false);
     setConfirmClear(false);
   }, [goal?.sessionId, goal?.goalId]);
   useEffect(() => {
@@ -193,7 +190,7 @@ export function WebuiGoalBanner({
         </div>
         <div className="webui-goal-banner-content-row" data-testid="thread-goal-banner-content-row">
           <div className="webui-goal-banner-objective-group" data-testid="thread-goal-banner-objective-group">
-            <WebuiButton variant="quiet-secondary" size="inline" className="webui-goal-objective" data-testid="thread-goal-banner-objective" aria-expanded={objectiveExpanded} aria-controls="thread-goal-objective-expanded" title={goal.objective} onClick={() => setObjectiveExpanded((value) => !value)}>{goal.objective}</WebuiButton>
+            <span className="webui-goal-objective" data-testid="thread-goal-banner-objective" title={goal.objective}>{goal.objective}</span>
           </div>
           <div className="webui-goal-usage" data-testid="thread-goal-usage">
             <span data-testid="thread-goal-tokens-used">{goal.tokensUsed} tokens</span>
@@ -213,9 +210,6 @@ export function WebuiGoalBanner({
             : <WebuiIconButton tone="bare" className="webui-goal-action" data-testid="thread-goal-banner-clear" label="清除目标" title="清除目标" onClick={() => setConfirmClear(true)} disabled={busy || interactionBlocked}><WebuiIconContextTrash /></WebuiIconButton>}
         </div>
       </div>
-      <WebuiDisclosure id="thread-goal-objective-expanded" open={objectiveExpanded} mountOnOpen data-testid="thread-goal-objective-disclosure">
-        <div className="webui-goal-objective-expanded" data-testid="thread-goal-objective-expanded">{goal.objective}</div>
-      </WebuiDisclosure>
       {clearDialog}
     </section>
   );

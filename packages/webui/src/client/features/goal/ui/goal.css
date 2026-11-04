@@ -106,6 +106,7 @@
   }
 
   .webui-goal-objective {
+    display: block;
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -149,6 +150,8 @@
   .webui-goal-banner-actions-slot {
     flex: none;
     gap: var(--spacing_4);
+    /* Keep the icon actions left of the composer mascot (60px + its 24px inset). */
+    margin-right: calc(60px + var(--spacing_24));
     padding: 8px 0 0 8px;
   }
 
@@ -170,15 +173,5 @@
 
   .webui-goal-usage {
     min-width: 0;
-  }
-
-  .webui-goal-objective-expanded {
-    max-height: 240px;
-    overflow: auto;
-    padding: var(--spacing_8) var(--spacing_12);
-    color: var(--text_default_secondary);
-    font-size: var(--size_14);
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
   }
 }

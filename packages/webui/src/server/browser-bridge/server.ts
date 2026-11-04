@@ -369,6 +369,16 @@ export class BrowserBridgeServer {
   /** The build this host speaks to, when it knows one. */
   readonly #expectedExtensionVersion: string | undefined;
   readonly #allowedIds = new Map<WebuiBridgeBrowserSurface, ReadonlySet<string>>();
+  /**
+   * The extension that connected last on each surface.
+   *
+   * It is kept in memory and never forgotten while the host runs, because it
+   * answers a question the trust file cannot: which of several builds the
+   * person has in this browser. The file records that an identity proved
+   * itself, not when it last spoke, so it cannot tell a build that is in use
+   * from one that was loaded once.
+   */
+  readonly #lastExtensionIds = new Map<WebuiBridgeBrowserSurface, string>();
   /** The identities this host has proved and therefore admits. */
   readonly #trusted: TrustedExtensionStore;
   /**
@@ -515,22 +525,23 @@ async readInstallationKey(
    * The extension's own page for one surface, when this host knows it.
    *
    * The live session's identity comes first: it is the extension the person
-   * is working with right now. The identities this host has proved come
-   * next, most recently learned first — a machine can hold several builds of
-   * the same extension, because each unpacked build has its own id, and the
-   * one that connected last is the one the person is most likely holding.
-   * The identities an operator configured come last, and only when there is
-   * exactly one of them, because a page named for the wrong extension is
-   * worse than no page at all.
+   * is working with right now. The one that connected last comes next — a
+   * browser that is idle still has an extension, and the person is about to
+   * paste a key into it. The identities this host has proved come after
+   * that, most recently learned first, and the ones an operator configured
+   * come last, and only when there is exactly one of them: a page named for
+   * the wrong extension is worse than no page at all.
    */
   #extensionPage(
     surface: WebuiBridgeBrowserSurface,
   ): { readonly extensionId: string; readonly optionsUrl: string } | undefined {
     const live = this.#surfaces.get(surface)?.extensionId;
+    const last = this.#lastExtensionIds.get(surface);
     const trusted = [...this.#trusted.ids(surface)];
     const configured = [...(this.#allowedIds.get(surface) ?? [])];
     const extensionId =
       live ??
+      last ??
       trusted.at(-1) ??
       (configured.length === 1 ? configured[0] : undefined);
     if (!extensionId) return undefined;
@@ -704,6 +715,10 @@ async readInstallationKey(
       // The identity the peer connected with. It is what lets the Settings
       // page link to the extension's own page, where the key is pasted.
       state.extensionId = extensionId;
+      // The build that is in the person's browser right now. It is kept after
+      // the session goes away, so the Settings page can still name the page
+      // the key is pasted on while the browser is idle.
+      if (extensionId) this.#lastExtensionIds.set(surface, extensionId);
       this.#surfaces.set(surface, state);
       state.live = true;
       // The peer is admitted, so it proved the installation key or a

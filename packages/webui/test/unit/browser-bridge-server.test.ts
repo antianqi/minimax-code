@@ -536,6 +536,20 @@ describe("WebUI browser bridge — the providers it lends to the browser service
     client.socket.terminate();
   });
 
+  it("keeps naming the extension after its session goes away", async () => {
+    // A browser that is idle still has an extension, and the person is about
+    // to paste a key into it. The page stays named once the session ends.
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    client.socket.terminate();
+    await settle();
+
+    const view = await harness.bridge.readInstallationKey("edge");
+
+    expect(view?.extensionId).toBe(EDGE_EXTENSION_ID);
+    expect(view?.optionsUrl).toBe(`chrome-extension://${EDGE_EXTENSION_ID}/options.html`);
+  });
+
   it("names the extension it learned most recently when a machine holds several", async () => {
     // Every unpacked build of the extension has its own id, so one machine can
     // hold more than one of them. The live session names the build in use;

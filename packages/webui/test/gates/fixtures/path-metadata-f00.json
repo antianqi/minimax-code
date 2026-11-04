@@ -157,6 +157,15 @@
       "home": "current"
     },
     {
+      "path": "client/bindings/remote-control-owner-context.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "bindings",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/bindings/ssh-owner-context.tsx",
       "layers": [
         "bindings"
@@ -1138,6 +1147,24 @@
       "home": "target"
     },
     {
+      "path": "client/features/miniapp/application/miniapp-tool-bridge.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/application/miniapp-window-bridge.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
       "path": "client/features/miniapp/application/miniapp-workflows.ts",
       "layers": [
         "application"
@@ -1202,6 +1229,15 @@
     },
     {
       "path": "client/features/miniapp/ui/MiniAppStandalone.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/ui/MiniAppToolApprovals.public.tsx",
       "layers": [
         "bindings"
       ],
@@ -1669,7 +1705,25 @@
       "home": "target"
     },
     {
+      "path": "client/features/remote-control/ui/RemoteControlDevices.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "remote-control",
+      "home": "target"
+    },
+    {
       "path": "client/features/remote-control/ui/RemoteControlPanel.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "remote-control",
+      "home": "target"
+    },
+    {
+      "path": "client/features/remote-control/ui/remote-control.css",
       "layers": [
         "bindings"
       ],
@@ -1823,6 +1877,15 @@
     },
     {
       "path": "client/features/scheduling/ui/SchedulingPanel.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "scheduling",
+      "home": "target"
+    },
+    {
+      "path": "client/features/scheduling/ui/scheduling.css",
       "layers": [
         "bindings"
       ],
@@ -2218,6 +2281,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/settings/ui/ConnectionSettingsPage.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
       "path": "client/features/settings/ui/GlobalInstructionsSection.tsx",
       "layers": [
         "bindings"
@@ -2385,6 +2457,42 @@
         "view"
       ],
       "role": "feature-projection",
+      "business": "ssh",
+      "home": "target"
+    },
+    {
+      "path": "client/features/ssh/ui/ssh-add-connection-dialog.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "ssh",
+      "home": "target"
+    },
+    {
+      "path": "client/features/ssh/ui/ssh-connection-details-dialog.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "ssh",
+      "home": "target"
+    },
+    {
+      "path": "client/features/ssh/ui/ssh-connection-picker.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "ssh",
+      "home": "target"
+    },
+    {
+      "path": "client/features/ssh/ui/ssh-connection-row.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
       "business": "ssh",
       "home": "target"
     },
@@ -3712,6 +3820,15 @@
       "home": "target"
     },
     {
+      "path": "client/styles/agent-avatar.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/styles/button.css",
       "layers": [
         "unknown"
@@ -3793,7 +3910,25 @@
       "home": "current"
     },
     {
+      "path": "client/styles/segmented-control.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/styles/shell.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "client/styles/toast.css",
       "layers": [
         "unknown"
       ],
@@ -3812,6 +3947,15 @@
     },
     {
       "path": "client/ui/activity-phrase.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/ui/agent-avatar.tsx",
       "layers": [
         "bindings"
       ],
@@ -3946,6 +4090,15 @@
       "home": "target"
     },
     {
+      "path": "client/ui/segmented-control.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
       "path": "client/ui/settings-glyphs.tsx",
       "layers": [
         "bindings"
@@ -3965,6 +4118,24 @@
     },
     {
       "path": "client/ui/ToggleSwitch.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/ui/toast-store.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/ui/toast.tsx",
       "layers": [
         "bindings"
       ],
@@ -5674,6 +5845,24 @@
       "home": "outside"
     },
     {
+      "path": "shared/contracts/miniapp-tools.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/contracts/miniapp-window.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "shared/contracts/miniapp.ts",
       "layers": [
         "shared"
@@ -5852,6 +6041,15 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "client/features/plugins/ui/PluginPageLayout.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "plugins",
+      "home": "target"
     },
     {
       "path": "client/features/plugins/ui/PluginRow.public.tsx",

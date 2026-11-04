@@ -286,7 +286,8 @@
   .webui-mavis-button.webui-plugin-show-all {
     display: flex;
     width: fit-content;
-    margin: 8px 0 34px;
+    /* Centred in the content column it belongs to, not left against it. */
+    margin: 8px auto 34px;
   }
   /* Marketplace rows stay open at rest and reveal a rounded surface only
    * while hovered or keyboard-focused. */

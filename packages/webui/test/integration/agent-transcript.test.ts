@@ -559,7 +559,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await unrefreshedActions.getByRole("button", { name: "编辑" }).click();
     const unrefreshedEditor = unrefreshedUserMessage.getByTestId("user-message-inline-editor");
     await browserExpect(unrefreshedEditor).toBeVisible();
-    await browserExpect(unrefreshedEditor.getByRole("textbox", { name: "编辑" }))
+    await browserExpect(unrefreshedEditor.getByRole("textbox", { name: "消息内容" }))
       .toHaveValue("Message actions before refresh.");
     await unrefreshedEditor.getByRole("button", { name: "取消" }).click();
     await browserExpect(unrefreshedEditor).toHaveCount(0);
@@ -592,6 +592,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       // The shared dialog carries the test id on its surface, and the mask
       // that covers the viewport is the surface's parent.
       const mask = node.parentElement!;
+      const surfaceNode = node as HTMLElement;
       const dialog = mask.getBoundingClientRect();
       const surface = node.getBoundingClientRect();
       const buttons = [...node.querySelectorAll<HTMLButtonElement>(".webui-dialog-actions button")];
@@ -606,8 +607,8 @@ it("a real agent turn resumes after refresh and drains a queued message in order
         // The layout box is what centring is about: the surface is measured
         // while its enter animation is still running, and the rect carries
         // that movement.
-        centered: Math.abs(node.offsetLeft + node.offsetWidth / 2 - mask.clientWidth / 2) < 3 &&
-          Math.abs(node.offsetTop + node.offsetHeight / 2 - mask.clientHeight / 2) < 3,
+        centered: Math.abs(surfaceNode.offsetLeft + surfaceNode.offsetWidth / 2 - mask.clientWidth / 2) < 3 &&
+          Math.abs(surfaceNode.offsetTop + surfaceNode.offsetHeight / 2 - mask.clientHeight / 2) < 3,
         surfaceWithinViewport: surface.left >= 0 && surface.top >= 0 &&
           surface.right <= viewportWidth && surface.bottom <= viewportHeight,
         actionsReachable: buttons.length >= 2 && buttons.every((button) => {
@@ -721,7 +722,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await survivingActions.getByRole("button", { name: "编辑" }).click();
     const postRewindEditor = survivingUserMessage.getByTestId("user-message-inline-editor");
     await browserExpect(postRewindEditor).toBeVisible();
-    await browserExpect(postRewindEditor.getByRole("textbox", { name: "编辑" }))
+    await browserExpect(postRewindEditor.getByRole("textbox", { name: "消息内容" }))
       .toHaveValue("Message actions before refresh.");
     await postRewindEditor.getByRole("button", { name: "取消" }).click();
     await browserExpect(postRewindEditor).toHaveCount(0);
@@ -1221,6 +1222,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await browserExpect(mcpDialog).toBeVisible();
     const mcpGeometry = await mcpDialog.evaluate((node) => {
       const backdrop = node.parentElement;
+      const surfaceNode = node as HTMLElement;
       const rect = node.getBoundingClientRect();
       const backdropRect = backdrop!.getBoundingClientRect();
       const fields = node.querySelector(".webui-mcp-form-fields")!;
@@ -1232,8 +1234,8 @@ it("a real agent turn resumes after refresh and drains a queued message in order
         // The layout box is what centring is about: the surface is measured
         // while its enter animation is still running, and the rect carries
         // that movement. The mask is the frame it is centred in.
-        centered: Math.abs(node.offsetLeft + node.offsetWidth / 2 - (backdropRect.left + backdropRect.width / 2)) < 3 &&
-          Math.abs(node.offsetTop + node.offsetHeight / 2 - (backdropRect.top + backdropRect.height / 2)) < 3,
+        centered: Math.abs(surfaceNode.offsetLeft + surfaceNode.offsetWidth / 2 - (backdropRect.left + backdropRect.width / 2)) < 3 &&
+          Math.abs(surfaceNode.offsetTop + surfaceNode.offsetHeight / 2 - (backdropRect.top + backdropRect.height / 2)) < 3,
         insideViewport: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
         fieldsGrid: getComputedStyle(fields).display === "grid",
         controlsAligned: controls.length >= 3 && controls.every((control) => {
@@ -1322,7 +1324,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await forkUserActions.getByRole("button", { name: "编辑" }).click();
     const forkUserEditor = forkUserMessageById.getByTestId("user-message-inline-editor");
     await browserExpect(forkUserEditor).toBeVisible();
-    await forkUserEditor.getByRole("textbox", { name: "编辑" }).fill("Fork isolation probe edited.");
+    await forkUserEditor.getByRole("textbox", { name: "消息内容" }).fill("Fork isolation probe edited.");
     await forkUserEditor.getByRole("button", { name: "发送" }).click();
     await browserExpect.poll(() => requests.some((request) => request.operation === "editSessionMessage"))
       .toBe(true);

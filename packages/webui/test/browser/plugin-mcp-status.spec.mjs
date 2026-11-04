@@ -60,35 +60,19 @@ test("a server that cannot connect is labelled 连接失败 with its own reason"
   await openApp(page, "#session=A");
   await openMcpArea(page);
 
-  // The failure states come with their server's own reason as visible text —
-  // not a tooltip, because nobody hovers a row they believe is healthy.
-  const broken = rowOf(page, "broken-http").locator("[data-webui-mcp-status]");
-  await expect(broken).toHaveText("连接失败");
-  await expect(broken).toHaveAttribute("data-webui-mcp-status", "error");
-  const brokenReason = rowOf(page, "broken-http").locator("[data-webui-mcp-status-reason]");
-  await expect(brokenReason).toHaveText("MCP_CONNECTION_TIMEOUT: 握手超时（10s）");
-  const secondaryText = await page.evaluate(() => {
-    const probe = document.createElement("span");
-    probe.style.color = "var(--text_default_secondary)";
-    document.body.append(probe);
-    const color = getComputedStyle(probe).color;
-    probe.remove();
-    return color;
-  });
-  expect(await brokenReason.evaluate((node) => getComputedStyle(node).color))
-    .toBe(secondaryText);
-
-  const gone = rowOf(page, "gone-binary").locator("[data-webui-mcp-status]");
-  await expect(gone).toHaveText("不可用");
-  await expect(gone).toHaveAttribute("data-webui-mcp-status", "unavailable");
-  const goneReason = rowOf(page, "gone-binary").locator("[data-webui-mcp-status-reason]");
-  await expect(goneReason).toHaveText("MCP_COMMAND_NOT_FOUND: ./missing-bin");
+  // The row no longer carries a status chip: it lists the server and its own
+  // actions, and the state is read where the server is opened. What this pins is
+  // that a failing server is still listed — the row is where the person starts —
+  // and that no stale chip is drawn beside it.
+  await expect(rowOf(page, "broken-http")).toBeVisible();
+  await expect(rowOf(page, "gone-binary")).toBeVisible();
+  await expect(page.locator("[data-webui-mcp-status]")).toHaveCount(0);
 });
 
-test("the calm states are labelled too, so trouble has honest neighbours", async ({ page }) => {
-  // Without the quiet half, every label would read as an alarm: a panel that
-  // says 未连接 on a resting server and 连接失败 on a dead one is legible;
-  // one that says nothing except on failure is a trap.
+test("every server state is listed, and none of them invents a status chip", async ({ page }) => {
+  // The chip was removed from the row on purpose. What the list still owes every
+  // state — connected, resting, disabled — is a row of its own, so a server is
+  // reachable whatever its state.
   await stageMcpServers(page, [
     { name: "ok-stdio", transport: "stdio", enabled: true, status: "available", available: true },
     { name: "idle", transport: "stdio", enabled: true, status: "configured", available: false },
@@ -97,11 +81,8 @@ test("the calm states are labelled too, so trouble has honest neighbours", async
   await openApp(page, "#session=A");
   await openMcpArea(page);
 
-  await expect(rowOf(page, "ok-stdio").locator("[data-webui-mcp-status]")).toHaveText("已连接");
-  await expect(rowOf(page, "idle").locator("[data-webui-mcp-status]")).toHaveText("未连接");
-  await expect(rowOf(page, "off").locator("[data-webui-mcp-status]")).toHaveText("已停用");
-  // And no row invents a reason where the runtime gave none.
-  await expect(page.locator("[data-webui-mcp-status-reason]")).toHaveCount(0);
+  for (const name of ["ok-stdio", "idle", "off"]) await expect(rowOf(page, name)).toBeVisible();
+  await expect(page.locator("[data-webui-mcp-status]")).toHaveCount(0);
 });
 
 test("a late MCP detail cannot attach to a different management selection", async ({ page }) => {
@@ -116,7 +97,10 @@ test("a late MCP detail cannot attach to a different management selection", asyn
   });
   await openApp(page, "#session=A");
   await openMcpArea(page);
-  await rowOf(page, "delayed-server").getByRole("button", { name: "编辑" }).click();
+  // A row's actions are its own menu: the trigger names the row, the item is
+  // portal-rendered.
+  await rowOf(page, "delayed-server").getByRole("button", { name: /更多操作/u }).click();
+  await page.getByRole("menuitem", { name: "编辑" }).click();
   await expect.poll(() => page.evaluate(() =>
     window.__fixture.requests.some((request) =>
       request.operation === "pluginManagement" && request.body.action === "getMcpServer",

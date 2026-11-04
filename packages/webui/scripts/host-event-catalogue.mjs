@@ -17,6 +17,9 @@ const eventName = /^(?:session|message|agent|rotation|content|turn|stream|permis
 const excludedSources = [
   path.join("service", "miniapp", "agent", "contracts.ts"),
   path.join("service", "miniapp", "agent", "gateway.ts"),
+  // The `agent.observe` watches: the settled-turn event a page reads is the
+  // same never-on-the-bus vocabulary, projected to that page's bridge.
+  path.join("service", "miniapp", "agent", "observations.ts"),
   path.join("service", "miniapp", "agent", "session-ports.ts"),
   path.join("service", "miniapp", "agent", "session-ports-projection.ts"),
   // The child IPC connector answers those same run frames over the parent/child channel.

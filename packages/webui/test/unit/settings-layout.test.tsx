@@ -127,7 +127,11 @@ describe("the shared settings skeleton", () => {
       "webui-settings-divider",
     ]) {
       expect(shell.includes(`.${className} {`), `shell.css does not declare ${className}`).toBe(true);
-      expect(settings.includes(`.${className} {`), `settings.css declares ${className} too`).toBe(false);
+      // A scoped override (`:has(...) > .webui-settings-page {`) is a different
+      // rule from the frame's own declaration, so this looks for a base
+      // selector: start of line, or after a closed rule, with nothing between.
+      const baseDeclaration = new RegExp(`(?:^|[},])\\s*\\.${className}\\s*\\{`, "mu");
+      expect(baseDeclaration.test(settings), `settings.css declares ${className} too`).toBe(false);
     }
   });
 

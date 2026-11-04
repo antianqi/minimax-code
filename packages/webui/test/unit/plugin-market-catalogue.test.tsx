@@ -330,13 +330,13 @@ describe("plugin marketplace data paths", () => {
       headerStart,
       marketplaceContentStart,
     );
-    // The marketplace branch in the same span is the catalogue pair.
-    expect(managingHeader).toContain(
-      'onClick={() => selectMarketCatalog("plugins")}',
-    );
-    expect(managingHeader).toContain(
-      'onClick={() => selectMarketCatalog("skills")}',
-    );
+    // The catalogue pair in the same span is the shared segmented control:
+    // what the rule protects is that both areas stay reachable from the header,
+    // not the call syntax a pair of buttons used.
+    expect(managingHeader).toContain('ariaLabel="插件与技能"');
+    expect(managingHeader).toContain('{ value: "plugins", label: "插件" }');
+    expect(managingHeader).toContain('{ value: "skills", label: "技能" }');
+    expect(managingHeader).toContain("onChange={(nextArea) => selectMarketCatalog(nextArea)}");
     // The 管理 entry is what actually opens the installed view. It renders the
     // shared button, so the stable hook is its test id rather than a literal
     // `>管理</button>` string.

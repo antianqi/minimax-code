@@ -911,9 +911,10 @@ test("a refused fourth start names the running Mini Apps and frees a slot from t
   await expect(picker.getByTestId("miniapp-picker-running")).toContainText("看板、笔记、画板");
 
   await picker.getByTestId("miniapp-picker-row-demo.fourth").getByRole("button", { name: "打开" }).click();
-  const capacity = picker.getByTestId("miniapp-picker-capacity");
+  // The capacity refusal is an event, so it is said through the shared notice
+  // host (ADR 0030) rather than drawn inside the picker.
+  const capacity = page.locator('[data-webui-toast="true"]').filter({ hasText: "同时最多运行 3 个 Mini App" });
   await expect(capacity).toBeVisible();
-  await expect(capacity).toContainText("同时最多运行 3 个 Mini App");
   await expect(capacity).toContainText("看板、笔记、画板");
   await expect(capacity).toContainText("请先停止一个再打开");
 
@@ -1038,6 +1039,7 @@ test("the apps area uses installed plugin metadata and has no separate install b
   await expect(apps.getByTestId("miniapp-app-status-minimax-stocks")).toHaveAttribute("data-status", "unavailable");
   await expect(apps.getByTestId("miniapp-app-status-market-disabled")).toHaveAttribute("data-status", "disabled");
   await expect(apps.getByTestId("miniapp-app-market-disabled")).toContainText("已停用");
-  await expect(apps.getByTestId("miniapp-app-market-disabled").getByRole("button", { name: "启用" })).toBeVisible();
+  // Enabling a disabled Mini App is the row's own switch, named 启用 <name>.
+  await expect(apps.getByTestId("miniapp-app-market-disabled").getByRole("switch", { name: /^启用/u })).toBeVisible();
   await expect(apps.getByRole("button", { name: "安装 Mini App" })).toHaveCount(0);
 });

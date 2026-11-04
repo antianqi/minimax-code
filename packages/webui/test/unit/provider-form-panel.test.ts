@@ -47,9 +47,13 @@ describe("the parent keeps the lifetime", () => {
     expect(effect).toContain("settings?.loadModelSource()");
     expect(effect).toContain("account?.loadCodexOAuthStatus()");
     expect(parent).toContain("}, [sessionId]);");
-    // and NOT in the panel: a panel-side preload would run per mount
+    // and NOT in the panel: a panel-side preload would run per mount. The panel
+    // may register its own toolbar action in an effect; what it must not do is
+    // load, so the reads are what this forbids.
     expect(panel).not.toContain("loadProviders()");
-    expect(panel).not.toContain("useEffect(");
+    expect(panel).not.toContain("loadUsage()");
+    expect(panel).not.toContain("loadApiKeyStatus()");
+    expect(panel).not.toContain("loadModelSource()");
   });
 
   it("LC-3 keeps the quota clock in the parent and the OAuth poll in its owner", () => {
@@ -89,8 +93,11 @@ describe("the parent keeps the lifetime", () => {
     const branch = parent.slice(parent.indexOf('data-testid="settings-custom-models-panel"'));
     expect(branch).toContain("<ProviderFormPanel");
     expect(parent.match(/<ProviderFormPanel/gu) ?? []).toHaveLength(1);
-    // The OAuth surface is `settings`', so it stayed in the parent, after the panel.
-    expect(branch.indexOf("<ProviderFormPanel")).toBeLessThan(branch.indexOf("Codex OAuth"));
+    // The OAuth surface is `settings`'. Those controls moved into the page
+    // toolbar, which sits above the custom-models section, so source order no
+    // longer says who owns them — ownership does.
+    expect(panel).not.toContain("Codex OAuth");
+    expect(parent).toContain("Codex OAuth");
   });
 });
 
@@ -101,7 +108,9 @@ describe("the form carries every model field", () => {
     expect(form).toContain("editor.addModel()");
     expect(form).toContain("editor.removeModel(");
     expect(form).toContain("editor.changeModel(");
-    expect(form).toContain("editor.testModel(");
+    // Per-model tests are actions on saved list rows; draft rows stay compact.
+    expect(form).toContain("function ProviderModelCard(");
+    expect(form).not.toContain("editor.testModel(");
     // Picking another preset drops the models the previous one carried.
     expect(form).toContain("editor.clearModels()");
     // The API format is a choice among the formats the runtime accepts, and it
@@ -124,6 +133,20 @@ describe("the form carries every model field", () => {
     // The textarea of ids is gone: one id belongs to one row now.
     expect(panel).not.toContain("modelIdText");
     expect(panel).not.toContain("<textarea");
+  });
+
+  it("keeps add/discovery rows compact and renders attachment choices through the shared button contract", () => {
+    const compactRow = between(panel, "function ProviderModelCard(", "function EffortOptionsField(");
+    expect(compactRow).toContain("aria-label=\"模型名称\"");
+    expect(compactRow).not.toContain("上下文窗口");
+    expect(compactRow).not.toContain("支持的附件");
+
+    const attachmentField = between(panel, "function AttachmentField(", "function SortableModelRow(");
+    expect(attachmentField).toContain('role="group" aria-label="支持的附件类型"');
+    expect(attachmentField).toContain('variant="segmented"');
+    expect(attachmentField).toContain("aria-pressed={value.includes(modality)}");
+    expect(panel).toContain('{ value: "pdf", label: "PDF", Icon: IconFileTypePdf }');
+    expect(attachmentField).not.toContain("WebuiCheckbox");
   });
 });
 
@@ -154,10 +177,13 @@ describe("the panel keeps the reset boundary", () => {
     // names them: it calls the editor, and the editor is what sends them.
     expect(panel).not.toContain("commands.saveCandidate(");
     expect(panel).not.toContain("commands.testCandidate(");
-    expect(panel).not.toContain("commands.deleteProvider(");
+    // Deletion is a list action: the row's draft is not open when the row's own
+    // delete is pressed, so the panel hands the id to the list-level command
+    // rather than the editor's remove.
+    expect(panel).toContain("commands.deleteProvider(");
+    expect(panel).not.toContain("editor.remove()");
     expect(panel).toContain("editor.save()");
     expect(panel).toContain("editor.test()");
-    expect(panel).toContain("editor.remove()");
     expect(panel).not.toContain("useWebuiSettingsWorkflows");
     expect(panel).not.toContain("application/");
   });

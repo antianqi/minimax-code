@@ -380,7 +380,10 @@ describe("WebUI compiled stylesheet", () => {
       // glyph, and the old class went with it.
       /\.webui-project-empty\s*\{/u,
       /\.webui-transcript-empty-state\s*\{/u,
-      /\.webui-control:focus-visible/u,
+      // The controls' focus state is a recoloured border, not an outer ring
+      // (design language: "the same blue border on focus, without an outer
+      // ring"), so the compiled rule is `:focus`, not `:focus-visible`.
+      /\.webui-control:focus\b/u,
       /\.webui-mavis-button-accent:focus-visible/u,
       /\.webui-mavis-button-grouped:focus-visible/u,
       // The conversation surface: the message blocks, the user bubble, the

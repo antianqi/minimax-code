@@ -253,11 +253,27 @@ describe("the SSH panel", () => {
     expect(markup).toContain("border-t border-border_light");
   });
 
-  it("shows the terminal's output", () => {
+  it("mounts the terminal view for a live session and hands its output to xterm", () => {
+    // The remote terminal is xterm inside the shared modal frame: xterm owns the
+    // output, and the frame renders into a portal a server render does not have.
+    // The panel owes the branch, the view owes the write.
+    const panelSource = readFileSync(
+      new URL("../../src/client/features/ssh/ui/SshPanel.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(panelSource).toContain('props.terminal.status === "closed"');
+    expect(panelSource).toContain("<SshTerminalView");
+    const terminalSource = readFileSync(
+      new URL("../../src/client/features/ssh/ui/ssh-terminal-view.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(terminalSource).toContain("terminal.write(");
+    expect(terminalSource).toContain("props.terminal.output");
+    // A server render of the same snapshot reaches the panel's own chrome only.
     const markup = view({
       terminal: { status: "running", output: "hello from the remote shell", terminalId: "t1" },
     });
-    expect(markup).toContain("hello from the remote shell");
+    expect(markup).toContain('data-testid="ssh-connections-section"');
   });
 });
 

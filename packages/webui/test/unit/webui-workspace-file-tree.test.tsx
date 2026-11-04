@@ -79,7 +79,7 @@ describe("workspace file tree metadata column", () => {
     expect(markup).toContain("10 B");
   });
 
-  it("keeps collapsed directory content mounted but hidden through the shared disclosure", () => {
+  it("mounts a directory's content on first open and hides it while collapsed", () => {
     const markup = renderTree([
       {
         path: "src",
@@ -94,8 +94,10 @@ describe("workspace file tree metadata column", () => {
     expect(markup).toContain('data-webui-motion-state="collapse"');
     expect(markup).toMatch(/aria-hidden="true"[^>]*class="webui-motion webui-file-tree-disclosure"/u);
     expect(markup).toContain('class="webui-disclosure-content"');
-    // Retaining children lets the shared collapse transition finish.
-    expect(markup).toContain("a.ts");
+    // The shared disclosure mounts its content on first open and retains it
+    // afterwards, so a folder nobody has opened renders no children at all —
+    // the shell, its motion state and its hidden content box are what exist.
+    expect(markup).not.toContain("a.ts");
   });
 
   it("renders the metadata without a container element when both fields are missing", () => {

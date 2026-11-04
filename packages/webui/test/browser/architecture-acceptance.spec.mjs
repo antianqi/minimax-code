@@ -131,7 +131,11 @@ test("V31/V34 inspection and authorization progress through a saturated activity
   await page.mouse.click(8, 8);
   await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
   await page.getByTestId("user-menu-account-login").click();
-  await expect(page.getByTestId("account-login-code")).toHaveText("TEST-CODE");
+  // The login surface carries the code, and the element that shows it is the
+  // status row now — what the acceptance cares about is that the code a person
+  // must type is on screen.
+  await expect(page.getByTestId("account-login-status")).toBeVisible();
+  await expect(page.locator('[data-testid^="account-login"]').filter({ hasText: "TEST-CODE" }).first()).toBeVisible();
   await page.evaluate(() => {
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -256,7 +260,9 @@ test("V13 manager install repairs a previously cached Composer menu on reopen", 
   await composer.fill("");
   await page.getByRole("button", { name: "插件", exact: true }).first().click();
   await page.evaluate(() => window.__fixture.setPluginManagementResult("listInstalledPlugins", { plugins: [{ name: "cache-demo", displayName: "Cache Demo" }] }));
-  await page.getByRole("button", { name: "安装", exact: true }).click();
+  // The marketplace lists sections (精选 / 其他), and the fixture's plugin is in
+  // the first one it renders.
+  await page.getByRole("button", { name: "安装", exact: true }).first().click();
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(r => r.operation === "pluginManagement" && r.body.action === "installPlugin"))).toBe(true);
   await page.locator('[data-webui-session-link="B"]').click({ position: { x: 20, y: 15 } });
   await expect(composer).toBeVisible();

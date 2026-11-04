@@ -38,7 +38,25 @@ function page() {
       if (name === "message") listeners.push(handler);
     },
   };
-  runInNewContext(miniAppPageBridge().script, { window, Map, Math, Date, Promise, Error });
+  // The page script reads these at load: it measures the page's own background
+  // (`document.documentElement` / `document.body`) and watches for the host
+  // painting over it (`MutationObserver`). A served document has all three; this
+  // context is a bare vm, so the harness supplies them.
+  const surface = {
+    style: {
+      getPropertyValue: () => "",
+      getPropertyPriority: () => "",
+      setProperty: () => undefined,
+      removeProperty: () => undefined,
+    },
+    classList: { contains: () => false, toggle: () => undefined },
+  };
+  class MutationObserverStub {
+    observe() {}
+    disconnect() {}
+  }
+  const document = { documentElement: surface, body: surface };
+  runInNewContext(miniAppPageBridge().script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
   const agent = (window.mcode as { miniapp: { agent: AgentApi } }).miniapp.agent;
 
   const deliver = (data: Record<string, unknown>) => {

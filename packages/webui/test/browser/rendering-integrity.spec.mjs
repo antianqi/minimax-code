@@ -273,7 +273,8 @@ const SURFACES = [
         data: { providers: [], presets: PRESETS },
         open: async (page) => {
           await openCustomModels(page);
-          await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+          await page.getByRole("dialog", { name: "设置" })
+            .getByRole("button", { name: "添加模型", exact: true }).click();
           await expect(formDialog(page)).toBeVisible();
         },
       },

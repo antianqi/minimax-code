@@ -111,7 +111,7 @@ describe("the panel's rows", () => {
 describe("the rendered panel", () => {
   const render = (snapshot: Parameters<typeof SchedulingPanelView>[0]["snapshot"]) =>
     renderToStaticMarkup(
-      SchedulingPanelView({
+      createElement(SchedulingPanelView, {
         snapshot,
         nowMs: 0,
         onClose: () => undefined,
@@ -148,11 +148,19 @@ describe("the rendered panel", () => {
     expect(markup).toContain(WEBUI_SCHEDULING_EMPTY_TEXT);
   });
 
-  it("shows a read failure without pretending the list is empty", () => {
+  it("reports a read failure through the notice host instead of pretending the list is empty", () => {
     const markup = render({ status: "error", tasks: [], error: WEBUI_SCHEDULING_UNAVAILABLE });
-    expect(markup).toContain('data-webui-scheduling-error="true"');
-    expect(markup).toContain(WEBUI_SCHEDULING_UNAVAILABLE);
+    // A failure is an event (ADR 0030): it is raised through the shared notice
+    // host, which is drawn over the page, so a server render never contains it.
+    // What the panel's own markup must not do is claim the list is empty.
     expect(markup).not.toContain('data-webui-scheduling-empty="true"');
+    expect(markup).not.toContain(WEBUI_SCHEDULING_EMPTY_TEXT);
+    const source = readFileSync(
+      new URL("../../src/client/features/scheduling/ui/SchedulingPanel.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("useWebuiToastError(snapshotError");
+    expect(source).toContain('"data-webui-scheduling-error": "true"');
   });
 
   it("keeps the last good rows on screen while a refresh is in flight", () => {
@@ -411,7 +419,7 @@ describe("the run history", () => {
   it("renders the open history with a way into the session it produced", () => {
     const runs = new Map([["cron-1", [run()]]]);
     const markup = renderToStaticMarkup(
-      SchedulingPanelView({
+      createElement(SchedulingPanelView, {
         snapshot: { status: "ready", tasks: [task()], loadedAtMs: 1 },
         nowMs: 0,
         onClose: () => undefined,

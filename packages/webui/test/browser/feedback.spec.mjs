@@ -43,7 +43,8 @@ async function openSettingsPage(page, menuKey) {
 test("a dynamic field error is announced once and stays associated with its control", async ({ page }) => {
   await openSettingsPage(page, "usage");
   await page.getByRole("button", { name: "自定义模型" }).click();
-  await page.locator('[data-testid="settings-custom-models-panel"]').getByRole("button", { name: "添加模型" }).click();
+  // The action sits in the page toolbar, outside the panel it opens the form from.
+  await page.getByRole("dialog", { name: "设置" }).getByRole("button", { name: "添加模型", exact: true }).click();
   const form = page.getByRole("dialog", { name: "添加模型" });
   await expect(form).toBeVisible();
 

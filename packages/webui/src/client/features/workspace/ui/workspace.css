@@ -217,7 +217,7 @@
   .webui-miniapp-launcher-popover { position: fixed; z-index: 150; display: flex; width: min(700px, calc(100vw - 32px)); max-height: min(57.4vh, 574px); flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, var(--border_light) 68%, transparent); border-radius: 26px; background: color-mix(in srgb, var(--bg_default_secondary) 62%, transparent); box-shadow: 0 24px 72px color-mix(in srgb, #000 24%, transparent), inset 0 1px color-mix(in srgb, #fff 64%, transparent); -webkit-backdrop-filter: blur(48px) saturate(1.5); backdrop-filter: blur(48px) saturate(1.5); color: var(--text_default_primary); }
   .webui-miniapp-launcher-heading { display: flex; min-height: 56px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--spacing_16); border-bottom: 1px solid color-mix(in srgb, var(--border_light) 68%, transparent); padding: 12px 16px; }
   .webui-miniapp-launcher-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-  .webui-miniapp-launcher-heading h2 { margin: 0; font-size: var(--size_18); font-weight: var(--weight_medium); line-height: var(--line_height_24); }
+  .webui-miniapp-launcher-heading h2 { margin: 0; font-size: var(--size_16); font-weight: var(--weight_medium); line-height: var(--line_height_22); }
   .webui-miniapp-launcher-heading > div > span { color: var(--text_default_tertiary); font-size: var(--size_12); }
   .webui-miniapp-launcher-grid { display: grid; overflow: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; }
   .webui-miniapp-launcher-card { position: relative; display: flex; width: 80%; min-width: 0; justify-self: center; flex-direction: column; border: 1px solid color-mix(in srgb, var(--border_light) 62%, transparent); border-radius: 20px; background: color-mix(in srgb, var(--bg_default_primary) 52%, transparent); padding: 12px; text-align: left; }
@@ -225,7 +225,7 @@
   .webui-miniapp-launcher-loading-icon { width: 80%; height: auto; aspect-ratio: 1; align-self: center; border-radius: 16px; }
   .webui-miniapp-launcher-open, .webui-miniapp-launcher-face { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: stretch; gap: 12px; border: 0; background: transparent; color: var(--text_default_primary); text-align: left; }
   .webui-miniapp-launcher-open { cursor: pointer; padding: 0; }
-  .webui-miniapp-launcher-open:focus-visible { outline: 2px solid var(--border_interaction_focus); outline-offset: 4px; border-radius: 12px; }
+  .webui-miniapp-launcher-open:focus-visible { outline: 2px solid var(--border_accent); outline-offset: 4px; border-radius: 12px; }
   .webui-miniapp-launcher-card-heading { display: flex; min-width: 0; align-items: center; }
   .webui-miniapp-launcher-name { display: block; min-width: 0; overflow: hidden; font-size: var(--size_14); font-weight: var(--weight_medium); text-overflow: ellipsis; white-space: nowrap; }
   .webui-miniapp-launcher-preview { position: relative; display: grid; width: 80%; aspect-ratio: 1; place-items: center; align-self: center; overflow: visible; border-radius: 14px; background: transparent; }

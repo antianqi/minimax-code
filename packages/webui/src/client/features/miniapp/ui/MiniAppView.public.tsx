@@ -47,6 +47,7 @@ import {
   WEBUI_MINIAPP_BRIDGE_APPEND_REPLY,
   type WebuiMiniAppComposerResult,
 } from "../../../../shared/contracts/miniapp.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { useWebuiComposerStore } from "../../../bindings/composer-store.js";
 import {
   useWebuiMiniAppWorkflows,
@@ -145,6 +146,7 @@ export function MiniAppView({
   mountTarget,
   onWindowModeChange,
 }: MiniAppViewProps): ReactElement {
+  const { dom } = useWebuiBrowserCapabilities();
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const composer = useWebuiComposerStore();
@@ -201,9 +203,7 @@ export function MiniAppView({
   } | null>(null);
   // Keep one portal target for the iframe's full lifetime. Moving it between React
   // parents would reload the cross-origin document and discard the Mini App's state.
-  const [framePortalTarget] = useState<HTMLElement | null>(() =>
-    typeof document === "undefined" ? null : document.body,
-  );
+  const [framePortalTarget] = useState<HTMLElement | null>(() => dom.portalTarget());
   /**
    * The box this view draws the page in.
    *

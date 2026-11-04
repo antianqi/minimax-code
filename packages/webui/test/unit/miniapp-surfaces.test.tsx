@@ -149,10 +149,24 @@ describe("the plugin catalogue's apps area", () => {
     // The failure is said in words: the code names the failure for other
     // programs, and the person needs what it means.
     expect(markup).toContain("启动失败（进程启动失败）");
-    // stop, uninstall and disable are all reachable from the row.
-    expect(markup).toContain("停止");
-    expect(markup).toContain("卸载");
-    expect(markup).toContain("停用");
+    // The row's actions are a menu, and its popup is portal-rendered only while
+    // it is open: the rendered row carries the trigger and its name, the items
+    // are pinned against the component's own source. Enabling is the row's
+    // switch rather than a menu item.
+    expect(markup).toContain('aria-label="dashboard 应用的更多操作"');
+    expect(markup).toMatch(/role="switch"[^>]*aria-label="启用 dashboard 应用"/u);
+    const appsListSource = readFileSync(
+      new URL("../../src/client/features/miniapp/ui/MiniAppAppsList.public.tsx", import.meta.url),
+      "utf8",
+    );
+    for (const action of [
+      "data-testid={`miniapp-app-open-${row.pluginId}`}",
+      "data-testid={`miniapp-app-stop-${row.pluginId}`}",
+      "data-testid={`miniapp-app-permissions-${row.pluginId}`}",
+    ]) {
+      expect(appsListSource, `row menu lost ${action}`).toContain(action);
+    }
+    expect(appsListSource).toContain("卸载");
   });
 
   it("leaves the refusal another client owns to the toast, and keeps the row", async () => {
@@ -205,8 +219,13 @@ describe("the plugin catalogue's apps area", () => {
     // Each attribute is asserted on its own: the row renders `data-testid`,
     // `aria-label`, `disabled` and `title`, and a substring that spans two of
     // them pins the attribute order instead of the state the test is about.
-    expect(apps).toContain('data-testid="miniapp-app-open-shared"');
-    expect(apps).toMatch(/data-testid="miniapp-app-open-shared"[^>]*disabled=""/u);
+    // The launch item is inside the row's menu, so its disabled state is pinned
+    // in the source: an owned-elsewhere row cannot be opened from here.
+    const appsListSource = readFileSync(
+      new URL("../../src/client/features/miniapp/ui/MiniAppAppsList.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(appsListSource).toMatch(/disabled=\{\s*state\.opening === row\.pluginId \|\| row\.ownedElsewhere\s*\}/u);
     expect(picker).toContain('data-testid="miniapp-picker-open-shared"');
     expect(picker).toMatch(/data-testid="miniapp-picker-open-shared"[^>]*disabled=""/u);
   });
@@ -252,10 +271,14 @@ describe("the plugin catalogue's apps area", () => {
     // says so rather than showing a runtime state it does not have.
     expect(markup).toContain("disabled-one 应用");
     expect(markup).toContain("已停用");
-    expect(markup).toContain("启用");
-    // The enabled row keeps its start and stop actions.
+    expect(markup).toMatch(/role="switch"[^>]*aria-label="启用 disabled-one 应用"/u);
+    // The enabled row keeps its start action, which lives in the row's menu.
     expect(markup).toContain("enabled-one 应用");
-    expect(markup).toContain("打开");
+    const appsListSource = readFileSync(
+      new URL("../../src/client/features/miniapp/ui/MiniAppAppsList.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(appsListSource).toContain(': "打开"');
   });
 
   it("offers standalone viewing only when the WebUI deep link has a selected session", async () => {
@@ -275,10 +298,16 @@ describe("the plugin catalogue's apps area", () => {
       createElement(MiniAppAppsList, { selectedSessionId: "session-1" }),
       workflows,
     );
-    expect(withSession).toContain("查看");
-    // The action is the shared button now; what the row promises is its
-    // accessible name and its visible label.
-    expect(withSession).toMatch(/<button[^>]*aria-label="查看"[^>]*title="[^"]+"[^>]*>[^<]*查看<\/button>/u);
+    // The standalone view is a row-menu item: it renders only after the page has
+    // opened the app and the client has a session to link to, and the popup is
+    // portal-rendered, so the source is what pins it.
+    const appsListSource = readFileSync(
+      new URL("../../src/client/features/miniapp/ui/MiniAppAppsList.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(appsListSource).toContain('opened?.kind === "open" && standaloneHref !== undefined');
+    expect(appsListSource).toContain("在独立标签页中查看 Mini App");
+    expect(withSession).toContain("dashboard 应用");
   });
 
   it("says the capability is absent through the toast, and shows the empty state", () => {

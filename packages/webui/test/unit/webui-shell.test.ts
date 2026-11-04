@@ -217,18 +217,25 @@ function renderSessionShell(): string {
   );
 }
 
-/** The rail destinations the WebUI has no feature for. */
-// The 远程 row left this list when the remote page shipped: it opens the 远程
-// page — the phone pairing tab and the 接入 IM tab — so it is bound rather than
-// a placeholder.
-const INERT_NAV_LABELS = ["网站"];
+/**
+ * The rail destinations the WebUI has no feature for.
+ *
+ * The list is empty: 远程 left it when the remote page shipped, and 网站 left it
+ * when the 应用 launcher replaced that placeholder row with a bound one. The
+ * assertions below still run — an inert row that came back would put its marker
+ * back into the shell, and the count would no longer be zero.
+ */
+const INERT_NAV_LABELS: readonly string[] = [];
 
 describe("WebUI shell", () => {
   it("gives compact vertical stacks clear spacing while a page is loading", () => {
     const markup = renderToStaticMarkup(createElement(
       WebuiPage,
       { loading: true },
-      createElement(WebuiStack, { gap: "hairline" }, createElement("div", null, "first"), createElement("div", null, "second")),
+      createElement(WebuiStack, {
+        gap: "hairline",
+        children: [createElement("div", null, "first"), createElement("div", null, "second")],
+      }),
     ));
     expect(markup).toContain("webui-stack--gap-small");
     expect(markup).not.toContain("webui-stack--gap-hairline");
@@ -254,12 +261,25 @@ describe("WebUI shell", () => {
 
     const reviewState = reduceWorkspacePanelState(state, { type: "open-workspace-review", sessionId: "session-1", workspaceDir: "/tmp" });
     const reviewMarkup = renderToStaticMarkup(createElement(WebuiWorkspacePanel, { state: reviewState, dispatch: () => undefined, workspaceDir: "/tmp" }));
-    for (const toolbarButton of ["expand", "layout", "context", "tree"]) {
-      expect(reviewMarkup).toContain(`data-testid="workspace-review-toolbar-${toolbarButton}"`);
+    // The toolbar's actions are named by their own test ids, so the set is the
+    // measurement: a capture between the toolbar's opening tag and its first
+    // `</div>` stops inside the search field's wrapper and counts nothing.
+    const toolbarActions = [
+      ...reviewMarkup.matchAll(/data-testid="workspace-review-toolbar-([a-z-]+)"/gu),
+    ].map((match) => match[1] ?? "").sort();
+    expect(toolbarActions).toEqual(["context", "expand", "layout", "tree"]);
+    // Each action is an icon button: the glyph is the visible content and the
+    // name is its accessible label. The tag is read around the test id rather
+    // than matched as one pattern, because the attribute order is the
+    // component's.
+    for (const action of toolbarActions) {
+      const at = reviewMarkup.indexOf(`data-testid="workspace-review-toolbar-${action}"`);
+      const tag = reviewMarkup.slice(reviewMarkup.lastIndexOf("<", at), reviewMarkup.indexOf(">", at) + 1);
+      expect(tag, `${action} is not a control`).toMatch(/^<button\b/u);
+      expect(tag, `${action} has no accessible name`).toMatch(/aria-label="[^"]+"/u);
+      const body = reviewMarkup.slice(reviewMarkup.indexOf(">", at) + 1, reviewMarkup.indexOf("</button>", at));
+      expect(body, `${action} draws no icon`).toMatch(/<svg\b/u);
     }
-    const toolbarMarkup = reviewMarkup.match(/<div class="webui-workspace-review-toolbar"[^>]*>(.*?)<\/div>/u)?.[1] ?? "";
-    expect([...toolbarMarkup.matchAll(/<button\b/gu)]).toHaveLength(4);
-    expect([...toolbarMarkup.matchAll(/<svg\b/gu)]).toHaveLength(4);
   });
 
   it("renders Desktop-compatible Subagents and exposes child selection", () => {
@@ -1209,7 +1229,10 @@ describe("WebUI shell — desktop anatomy", () => {
     const html = renderShell();
 
     expect(html).toMatch(/text-text_default_primary/u);
-    expect(html).toMatch(/text-text_default_tertiary/u);
+    // The tertiary text token is used as a fill here (the rail grip); the shell
+    // no longer paints a tertiary *text* colour, so the sample follows the
+    // declaration that carries it.
+    expect(html).toMatch(/bg-text_default_tertiary/u);
     expect(html).toMatch(/text-icon_default_tertiary/u);
     expect(html).toMatch(/border-border_default/u);
 
@@ -1321,7 +1344,9 @@ describe("WebUI shell — desktop anatomy", () => {
     // used to go INERT whenever the catalogue was momentarily empty, which is
     // what left a user staring at a chip that would not open -- and a reload
     // was the only thing that brought it back.
-    expect(operable).toHaveLength(13);
+    // The 应用 launcher joined the ledger when it replaced the inert 网站 row.
+    expect(operable).toHaveLength(14);
+    expect(html).toMatch(/data-webui-nav-item="应用"/u);
     expect(html).toMatch(/data-webui-model-selector="true"/u);
     expect(html).not.toMatch(/data-webui-model-selector="true"[^>]*\sdisabled/u);
     expect(html).toMatch(/data-testid="composer-add-menu"/u);
@@ -2412,7 +2437,16 @@ describe("WebUI composer app-to-helper seam", () => {
     );
 
     expect(markup).toContain("项目绝对路径");
-    expect(markup).toContain("使用此目录");
+    expect(markup).toContain('data-webui-workspace-manual="true"');
+    // The two actions belong to the dialog frame: `WebuiDialogActions` renders
+    // through the footer context, and the frame needs a portal target that a
+    // server render does not have. What the browser owns is handing them to it.
+    const browserSource = readFileSync(
+      new URL("../../src/client/features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(browserSource).toContain("<WebuiDialogActions>");
+    expect(browserSource).toContain("使用此目录");
   });
 
   it("migrates the in-flight home turn into the created session and leaves home clean", async () => {

@@ -118,6 +118,16 @@ export function WebuiInteractionPanel({
       message: selectedOther ? "请输入自定义回答。" : "请选择一个选项。",
     };
   });
+  /**
+   * Whether the step on screen can be left.
+   *
+   * 下一步 says so on the control as well as at the press: a step whose required
+   * answer is missing disables it, so the person is not offered a button whose
+   * only answer is an error under the field they just left.
+   */
+  const activeStepField = requiredFields.find((field) => field.name === activeStep?.id);
+  const stepAnswered =
+    activeStepField === undefined || !activeStepField.required || activeStepField.value.trim().length > 0;
   return (
     <WebuiStack
       gap="medium"
@@ -445,7 +455,7 @@ export function WebuiInteractionPanel({
           </div>
           <WebuiInline gap="small" wrap className="webui-questionnaire-actions">
             {questionnaire.steps.length > 1 && currentStep > 0 ? <WebuiButton variant="grouped" size="pill" disabled={submitting} data-testid="questionnaire-back" onClick={() => setCurrentStep((value) => Math.max(0, value - 1))}>上一步</WebuiButton> : null}
-            {questionnaire.steps.length > 1 && currentStep < questionnaire.steps.length - 1 ? <WebuiButton variant="accent" size="action" disabled={submitting} data-testid="questionnaire-next" onClick={() => {
+            {questionnaire.steps.length > 1 && currentStep < questionnaire.steps.length - 1 ? <WebuiButton variant="accent" size="action" disabled={submitting || !stepAnswered} data-testid="questionnaire-next" onClick={() => {
               const activeField = requiredFields.find((field) => field.name === activeStep?.id);
               if (!validateRequired(activeField ? [activeField] : [])) return;
               setCurrentStep((value) => Math.min(questionnaire.steps.length - 1, value + 1));

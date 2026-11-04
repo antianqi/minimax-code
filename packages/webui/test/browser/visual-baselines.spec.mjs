@@ -199,10 +199,12 @@ test("plugin marketplace and skills catalogue layout baselines", async ({ page }
 
   const surface = page.getByTestId("plugin-management");
   const pluginGrid = surface.locator(".webui-plugin-grid");
-  await expect(pluginGrid.locator(".webui-plugin-row")).toHaveCount(2);
-  const grid = await pluginGrid.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
+  // The catalogue is sectioned (精选 / 其他), so each row still sits in a
+  // two-column grid and the surface lists four of them.
+  await expect(pluginGrid.locator(".webui-plugin-row")).toHaveCount(4);
+  const grid = await pluginGrid.first().evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
   expect(grid).toBe(2);
-  await assertInViewport(pluginGrid, page);
+  await assertInViewport(pluginGrid.first(), page);
   await expect(surface).toHaveScreenshot("plugin-marketplace.png", screenshotOptions);
 
   await surface.getByRole("button", { name: "技能", exact: true }).click();
@@ -241,7 +243,9 @@ test("plugin management skill and MCP rows layout baselines", async ({ page }) =
   await expect(surface).toHaveScreenshot("skill-management.png", screenshotOptions);
 
   await surface.locator('.webui-plugin-category-filter button', { hasText: "MCP" }).click();
-  await expect(surface.getByText("已连接")).toBeVisible();
-  await expect(surface.getByText("MCP_COMMAND_NOT_FOUND: synthetic")).toBeVisible();
+  // The rows name their servers; the status chip that used to sit beside them was
+  // removed with the row redesign, so the baseline shows the rows and their actions.
+  await expect(surface.getByText("local-http")).toBeVisible();
+  await expect(surface.getByText("missing-binary")).toBeVisible();
   await expect(surface).toHaveScreenshot("mcp-management.png", screenshotOptions);
 });

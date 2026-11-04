@@ -31,7 +31,10 @@ import { createSshHandlerEntries } from "../../src/server/operation/handlers/ssh
 import { watchTerminalOperation } from "../../src/server/operation/workspace.js";
 import { watchBrowserFramesOperation, watchBrowserWebTabsOperation } from "../../src/server/operation/browser.js";
 import { watchMiniAppPresentationOperation, watchMiniAppPresenterOperation } from "../../src/server/operation/miniapp.js";
-import { watchMiniAppAgentTurnOperation } from "../../src/server/operation/miniapp-agent.js";
+import {
+  watchMiniAppAgentObservationsOperation,
+  watchMiniAppAgentTurnOperation,
+} from "../../src/server/operation/miniapp-agent.js";
 import {
   WEBUI_STREAM_OPERATION_NAMES,
   type OperationSpec,
@@ -120,7 +123,7 @@ describe("the unary request interface over OperationSpec", () => {
         `${name} is a stream and must not be unary`,
       );
     }
-    assert.equal(streams.length, 11);
+    assert.equal(streams.length, 12);
   });
 
   it("matches the server's registered stream descriptors exactly", () => {
@@ -143,6 +146,9 @@ describe("the unary request interface over OperationSpec", () => {
       // its frames are the runtime's run events plus one settlement, which the
       // generic stream factory does not shape.
       watchMiniAppAgentTurnOperation.name,
+      // The page bridge's all-session watch: the settled-turn event stream a page
+      // opens, shaped by its own dedicated handler.
+      watchMiniAppAgentObservationsOperation.name,
     ].sort();
     assert.deepEqual(registered, [...WEBUI_STREAM_OPERATION_NAMES].sort());
   });

@@ -54,6 +54,22 @@ async function openApplications(page: Page): Promise<void> {
   await browserExpect(page.getByTestId(`miniapp-app-${PLUGIN}`)).toBeVisible();
 }
 
+/**
+ * Runs one action from a row's own menu.
+ *
+ * A row's actions are a dropdown now: the trigger is the row's `更多操作` button
+ * and the popup is portal-rendered, so the item is looked up on the page rather
+ * than inside the row. Each action closes the menu it ran from.
+ */
+async function runRowAction(page: Page, plugin: string, name: string): Promise<void> {
+  // The trigger is the row's only menu button; its accessible name is the app's
+  // display name, which is not the package id this helper is given.
+  await page.getByTestId(`miniapp-app-${plugin}`)
+    .locator('button[aria-haspopup="menu"]')
+    .click();
+  await page.getByRole("menuitem", { name }).click();
+}
+
 describe("the Mini App management surface against the real host", () => {
   it("starts, shows, stops, disables, enables and uninstalls a Mini App", async () => {
     const host = await bootRealHost({ dev: true, serveBuiltClient: true });
@@ -96,7 +112,7 @@ describe("the Mini App management surface against the real host", () => {
       );
 
       // 打开 — the Mini App starts, and the row says it is running.
-      await page.getByTestId(`miniapp-app-open-${PLUGIN}`).click();
+      await runRowAction(page, PLUGIN, "打开");
       await browserExpect(page.getByTestId(`miniapp-app-status-${PLUGIN}`)).toHaveAttribute(
         "data-status",
         "running",
@@ -106,7 +122,7 @@ describe("the Mini App management surface against the real host", () => {
       // it. This is the deep link a person shares, so the page behind it has to
       // be the Mini App and not an empty frame.
       const standalone = browser.contexts()[0]?.waitForEvent("page");
-      await page.getByRole("button", { name: "查看" }).click();
+      await runRowAction(page, PLUGIN, "查看");
       const standalonePage = await standalone;
       expect(standalonePage).toBeTruthy();
       await standalonePage.waitForLoadState("domcontentloaded");
@@ -118,7 +134,7 @@ describe("the Mini App management surface against the real host", () => {
       await standalonePage.close();
 
       // 停止 — the Mini App stops, and the row says so.
-      await page.getByRole("button", { name: "停止" }).click();
+      await runRowAction(page, PLUGIN, "停止");
       await browserExpect(page.getByTestId(`miniapp-app-status-${PLUGIN}`)).toHaveAttribute(
         "data-status",
         "stopped",
@@ -129,16 +145,17 @@ describe("the Mini App management surface against the real host", () => {
       // when it did not, the change was read as an official one, refused with
       // an authentication error, and the row stayed exactly as it was.
       const row = page.getByTestId(`miniapp-app-${PLUGIN}`);
-      await row.getByRole("button", { name: "停用" }).click();
-      await browserExpect(row.getByRole("button", { name: "启用" })).toBeVisible();
+      const toggle = row.getByRole("switch");
+      await toggle.click();
+      await browserExpect(toggle).toHaveAttribute("aria-checked", "false");
       await browserExpect(page.getByTestId(`miniapp-app-status-${PLUGIN}`)).toContainText("已停用");
 
       // 启用 — the same contract on the way back.
-      await row.getByRole("button", { name: "启用" }).click();
-      await browserExpect(row.getByRole("button", { name: "停用" })).toBeVisible();
+      await toggle.click();
+      await browserExpect(toggle).toHaveAttribute("aria-checked", "true");
 
       // 卸载 — and the row leaves the catalogue.
-      await row.getByRole("button", { name: "卸载" }).click();
+      await runRowAction(page, PLUGIN, "卸载");
       await browserExpect(page.getByTestId(`miniapp-app-${PLUGIN}`)).toHaveCount(0);
     } finally {
       await browser.close();
@@ -166,7 +183,7 @@ describe("the Mini App management surface against the real host", () => {
       await browserExpect(page.locator("#webui-root")).toBeVisible();
       await openApplications(page);
 
-      await page.getByTestId(`miniapp-app-open-${PLUGIN}`).click();
+      await runRowAction(page, PLUGIN, "打开");
       // The refusal is shown on the row, and it names the failure rather than
       // leaving an empty state.
       const refusal = page.getByTestId(`miniapp-app-refusal-${PLUGIN}`);

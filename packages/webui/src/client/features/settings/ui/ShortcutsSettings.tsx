@@ -39,11 +39,15 @@ export function ShortcutsSettings({ bindings, onChange, onReset }: ShortcutsSett
   const rows = useMemo(() => shortcutSettingsRows(bindings), [bindings]);
 
   /**
-   * The capture is a layer while it is open (ADR 0028 § Overlay coordination):
-   * the Escape that cancels it is answered by the coordinator, so the page
-   * keeps no listener of its own for that key. It sits above the settings
-   * modal because the capture owns the keyboard while it is open — a press
-   * outside it ends the capture rather than the page underneath.
+   * The capture is a layer while it is open (ADR 0028 § Overlay coordination),
+   * and it sits above the settings modal because the capture owns the keyboard
+   * while it is open — a press outside it ends the capture rather than the page
+   * underneath.
+   *
+   * The layer's `onClose` is what ends a capture the coordinator dismisses; the
+   * capture also answers Escape itself, because a higher surface can take that
+   * key first and a capture left open on a stale conflict notice is the state
+   * nobody can get out of.
    */
   const captureLayerId = useDialogLayer({
     id: "shortcut-capture",
@@ -56,13 +60,28 @@ export function ShortcutsSettings({ bindings, onChange, onReset }: ShortcutsSett
     active: capturing !== undefined,
   });
 
+  /**
+   * The notice belongs to the capture that raised it.
+   *
+   * However the capture ends — the coordinator's Escape, a press elsewhere, a
+   * successful capture — the conflict it reported stops being true, so it goes
+   * with the capture instead of waiting for another one to clear it.
+   */
+  useEffect(() => {
+    if (capturing === undefined) setError("");
+  }, [capturing]);
+
   useEffect(() => {
     if (!capturing) return;
     const onKeyDown = (event: KeyboardEvent): void => {
-      // Escape is the coordinator's: the capture answers it as a layer, and a
-      // second listener for the same key would be a second implementation of
-      // the same contract.
-      if (event.key === "Escape") return;
+      if (event.key === "Escape") {
+        // Escape leaves the capture and takes the notice it raised with it.
+        event.preventDefault();
+        event.stopPropagation();
+        setCapturing(undefined);
+        setError("");
+        return;
+      }
       // Tab keeps its own meaning while the capture is open: it is how the
       // user leaves the control, and a shortcut that swallows it would leave
       // them stuck on the button they are editing.

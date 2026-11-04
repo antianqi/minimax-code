@@ -82,7 +82,7 @@ describe("a page's window request", () => {
       skipTaskbar: true,
     } as never, BOUNDS);
 
-    expect(result.ignored.sort()).toEqual(["alwaysOnTop", "skipTaskbar"]);
+    expect([...result.ignored].sort()).toEqual(["alwaysOnTop", "skipTaskbar"]);
     // The mode it could honour still landed.
     expect(result.state.mode).toBe("window");
   });

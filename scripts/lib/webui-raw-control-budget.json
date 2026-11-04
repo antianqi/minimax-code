@@ -9,6 +9,8 @@
     "packages/webui/src/client/features/interactions/ui/plan-mode.css": [],
     "packages/webui/src/client/features/models/ui/models.css": [],
     "packages/webui/src/client/features/plugins/ui/plugins.css": [],
+    "packages/webui/src/client/features/remote-control/ui/remote-control.css": [],
+    "packages/webui/src/client/features/scheduling/ui/scheduling.css": [],
     "packages/webui/src/client/features/sessions/ui/sessions.css": [],
     "packages/webui/src/client/features/settings/ui/settings.css": [],
     "packages/webui/src/client/features/transcript/ui/transcript-widgets.css": [],

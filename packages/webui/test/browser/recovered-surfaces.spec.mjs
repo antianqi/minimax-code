@@ -229,15 +229,22 @@ test("the workspace picker opens 选择新项目 without tripping the error boun
   await page.evaluate(() => {
     window.__workspaceBrowserExitAnimation = undefined;
     document.addEventListener("animationend", (event) => {
+      // The picker is a surface inside the shared modal frame now, so the exit
+      // animation runs on whichever element the frame animates; what the test is
+      // about is that closing it animates rather than vanishing.
       if (
         event.target instanceof HTMLElement &&
-        event.target.matches(".webui-workspace-menu--desktop")
+        event.target.closest('[data-testid="webui-workspace-browser-dialog"]') !== null
       ) {
         window.__workspaceBrowserExitAnimation = event.animationName;
       }
     }, { capture: true });
   });
-  await browser.getByRole("button", { name: "取消" }).click();
+  // The directory browser lives inside the shared dialog now, so the frame owns
+  // the close control.
+  await page.getByTestId("webui-workspace-browser-dialog")
+    .getByRole("button", { name: "关闭" })
+    .click();
   await expect.poll(() => page.evaluate(() => window.__workspaceBrowserExitAnimation))
     .toBe("webui-motion-surface-exit");
   await expect(browser).toHaveCount(0);

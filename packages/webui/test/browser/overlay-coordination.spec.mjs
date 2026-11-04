@@ -53,7 +53,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 const dialog = (page) => page.getByTestId("agent-memory-manager");
-const menu = (page) => page.locator('[data-overlay-layer="memory-manager-menu"]');
+// The managed layer's id is on the trigger's wrapper as well as on the popup —
+// a press on the trigger has to be a press inside the layer — so the popup is
+// located by the role it is given rather than by the attribute alone.
+const menu = (page) => page.locator('[data-overlay-layer="memory-manager-menu"][role="menu"]');
 const confirm = (page) => page.locator('[data-overlay-layer="memory-manager-confirm"]');
 
 /** Opens settings › 自定义指令 › 管理, and returns that opener. */

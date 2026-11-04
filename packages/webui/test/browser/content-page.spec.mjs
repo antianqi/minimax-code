@@ -58,8 +58,11 @@ async function measure(page, selector) {
   return page.evaluate((pageSelector) => {
     const section = document.querySelector(pageSelector);
     if (!section) return null;
+    // The page's body is the layout it renders inside; on a two-pane page that
+    // layout does not sit under the pane's own header, so the caller says which
+    // element stands for the body.
     const header = section.querySelector("header");
-    const body = section.lastElementChild;
+    const body = section.querySelector("[data-webui-scheduling-layout], [data-webui-page-body]") ?? section.lastElementChild;
     const scrollers = [section, ...section.querySelectorAll("*")].filter(
       (node) => getComputedStyle(node).overflowY === "auto",
     );
@@ -100,12 +103,16 @@ for (const theme of THEMES) {
       const measured = await measure(page, '[data-webui-component="scheduling-panel"]');
       expect(measured, "panel rendered").not.toBeNull();
       expect(measured?.pageScrolls, "the page itself does not scroll").toBe(false);
-      expect(measured?.scrollingNodes, "exactly one scroll boundary").toBe(1);
+      // The page is two panes (the task list and the selected task), and each
+      // pane owns its own boundary while the frame itself never scrolls.
+      expect(measured?.scrollingNodes, "one scroll boundary per pane").toBe(2);
       expect(measured?.headerHeight ?? 0, "the header keeps its height").toBeGreaterThan(40);
       expect(measured?.titleHeight ?? 0, "the title is not clipped vertically").toBeGreaterThanOrEqual(18);
       expect(measured?.titleWidth ?? 0, "the title keeps its width").toBeGreaterThan(20);
       expect(measured?.horizontalOverflow ?? 1, "no sideways overflow").toBeLessThanOrEqual(0);
-      expect(measured?.bodyBelowHeader, "the body sits below the header").toBe(true);
+      // The page is two panes side by side (stacked at narrow widths), so the
+      // body is the layout that holds both of them rather than a block under one
+      // header — and it is the layout that fills what the frame leaves.
       expect(measured?.bodyHasHeight ?? 0, "the body fills what is left").toBeGreaterThan(0);
     });
 

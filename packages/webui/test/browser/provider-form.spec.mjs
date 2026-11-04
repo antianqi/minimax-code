@@ -33,7 +33,21 @@ function seedProviderSurface() {
       maskedApiKey: "sk-synthetic-0000",
       headerNames: ["X-Api-Key"],
       configRevision: "rev-1",
-      models: [{ modelId: "gpt-x", displayName: "GPT X", enabled: true }],
+      models: [
+        {
+          providerId: "provider-synthetic",
+          modelId: "gpt-x",
+          modelConfigId: "gpt-x",
+          displayName: "GPT X",
+          enabled: true,
+          selected: false,
+          contextLimit: 256000,
+          maxOutputTokens: 64000,
+          effortOptions: ["low"],
+          modalities: { input: ["text", "image"], output: ["text"] },
+        },
+        { providerId: "provider-synthetic", modelId: "other-model", modelConfigId: "other-model", displayName: "Other Model", enabled: true, selected: false },
+      ],
     },
   ]);
   window.__fixture.setProviderPresets([
@@ -67,6 +81,16 @@ const settingsDialog = (page) => page.locator('[role="dialog"][aria-label="设�
 const customPanel = (page) => page.locator('[data-testid="settings-custom-models-panel"]');
 const formDialog = (page) => page.getByRole("dialog", { name: /^(添加模型|编辑提供商)$/u });
 
+/**
+ * The 添加模型 action.
+ *
+ * It lives in the page's own toolbar — beside the source switcher and the OAuth
+ * controls — not inside the panel it opens the form from, so scoping the locator
+ * to the panel finds nothing.
+ */
+const addModelButton = (page) =>
+  settingsDialog(page).getByRole("button", { name: "添加模型", exact: true });
+
 /** Opens settings the way a user does, then the Usage page's custom-model tab. */
 async function openCustomModels(page) {
   await openApp(page, "#session=A");
@@ -96,8 +120,7 @@ async function fillNewProvider(page, dialog) {
   await dialog.getByLabel("提供商名称").fill("Synthetic Draft");
   await dialog.getByLabel("接口地址").fill("https://draft.example/v1");
   await dialog.getByLabel("API Key").fill("sk-draft-synthetic");
-  // The form is a list of model cards, not one textarea of ids: a row is added
-  // first, and every model carries its own fields.
+  // The form is a compact model-name list: a row is added first.
   await dialog.getByRole("button", { name: "添加模型" }).click();
   await dialog.getByLabel("模型名称").fill("draft-model");
 }
@@ -185,7 +208,7 @@ test("the provider picker closes when the pointer lands outside it", async ({ pa
   await configureFixture(page, seedNewProviderSurface);
   await openCustomModels(page);
 
-  await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+  await addModelButton(page).click();
   const dialog = formDialog(page);
   await dialog.getByRole("combobox", { name: "提供商" }).click();
 
@@ -207,7 +230,7 @@ test.describe("with motion allowed", () => {
     await configureFixture(page, seedNewProviderSurface);
     await openCustomModels(page);
 
-    await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+    await addModelButton(page).click();
     const dialog = formDialog(page);
     await dialog.getByRole("combobox", { name: "提供商" }).click();
 
@@ -237,7 +260,7 @@ test("a save stays refused until the draft is proven or the test is skipped", as
   await configureFixture(page, seedNewProviderSurface);
   await openCustomModels(page);
 
-  await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+  await addModelButton(page).click();
   const dialog = formDialog(page);
   await expect(dialog).toBeVisible();
   await fillNewProvider(page, dialog);
@@ -252,7 +275,7 @@ test("a proven draft saves the candidate the editor built, and the form closes",
   await configureFixture(page, seedNewProviderSurface);
   await openCustomModels(page);
 
-  await customPanel(page).getByRole("button", { name: "添加模型" }).click();
+  await addModelButton(page).click();
   const dialog = formDialog(page);
   await fillNewProvider(page, dialog);
 
@@ -276,37 +299,48 @@ test("a proven draft saves the candidate the editor built, and the form closes",
   await expect(dialog).toHaveCount(0);
 });
 
-test("each model carries its own limits, reasoning levels and attachments", async ({ page }) => {
-  await configureFixture(page, seedNewProviderSurface);
+test("a saved model opens its complete form with styled multi-select attachment controls", async ({ page }) => {
+  await configureFixture(page, seedProviderSurface);
   await openCustomModels(page);
 
-  await customPanel(page).getByRole("button", { name: "添加模型" }).click();
-  const dialog = formDialog(page);
-  await fillNewProvider(page, dialog);
+  await customPanel(page).getByRole("button", { name: "修改模型 GPT X" }).click();
+  const dialog = page.getByRole("dialog", { name: "修改模型" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("模型名称")).toHaveValue("gpt-x");
+  await expect(dialog.getByLabel("上下文窗口")).toHaveValue("256000");
+  await expect(dialog.getByLabel("最大输出 Token")).toHaveValue("64000");
+  await expect(dialog.locator(".webui-provider-form-chip")).toContainText("low");
 
-  // The fields Desktop's model card carries, filled on the model they belong to.
+  const attachments = dialog.getByRole("group", { name: "支持的附件类型" });
+  const image = attachments.getByRole("button", { name: "图片" });
+  const pdf = attachments.getByRole("button", { name: "PDF" });
+  await expect(image).toHaveAttribute("aria-pressed", "true");
+  await expect(pdf).toHaveAttribute("aria-pressed", "false");
+  await expect(image).toHaveClass(/webui-mavis-button-segmented/u);
+  const selectedBackground = await image.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const unselectedBackground = await pdf.evaluate((node) => getComputedStyle(node).backgroundColor);
+  expect(selectedBackground).not.toBe(unselectedBackground);
+  await pdf.click();
+  await expect(pdf).toHaveAttribute("aria-pressed", "true");
+  await image.click();
+  await expect(image).toHaveAttribute("aria-pressed", "false");
+
   await dialog.getByLabel("上下文窗口").fill("128000");
   await dialog.getByLabel("最大输出 Token").fill("8000");
-  await dialog.getByLabel("推理等级").fill("low");
-  await dialog.getByLabel("推理等级").press("Enter");
   await dialog.getByLabel("推理等级").fill("high");
   await dialog.getByLabel("推理等级").press("Enter");
-  await dialog.getByLabel("图片").check();
-
-  await dialog.getByLabel("跳过连通检测").check();
   await dialog.getByRole("button", { name: "保存" }).click();
-  await expect.poll(() => lastRequestBody(page, "saveUserModelProviderCandidate")).toBeTruthy();
-  const saved = await lastRequestBody(page, "saveUserModelProviderCandidate");
-  expect(saved.candidate.models).toEqual([
-    {
-      modelId: "draft-model",
-      displayName: "draft-model",
-      limit: { context: 128000, output: 8000 },
-      effortOptions: ["low", "high"],
-      attachment: true,
-      modalities: { input: ["text", "image"], output: ["text"] },
-    },
-  ]);
+  await expect.poll(() => lastRequestBody(page, "updateUserModelProvider")).toBeTruthy();
+
+  const updated = await lastRequestBody(page, "updateUserModelProvider");
+  expect(updated.models).toHaveLength(2);
+  expect(updated.models[0]).toMatchObject({
+    modelId: "gpt-x",
+    limit: { context: 128000, output: 8000 },
+    effortOptions: ["low", "high"],
+    modalities: { input: ["text", "pdf"], output: ["text"] },
+  });
+  expect(updated.models[1]).toMatchObject({ modelId: "other-model" });
 });
 
 test("an edit writes with the revision the read reported, and offers discovery with it", async ({ page }) => {

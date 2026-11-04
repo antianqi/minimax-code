@@ -46,8 +46,7 @@
   .webui-provider-form-effort { display: flex; min-height: 40px; flex-wrap: wrap; align-items: center; gap: var(--spacing_6); border: 1px solid var(--border_default); border-radius: 8px; background: var(--bg_default_primary); padding: 4px 8px; }
   .webui-provider-form-effort:focus-within { border-color: var(--border_accent); }
   .webui-provider-form-chip { display: inline-flex; height: 24px; align-items: center; gap: var(--spacing_4); border-radius: 6px; background: var(--bg_interaction_tertiary_default); padding: 0 4px 0 8px; color: var(--text_default_primary); font-size: var(--size_12); }
-  .webui-provider-form-attachments { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing_16); }
-  .webui-provider-form-attachment { display: flex; align-items: center; gap: var(--spacing_6); color: var(--text_default_primary); font-size: var(--size_14); }
+  .webui-provider-form-attachments { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing_8); }
   .webui-provider-form-error { margin: 0; color: var(--text_status_error); font-size: var(--size_12); }
   .webui-provider-form-footer-leading { margin-inline-end: auto; }
   .webui-dialog-footer .webui-provider-form-footer-leading { display: flex; align-items: center; gap: var(--spacing_8); color: var(--text_default_secondary); font-size: var(--size_14); }

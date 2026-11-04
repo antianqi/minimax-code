@@ -394,93 +394,31 @@ describe("W0 · the memory manager's header controls", () => {
     expect(declaration(shared, "width")).toBe("100%");
   });
 
-  it("sizes the dialog editor by content, 13 to 24 rows", () => {
-    // The dialog's `autoSize: {minRows: 13, maxRows: 24}` at `!leading-6`:
-    // 24px between baselines, and a 593px box for content long enough to cap
-    // out, which is 24 rows. 13 rows + 8px top padding + the 28px the count
-    // needs is the floor; 24 rows is the ceiling.
-    const editor = winning(
-      ".webui-memory-manager-editor .webui-personalization-textarea",
-    ).body;
-    expect(declaration(editor, "field-sizing")).toBe("content");
-    // Load-bearing, and invisible when wrong: `field-sizing` only takes effect
-    // when height is `auto`, the shared rule still declares `height: 300px`, and
-    // without this the property was silently inert -- 348px box, text scrolling
-    // under the count, nothing reported anywhere.
-    expect(declaration(editor, "height")).toBe("auto");
-    expect(declaration(editor, "min-height")).toBe("348px");
-    expect(declaration(editor, "max-height")).toBe("612px");
-    // The field is `shrink-0`: its height is its content's, not
-    // the leftover space in the dialog. `flex: 1` is what pinned it at 239px.
-    expect(declaration(editor, "flex")).toBe("none");
-    // Prose, not code: it runs at `!text-sm !leading-6` in the UI
-    // face. 12px monospace is also why a "13 row" floor was not 312px here.
-    expect(declaration(editor, "font-family")).toBe("inherit");
-    expect(declaration(editor, "font-size")).toBe("var(--size_14)");
-    expect(declaration(editor, "line-height")).toBe("24px");
-    // The count's row is reserved so the last line cannot scroll under it.
-    expect(declaration(editor, "padding")).toBe("var(--spacing_8) 0 28px");
+  it("sizes the dialog editor from the shared large control, with room for the count", () => {
+    // The dialog's editor is a shared `WebuiTextarea` at `controlSize="large"`:
+    // the box comes from the shared size, and the dialog reserves only the row
+    // its character count draws in. The scoped `field-sizing` pair that used to
+    // size this one editor is gone, so what is pinned here is the size it takes
+    // from the contract plus the padding its own count needs.
+    const large = winning(".webui-control--large").body;
+    expect(declaration(large, "min-height")).toBe("360px");
+    const multiline = winning(".webui-control--multiline").body;
+    expect(declaration(multiline, "resize")).toBe("vertical");
+    const count = winning(".webui-memory-manager-textarea").body;
+    expect(declaration(count, "padding-bottom")).toBe("28px");
   });
 
-  it("keeps the dialog editor bordered while the settings-page editors are not", () => {
-    // Three editors, two looks, and the split is on which class the call site
-    // carries. The dialog uses the base `.mavis-textarea`, which keeps a border
-    // and takes `!rounded-xl` from the call site. 关于你 and 自定义指令 both add
-    // `mavis-personalization-editor`, which zeroes the border and fills with
-    // `--bg_grouped_tertiary` at 16px.
-    const dialog = winning(
-      ".webui-memory-manager-editor .webui-personalization-textarea",
-    ).body;
-    expect(declaration(dialog, "border")).toBe("1px solid var(--border_default)");
-    expect(declaration(dialog, "border-radius")).toBe("var(--radius_12)");
-    expect(declaration(dialog, "background")).toBe("transparent");
-
-    // Hover and focus restate only `border-color`; the focus must not add a glow
-    // on top of it.
-    const hover = winning(
-      ".webui-memory-manager-editor .webui-personalization-textarea:hover",
-    ).body;
-    expect(declaration(hover, "border-color")).toBe("var(--border_heavy)");
-    expect(declaration(hover, "box-shadow")).toBe("none");
-
-    // The focus ring is the shared field contract's: an outline outside the box
-    // with the border switched to the accent colour, so the ring costs the
-    // content no layout and the text never sits against it. The dialog used to
-    // restate this with a 1px `--blue_500` outline; that was the field
-    // contract's state written a second time, and a primitive ramp standing in
-    // for a semantic token.
-    const focus = winning(".webui-control:focus-visible").body;
-    expect(declaration(focus, "outline")).toBe("2px solid var(--border_accent)");
+  it("keeps the dialog editor on the shared bordered control", () => {
+    // One control contract, one border: the dialog's editor is a `.webui-control`
+    // like every other field, and the state it shows on focus is the shared
+    // recoloured border rather than a per-dialog ring.
+    const base = winning(".webui-control").body;
+    expect(declaration(base, "border")).toBe("1px solid var(--border_default)");
+    expect(declaration(base, "border-radius")).toBe("9px");
+    const focus = winning(".webui-control:focus").body;
     expect(declaration(focus, "border-color")).toBe("var(--border_accent)");
-    expect(declaration(focus, "outline-offset")).toBe("1px");
-    // The ring must not be drawn as a border width change: that is the 1px it
-    // would cost the content, and the reason this is asserted as a pair.
-    expect(declaration(focus, "border-width")).toBeUndefined();
-
-    // The shared rule is the `mavis-personalization-editor` half. `resize: none`
-    // is global (`.mavis-textarea textarea{resize:none!important}`
-    // beats even the inline `resize:vertical` one call site passes), so no
-    // editor in this dialog can be dragged taller.
-    // The shared document editor is the field contract's `.webui-control--document*`
-    // pair now: the dialog states the size, and the control owns the surface.
-    const shared = winning(".webui-control--document").body;
-    const sharedAppearance = winning(".webui-control--document-appearance").body;
-    expect(declaration(sharedAppearance, "border")).toBe("0");
-    expect(declaration(sharedAppearance, "background")).toBe("var(--bg_grouped_tertiary)");
-    expect(declaration(sharedAppearance, "border-radius")).toBe("var(--radius_16)");
-    // The two settings-page editors are height-clamped, not free. Their style
-    // object passes `minHeight: 144, maxHeight: 200`, and
-    // `field-sizing: content` with `height: auto` is what makes those two
-    // numbers the whole rule -- the field grows with its text and stops at
-    // 200px. The dialog overrides both for its own 13-to-24-row range.
-    expect(declaration(shared, "resize")).toBe("none");
-    expect(declaration(shared, "height")).toBe("auto");
-    expect(declaration(shared, "field-sizing")).toBe("content");
-    expect(declaration(sharedAppearance, "font-size")).toBe("var(--size_12)");
-    expect(declaration(shared, "min-height")).toBe("144px");
-    expect(declaration(shared, "max-height")).toBe("200px");
+    expect(declaration(focus, "box-shadow")).toBe("none");
   });
-
   it("separates the dialog's footer with space, not a rule", () => {
     // The last row is `flex justify-between`: the timestamp on the
     // left, 取消/保存 on the right, 20px from the editor above and 16px between
@@ -519,7 +457,14 @@ describe("W0 · stylesheet composition", () => {
       // caller's own box wins over the shared shape.
       "./tooltip.css",
       "./field.css",
+      // The avatar and the segmented control: two shared controls whose own
+      // appearance travels with them rather than living in a caller.
+      "./agent-avatar.css",
+      "./segmented-control.css",
       "./feedback.css",
+      // The notice (ADR 0030): drawn over the client, so it loads after the
+      // shell and the surfaces it interrupts.
+      "./toast.css",
       "./shell.css",
       // The shared menu-item contract: the row, its two slots and its states.
       "./menu-item.css",
@@ -550,12 +495,14 @@ describe("W0 · stylesheet composition", () => {
       "../features/transcript/ui/transcript.css",
       "../features/sessions/ui/sessions.css",
       "../features/workspace/ui/workspace.css",
+      "../features/scheduling/ui/scheduling.css",
       "../features/workspace/ui/workspace-progress.css",
       "../features/browser/ui/browser.css",
       "../features/goal/ui/goal.css",
       "../features/account/ui/account.css",
       "../features/transcript/ui/transcript-widgets.css",
       "../features/interactions/ui/plan-mode.css",
+      "../features/remote-control/ui/remote-control.css",
       "katex/dist/katex.min.css",
     ]);
   });
@@ -1027,9 +974,10 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
     const important = shellRules.filter((rule) =>
       rule.body.includes("!important"),
     );
-    // Seven: the shared skeleton's own surface (it has to beat the surface it
-    // stands in for), the button's dark hover, and the xterm viewport.
-    expect(important).toHaveLength(7);
+    // Eight: the shared skeleton's own surface (it has to beat the surface it
+    // stands in for), the skeleton's control shape, the button's dark hover,
+    // and the xterm viewport.
+    expect(important).toHaveLength(8);
     expect(
       important.some((rule) =>
         rule.selector.includes(".webui-xterm-host .xterm-viewport"),
@@ -1039,13 +987,14 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
 });
 
 describe("W0 · stacking order", () => {
-  // `.webui-message-dialog`, the portal-rendered modal, is the ceiling: it
-  // mounts outside the shell's stacking context, so it is the one layer that
-  // cannot be covered by anything declared in this stylesheet. A value above
-  // it paints over every dialog and the defect is invisible in review, so it
-  // is asserted on its own rather than left to the registry below happening to
-  // be complete.
-  const TOP_OVERLAY = 1400;
+  // The notice host is the ceiling. Every surface below it is portalled into
+  // the same root stacking context — the shared dialog mask (100), its surface
+  // (111), the dropdown (120) and the menu submenu (121) — and ADR 0030 puts
+  // the notice above all of them, including a modal, so 160 is the top of the
+  // band. A value above it paints over a notice nobody can then read, and the
+  // defect is invisible in review, so it is asserted on its own rather than
+  // left to the registry below happening to be complete.
+  const TOP_OVERLAY = 160;
 
   it("keeps the overlay stacking values declared by the shell", () => {
     const values = [
@@ -1112,25 +1061,27 @@ describe("W0 · stacking order", () => {
       // settings dialog's own 120 scrim — the account page draws the calendar
       // inside that dialog — while staying far below the portal-rendered
       // 1400, which is the shell's ceiling.
-      // 140 is `.webui-memory-confirm-mask`, the 删除记忆 confirmation. It is a
-      // second modal stacked on the memory manager rather than part of it, so it
-      // has to sit above that dialog's own 120 scrim while staying far below the
-      // portal-rendered 1400 — it dims one dialog, it does not outrank the whole
-      // shell.
-      // 1400 is `.webui-message-dialog`, the portal-rendered modal shared by
-      // the fork, rewind-preview and goal-clear dialogs. It mounts outside the
-      // shell's stacking context, so it cannot join the 100-121 in-shell
-      // dialog band and has to clear all of it.
+      // 0 is the segmented control's own indicator: it is the selected tile's
+      // fill, positioned inside the control, so it only has to sit under the
+      // labels that share that box.
+      // 140 is `.webui-miniapp-window-frame`, the Mini App drawn as a floating
+      // window: above the workspace panel's expanded tier (70) and below the
+      // launcher (150), because a floating page is a window over the whole app
+      // rather than a layer inside the panel that holds its tab.
+      // 150 is `.webui-miniapp-launcher-popover`, the 应用 launcher's popover:
+      // above the window frame it can open over (140), and still under the
+      // notice host (160), which has to stay readable over everything.
+      // 160 is `.webui-toast-host` (ADR 0030): the notice crosses a modal, so
+      // it is the one layer declared above the dialog band.
       // 4 is gone: it was the workspace panel's add-menu anchor, and the add
       // menu became the launcher's tiles. The launcher is a tab's content
       // rather than an overlay, so it needs no layer of its own.
       //
-      // The band above 100 is the shared dialog shell's now. The provider
-      // dialog's own 110 backdrop, the memory confirmation's 140 mask and the
-      // portalled 1400 message dialog are all `WebuiDialog` instances, so each
-      // one registers at the shell's 100 mask and 111 surface instead of
-      // declaring a layer of its own.
-      1, 2, 3, 5, 20, 40, 45, 50, 60, 70, 80, 90, 100, 111, 120, 121, 130,
+      // The band above 100 is the shared dialog shell's. Every `WebuiDialog`
+      // registers at the shell's 100 mask and 111 surface instead of declaring
+      // a layer of its own.
+      0, 1, 2, 3, 5, 20, 40, 45, 50, 60, 70, 80, 90, 100, 111, 120, 121, 130,
+      140, 150, 160,
     ]);
   });
 });

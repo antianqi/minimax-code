@@ -70,6 +70,10 @@ const EXPECTED: Record<
     // A Mini App is a plugin, so the catalogue's apps area writes the package
     // lifecycle through the same member the plugin manager does.
     "pluginManagement",
+    // The page channels: the business that frames the page is the one that
+    // answers it.
+    "watchMiniAppAgentTurn", "watchMiniAppAgentObservations", "miniAppAgentCall",
+    "watchMiniAppToolApprovals", "replyMiniAppToolApproval", "miniAppToolCall",
   ],
   composer: ["runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem"],
   interactions: [

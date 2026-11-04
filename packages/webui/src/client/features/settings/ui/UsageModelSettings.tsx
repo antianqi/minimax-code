@@ -58,6 +58,7 @@ const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
   deleteProvider: async () => undefined,
   setProviderModelEnabled: async () => ({ status: "failed", category: "refused", error: new Error("当前运行时不支持修改提供商。") }),
   reorderProviderModels: async () => ({ status: "failed", category: "refused", error: new Error("当前运行时不支持修改提供商。") }),
+  updateProvider: async () => { throw new Error("当前运行时不支持修改提供商。"); },
 };
 
 export function UsageModelSettings({ sessionId }: Props): ReactElement {
@@ -297,7 +298,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     <div className="webui-usage-model-scroll">
     {sourceTab === "token-plan" ? <WebuiStack as="section" gap="roomy" className="w-full" data-testid="settings-usage-token-plan">
       {quotaError ? <SettingsErrorNotice message="加载失败" action={{ label: "重试", onClick: () => void loadQuota() }} /> : null}
-      {quotaLoading ? <p>加载中…</p> : !quotaView ? <p>登录后查看用量</p> : <>
+      {quotaLoading ? <UsageQuotaSkeleton /> : !quotaView ? <p>登录后查看用量</p> : <>
         <SettingsSection title="当前套餐" testId="settings-usage-plan">
             <WebuiInline gap="large" className="min-h-[64px] w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="min-w-0"><span className="block text-[14px] leading-5" data-testid="settings-usage-plan-name">{planFacts ? formatPlanName(planFacts) : ""}</span>{quotaView.tokenPlanExpiresAt ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">{new Date(quotaView.tokenPlanExpiresAt < 1e12 ? quotaView.tokenPlanExpiresAt * 1000 : quotaView.tokenPlanExpiresAt).toLocaleDateString("sv-SE").replaceAll("-", ".")}{quotaView.willRenewal ? " 自动续费" : " 到期"}</span> : planFacts && !hasWebuiPlan(planFacts) ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary" data-testid="settings-usage-plan-state">未订阅 M Plan</span> : null}</div></WebuiInline>
             <div className="h-[0.5px] bg-border_default" />
@@ -310,9 +311,9 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     </WebuiStack> : null}
 
     {sourceTab === "minimax-api" ? <WebuiStack as="section" gap="small" className="w-full pt-1" data-testid="settings-minimax-api-panel">
-      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span><span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span></WebuiInline>
+      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span>{apiLoading ? <WebuiSkeleton variant="shape" data-testid="settings-usage-api-key-status-loading" className="h-5 w-12 rounded-[6px]" /> : <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span>}</WebuiInline>
       {apiError ? <SettingsErrorNotice message={apiError} action={{ label: "重试", onClick: () => void loadApiStatus() }} /> : null}
-      {apiLoading ? <p>加载中…</p> : <>
+      {apiLoading ? <ApiKeySkeleton /> : <>
         <WebuiInline gap="medium" align="start"><WebuiField className="min-w-0 flex-[1_0_0]" label="API Key" required error={keyErrors.apiKey} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" value={apiKey} onChange={(event) => { setApiKey(event.target.value); clearFieldError("apiKey"); }} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} />} /><IconButton label="测试连通性" disabled={testingKey} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>
         {/* 保存结果要被听到，播报通道交给共享契约。 */}
         {keyResult ? <FeedbackLiveRegion>{keyResult}</FeedbackLiveRegion> : null}<WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
@@ -321,7 +322,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
 
     {sourceTab === "custom" ? <WebuiStack as="section" gap="medium" className="min-h-0 flex-1" data-testid="settings-custom-models-panel">
       {providerError ? <SettingsErrorNotice message={providerError} action={{ label: "重试", onClick: () => void loadProviders() }} /> : null}
-      {providerLoading ? <p>模型加载中...</p> : <>
+      {providerLoading ? <ProviderListSkeleton /> : <>
         <ProviderFormPanel
           providers={providers}
           presets={presets}

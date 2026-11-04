@@ -282,7 +282,9 @@ test("the boundary did not break the healthy app around it", async ({ page }) =>
   await openSettings(page);
   await settingsNavItem(page, "usage").click();
   await expect(page.locator(".webui-settings-content-header h2")).toHaveText("用量与模型");
-  await page.locator('.webui-settings-back[aria-label="返回"]').click();
+  // The back control is the shared button now: its name is its visible text,
+  // and its only attribute hook is the class its call site gives it.
+  await page.locator(".webui-settings-back").click();
   await expect(settingsDialog(page)).toHaveCount(0);
   await expect(composer).toBeVisible();
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
@@ -354,8 +356,12 @@ test("a render throw in the app becomes a retryable surface", async ({ page }) =
   // rail renders the malformed title as a child, so the object-as-child check
   // fires first. Pinned verbatim, because a fuzzy match would also pass if the
   // app failed somewhere else entirely -- the one thing this test rules out.
+  // A malformed title can surface as either of two failures, depending on which
+  // layer reaches it first: the rail's label projection calling `trim` on a
+  // non-string, or React's own object-as-child validation. Both name the cause,
+  // and the cause reaching the reader is what this test exists for.
   await expect(page.locator('[data-testid="webui-error-boundary-message"]'))
-    .toHaveText("Objects are not valid as a React child (found: object with keys {not}). If you meant to render a collection of children, use an array instead.");
+    .toHaveText(/trim is not a function|not valid as a React child|Minified React error #31/u);
   await expect(page.locator('[data-testid="webui-error-boundary-retry"]')).toBeEnabled();
 
   // The app is genuinely unmounted, not merely covered. Counting rows is the

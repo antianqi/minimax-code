@@ -90,6 +90,10 @@
     font-size: 12px;
     line-height: 16px;
   }
+  /* The overlay says a command is running; it does not take the surface away.
+   * The control that started the command owns its own loading state (ADR 0028),
+   * and a blocking scrim also made the dialog the command came from impossible
+   * to close — so the press goes through to it. */
   .webui-feedback-loading-overlay {
     position: fixed;
     inset: 0;
@@ -97,6 +101,7 @@
     display: grid;
     place-items: center;
     background: rgb(0 0 0 / 18%);
+    pointer-events: none;
   }
   .webui-feedback-loading-dialog {
     display: flex;

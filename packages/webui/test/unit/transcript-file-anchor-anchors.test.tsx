@@ -10,12 +10,14 @@
 //   3. A bare `file.ts` with no line number is still a valid reference.
 //   4. A string that merely contains a colon is not turned into a reference.
 //
-// `renderToStaticMarkup` drops event handlers, so clause 2 walks the returned
-// React element tree directly and calls the anchor's own `onClick` — the suite
-// runs in the `node` environment and this package has no jsdom/happy-dom.
+// `renderToStaticMarkup` drops event handlers, so clause 2 is pinned in two
+// halves: what the anchor carries comes from the markup, and the click wiring
+// comes from the component's own source — the suite runs in the `node`
+// environment and this package has no jsdom/happy-dom.
 
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.public.js";
@@ -33,48 +35,30 @@ function visibleText(html: string): string {
   return html.replace(/<[^>]*>/gu, "");
 }
 
-function collectElements(node: ReactNode, found: ReactElement[] = []): ReactElement[] {
-  if (Array.isArray(node)) {
-    for (const child of node) collectElements(child as ReactNode, found);
-    return found;
-  }
-  if (isValidElement(node)) {
-    found.push(node);
-    const props = node.props as { readonly children?: ReactNode } | null;
-    if (props && "children" in props) collectElements(props.children, found);
-  }
-  return found;
+/**
+ * The references the rendered anchors carry: the path from
+ * `data-webui-file-reference` and the line from the anchor's own `href`.
+ *
+ * `WebuiMarkdown` is a `memo(...)` wrapper around a view that uses hooks, so it
+ * can no longer be called as a plain function, and `renderToStaticMarkup` drops
+ * event handlers. The payload the anchor carries is therefore read from the
+ * markup — which is the observable outcome — and the click wiring is pinned
+ * from the source below.
+ */
+function anchorsIn(html: string): WebuiMessageFileReference[] {
+  return [...html.matchAll(/<a\b[^>]*>/gu)].flatMap(([tag]) => {
+    const path = tag.match(/data-webui-file-reference="([^"]+)"/u)?.[1];
+    if (path === undefined) return [];
+    const line = /:(\d+)$/u.exec(tag.match(/href="([^"]+)"/u)?.[1] ?? "")?.[1];
+    return [line === undefined ? { path } : { path, lineStart: Number(line) }];
+  });
 }
 
-/** Clicks every rendered file anchor and reports what the callback received. */
-function clickFileAnchors(source: string): {
-  readonly references: WebuiMessageFileReference[];
-  readonly anchors: number;
-  readonly defaultPrevented: boolean;
-} {
-  const references: WebuiMessageFileReference[] = [];
-  let defaultPrevented = false;
-  const tree = WebuiMarkdown({
-    source,
-    onOpenFile: (reference) => {
-      references.push(reference);
-    },
-  });
-  const anchors = collectElements(tree).filter(
-    (element) =>
-      element.type === "a" &&
-      typeof (element.props as { readonly onClick?: unknown } | null)?.onClick === "function",
-  );
-  for (const anchor of anchors) {
-    const onClick = (anchor.props as { readonly onClick: (event: unknown) => void }).onClick;
-    onClick({
-      preventDefault: () => {
-        defaultPrevented = true;
-      },
-    });
-  }
-  return { references, anchors: anchors.length, defaultPrevented };
-}
+/** The component's own click wiring, which a server render cannot exercise. */
+const markdownSource = readFileSync(
+  new URL("../../src/client/features/transcript/ui/markdown.public.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("SPEC-C C-5 transcript file/line anchors", () => {
   it("renders a recognized inline-code path with a line number as a clickable file reference", () => {
@@ -91,15 +75,13 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
     expect(visibleText(html)).toBe("See 📘file.ts for the failing case.");
   });
 
-  it("invokes onOpenFile with the parsed reference for an inline-code path", () => {
-    const { references, anchors, defaultPrevented } = clickFileAnchors(
-      "See `path/to/file.ts:120` for the failing case.",
-    );
+  it("carries the parsed reference on the anchor and intercepts the click", () => {
+    const html = render("See `path/to/file.ts:120` for the failing case.", () => undefined);
 
-    expect(anchors).toBe(1);
-    expect(references).toEqual([{ path: "path/to/file.ts", lineStart: 120 }]);
-    // The click is intercepted, so the browser never navigates to the href.
-    expect(defaultPrevented).toBe(true);
+    expect(anchorsIn(html)).toEqual([{ path: "path/to/file.ts", lineStart: 120 }]);
+    // A click must not navigate: the component stops it and hands the parsed
+    // reference to the caller.
+    expect(markdownSource).toContain("event.preventDefault(); onOpenFile(reference);");
   });
 
   it("keeps a recognized bare filename in inline code as a valid reference", () => {
@@ -109,8 +91,7 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
     expect(html).toContain('data-webui-file-reference="file.ts"');
     expect(html).toContain('href="file.ts"');
 
-    const { references, anchors } = clickFileAnchors("`file.ts`");
-    expect(anchors).toBe(1);
+    const references = anchorsIn(render("`file.ts`", () => undefined));
     expect(references).toEqual([{ path: "file.ts" }]);
     expect(references[0]).not.toHaveProperty("lineStart");
     expect(references[0]).not.toHaveProperty("lineEnd");
@@ -123,7 +104,7 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
     expect(html).not.toContain("data-webui-file-reference");
     expect(html).not.toContain("webui-message-file-link");
     expect(visibleText(html)).toBe("zht_user2.sys_user_identity and SysUserIdentity.IdentityTypeEnum and report.csv");
-    expect(clickFileAnchors(source).references).toEqual([]);
+    expect(anchorsIn(html)).toEqual([]);
   });
 
   it("does not scan ordinary prose for path-looking text", () => {
@@ -149,7 +130,7 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
       expect(html, source).not.toContain("webui-message-file-link");
       // Nothing is swallowed or rewritten.
       expect(visibleText(html), source).toBe(source);
-      expect(clickFileAnchors(source).references, source).toEqual([]);
+      expect(anchorsIn(html), source).toEqual([]);
     }
   });
 
@@ -174,7 +155,7 @@ describe("SPEC-C C-5 transcript file/line anchors", () => {
     const source = "see https://example.com/pkg/index.ts now";
     const html = render(source, () => undefined);
     expect(html).not.toContain("data-webui-file-reference");
-    expect(clickFileAnchors(source).references).toEqual([]);
+    expect(anchorsIn(html)).toEqual([]);
   });
 
   // markdown.tsx — the `link` branch re-entered `inline()` for the link's own

@@ -139,33 +139,23 @@ describe("the MCP row wiring", () => {
     });
   });
 
-  it("renders the status view on the row, reason included", () => {
-    const statusAt = MANAGEMENT_SOURCE.indexOf(
-      "data-webui-mcp-status={row.mcpStatus.key}",
-    );
-    expect(
-      statusAt,
-      "the mcp row no longer renders the status chip",
-    ).toBeGreaterThanOrEqual(0);
-    const row = MANAGEMENT_SOURCE.slice(statusAt - 600, statusAt + 900);
-    expect(row).toContain("{row.mcpStatus.label}");
-    expect(row).toContain("{row.mcpStatus.reason}");
-    expect(row).toContain(
-      "data-webui-mcp-status-reason={row.mcpStatus.key}",
-    );
+  it("keeps the status chip off the management row, where it was removed", () => {
+    // The row shows the server and its actions; the status chip it used to draw
+    // is gone. The projection above keeps the vocabulary ready for a surface that
+    // wants it, so what this pins is the row's own markup, not the projector.
+    expect(MANAGEMENT_SOURCE).not.toContain("row.mcpStatus");
+    expect(MANAGEMENT_SOURCE).not.toContain("data-webui-mcp-status");
   });
 
-  it("derives the view from the row item the list loads", () => {
+  it("still derives the view for the rows the catalogue hands out", () => {
     const deriveAt = VIEW_SOURCE.indexOf(
       "mcpStatus: describeWebuiMcpServerStatus(source)",
     );
     expect(deriveAt).toBeGreaterThanOrEqual(0);
-    // It is projected for the rows the catalogue receives, then consumed by the rendered row.
     const mapAt = VIEW_SOURCE.indexOf(
       ".map((source): WebuiPluginCatalogueRow => {",
     );
     expect(mapAt).toBeGreaterThan(0);
     expect(deriveAt).toBeGreaterThan(mapAt);
-    expect(MANAGEMENT_SOURCE).toContain("row.mcpStatus");
   });
 });

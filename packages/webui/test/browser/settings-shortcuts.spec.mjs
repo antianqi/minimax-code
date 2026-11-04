@@ -36,7 +36,8 @@ async function openSettings(page) {
 
 /** Leaves the settings the way a user does: the 返回应用 button. */
 async function closeSettings(page) {
-  await page.locator('[aria-label="返回"]').click();
+  // The settings frame's back control names itself by its text (返回应用).
+  await page.getByRole("button", { name: "返回应用" }).click();
   await expect(settingsDialog(page)).toHaveCount(0);
 }
 

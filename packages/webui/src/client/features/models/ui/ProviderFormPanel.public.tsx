@@ -20,7 +20,7 @@ import { useEffect, useRef, useState, type Dispatch, type FormEvent, type ReactE
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { IconCheck, IconChevronDown, IconEdit, IconGripVertical, IconPlus, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconEdit, IconFileTypePdf, IconGripVertical, IconPhoto, IconPlus, IconSearch, IconTrash, IconVideo, IconVolume, IconX } from "@tabler/icons-react";
 
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { reorderModelIds } from "../projection/model-reorder.js";
@@ -30,6 +30,7 @@ import type {
   WebuiModelProviderView,
   WebuiSaveUserModelProviderCandidateRequest,
   WebuiTestUserModelCandidateRequest,
+  WebuiUpdateUserModelProviderRequest,
 } from "../../../../shared/contracts/models.js";
 import type {
   WebuiProviderEditor,
@@ -56,14 +57,17 @@ import { useWebuiToastError } from "../../../ui/toast.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import { WebuiMotion } from "../../../ui/page.js";
 /** The attachment modalities, in the form's own words. */
-const ATTACHMENT_LABELS: Readonly<
-  Record<(typeof WEBUI_MODEL_ATTACHMENT_MODALITIES)[number], string>
-> = {
-  image: "图片",
-  pdf: "PDF",
-  video: "视频",
-  audio: "音频",
-};
+const ATTACHMENT_OPTIONS = [
+  { value: "image", label: "图片", Icon: IconPhoto },
+  { value: "pdf", label: "PDF", Icon: IconFileTypePdf },
+  { value: "video", label: "视频", Icon: IconVideo },
+  { value: "audio", label: "音频", Icon: IconVolume },
+] as const;
+
+function positiveInteger(value: string): number | undefined {
+  const parsed = Number(value.trim());
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
 
 /**
  * The provider commands this panel invokes. They are `models`' rather than
@@ -82,6 +86,7 @@ const ATTACHMENT_LABELS: Readonly<
   readonly saveCandidate: (
     body: WebuiSaveUserModelProviderCandidateRequest,
   ) => Promise<unknown>;
+  readonly updateProvider: (body: WebuiUpdateUserModelProviderRequest) => Promise<unknown>;
   readonly deleteProvider: (providerId: string) => Promise<unknown>;
   /**
    * The two semantic mutations this panel asks for.
@@ -249,6 +254,9 @@ export function ProviderFormPanel({
   const [apiFormatOpen, setApiFormatOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+  const [editingModel, setEditingModel] = useState<{ providerId: string; model: WebuiModelProviderModelEntry }>();
+  const [modelEditDraft, setModelEditDraft] = useState<ProviderModelDraft>();
+  const [modelEditBusy, setModelEditBusy] = useState(false);
   /* The write that failed and the delete that failed are events, not states:
    * each is said once, and the form keeps its draft. */
   useWebuiToastError(formError);
@@ -328,6 +336,34 @@ export function ProviderFormPanel({
         setProviderActionError(failure.error instanceof Error ? failure.error.message : String(failure.error));
       }
     };
+    const saveModelEdit = async () => {
+      if (!editingModel || !modelEditDraft?.modelId.trim() || modelEditBusy) return;
+      const provider = providers.find((item) => textOf(item.providerId) === editingModel.providerId);
+      if (!provider) return;
+      setModelEditBusy(true);
+      try {
+        const contextLimit = positiveInteger(modelEditDraft.contextLimit);
+        const maxOutputTokens = positiveInteger(modelEditDraft.maxOutputTokens);
+        await commands.updateProvider({
+          providerId: editingModel.providerId,
+          models: provider.models.map((item) => item.modelId === editingModel.model.modelId ? {
+            modelId: modelEditDraft.modelId.trim(),
+            displayName: editingModel.model.displayName === editingModel.model.modelId ? modelEditDraft.modelId.trim() : editingModel.model.displayName,
+            enabled: editingModel.model.enabled,
+            ...(contextLimit === undefined && maxOutputTokens === undefined ? {} : { limit: { ...(contextLimit === undefined ? {} : { context: contextLimit }), ...(maxOutputTokens === undefined ? {} : { output: maxOutputTokens }) } }),
+            effortOptions: modelEditDraft.effortOptions,
+            modalities: { input: ["text", ...modelEditDraft.modalities], output: editingModel.model.modalities?.output ?? ["text"] },
+            ...(editingModel.model.configurationSource === undefined ? {} : { configurationSource: editingModel.model.configurationSource }),
+            ...(editingModel.model.thinkingConfig === undefined ? {} : { thinkingConfig: editingModel.model.thinkingConfig }),
+          } : { modelId: item.modelId, enabled: item.enabled }),
+        });
+        setEditingModel(undefined);
+      } catch (error) {
+        setProviderActionError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setModelEditBusy(false);
+      }
+    };
   return <>
       {providers.length === 0 ? <p>暂未添加自定义模型</p> : providers.map((provider) => {
         const id = textOf(provider.providerId);
@@ -356,7 +392,7 @@ export function ProviderFormPanel({
               const failure = outcome as { readonly error?: unknown };
               setProviderActionError(failure.error instanceof Error ? failure.error.message : String(failure.error));
             }
-          }}><SortableContext items={ids} strategy={verticalListSortingStrategy}><div className="w-full rounded-[16px] bg-bg_grouped_tertiary p-1">{models.map((model, index) => <SortableModelRow key={ids[index]} id={ids[index]!} model={model} onTest={() => void commands.testModel({ providerId: id, modelId: textOf(model.modelId) })} onToggle={(enabled) => void toggleModel(id, model, enabled)} />)}</div></SortableContext></DndContext> : null}
+          }}><SortableContext items={ids} strategy={verticalListSortingStrategy}><div className="w-full rounded-[16px] bg-bg_grouped_tertiary p-1">{models.map((model, index) => <SortableModelRow key={ids[index]} id={ids[index]!} model={model} onEdit={() => { setEditingModel({ providerId: id, model }); setModelEditDraft({ id: model.modelConfigId, modelId: model.modelId, displayName: model.displayName, contextLimit: model.contextLimit === undefined ? "" : String(model.contextLimit), maxOutputTokens: model.maxOutputTokens === undefined ? "" : String(model.maxOutputTokens), effortOptions: [...(model.effortOptions ?? [])], modalities: (model.modalities?.input ?? []).filter((modality) => (WEBUI_MODEL_ATTACHMENT_MODALITIES as readonly string[]).includes(modality)), tested: false }); }} onTest={() => void commands.testModel({ providerId: id, modelId: textOf(model.modelId) })} onToggle={(enabled) => void toggleModel(id, model, enabled)} />)}</div></SortableContext></DndContext> : null}
         </WebuiStack>;
       })}
       <WebuiDialog id="provider-form" open={showProviderForm} title={editingProvider ? "编辑提供商" : "添加模型"} onClose={() => editor.close()} dismissOnEscape portalTarget={portalTarget} width="standard" footer={<>
@@ -380,12 +416,23 @@ export function ProviderFormPanel({
           }}>{apiFormatOptions.map((option) => <WebuiButton key={option} variant="selectable-row" size="regular" type="button" role="option" aria-selected={draftApiFormat === option} className="webui-provider-format-option" onClick={() => { editor.changeField("apiFormat", option); setApiFormatOpen(false); }}>{option}</WebuiButton>)}</WebuiDropdown>} /><WebuiField gap="small" label="接口地址" required error={baseUrlError} control={(props) => <WebuiTextInput {...props} controlSize="compact" placeholder="https://api.example.com/v1" value={draftBaseUrl} onChange={(event) => { editor.changeField("baseUrl", event.target.value); clearFieldError("baseUrl"); }} />} /><WebuiField gap="small" label="API Key" required={!editingProvider} error={fieldErrors.apiKey} description={editingProvider ? "留空则保留原值" : undefined} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" placeholder={editingProvider ? "留空保留原值" : "请输入API Key"} value={draftApiKey} onChange={(event) => { editor.changeField("apiKey", event.target.value); clearFieldError("apiKey"); }} />} /></WebuiFormGrid>
           <WebuiStack gap="medium" className="webui-provider-form-models">
             <WebuiInline justify="between" gap="medium" className="webui-provider-form-models-header"><span className="text-[14px] font-medium leading-5 text-text_default_primary">模型</span><WebuiInline gap="small"><WebuiButton variant="outline-secondary" size="compact" onClick={() => { editor.addModel(); clearFieldError("models"); }}>添加模型</WebuiButton><WebuiButton variant="quiet-highlight" size="compact" disabled={!snapshot.canDiscover || formBusy} onClick={() => void editor.discover()}>自动获取</WebuiButton></WebuiInline></WebuiInline>
-            {draftModels.length ? draftModels.map((model, index) => <ProviderModelCard key={model.id} model={model} index={index} busy={formBusy} onChange={(patch) => { editor.changeModel(model.id, patch); clearFieldError("models"); }} onTest={() => void editor.testModel(model.id)} onRemove={() => { editor.removeModel(model.id); clearFieldError("models"); }} />) : <FeedbackEmpty className="webui-provider-form-models-empty" title={"请至少添加一个模型"} />}
+            {draftModels.length ? draftModels.map((model) => <ProviderModelCard key={model.id} model={model} busy={formBusy} onChange={(patch) => { editor.changeModel(model.id, patch); clearFieldError("models"); }} onRemove={() => { editor.removeModel(model.id); clearFieldError("models"); }} />) : <FeedbackEmpty className="webui-provider-form-models-empty" title={"请至少添加一个模型"} />}
             {fieldErrors.models ? <WebuiFieldError message={fieldErrors.models} /> : null}
           </WebuiStack>
           <WebuiStack gap="small" className="webui-provider-form-headers"><div className="text-[13px] font-medium leading-5 text-text_default_primary">自定义 Headers</div>{draftHeaders.map((header) => <WebuiInline key={header.id} gap="small" className="webui-provider-form-header-row"><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 名称" placeholder="Header 名称" value={header.name} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} /><WebuiTextInput controlSize="dense" className="flex-1" aria-label="Header 值" placeholder={header.persistedName ? "留空保留原值" : "Header 值"} value={header.value} onChange={(event) => editor.setHeaders(draftHeaders.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} /><IconButton label="移除 Header" onClick={() => editor.removeHeader(header.id)}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton></WebuiInline>)}<WebuiButton variant="outline-secondary" size="compact" className="w-fit self-start" onClick={() => editor.addHeader()}><IconPlus aria-hidden="true" size={16} stroke={1.7} /> 添加 Header</WebuiButton></WebuiStack>
         </WebuiStack>
         </form>
+      </WebuiDialog>
+      <WebuiDialog id="provider-model-edit" open={editingModel !== undefined} title="修改模型" onClose={() => { if (!modelEditBusy) setEditingModel(undefined); }} dismissOnEscape={!modelEditBusy} portalTarget={portalTarget} width="standard" footer={<WebuiDialogActions><WebuiButton variant="secondary" disabled={modelEditBusy} onClick={() => setEditingModel(undefined)}>取消</WebuiButton><WebuiButton variant="primary" disabled={modelEditBusy || !modelEditDraft?.modelId.trim()} onClick={() => void saveModelEdit()}>{modelEditBusy ? "保存中…" : "保存"}</WebuiButton></WebuiDialogActions>}>
+        {modelEditDraft ? <WebuiStack gap="roomy" className="webui-provider-form-body">
+          <WebuiField gap="small" label="模型名称" required control={(props) => <WebuiTextInput {...props} controlSize="compact" value={modelEditDraft.modelId} onChange={(event) => setModelEditDraft({ ...modelEditDraft, modelId: event.target.value })} />} />
+          <div className="webui-provider-form-provider-grid">
+            <WebuiField gap="small" label="上下文窗口" description="留空按供应商默认值处理" control={(props) => <WebuiTextInput {...props} controlSize="compact" inputMode="numeric" placeholder="留空按供应商默认值处理" value={modelEditDraft.contextLimit} onChange={(event) => setModelEditDraft({ ...modelEditDraft, contextLimit: event.target.value })} />} />
+            <WebuiField gap="small" label="最大输出 Token" description="留空按供应商默认值处理" control={(props) => <WebuiTextInput {...props} controlSize="compact" inputMode="numeric" placeholder="留空按供应商默认值处理" value={modelEditDraft.maxOutputTokens} onChange={(event) => setModelEditDraft({ ...modelEditDraft, maxOutputTokens: event.target.value })} />} />
+          </div>
+          <WebuiField gap="small" label="推理等级" description="请确保输入模型原生支持的推理等级，留空按供应商默认值处理。" control={() => <EffortOptionsField value={modelEditDraft.effortOptions} onChange={(effortOptions) => setModelEditDraft({ ...modelEditDraft, effortOptions })} />} />
+          <WebuiField gap="small" label="支持的附件" description="所选附件将默认直接发送给模型处理，请确保模型原生支持。其余类型由平台工具处理，需消耗平台积分。" control={() => <AttachmentField value={modelEditDraft.modalities} onChange={(modalities) => setModelEditDraft({ ...modelEditDraft, modalities })} />} />
+        </WebuiStack> : null}
       </WebuiDialog>
       <WebuiDialog id="provider-delete" open={providerPendingDelete !== undefined} title={`删除供应商“${textOf(providerPendingDelete?.name)}”吗？`} description="删除后将移除该供应商下的所有模型选项。" onClose={() => { if (!deleteBusy) { setDeleteError(undefined); setProviderPendingDelete(undefined); } }} dismissOnEscape={!deleteBusy} portalTarget={portalTarget} width="compact" role="alertdialog" footer={<WebuiDialogActions>
         <WebuiButton variant="secondary" disabled={deleteBusy} onClick={() => { setDeleteError(undefined); setProviderPendingDelete(undefined); }}>取消</WebuiButton>
@@ -395,45 +442,12 @@ export function ProviderFormPanel({
   </>;
 }
 
-/**
- * One model card: the model name, the limits, the reasoning levels and the
- * attachments it takes.
- *
- * The card: a header carrying the model's number and its own connectivity probe,
- * and a bordered body holding one field per row.
- */
-function ProviderModelCard({ model, index, busy, onChange, onTest, onRemove }: { readonly model: ProviderModelDraft; readonly index: number; readonly busy: boolean; readonly onChange: (patch: ProviderModelPatch) => void; readonly onTest: () => void; readonly onRemove: () => void }): ReactElement {
+/** Compact model-name row used while adding or discovering provider models. */
+function ProviderModelCard({ model, busy, onChange, onRemove }: { readonly model: ProviderModelDraft; readonly busy: boolean; readonly onChange: (patch: ProviderModelPatch) => void; readonly onRemove: () => void }): ReactElement {
   /* The connection test that failed is an event, not a state: it is said once,
    * and the model keeps its draft. */
   useWebuiToastError(model.error);
-  return <WebuiStack gap="small" className="webui-provider-form-model">
-    <div className="webui-provider-form-model-header">
-      <span className="text-[13px] font-medium leading-5 text-text_default_primary">模型 {String(index + 1).padStart(2, "0")}</span>
-      <div className="webui-provider-form-model-tools">
-        <IconButton label="测试模型连通性" disabled={busy || !model.modelId.trim()} onClick={onTest}><RefreshIcon /></IconButton>
-        <IconButton label="移除模型" disabled={busy} onClick={onRemove}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton>
-      </div>
-    </div>
-    <WebuiStack gap="small" className="webui-provider-form-model-body">
-      <WebuiField gap="small" label="模型名称" control={(props) => <WebuiTextInput {...props} controlSize="compact" value={model.modelId} placeholder="输入 API 使用的模型 ID" onChange={(event) => onChange({ modelId: event.target.value })} />} />
-      <div className="webui-provider-form-provider-grid">
-        <WebuiField gap="small" label="上下文窗口" description="留空按供应商默认值处理" control={(props) => <WebuiTextInput {...props} controlSize="compact" inputMode="numeric" placeholder="留空按供应商默认值处理" value={model.contextLimit} onChange={(event) => onChange({ contextLimit: event.target.value })} />} />
-        <WebuiField gap="small" label="最大输出 Token" description="留空按供应商默认值处理" control={(props) => <WebuiTextInput {...props} controlSize="compact" inputMode="numeric" placeholder="留空按供应商默认值处理" value={model.maxOutputTokens} onChange={(event) => onChange({ maxOutputTokens: event.target.value })} />} />
-      </div>
-      <WebuiField
-        gap="small"
-        label="推理等级"
-        description="请确保输入模型原生支持的推理等级，留空按供应商默认值处理。"
-        control={() => <EffortOptionsField value={model.effortOptions} onChange={(effortOptions) => onChange({ effortOptions })} />}
-      />
-      <WebuiField
-        gap="small"
-        label="支持的附件"
-        description="所选附件将默认直接发送给模型处理，请确保模型原生支持。其余类型由平台工具处理，需消耗平台积分。"
-        control={() => <AttachmentField value={model.modalities} onChange={(modalities) => onChange({ modalities })} />}
-      />
-    </WebuiStack>
-  </WebuiStack>;
+  return <WebuiInline gap="small" className="webui-provider-form-model-compact"><WebuiTextInput controlSize="compact" className="min-w-0 flex-1" aria-label="模型名称" value={model.modelId} placeholder="输入模型名称" onChange={(event) => onChange({ modelId: event.target.value })} /><IconButton label="移除模型" disabled={busy} onClick={onRemove}><IconTrash aria-hidden="true" size={16} stroke={1.7} /></IconButton></WebuiInline>;
 }
 
 /**
@@ -459,18 +473,19 @@ function EffortOptionsField({ value, onChange }: { readonly value: readonly stri
 
 /** The attachment modalities one model takes, as a multiple selection. */
 function AttachmentField({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: readonly string[]) => void }): ReactElement {
-  return <div className="webui-provider-form-attachments">
-    {WEBUI_MODEL_ATTACHMENT_MODALITIES.map((modality) => <WebuiInline as="label" key={modality} className="webui-provider-form-attachment"><WebuiCheckbox checked={value.includes(modality)} onChange={(event) => onChange(event.target.checked ? [...value, modality] : value.filter((item) => item !== modality))} />{ATTACHMENT_LABELS[modality]}</WebuiInline>)}
+  return <div className="webui-provider-form-attachments" role="group" aria-label="支持的附件类型">
+    {ATTACHMENT_OPTIONS.map(({ value: modality, label, Icon }) => <WebuiButton key={modality} type="button" variant="segmented" size="compact" aria-pressed={value.includes(modality)} onClick={() => onChange(value.includes(modality) ? value.filter((item) => item !== modality) : [...value, modality])}><Icon aria-hidden="true" size={16} stroke={1.7} />{label}</WebuiButton>)}
   </div>;
 }
 
-function SortableModelRow({ id, model, onTest, onToggle }: { readonly id: string; readonly model: WebuiModelProviderModelEntry; readonly onTest: () => void; readonly onToggle: (enabled: boolean) => void }): ReactElement {
+function SortableModelRow({ id, model, onEdit, onTest, onToggle }: { readonly id: string; readonly model: WebuiModelProviderModelEntry; readonly onEdit: () => void; readonly onTest: () => void; readonly onToggle: (enabled: boolean) => void }): ReactElement {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
   const enabled = model.enabled !== false;
   return <WebuiMotion ref={setNodeRef} kind="sortable" style={{ transform: CSS.Transform.toString(transform), opacity: isDragging ? 0.55 : undefined, position: "relative", zIndex: isDragging ? 1 : undefined }} data-testid={`settings-custom-model-row-${textOf(model.modelId)}`}>
     <WebuiInline gap="medium" className="overflow-hidden rounded-[12px] py-2 pl-3 pr-3">
       <WebuiIconButton type="button" label={`调整 ${textOf(model.displayName) || textOf(model.modelId)} 顺序`} tone="bare" size="micro" className="shrink-0 touch-none cursor-grab active:cursor-grabbing" {...attributes} {...listeners}><IconGripVertical aria-hidden="true" size={16} stroke={1.7} /></WebuiIconButton>
       <span className={`min-w-0 flex-1 truncate text-[14px] leading-5 text-text_default_primary ${enabled ? "" : "opacity-50"}`}>{textOf(model.displayName) || textOf(model.modelId)}</span>
+      <IconButton label={`修改模型 ${textOf(model.displayName) || textOf(model.modelId)}`} onClick={onEdit}><IconEdit aria-hidden="true" size={16} stroke={1.7} /></IconButton>
       <IconButton label="测试模型连通性" onClick={onTest}><RefreshIcon /></IconButton>
       <ToggleSwitch checked={enabled} label={`${enabled ? "禁用" : "启用"} ${textOf(model.displayName) || textOf(model.modelId)}`} onChange={onToggle} />
     </WebuiInline>

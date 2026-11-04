@@ -85,7 +85,9 @@ test("the inline tab moves the Mini App into its own tab, which shows only the M
   // The inline tab offers the move.
   const move = page.getByTestId("miniapp-open-standalone");
   await expect(move).toBeVisible();
-  await expect(move).toContainText("在新标签页中打开");
+  // The control carries an icon rather than a label, so its name is the
+  // accessible one.
+  await expect(move).toHaveAttribute("aria-label", "在新标签页中打开");
 
   const [popup] = await Promise.all([page.waitForEvent("popup"), move.click()]);
   await popup.waitForLoadState("domcontentloaded");

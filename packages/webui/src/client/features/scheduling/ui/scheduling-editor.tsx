@@ -324,6 +324,17 @@ export function SchedulingEditor(props: {
     props.onDone();
   };
 
+  /**
+   * Whether the footer's primary action can be pressed.
+   *
+   * The same fields `submit` validates: a task with no name, no instruction or
+   * no agent is not offered a button whose only answer is a field error.
+   */
+  const canSubmit =
+    draft.name.trim().length > 0 &&
+    draft.prompt.trim().length > 0 &&
+    (editingTask !== undefined || draft.agentName.trim().length > 0);
+
   return (
     <WebuiDialog
       id="webui-scheduling-editor-dialog"
@@ -343,7 +354,7 @@ export function SchedulingEditor(props: {
             取消
           </WebuiButton>
           <WebuiButton variant="primary" size="dialog" type="submit" form="webui-scheduling-editor-form"
-            data-webui-scheduling-submit="true" loading={busy}
+            data-webui-scheduling-submit="true" loading={busy} disabled={!canSubmit}
             loadingLabel={editingTask ? "保存中…" : "创建中…"}
           >
             {editingTask ? "保存" : "创建任务"}

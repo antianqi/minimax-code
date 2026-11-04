@@ -24,7 +24,8 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('[role="dialog"][aria-label="设置"]')).toBeVisible();
   await page.locator('.webui-settings-nav [data-menu-key="usage"]').click();
   await page.getByRole("button", { name: "自定义模型" }).click();
-  await page.locator('[data-testid="settings-custom-models-panel"]').getByRole("button", { name: "添加模型" }).click();
+  // The action sits in the page toolbar, outside the panel it opens the form from.
+  await page.getByRole("dialog", { name: "设置" }).getByRole("button", { name: "添加模型", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "添加模型" })).toBeVisible();
 });
 

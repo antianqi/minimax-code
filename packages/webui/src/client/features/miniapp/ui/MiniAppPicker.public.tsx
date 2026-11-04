@@ -103,13 +103,15 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
       setOpen(false);
       triggerRef.current?.querySelector("button")?.focus();
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+    // The listeners come from the injected platform, so a host without an
+    // ambient `document` still dismisses the picker.
+    const stopPointer = dom.listenForPointerDown(onPointerDown);
+    const stopKey = dom.listenForKeyDown(onKeyDown);
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
+      stopPointer();
+      stopKey();
     };
-  }, [open]);
+  }, [open, dom]);
 
   const iconSource = (iconUrl: string | undefined): string | undefined => {
     if (!iconUrl) return undefined;

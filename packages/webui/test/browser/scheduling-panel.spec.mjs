@@ -29,13 +29,15 @@ test.describe("the scheduled-task panel", () => {
     await expect(panel.locator("[data-webui-scheduling-task]")).toHaveCount(3);
     const held = panel.locator('[data-webui-scheduling-task="cron-fixture-held"]');
     await expect(held).toContainText("队列摘要");
-    await expect(held).toContainText("每天 09:00");
     await panel.locator('[data-webui-scheduling-select="cron-fixture-held"]').click();
+    // The row says when the task runs next; the schedule itself is the detail
+    // pane's, which is what selecting the row opens.
+    await expect(panel.locator("[data-webui-scheduling-main]")).toContainText("每天 09:00");
     await expect(panel.locator('[data-webui-scheduling-hold="held"]')).toContainText("本客户端已接管");
 
     const unheld = panel.locator('[data-webui-scheduling-task="cron-fixture-unheld"]');
-    await expect(unheld).toContainText("每 30 分钟");
     await panel.locator('[data-webui-scheduling-select="cron-fixture-unheld"]').click();
+    await expect(panel.locator("[data-webui-scheduling-main]")).toContainText("每 30 分钟");
     await expect(panel.locator('[data-webui-scheduling-hold="unheld"]')).toContainText("本客户端未接管");
 
     const paused = panel.locator('[data-webui-scheduling-task="cron-fixture-paused"]');
@@ -71,15 +73,20 @@ test.describe("the scheduled-task panel", () => {
     await editor.locator('[data-webui-scheduling-field="agentName"]').fill("synthetic-A");
     await editor.locator('[data-webui-scheduling-field="prompt"]').fill("Summarize the day.");
     await expect(editor).toHaveScreenshot("scheduling-editor.png", screenshotOptions);
-    await editor.locator('[data-webui-scheduling-submit="true"]').click();
+    // The editor's submit control is the dialog footer's, so it is not inside the
+    // editor's own element.
+    await page.locator('[data-webui-scheduling-submit="true"]').click();
     await expect(editor).toHaveCount(0);
     const created = panel.locator('[data-webui-scheduling-task="cron-fixture-new-1"]');
     await expect(created).toContainText("每日摘要");
     // What the preset means reached the runtime: daily at 09:00 is `0 9 * * *`.
-    await expect(created).toContainText("每天 09:00");
+    // The row shows when the task runs next; the schedule is the detail pane's.
+    await created.locator('[data-webui-scheduling-select="cron-fixture-new-1"]').click();
+    await expect(panel.locator("[data-webui-scheduling-main]")).toContainText("每天 09:00");
 
-    // Turn one off: the selected task's action, and the label follows the runtime's answer.
-    const heldRow = panel.locator('[data-webui-scheduling-task="cron-fixture-held"]');
+    // Turn one off: the action belongs to the selected task's own pane, so the
+    // row is selected first — the same way a person reaches it.
+    await panel.locator('[data-webui-scheduling-select="cron-fixture-held"]').click();
     await panel.locator('[data-webui-scheduling-toggle="cron-fixture-held"]').click();
     await expect(panel.locator('[data-webui-scheduling-enabled="false"]')).toContainText("已停用");
     // And back on again.

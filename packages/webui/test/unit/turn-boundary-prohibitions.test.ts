@@ -279,8 +279,10 @@ describe("prohibition 6 — a workspace reader takes the resource it renders", (
   it("gives each consumer the hook for the resource it renders", () => {
     // A consumer reaching for the whole facade is how the split decays: the
     // types stop narrowing and every capability is everyone's again.
+    // The composer left this list with the `@` menu's project-file section: it no
+    // longer renders that resource, so it must not hold the reader either.
+    expect(read("features/composer/ui/WebuiComposer.tsx")).not.toContain("useWebuiWorkspaceFiles");
     const expectations: readonly [string, string][] = [
-      ["features/composer/ui/WebuiComposer.tsx", "useWebuiWorkspaceFiles"],
       ["features/review/ui/ReviewSettingsPage.public.tsx", "useWebuiWorkspaceReview"],
       ["features/workspace/ui/WorkspaceArchiveView.tsx", "useWebuiWorkspaceArchive"],
       ["features/workspace/ui/WorkspaceCanvas.tsx", "useWebuiWorkspaceCanvas"],

@@ -399,7 +399,7 @@ describe("the model rows", () => {
     expect(editor.getSnapshot().tested).toBe(false);
   });
 
-  it("probes every row that carries an id", async () => {
+  it("probes the save model, and leaves the per-row probe to its own command", async () => {
     const { commands, calls } = harness();
     const editor = createWebuiProviderEditor({ commands });
     editor.openNew();
@@ -407,7 +407,9 @@ describe("the model rows", () => {
     addModel(editor, "m1");
     addModel(editor, "m2");
     await editor.test();
-    expect(calls.test.map((call) => call.modelId)).toEqual(["m1", "m2"]);
+    // The save's probe answers "does this provider answer at all", so it names
+    // one row; each model card's own action probes that card.
+    expect(calls.test.map((call) => call.modelId)).toEqual(["m1"]);
     expect(editor.getSnapshot().tested).toBe(true);
   });
 });

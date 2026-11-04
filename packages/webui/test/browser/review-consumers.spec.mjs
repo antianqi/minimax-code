@@ -92,7 +92,9 @@ test("a settled revert refreshes the workspace review family", async ({ page }) 
     await page.screenshot({ path: join(captureDir, "workspace-review-search.png"), fullPage: true });
   }
   await changeSearch.fill("a.ts");
-  await page.getByTestId("workspace-review").getByRole("button", { name: "搜索", exact: true }).click();
+  // The review toolbar carries a search field now, and the field submits on
+  // Enter rather than through a button beside it.
+  await changeSearch.press("Enter");
   await expect.poll(() => requests(page, "searchWorkspaceReviewDiffs")).toBeGreaterThan(0);
   const before = await requests(page, "getWorkspaceReviewSummary");
 

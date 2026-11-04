@@ -300,6 +300,28 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
   };
 
   const isStdio = transport === "stdio";
+  /**
+   * Whether the primary action can be pressed at all.
+   *
+   * Desktop disables it while the form is invalid, so an invalid value never
+   * becomes a request the person has to read an error for. The conditions are
+   * the ones `configFromForm` throws on: a named server, a reachable endpoint, a
+   * header block that parses, and a positive whole-number timeout.
+   */
+  const headersParsable = (() => {
+    if (isStdio) return true;
+    try {
+      parseRecord(headers, "请求头");
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const timeoutValid = (() => {
+    if (!timeoutMs.trim()) return true;
+    const parsed = Number(timeoutMs);
+    return Number.isSafeInteger(parsed) && parsed > 0;
+  })();
   const isConnectionValid = isStdio
     ? command.trim().length > 0
     : (() => {
@@ -446,7 +468,12 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
         <WebuiButton variant="secondary" size="dialog" onClick={onClose}>
           取消
         </WebuiButton>
-        <WebuiButton variant="primary" size="dialog" onClick={save}>
+        <WebuiButton
+          variant="primary"
+          size="dialog"
+          disabled={!(jsonMode ? json.trim().length > 0 : name.trim().length > 0 && isConnectionValid && headersParsable && timeoutValid)}
+          onClick={save}
+        >
           {editing ? "保存" : "添加服务器"}
         </WebuiButton>
       </WebuiDialogActions>

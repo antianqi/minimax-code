@@ -327,8 +327,10 @@ test.describe("the layout adapts to the width it has", () => {
       const style = getComputedStyle(element);
       return { property: style.transitionProperty, duration: style.transitionDuration };
     });
-    expect(layoutMotion.property).toContain("padding-inline-end");
-    expect(layoutMotion.duration).toBe("0.18s");
+    // The width change belongs to the motion surface (ADR 0028): the panel slot
+    // reports enter/exit and the layout follows it, so the layout declares no
+    // timing of its own — which is the thing worth pinning here.
+    expect(layoutMotion.duration).toBe("0s");
 
     await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "环境信息与进度" }).click();
     await expect(motion).toHaveAttribute("data-webui-motion-state", "exit");

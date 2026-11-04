@@ -1183,6 +1183,13 @@ export class WebuiBrowserService {
    * browsers are driven in the person's own windows — so a person typing a url
    * must not be refused because the Agent happens to be working in Edge.
    *
+   * The Agent may also **name** the surface it means (ADR 0019 A12). The name is
+   * the Agent's own choice and it moves nothing else: the surface's switch still
+   * decides whether that browser may be used at all, and a browser that is not
+   * connected still has no provider. The person's path ignores the name
+   * entirely — a person typing a url never lands in Edge because the Agent
+   * happens to be working there.
+   *
    * The run is optional because the person may have no run in view: an absent run
    * is the panel's own cell, and the bootstrap applies to it exactly as it applies
    * to a run.
@@ -1192,6 +1199,7 @@ export class WebuiBrowserService {
     params: Record<string, unknown> = {},
     signal?: AbortSignal,
     opener: WebuiBrowserTabOpener = "agent",
+    namedSurface?: WebuiBrowserSurface,
   ): Promise<{
     readonly accepted: true;
     readonly target: WebuiBrowserTargetId;
@@ -1200,7 +1208,7 @@ export class WebuiBrowserService {
     const surface =
       opener === "person"
         ? "isolated-chromium"
-        : (this.selectionSurfaceOf(runId) ?? "isolated-chromium");
+        : (namedSurface ?? this.selectionSurfaceOf(runId) ?? "isolated-chromium");
     // The switch comes first: a surface that is switched off is refused
     // before anything is attempted, so the refusal names the switch rather
     // than the selection.

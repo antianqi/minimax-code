@@ -10,6 +10,7 @@ import type {
   WebuiBrowserAuthorization,
   WebuiBrowserImageFrame,
   WebuiBrowserInputCommand,
+  WebuiBrowserSurface,
   WebuiBrowserTargetId,
   WebuiBrowserWebTabSnapshot,
   WebuiBrowserTargetState,
@@ -29,7 +30,7 @@ import type {
  * the case the run-scoped selection exists for.
  */
 class RecordingProvider implements WebuiBrowserSurfaceProvider {
-  readonly surface = "isolated-chromium" as const;
+  readonly surface: WebuiBrowserSurface;
   readonly browserId = "browser-1";
   readonly inputs: WebuiBrowserInputCommand[] = [];
   readonly commands: { command: string; params: Record<string, unknown> }[] = [];
@@ -50,8 +51,12 @@ class RecordingProvider implements WebuiBrowserSurfaceProvider {
   frameHandler: ((frame: WebuiBrowserImageFrame) => void) | undefined;
   closed = false;
 
-  constructor(tabIds: readonly string[] = ["tab-1"]) {
+  constructor(
+    tabIds: readonly string[] = ["tab-1"],
+    surface: WebuiBrowserSurface = "isolated-chromium",
+  ) {
     this.tabIds = tabIds;
+    this.surface = surface;
   }
 
   onTargetChanged(
@@ -216,8 +221,9 @@ function tab(targetId: string, generation = 1): WebuiBrowserTargetId {
 async function selectedTargetOf(
   service: WebuiBrowserService,
   runId?: string,
+  surface: WebuiBrowserSurface = "isolated-chromium",
 ): Promise<string | undefined> {
-  const list = await service.listTargets("isolated-chromium", runId);
+  const list = await service.listTargets(surface, runId);
   return list.targets.find((target) => target.selected)?.id.targetId;
 }
 
@@ -619,6 +625,57 @@ describe("browser service", () => {
       targetId: "tab-2",
       generation: 1,
     });
+    await service.close();
+  });
+
+  it("opens a page on the surface the caller names, and the run's selection moves there", async () => {
+    // The Agent names the browser it means. The page is created in that
+    // browser — here Edge, through the bridge — and the run's selection moves
+    // to it, so the run acts on the page it just opened.
+    const edge = new RecordingProvider(["edge-tab-1"], "edge");
+    const { service } = createService(
+      { isolatedChromium: true, edge: true, chrome: false, fullCdp: false },
+      ["tab-1"],
+      edge,
+    );
+
+    const opened = await service.openWebTab(
+      "run-1",
+      { url: "https://example.test/agent" },
+      undefined,
+      "agent",
+      "edge",
+    );
+
+    expect(opened.target.surface).toBe("edge");
+    // The page was created in Edge, not in the browser this process owns.
+    expect(edge.openedTabs).toHaveLength(1);
+    expect(await selectedTargetOf(service, "run-1", "edge")).toBe(opened.target.targetId);
+    // The run works on the browser it was told to work on.
+    expect(service.selectionSurfaceOf("run-1")).toBe("edge");
+    await service.close();
+  });
+
+  it("refuses to open a page on a surface whose switch is off", async () => {
+    // Naming a browser is the Agent's choice; the switch is the person's, and
+    // it still decides whether that browser may be used at all.
+    const edge = new RecordingProvider(["edge-tab-1"], "edge");
+    const { service } = createService(
+      { isolatedChromium: true, edge: false, chrome: false, fullCdp: false },
+      ["tab-1"],
+      edge,
+    );
+
+    await expect(
+      service.openWebTab(
+        "run-1",
+        { url: "https://example.test/agent" },
+        undefined,
+        "agent",
+        "edge",
+      ),
+    ).rejects.toMatchObject({ code: "browser_surface_not_authorized" });
+    expect(edge.openedTabs).toHaveLength(0);
     await service.close();
   });
 

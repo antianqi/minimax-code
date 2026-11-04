@@ -35,6 +35,8 @@ import type {
 } from './types.js';
 
 export const CONTROL_IN_APP_BROWSER_SKILL_NAME = 'control-in-app-browser';
+/** The field a browser call carries to name the browser it means. */
+const BROWSER_NAME_FIELD = 'browser';
 const SCREENSHOT_DELIVERY_INSTRUCTION =
   'This screenshot is model-visible inspection evidence and is not shown to the user by default. Do not proactively claim it was sent, shared, shown, or attached, and do not emit its delivery markup unless the user explicitly asks to see or receive this screenshot. When explicitly requested, emit userDelivery.mediaMarkup exactly once if userDelivery.available is true. Never expose Base64 or a data URL, and never fabricate a path or markup when delivery is unavailable.';
 const COMPACT_HOVER_SEMANTIC_SOURCES = new Set([
@@ -137,6 +139,90 @@ interface BrowserRuntimeInternalOptions extends LocalBrowserRuntimeToolOptions {
   postActionVisualCountByTurn: Map<string, number>;
   interactiveTakeover: boolean;
   providerNavigationGuidance: string;
+  /**
+   * The browser name a call may carry, when the provider drives more than one
+   * browser and the model is therefore asked to choose.
+   */
+  browserProperty?: TSchema;
+  /**
+   * The browsers the provider offers, by name.
+   *
+   * The names are the provider's own, and the provider is what drives them: a
+   * name outside this list is refused here rather than passed on to a browser
+   * that does not exist.
+   */
+  browsers?: readonly string[];
+}
+
+/**
+ * The optional browser name a call may carry.
+ *
+ * It is only offered to a provider that drives more than one browser: a
+ * provider with one browser has nothing to choose, and the model is not shown
+ * a field that would have exactly one meaning.
+ */
+function browserNameProperty(browsers: readonly string[] | undefined): TSchema | undefined {
+  if (!browsers || browsers.length < 2) return undefined;
+  const names = [...browsers];
+  return Type.Optional(
+    Type.String({
+      enum: names,
+      // TypeBox does not enforce an enum on a string, so the pattern is what
+      // actually refuses a name the provider does not offer.
+      pattern: `^(?:${names.map(escapeRegExpPattern).join('|')})$`,
+      description:
+        'Which browser this call acts on, by the provider\'s own name for it. Omit it to use the browser this session is already on.',
+    }),
+  );
+}
+
+/** The browser a call names, when it names one. */
+function readBrowserName(input: unknown): string | undefined {
+  if (!isRecord(input)) return undefined;
+  const named = input[BROWSER_NAME_FIELD];
+  return typeof named === 'string' ? named : undefined;
+}
+
+/**
+ * The complaint about the browser a call named, when the name is not one this
+ * provider drives.
+ *
+ * A name is refused rather than ignored: a call that believes it is in a
+ * browser it is not in is worse than a refusal.
+ */
+function checkNamedBrowser(
+  named: string | undefined,
+  browsers: readonly string[] | undefined,
+): string | undefined {
+  if (named === undefined) return undefined;
+  if (!browsers) {
+    return `This provider drives one browser, so a call cannot name another: "${named}" was not understood.`;
+  }
+  if (browsers.includes(named)) return undefined;
+  return `The browser "${named}" is not one this provider offers. It offers ${browsers.join(', ')}.`;
+}
+
+/** Escapes a browser name for use inside a regular expression alternation. */
+function escapeRegExpPattern(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+/**
+ * An input schema, with the browser name added when there is one.
+ *
+ * The name is added to the action's own fields rather than beside them: it is
+ * how the call reaches a browser, and it travels inside the call's input.
+ */
+function inputSchemaWithBrowser(schema: TSchema, browser: TSchema | undefined): TSchema {
+  if (!browser) return schema;
+  const additional = schema.additionalProperties;
+  return Type.Object(
+    { ...(schema.properties ?? {}), [BROWSER_NAME_FIELD]: browser },
+    {
+      ...(additional === undefined ? {} : { additionalProperties: additional }),
+      ...(schema.description === undefined ? {} : { description: schema.description }),
+    },
+  );
 }
 
 export function buildLocalBrowserRuntimeTools(
@@ -144,11 +230,14 @@ export function buildLocalBrowserRuntimeTools(
   options: LocalBrowserRuntimeToolOptions = {},
 ): LocalRuntimeTool[] {
   const capabilities = adapter.getCapabilities?.();
+  const offeredBrowsers = capabilities?.browsers ?? [];
+  const browserProperty = browserNameProperty(offeredBrowsers);
   const runtimeOptions: BrowserRuntimeInternalOptions = {
     ...options,
     postActionVisualCountByTurn: new Map(),
     interactiveTakeover: capabilities?.interactiveTakeover !== false,
     providerNavigationGuidance: browserProviderNavigationGuidance(capabilities?.provider),
+    ...(browserProperty ? { browserProperty, browsers: offeredBrowsers } : {}),
   };
   const exposure = options.exposure ?? 'compact';
   const declaredActions = capabilities?.actions;
@@ -170,19 +259,31 @@ export function buildLocalBrowserRuntimeTools(
 export function describeLocalBrowserToolInput(target: RuntimeTool): TSchema {
   const actions: unknown = target.def.schema.properties?.action?.enum;
   const allowed = new Set(Array.isArray(actions) ? actions : []);
+  // The browser name is read back from the tool this binding discloses, not
+  // from the provider's capabilities: the disclosed contract is then exactly
+  // what the tool accepts, because the tool's own schema is what says it.
+  const browser = browserPropertyOf(target);
   return Type.Union(
     Object.entries(LOCAL_BROWSER_ACTION_INPUT_CONTRACTS)
       .filter(([action]) => allowed.has(action))
-      .map(([action, contract]) =>
-        Type.Object(
+      .map(([action, contract]) => {
+        const input = inputSchemaWithBrowser(contract.schema, browser);
+        return Type.Object(
           {
             action: Type.Literal(action),
-            input: contract.optional ? Type.Optional(contract.schema) : contract.schema,
+            input: contract.optional ? Type.Optional(input) : input,
           },
           { additionalProperties: false },
-        ),
-      ),
+        );
+      }),
   );
+}
+
+/** The browser name the tool accepts, when it accepts one. */
+function browserPropertyOf(target: RuntimeTool): TSchema | undefined {
+  const input = target.def.schema.properties?.input;
+  const browser = input?.properties?.[BROWSER_NAME_FIELD];
+  return browser === undefined ? undefined : browser;
 }
 
 function buildDetailedBrowserRuntimeTools(
@@ -271,13 +372,22 @@ function createBrowserCompactRuntimeTool(
     enum: compactActions,
     pattern: `^(?:${compactActions.join('|')})$`,
   });
+  // The input contract the model is shown. A provider that drives more than
+  // one browser shows the name inside the input, so a call can say which
+  // browser it means. The input stays the one flat object it always was: the
+  // exact fields of an action are settled when the action runs, and the model
+  // is not asked to learn a union to name a browser.
+  const providerInput = LocalBrowserToolDef.schema.properties.input;
+  const inputSchema = options.browserProperty
+    ? Type.Optional(inputSchemaWithBrowser(providerInput, options.browserProperty))
+    : providerInput;
   const def = {
     ...LocalBrowserToolDef,
     description: `${LocalBrowserToolDef.description} ${options.providerNavigationGuidance} ${COMPACT_INSPECT_CONTINUATION_INSTRUCTION} Available actions for this turn: ${actions.join(', ')}.`,
     schema: Type.Object(
       {
         action: actionSchema,
-        input: LocalBrowserToolDef.schema.properties.input,
+        input: inputSchema,
       },
       {
         additionalProperties: false,
@@ -312,7 +422,23 @@ function createBrowserCompactRuntimeTool(
       }
 
       const rawInput = input.input ?? {};
-      if (!Value.Check(contract.schema, rawInput)) {
+      // The browser a call names is checked on its own, so that a name this
+      // provider does not offer is refused in the words of that refusal rather
+      // than as a mismatch of the whole input.
+      const namedBrowserError = checkNamedBrowser(
+        readBrowserName(rawInput),
+        options.browsers,
+      );
+      if (namedBrowserError) {
+        return browserToolError(
+          LocalBrowserToolDef.name,
+          action,
+          namedBrowserError,
+          'browser_command_invalid',
+        );
+      }
+      const inputContract = inputSchemaWithBrowser(contract.schema, options.browserProperty);
+      if (!Value.Check(inputContract, rawInput)) {
         return browserToolError(
           LocalBrowserToolDef.name,
           action,
@@ -350,8 +476,12 @@ function createBrowserRuntimeTool<S extends TSchema>(
   adapter: LocalBrowserAdapter,
   options: BrowserRuntimeInternalOptions,
 ): LocalRuntimeTool {
+  // A provider that drives more than one browser shows the name in the
+  // action's own schema, so a call can say which browser it means.
+  const schema = inputSchemaWithBrowser(def.schema, options.browserProperty) as S;
   return defineRuntimeTool<S, LocalRuntimeToolContext>({
     ...def,
+    schema,
     ...(action === 'navigate'
       ? { description: `${def.description} ${options.providerNavigationGuidance}` }
       : {}),

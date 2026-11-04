@@ -264,6 +264,7 @@
       "packages/agent-tools/test/desktop/local-bash-output.test.ts",
       "packages/agent-tools/test/desktop/local-bash-timeout.test.ts",
       "packages/agent-tools/test/desktop/local-memory.test.ts",
+      "packages/agent-tools/test/desktop/local-browser-browsers.test.ts",
       "packages/local-runtime-v2/src/service/turn-system/agent-host/compaction/context-compaction.test.ts",
       "packages/local-runtime-v2/src/service/turn-system/compaction/algorithm/compact-context.test.ts",
       "packages/local-runtime-v2/src/service/turn-system/compaction/automatic-context-compactor.test.ts",
@@ -296,6 +297,7 @@
       "packages/browser-extension/test/cdp.test.ts",
       "packages/browser-extension/test/settings.test.ts",
       "packages/browser-extension/test/extension-identity.test.ts",
+      "packages/browser-extension/test/tab-opener.test.ts",
       "packages/local-runtime/test/unit/channel-bridge-surface.test.ts"
     ],
     "status-contract": [

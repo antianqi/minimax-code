@@ -19,7 +19,10 @@ import type {
   WebuiBrowserTargetId,
   WebuiBrowserTargetState,
 } from "../../src/shared/contracts/browser.js";
-import { WEBUI_BROWSER_RESTRICTED_COMMANDS } from "../../src/shared/contracts/browser.js";
+import {
+  WEBUI_BROWSER_RESTRICTED_COMMANDS,
+  WEBUI_BROWSER_SURFACES,
+} from "../../src/shared/contracts/browser.js";
 
 /**
  * A provider that records what it was asked to do.
@@ -162,6 +165,13 @@ function createService(
     readonly isolatedTabs?: readonly string[];
     /** When given, the bridge lends Edge a session with these tabs. */
     readonly edgeTabs?: readonly string[];
+    /**
+     * Whether Edge's browser offers the page-opening capability.
+     *
+     * It does by default: the extension holds the `tabs` permission and can
+     * create a page in the person's browser itself.
+     */
+    readonly edgeCanOpenTab?: boolean;
   } = {},
 ): {
   service: WebuiBrowserService;
@@ -176,10 +186,10 @@ function createService(
     "isolated-chromium",
     options.isolatedTabs ?? ["tab-1"],
   );
-  // The edge provider never has an `openTab`: the extension drives the
-  // person's own browser through its debugger and cannot open a page in it.
+  // The bridge's browser can open a page: the extension holds the `tabs`
+  // permission and creates it in the person's browser itself.
   const edge = options.edgeTabs
-    ? new RecordingProvider("edge", options.edgeTabs, false)
+    ? new RecordingProvider("edge", options.edgeTabs, options.edgeCanOpenTab ?? true)
     : undefined;
   const state = { authorization };
   const serviceOptions: WebuiBrowserServiceOptions = {
@@ -330,14 +340,15 @@ describe("Agent browser-tool adapter", () => {
     expect(provider.commands).toHaveLength(0);
   });
 
-  it("refuses open_tab on a surface that cannot open a tab", async () => {
+  it("refuses open_tab on a surface whose browser cannot open a tab", async () => {
+    // Opening a page is the browser's own capability, and a browser that does
+    // not offer it is refused rather than approximated.
     const { service } = createService(
       { ...ALL_OFF, edge: true },
-      { edgeTabs: ["tab-edge"] },
+      { edgeTabs: ["tab-edge"], edgeCanOpenTab: false },
     );
     const adapter = createWebuiBrowserToolAdapter({ browser: service });
-    // The run works on Edge, and the extension drives that browser through
-    // its debugger — it cannot open a page in it.
+    // The run works on Edge, and Edge's browser cannot open a page in it.
     await service.listTargets("edge", "run-a");
     await service.selectTarget(EDGE_TARGET, "run-a");
 
@@ -380,6 +391,70 @@ describe("Agent browser-tool adapter", () => {
     // The person can take over the page these actions drive: it is the page
     // the panel is showing.
     expect(capabilities?.interactiveTakeover).toBe(true);
+    // The browsers this host drives, by the names a call may use. The model is
+    // offered the choice because there is more than one browser to choose.
+    expect([...(capabilities?.browsers ?? [])]).toEqual([
+      ...WEBUI_BROWSER_SURFACES,
+    ]);
+  });
+
+  it("opens a page in the browser the call names, and acts on it there", async () => {
+    // The Agent names the browser it means. The page is created in that
+    // browser — here Edge — and the next call acts on that page, in Edge.
+    const { service, provider, edge } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      { edgeTabs: ["tab-edge"] },
+    );
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    await adapter.execute(TOOL_CONTEXT, "open_tab", {
+      url: "https://example.test/agent",
+      browser: "edge",
+    });
+
+    // The page was created in Edge, not in the browser this process owns.
+    expect(edge?.openedTabs).toHaveLength(1);
+    expect(provider.openedTabs).toHaveLength(0);
+
+    await adapter.execute(TOOL_CONTEXT, "reload", { browser: "edge" });
+
+    // Both calls landed in Edge, and the name that sent them there is not a
+    // parameter of the commands themselves.
+    expect(edge?.commands).toEqual([
+      { command: "open_tab", params: { url: "https://example.test/agent" } },
+      { command: "reload", params: {} },
+    ]);
+    expect(provider.commands).toHaveLength(0);
+    await service.close();
+  });
+
+  it("opens a page in the built-in browser when the call names none", async () => {
+    const { service, provider, edge } = createService(
+      { ...ALL_OFF, isolatedChromium: true, edge: true },
+      { edgeTabs: ["tab-edge"] },
+    );
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    await adapter.execute(TOOL_CONTEXT, "open_tab", { url: "https://example.test/agent" });
+
+    // The default is the built-in browser, even when Edge is right there.
+    expect(provider.openedTabs).toHaveLength(1);
+    expect(edge?.openedTabs ?? []).toHaveLength(0);
+    await service.close();
+  });
+
+  it("refuses a browser it does not drive", async () => {
+    const { service, provider } = createService({ ...ALL_OFF, isolatedChromium: true });
+    const adapter = createWebuiBrowserToolAdapter({ browser: service });
+
+    // A name this host does not drive is refused rather than ignored: a run
+    // that believes it is in Safari and is really in the built-in browser is
+    // worse than a refusal.
+    await expect(
+      adapter.execute(TOOL_CONTEXT, "reload", { browser: "safari" }),
+    ).rejects.toMatchObject({ code: "browser_command_invalid" });
+    expect(provider.commands).toHaveLength(0);
+    await service.close();
   });
 
   it("forwards a restricted action to the browser and returns the result", async () => {

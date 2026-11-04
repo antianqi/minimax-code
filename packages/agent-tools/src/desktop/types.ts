@@ -231,6 +231,15 @@ export interface BrowserProviderCapabilities {
   readonly actions: readonly LocalBrowserToolAction[];
   /** Whether a user can safely take over the provider's current visible Browser surface. */
   readonly interactiveTakeover?: boolean;
+  /**
+   * The browsers this provider can drive, by name.
+   *
+   * A provider that drives more than one lets a call name the browser it
+   * means, and the names are the provider's own. A provider with one browser
+   * leaves this absent, and its calls carry no name: there is nothing to
+   * choose between.
+   */
+  readonly browsers?: readonly string[];
 }
 
 export type ModelVerdict = 'pass' | 'fail' | 'partial';

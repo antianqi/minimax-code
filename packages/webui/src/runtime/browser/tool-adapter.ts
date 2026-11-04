@@ -30,12 +30,65 @@
 
 import {
   WEBUI_BROWSER_RESTRICTED_COMMANDS,
+  WEBUI_BROWSER_SURFACES,
   type WebuiBrowserSurface,
+  type WebuiBrowserTabOpener,
   type WebuiBrowserTargetId,
 } from "../../shared/contracts/browser.js";
 import type { WebuiBrowserAdapter } from "../browser-provider.js";
 import { isRestrictedBrowserCommand } from "./authorization.js";
 import { browserOperationError } from "./errors.js";
+
+/**
+ * The field a browser tool call carries to name the browser it means.
+ *
+ * Its values are the surfaces themselves — `isolated-chromium`, `edge`,
+ * `chrome` — because a call that names a browser is naming one of the
+ * browsers this host drives.
+ */
+const WEBUI_BROWSER_TOOL_BROWSER_FIELD = "browser";
+
+/**
+ * The browser a call names, or `undefined` when it names none.
+ *
+ * A name this host does not drive is refused rather than ignored: a run that
+ * believes it is in a browser it is not in is worse than a refusal.
+ */
+function readNamedSurface(input: unknown): WebuiBrowserSurface | undefined {
+  if (!isRecord(input)) return undefined;
+  const named = input[WEBUI_BROWSER_TOOL_BROWSER_FIELD];
+  if (named === undefined) return undefined;
+  if (isWebuiBrowserSurface(named)) return named;
+  throw browserOperationError(
+    "browser_command_invalid",
+    `The browser "${String(named)}" is not one this host drives.`,
+  );
+}
+
+/** Whether a value names one of the browsers this host drives. */
+function isWebuiBrowserSurface(value: unknown): value is WebuiBrowserSurface {
+  return (
+    typeof value === "string" &&
+    (WEBUI_BROWSER_SURFACES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * The call's own parameters, without the name of the browser it addresses.
+ *
+ * The name is how the call reaches a browser; it is not something the browser
+ * is asked to do, so it does not travel on to the command.
+ */
+function commandParams(input: unknown): Record<string, unknown> {
+  if (!isRecord(input)) return {};
+  const { [WEBUI_BROWSER_TOOL_BROWSER_FIELD]: _named, ...rest } = input;
+  return rest;
+}
+
+/** Whether a value is a plain record. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 /** The provider name the runtime's browser guidance and skills branch on. */
 const WEBUI_BROWSER_TOOL_PROVIDER = "webui-browser";
@@ -75,6 +128,8 @@ export interface WebuiBrowserToolCommandSurface {
     runId: string,
     params?: Record<string, unknown>,
     signal?: AbortSignal,
+    opener?: WebuiBrowserTabOpener,
+    surface?: WebuiBrowserSurface,
   ): Promise<{
     readonly accepted: true;
     readonly target: WebuiBrowserTargetId;
@@ -141,6 +196,11 @@ export function createWebuiBrowserToolAdapter(
       version: WEBUI_BROWSER_TOOL_CAPABILITY_VERSION,
       actions: WEBUI_BROWSER_RESTRICTED_COMMANDS,
       interactiveTakeover: true,
+      // The browsers this host drives, by the names a call may use. The model
+      // is offered the choice because there is more than one; naming one is
+      // still the Agent's own choice, and the switch for that browser decides
+      // whether it may be used at all.
+      browsers: WEBUI_BROWSER_SURFACES,
     }),
     /**
      * Runs one browser-tool action on the selected target of the surface this
@@ -175,16 +235,31 @@ export function createWebuiBrowserToolAdapter(
       // selection: two runs driving one surface act on the target each of them
       // selected, never on each other's.
       const runId = ctx.sessionId;
+      // The browser the call names, when it names one. The name is the Agent's
+      // own choice, and it moves nothing else: the surface's switch still
+      // decides whether that browser may be used at all.
+      const named = readNamedSurface(input);
+      const params = commandParams(input);
       if (action === "open_tab") {
         // `open_tab` is the bootstrap, and it is the only exception to the
         // gate below. It is the action that would create the selection the
         // gate wants, so it is the one action a run with no selection may
         // perform — and it moves the run's selection to the page it opened.
         // Every other action of a run with no selection is still refused.
-        const { result } = await options.browser.openWebTab(runId, input, signal);
+        //
+        // The page opens in the browser the call names, else in the one the
+        // run selected on, else in the built-in browser.
+        const surface = named ?? options.browser.selectionSurfaceOf(runId) ?? "isolated-chromium";
+        const { result } = await options.browser.openWebTab(
+          runId,
+          params,
+          signal,
+          "agent",
+          surface,
+        );
         return result;
       }
-      const surface = options.browser.selectionSurfaceOf(runId);
+      const surface = named ?? options.browser.selectionSurfaceOf(runId);
       if (!surface) {
         // There is no surface to act on that the run chose, and no honest
         // default: the isolated Chromium is a browser the person never pointed
@@ -198,7 +273,7 @@ export function createWebuiBrowserToolAdapter(
         surface,
         runId,
         action,
-        input,
+        params,
         signal,
       );
       return result;

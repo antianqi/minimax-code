@@ -35,7 +35,7 @@ jobs:
           node-version: "24"
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
-          scope: "@fectivnfy112358"
+          scope: "@minimax-webui"
       - run: pnpm install --frozen-lockfile
       - name: Verify the source revision before packaging
         run: pnpm verify

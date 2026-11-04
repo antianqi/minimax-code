@@ -32,6 +32,7 @@ import {
 import { WebuiComposerPermissionControl } from "./ComposerPermissionControl.js";
 import { WebuiComposerProjectRow } from "./ComposerProjectRow.js";
 import { WebuiFileInput, WebuiTextarea } from "../../../ui/field.js";
+import { FeedbackBusy } from "../../../ui/feedback.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
 import type {
@@ -1096,14 +1097,15 @@ export function WebuiComposer({
         </pre>
       ) : null}
       {commandRunning && !compactCommand ? (
-        <p
-          role="status"
-          aria-live="polite"
+        // The row is the command's own marker for the suite; the announcement
+        // itself comes from the shared busy family, so the client decides how a
+        // running command is said instead of this surface inventing a live region.
+        <div
           className="mt-3 w-full text-text_default_secondary text-size_12 leading-line_height_16"
           data-webui-command-running="true"
         >
-          正在执行 {commandName ? `/${commandName}` : "斜杠命令"}…
-        </p>
+          <FeedbackBusy label={`正在执行 ${commandName ? `/${commandName}` : "斜杠命令"}…`} />
+        </div>
       ) : null}
       {stream.transcriptIncomplete ? (
         <p

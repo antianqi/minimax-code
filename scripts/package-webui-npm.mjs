@@ -28,8 +28,8 @@ const version = versionIndex === -1
   : args[versionIndex + 1];
 const outdir = path.resolve(outputIndex === -1 ? path.join(root, "dist-webui-npm") : args[outputIndex + 1]);
 
-if (!version || !/^\d+\.\d+\.\d+-preview\.\d+$/.test(version)) {
-  throw new Error(`Expected a preview semver version, got: ${version ?? "<missing>"}`);
+if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+  throw new Error(`Expected a semver version, got: ${version ?? "<missing>"}`);
 }
 const webuiDir = path.join(root, "packages/webui");
 const packages = new Map(

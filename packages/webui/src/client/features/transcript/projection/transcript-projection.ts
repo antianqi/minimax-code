@@ -39,6 +39,7 @@ export function projectWebuiTranscriptMessages(
   page: WebuiClientMessagePage,
   streamMessages: readonly WebuiStreamMessage[],
   preferStreamUpdates = true,
+  preserveSettledMessageIds?: ReadonlySet<string>,
 ): readonly WebuiClientMessage[] {
   // A malformed persisted row must not make transcript projection escape its
   // presentation boundary and replace the whole application.
@@ -57,6 +58,7 @@ export function projectWebuiTranscriptMessages(
   };
   for (let streamIndex = 0; streamIndex < streamMessages.length; streamIndex += 1) {
     const stream = streamMessages[streamIndex]!;
+    const preferThisStreamUpdate = preferStreamUpdates || preserveSettledMessageIds?.has(stream.id) === true;
     // Goal lifecycle events also project a synthetic user bubble. A goal-entry
     // turn may already have its own durable or live user message with a
     // different id, so keep that actionable message and omit only the matching
@@ -72,12 +74,12 @@ export function projectWebuiTranscriptMessages(
       if (hasGoalEntry) continue;
     }
     const index = indexById.get(stream.id);
-    // Once a turn is settled, the refreshed persisted page is authoritative.
-    // A rewind can delete a message that is still present in stream state; do
-    // not resurrect that orphan into the transcript after replacing history.
-    if (index === undefined && !preferStreamUpdates) continue;
+    // Once a turn is settled, the refreshed persisted page is authoritative,
+    // except for explicitly preserved message identities whose write has not
+    // landed yet. A rewind must not resurrect any other stream orphan.
+    if (index === undefined && !preferThisStreamUpdate) continue;
     const previous = index === undefined ? undefined : messages[index];
-    if (previous && !preferStreamUpdates) continue;
+    if (previous && !preferThisStreamUpdate) continue;
     const next: WebuiClientMessage = {
       ...(previous ?? { msgId: stream.id }),
       msgId: stream.id,

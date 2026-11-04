@@ -277,6 +277,14 @@
   .webui-plugin-management.is-skills .webui-plugin-grid {
     margin-inline: auto;
   }
+  /* The loading placeholder stands in the same column as the list it replaces:
+   * the skills grid is centred at 768px inside the page's 960px column, and a
+   * skeleton spanning the full column made the list jump when it arrived. */
+  .webui-plugin-management.is-skills .webui-feedback--skeleton {
+    width: 100%;
+    max-width: 768px;
+    margin-inline: auto;
+  }
   .webui-plugin-market-heading {
     max-width: 768px;
     margin: 32px 0 12px;

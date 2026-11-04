@@ -28,7 +28,7 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
-  .webui-message-file-link { display: inline-flex; align-items: baseline; gap: 5px; color: var(--text_default_accent); text-decoration: none; }
+  .webui-message-file-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text_default_accent); text-decoration: none; }
   .webui-message-file-link:hover { text-decoration: underline; }
   .webui-message-file-media { display: block; margin-block-start: 6px; max-width: min(100%, 420px); }
   .webui-message-file-media img,

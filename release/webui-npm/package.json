@@ -1,6 +1,6 @@
 {
-  "name": "@fectivnfy112358/minimax-code-web",
-  "version": "0.1.0-preview.3",
+  "name": "@minimax-webui/minimax-code",
+  "version": "0.1.0",
   "description": "MiniMax Code WebUI with a local, process-based runtime.",
   "license": "MIT",
   "repository": {

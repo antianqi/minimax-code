@@ -49,16 +49,17 @@ import {
 import { isWebuiSettledTurnCaughtUp, projectWebuiSettledTurnShape, type WebuiSettledTurnShape } from "../projection/settled-turn.js";
 import { WebuiWorkspaceFileUrlProvider } from "./markdown.public.js";
 import { WebuiButton } from "../../../ui/button.js";
-import { WebuiSpinner } from "../../../ui/feedback.js";
 
-import { FeedbackEmpty } from "../../../ui/feedback.js";
+import { FeedbackBusy, FeedbackEmpty } from "../../../ui/feedback.js";
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 
-/** Page reads a settled turn allows while its messages are still being written. */
+/** Fast page reads before settled-history polling backs off. */
 const SETTLED_PAGE_READS = 4;
 
 /** The gap between those reads: long enough for a turn's write to land. */
 const SETTLED_PAGE_READ_MS = 700;
+/** Slow follow-up reads keep a long-running write from leaving stale history indefinitely. */
+const SETTLED_PAGE_POLL_MS = 5_000;
 
 // --- TurnNavigator integration ------------------------------------------------
 //
@@ -234,9 +235,16 @@ function WebuiSessionTranscriptView({
   // a page that only carries the reply's text takes away the files the reader
   // just watched appear, until a reload brings them back.
   const unsettledTurnRef = useRef<readonly WebuiSettledTurnShape[]>([]);
+  const unsettledTurnSessionRef = useRef(sessionId);
   const unsettledReadsRef = useRef(0);
   useEffect(() => {
-    if (!turnLive) return;
+    // The final agent_message and [DONE] can be reduced into one React
+    // commit. Capture that final message on the live → done render too, or
+    // the stale history page can replace the just-rendered file immediately.
+    const justSettled = previousTurnStateRef.current.sessionId === sessionId &&
+      previousTurnStateRef.current.turnLive && streamPhase === "done";
+    if (!turnLive && !justSettled) return;
+    unsettledTurnSessionRef.current = sessionId;
     const shapes = stream.messages
       .filter((message) => message.role !== "user")
       .map((message) => projectWebuiSettledTurnShape({
@@ -245,20 +253,26 @@ function WebuiSessionTranscriptView({
         ...(message.parts ? { parts: message.parts } : {}),
       }));
     if (shapes.length) unsettledTurnRef.current = shapes;
-  }, [stream.messages, turnLive]);
+  }, [sessionId, stream.messages, streamPhase, turnLive]);
   useEffect(() => {
     const previous = previousTurnStateRef.current;
     previousTurnStateRef.current = { sessionId, turnLive };
+    if (previous.sessionId !== sessionId) {
+      unsettledTurnSessionRef.current = sessionId;
+      unsettledTurnRef.current = [];
+      unsettledReadsRef.current = 0;
+      return;
+    }
     // 加载历史页只处理会话内的 live → idle 转换；切换会话由首屏请求负责。
-    if (previous.sessionId !== sessionId || !previous.turnLive || turnLive) return;
+    if (!previous.turnLive || turnLive) return;
     // A settled turn has persisted messages the page we hold predates: this read
     // is the one that must not join an answer already in flight.
     unsettledReadsRef.current = 0;
     void historyOwner?.refreshPage(sessionId);
   }, [historyOwner, sessionId, turnLive]);
   // …and one read is not enough when the runtime is still writing the turn it
-  // just finished. Read again, a bounded number of times, until the page in
-  // hand actually carries the messages the live view was showing.
+  // just finished. Retry quickly, then back off while preserving the stream
+  // projection until the page in hand carries the messages already shown.
   useEffect(() => {
     const expected = unsettledTurnRef.current;
     if (expected.length === 0) return;
@@ -267,19 +281,19 @@ function WebuiSessionTranscriptView({
       unsettledReadsRef.current = 0;
       return;
     }
-    if (unsettledReadsRef.current >= SETTLED_PAGE_READS) {
-      // The page never caught up: keep what is on screen rather than reading
-      // forever. The next load (a reload, a session switch) will have it.
-      unsettledTurnRef.current = [];
-      unsettledReadsRef.current = 0;
-      return;
-    }
+    const delay = unsettledReadsRef.current < SETTLED_PAGE_READS
+      ? SETTLED_PAGE_READ_MS
+      : SETTLED_PAGE_POLL_MS;
     const timer = setTimeout(() => {
       unsettledReadsRef.current += 1;
       void historyOwner?.refreshPage(sessionId);
-    }, SETTLED_PAGE_READ_MS);
+    }, delay);
     return () => clearTimeout(timer);
   }, [historyOwner, sessionId, visiblePage]);
+  const preserveSettledMessageIds = !turnLive && unsettledTurnSessionRef.current === sessionId && unsettledTurnRef.current.length > 0 &&
+    !isWebuiSettledTurnCaughtUp(unsettledTurnRef.current, visiblePage.messages ?? [])
+    ? new Set(unsettledTurnRef.current.map(({ msgId }) => msgId))
+    : undefined;
   // One view model, derived in one place (`projection/transcript-view-model.ts`);
   // this component renders what it returns.
   const view = useMemo(
@@ -289,6 +303,7 @@ function WebuiSessionTranscriptView({
         visiblePage,
         streamMessages: stream.messages,
         streamPhase,
+        ...(preserveSettledMessageIds ? { preserveSettledMessageIds } : {}),
         processingStartedAtMs: stream.processingStartedAtMs,
         turnLive,
         loading,
@@ -301,6 +316,7 @@ function WebuiSessionTranscriptView({
       stream.messages,
       stream.processingStartedAtMs,
       streamPhase,
+      preserveSettledMessageIds,
       turnLive,
       visiblePage,
     ],
@@ -615,14 +631,13 @@ function WebuiSessionTranscriptView({
           </div>
         ) : null}
         {compactionRunning ? (
+          // The row is the suite's marker; the announcement belongs to the shared
+          // busy family, which owns the live region and the spinner.
           <div
-            role="status"
-            aria-live="polite"
-            className="mt-2 flex w-full min-w-0 items-center gap-spacing_4 text-text_default_secondary text-size_13 leading-line_height_20"
+            className="mt-2 w-full min-w-0 text-text_default_secondary text-size_13 leading-line_height_20"
             data-webui-command-running="true"
           >
-            <WebuiSpinner size="compact" className="shrink-0" />
-            <span>正在压缩会话…</span>
+            <FeedbackBusy label="正在压缩会话…" />
           </div>
         ) : compactionSummary ? (
           <div className="mt-2 w-full min-w-0" data-webui-compaction-result="true">

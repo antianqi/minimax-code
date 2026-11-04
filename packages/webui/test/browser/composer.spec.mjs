@@ -54,12 +54,38 @@ test("composer mascot plays the transparent octopus and respects reduced motion"
   await expect.poll(() => mascot.evaluate((video) => video.readyState >= 2)).toBe(true);
   await expect.poll(() => mascot.evaluate((video) => !video.paused)).toBe(true);
   const searchBox = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
-  for (const size of [{ width: 760, height: 900 }, { width: 1000, height: 700 }, { width: 1440, height: 900 }]) {
+  const card = page.locator(".webui-composer-card");
+  // The octopus lies on the input: it is anchored to the card's right edge at the
+  // shared spacing, and its tentacles reach the input's top edge. That is the
+  // placement the design asks for, and neither relation depends on the viewport —
+  // a mascot centred on the input would be a different design, so this measures
+  // the anchor rather than an equality of centres. Both are recorded as the whole
+  // set so a width-dependent drift (a centred or padded card) fails here.
+  const viewports = [{ width: 760, height: 900 }, { width: 1000, height: 700 }, { width: 1440, height: 900 }];
+  const rightGaps = [];
+  const tentacleGaps = [];
+  for (const size of viewports) {
     await page.setViewportSize(size);
-    const mascotBox = await mascot.boundingBox();
-    const searchBoxBounds = await searchBox.boundingBox();
-    expect(Math.abs(mascotBox.x + mascotBox.width / 2 - (searchBoxBounds.x + searchBoxBounds.width / 2))).toBeLessThanOrEqual(1);
+    const [mascotBox, searchBoxBounds, cardBox] = await Promise.all([
+      mascot.boundingBox(),
+      searchBox.boundingBox(),
+      card.boundingBox(),
+    ]);
+    expect(mascotBox && searchBoxBounds && cardBox, `geometry at ${size.width}`).toBeTruthy();
+    rightGaps.push(Math.round(cardBox.x + cardBox.width - (mascotBox.x + mascotBox.width)));
+    tentacleGaps.push(Math.round(searchBoxBounds.y - (mascotBox.y + mascotBox.height)));
   }
+  // Anchored to the right edge: the gap is the same at every width, and it is the
+  // shared 24px spacing plus the card's own border. A mascot placed relative to the
+  // input's centre moves with the card and fails the spread.
+  expect(Math.max(...rightGaps) - Math.min(...rightGaps), JSON.stringify(rightGaps)).toBeLessThanOrEqual(1);
+  expect(rightGaps[0], JSON.stringify(rightGaps)).toBeGreaterThanOrEqual(20);
+  expect(rightGaps[0], JSON.stringify(rightGaps)).toBeLessThanOrEqual(32);
+  // The tentacles rest on the input's top edge: a few pixels onto it, not floating
+  // above the card and not sitting over the text.
+  expect(Math.max(...tentacleGaps) - Math.min(...tentacleGaps), JSON.stringify(tentacleGaps)).toBeLessThanOrEqual(1);
+  expect(tentacleGaps[0], JSON.stringify(tentacleGaps)).toBeGreaterThanOrEqual(-12);
+  expect(tentacleGaps[0], JSON.stringify(tentacleGaps)).toBeLessThanOrEqual(0);
   const alpha = await mascot.evaluate((video) => {
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;

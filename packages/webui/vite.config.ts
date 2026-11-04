@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { readExtraction } from "../../scripts/lib/release-metadata.mjs";
 import { packageExportEntries } from "../../scripts/lib/package-exports.mjs";
 
-const serverPort = Number(process.env.WEBUI_SERVER_PORT ?? 8787);
+const serverPort = Number(process.env.WEBUI_SERVER_PORT ?? 2233);
 const webuiRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(webuiRoot, "..", "..");
 const clientRoot = path.join(webuiRoot, "src", "client");

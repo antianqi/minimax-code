@@ -65,7 +65,7 @@ if (!process.env.WEBUI_SERVER_TSX) {
     await import("../packages/webui/src/server/browser-bridge/index.ts");
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
-  const tcpPort = Number(process.env.WEBUI_SERVER_PORT ?? 8787);
+  const tcpPort = Number(process.env.WEBUI_SERVER_PORT ?? 2233);
   const clientDir = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "../dist-webui/client",

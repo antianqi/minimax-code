@@ -86,7 +86,7 @@ export async function writeWebuiBrowserBridgeOrigin(
   } catch (error) {
     throw new Error(
       error instanceof TypeError
-        ? "that is not a URL — the address looks like http://127.0.0.1:8787"
+        ? "that is not a URL — the address looks like http://127.0.0.1:2233"
         : error instanceof Error
           ? error.message
           : String(error),

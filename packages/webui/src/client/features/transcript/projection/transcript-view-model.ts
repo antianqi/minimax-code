@@ -92,6 +92,8 @@ export function projectWebuiTranscriptView(input: {
   readonly visiblePage: WebuiClientMessagePage;
   readonly streamMessages: WebuiTranscriptStreamMessages;
   readonly streamPhase: WebuiTranscriptStreamPhase;
+  /** Stream message identities that remain authoritative while settled history catches up. */
+  readonly preserveSettledMessageIds?: ReadonlySet<string>;
   readonly processingStartedAtMs: number | undefined;
   /** Passed in rather than derived again, so the component's effects and this
    *  projection can never disagree about whether the turn is live. */
@@ -107,6 +109,7 @@ export function projectWebuiTranscriptView(input: {
     visiblePage,
     streamMessages,
     streamPhase !== "done",
+    input.preserveSettledMessageIds,
   );
   const messageProjections = messages.map(projectMessage);
   const items = messageProjections.flatMap((projection) => projection.items);

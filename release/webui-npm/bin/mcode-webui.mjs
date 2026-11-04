@@ -20,7 +20,7 @@ import {
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { version } = JSON.parse(await readFile(path.join(packageRoot, "server/package-info.json"), "utf8"));
-const portValue = process.env.WEBUI_SERVER_PORT?.trim() || "8787";
+const portValue = process.env.WEBUI_SERVER_PORT?.trim() || "2233";
 const tcpPort = Number(portValue);
 if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
   throw new Error("WEBUI_SERVER_PORT must be an integer between 1 and 65535");

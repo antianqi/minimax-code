@@ -130,7 +130,12 @@ test("the skills marketplace renders rows from the skill hub listing", async ({ 
   await expect(surface.locator(".webui-plugin-header .webui-skeleton")).toHaveCount(0);
   await expect(skeleton.locator(".webui-feedback-skeleton-body > .webui-skeleton")).toHaveCount(12);
   const skillSkeletonBody = await skeleton.locator(".webui-feedback-skeleton-body").boundingBox();
-  expect(skillSkeletonBody.width).toBeLessThanOrEqual(266);
+  const skillSearchWhileLoading = await surface.locator(".webui-plugin-page-search").boundingBox();
+  // The placeholder is laid out in the column it stands in for: the skills list is
+  // centred at the search field's width, so a skeleton spanning the page's wider
+  // column made the list jump sideways the moment the rows arrived.
+  expect(skillSkeletonBody.width).toBeLessThanOrEqual(skillSearchWhileLoading.width + 1);
+  expect(Math.abs(skillSkeletonBody.x - skillSearchWhileLoading.x)).toBeLessThanOrEqual(16);
   await page.evaluate(() => window.__fixture.resolveAllPending(
     "pluginManagement",
     { action: "listSkillHub" },

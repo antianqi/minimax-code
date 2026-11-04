@@ -71,7 +71,7 @@ session transfer · the terminal process manager (one per service) · the six sl
 
 | Entry | Path | Notes |
 | --- | --- | --- |
-| Development server | `scripts/run-webui-server.mjs` via `pnpm --filter @mavis/webui dev:server` | Spawns itself under `tsx` with the repository's `tsconfig.standalone.json`; assembles the host, constructs `new WebuiService(...)` with the registry and the terminal manager, calls `service.start()`, and closes the service on SIGINT/SIGTERM. Serves the built client from `dist-webui/client/`. `WEBUI_SERVER_PORT` overrides 8787. |
+| Development server | `scripts/run-webui-server.mjs` via `pnpm --filter @mavis/webui dev:server` | Spawns itself under `tsx` with the repository's `tsconfig.standalone.json`; assembles the host, constructs `new WebuiService(...)` with the registry and the terminal manager, calls `service.start()`, and closes the service on SIGINT/SIGTERM. Serves the built client from `dist-webui/client/`. `WEBUI_SERVER_PORT` overrides 2233. |
 | Packaged service | `runtime/index.ts` + `server/index.ts` | The runtime's public entry and the server build entry. `scripts/build-webui.mjs` bundles both. |
 | npm preview package | `release/webui-npm/` | See [`../releasing.md`](../releasing.md). |
 

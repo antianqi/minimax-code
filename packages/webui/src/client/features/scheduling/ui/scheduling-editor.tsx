@@ -32,6 +32,8 @@ import {
 import { WebuiButton } from "../../../ui/button.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiField, WebuiFormLayout, WebuiSelectMenu, WebuiTextarea, WebuiTextInput, useWebuiFormValidation, type WebuiFieldErrors } from "../../../ui/field.js";
+import { WebuiModelSelect } from "../../models/ui/ModelSelect.public.js";
+import { WebuiAgentSelect } from "../../plugins/ui/AgentSelect.public.js";
 
 export interface SchedulingEditorViewProps {
   readonly mode: "create" | "edit";
@@ -86,14 +88,13 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
             required
             error={props.fieldErrors?.agentName}
             control={(props) => (
-              <WebuiTextInput
+              <WebuiAgentSelect
                 {...props}
                 controlSize="dense"
-                type="text"
-                data-webui-scheduling-field="agentName"
-                placeholder="输入要执行任务的 Agent 名称"
                 value={draft.agentName}
-                onChange={(event) => onChange({ agentName: event.target.value })}
+                onChange={(agentName) => onChange({ agentName })}
+                placeholder="选择要执行任务的 agent"
+                dataAttributes={{ "data-webui-scheduling-field": "agentName" }}
               />
             )}
           />
@@ -213,14 +214,14 @@ export function SchedulingEditorView(props: SchedulingEditorViewProps): ReactEle
         <WebuiField
           label="模型（可选）"
           control={(props) => (
-            <WebuiTextInput
+            <WebuiModelSelect
               {...props}
               controlSize="dense"
-              type="text"
-              data-webui-scheduling-field="model"
-              placeholder="输入模型名称，留空使用默认模型"
               value={draft.model}
-              onChange={(event) => onChange({ model: event.target.value })}
+              onChange={(model) => onChange({ model })}
+              placeholder="使用默认模型"
+              defaultLabel="使用默认模型"
+              dataAttributes={{ "data-webui-scheduling-field": "model" }}
             />
           )}
         />

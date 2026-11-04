@@ -257,6 +257,7 @@ export function FeedbackProgress({
    */
   readonly indeterminate?: boolean;
 }): ReactElement {
+  if (useWebuiPageLoading()) return <WebuiSkeleton testId={testId} />;
   const clamped = Math.max(0, Math.min(value, max));
   const percent = max === 0 ? 0 : Math.round((clamped / max) * 100);
   return (

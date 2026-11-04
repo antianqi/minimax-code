@@ -7,7 +7,6 @@ import type { WebuiWorkspaceFile } from "../../../../shared/contracts/workspace.
 import { WebuiIconChevronRight, WebuiIconFile } from "../../../shell/icons.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDisclosure, WebuiMotionSlot } from "../../../ui/page.js";
-import { formatWorkspaceFileSize, formatWorkspaceFileModifiedAt } from "../projection/workspace-file-tree.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 
@@ -20,27 +19,6 @@ export {
   findWorkspaceFile,
   getWorkspaceFileParentPaths,
 } from "../projection/workspace-file-tree.js";
-
-/**
- * The file-metadata column. `size` and `modifiedAt` are optional by contract:
- * absent for directories, and absent for any runtime that does not stat, so
- * each half is formatted on its own and the whole span is dropped when neither
- * produced a value. Directories never reach it — a directory's byte count is
- * meaningless — which also keeps a stray value from a permissive runtime out
- * of the row.
- */
-function FileTreeRowMeta({ file }: { readonly file: WebuiWorkspaceFile }): ReactElement | null {
-  if (file.type === "directory") return null;
-  const parts = [
-    file.size === undefined ? undefined : formatWorkspaceFileSize(file.size),
-    file.modifiedAt === undefined ? undefined : formatWorkspaceFileModifiedAt(file.modifiedAt),
-  ].filter((part): part is string => part !== undefined);
-  if (parts.length === 0) return null;
-  // `webui-file-tree-meta` is a hook for the row layout: the utilities keep
-  // the metadata pinned to the end of the flex row while the name truncates,
-  // so a long name can never push this off the end.
-  return <span className="webui-file-tree-meta shrink-0 text-size_12 leading-line_height_16 text-text_default_tertiary">{parts.join(" · ")}</span>;
-}
 
 /**
  * A directory whose read failed.
@@ -75,7 +53,6 @@ function FileTreeView({ files, onOpen, expandedPaths, loadingPaths, directoryErr
             <WebuiIconChevronRight className="inline size-3" />
           </WebuiMotionSlot>
         ) : <WebuiIconFile className="inline size-3" />} <span className="min-w-0 flex-1 truncate">{file.name}</span>
-        <FileTreeRowMeta file={file} />
       </WebuiButton>
       {file.type === "directory" ? <WebuiDisclosure as="div" open={expanded} mountOnOpen className="webui-file-tree-disclosure">
         <div className="webui-file-tree-children">

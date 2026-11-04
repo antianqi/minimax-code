@@ -48,11 +48,13 @@ export function WebuiInline({
   children,
   ...rest
 }: WebuiInlineProps): ReactElement {
+  const pageLoading = useWebuiPageLoading();
   return createElement(
     as,
     {
       className: [
         "webui-inline",
+        pageLoading ? "webui-page-skeleton-layout" : "",
         `webui-inline--gap-${gap}`,
         inline ? "webui-inline--inline" : "",
         `webui-inline--align-${align}`,
@@ -84,6 +86,7 @@ export function WebuiStack({
     {
       className: [
         "webui-stack",
+        pageLoading ? "webui-page-skeleton-layout" : "",
         `webui-stack--gap-${layoutGap}`,
         `webui-stack--align-${align}`,
         `webui-stack--justify-${justify}`,

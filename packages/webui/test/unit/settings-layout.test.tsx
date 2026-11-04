@@ -205,4 +205,18 @@ describe("the 限额重置 section renders the shared frame", () => {
     );
     expect(markup).toBe("");
   });
+
+  it("does not add a second skeleton while the page-level usage load is active", () => {
+    const markup = renderToStaticMarkup(
+      <UsageResetCards
+        account={subscribedAccount}
+        state={{
+          ...state,
+          cards: { ...state.cards, items: [], page: 0, loading: true, hasMore: true },
+        }}
+      />,
+    );
+    expect(markup).not.toContain('data-testid="settings-usage-reset-card-loading"');
+    expect(markup).not.toContain('class="webui-skeleton');
+  });
 });

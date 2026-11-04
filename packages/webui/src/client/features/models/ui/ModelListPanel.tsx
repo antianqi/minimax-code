@@ -41,6 +41,18 @@ export interface WebuiModelListPanelProps {
   readonly selected: WebuiModelPickerEntry | undefined;
   /** Choose a model. */
   readonly onSelect: (model: WebuiModelPickerEntry) => void;
+  /**
+   * A row above the catalogue that clears the choice.
+   *
+   * A form's model field may be left empty — the definition or the task then
+   * runs on the default model — so the list needs a way back to that state.
+   * Omitted, the choice is required and the row does not exist.
+   */
+  readonly defaultOption?: {
+    readonly label: string;
+    readonly active: boolean;
+    readonly onSelect: () => void;
+  };
   /** Retained for callers that provide the legacy secondary-panel action. */
   readonly onBack?: () => void;
   readonly animate?: boolean;
@@ -50,6 +62,7 @@ export function WebuiModelListPanel({
   groups,
   selected,
   onSelect,
+  defaultOption,
   animate = false,
 }: WebuiModelListPanelProps): ReactElement {
   const selectedKey = selected ? modelKey(selected) : undefined;
@@ -59,8 +72,25 @@ export function WebuiModelListPanel({
         <span className="webui-model-list-title">选择模型</span>
       </div>
       <WebuiStack gap="medium" className="webui-model-list-groups">
-        {groups.length === 0 ? (
+        {groups.length === 0 && defaultOption === undefined ? (
           <FeedbackEmpty className="webui-model-list-empty" title={"没有可用模型"} />
+        ) : null}
+        {defaultOption ? (
+          <WebuiButton
+            variant="selectable-row"
+            size="regular"
+            className={`webui-model-list-row ${defaultOption.active ? "is-active" : ""}`}
+            data-webui-model-list-default="true"
+            aria-pressed={defaultOption.active}
+            onClick={defaultOption.onSelect}
+          >
+            <span className="webui-model-list-row-name">{defaultOption.label}</span>
+            {defaultOption.active ? (
+              <span className="webui-model-list-row-check">
+                <WebuiIconCheck />
+              </span>
+            ) : null}
+          </WebuiButton>
         ) : null}
         {groups.map((group) => (
           <WebuiStack
@@ -69,10 +99,10 @@ export function WebuiModelListPanel({
             className="webui-model-list-group"
             data-webui-model-list-group={group.id}
           >
-            <WebuiStack as="div" gap="micro" align="start" className="webui-model-list-group-header">
+            <div className="webui-model-list-group-header">
               <span className="webui-model-list-group-name">{group.label}</span>
               <span className="webui-model-list-group-subtitle">{group.id}</span>
-            </WebuiStack>
+            </div>
             {group.models.map((model) => {
               const active = modelKey(model) === selectedKey;
               return (

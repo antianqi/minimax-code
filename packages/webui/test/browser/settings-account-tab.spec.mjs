@@ -213,6 +213,47 @@ test("the account usage tooltip uses the shared tooltip motion on entry and exit
   await expect(tooltip).toBeHidden();
 });
 
+test("the usage calendar's month row stays inside the calendar's own width", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("getAccountUsageSummary", { days: [] });
+  });
+  await openApp(page, "#session=A");
+  await openSettings(page);
+  await accountTab(page).click();
+
+  const heatmap = page.locator('[data-testid="account-usage-heatmap"]');
+  await expect(heatmap).toBeVisible();
+
+  // A month label with less than its own width left to the calendar's right
+  // edge used to be squeezed into the leftover few pixels: `11月` broke into
+  // `11` over `月`, the two lines overflowed the row's 16px, and the box —
+  // `overflow-x: auto` is also a vertical scroll container — grew a vertical
+  // scrollbar over a calendar that has nothing to scroll to vertically. The
+  // row now keeps one line per label and the calendar's own width.
+  const geometry = await heatmap.evaluate((element) => {
+    const calendar = element.firstElementChild;
+    const monthRow = calendar.lastElementChild;
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      calendarWidth: calendar.getBoundingClientRect().width,
+      monthRowHeight: monthRow.getBoundingClientRect().height,
+      labelHeights: [...monthRow.querySelectorAll("span")].map(
+        (label) => label.getBoundingClientRect().height,
+      ),
+    };
+  });
+
+  expect(geometry.scrollHeight).toBe(geometry.clientHeight);
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(
+    Math.max(geometry.clientWidth, Math.ceil(geometry.calendarWidth)),
+  );
+  expect(geometry.monthRowHeight).toBe(16);
+  expect(geometry.labelHeights.every((height) => height === 16)).toBe(true);
+});
+
 test("the account panel's 分享 action opens the share preview", async ({ page }) => {
   await openApp(page, "#session=A");
   await openSettings(page);

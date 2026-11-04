@@ -23,7 +23,7 @@
 
 import { expect } from "@playwright/test";
 
-import { openApp, openLauncherTile, test } from "./harness.mjs";
+import { configureFixture, openApp, openLauncherTile, test } from "./harness.mjs";
 import {
   classifyFindings,
   compareBaseline,
@@ -198,6 +198,71 @@ async function openUsagePage(page) {
   await page.locator('.webui-settings-nav [data-menu-key="usage"]').click();
   await expect(page.locator('[data-testid="settings-usage-token-plan"]')).toBeVisible();
 }
+
+test("usage settings keeps one page loader while its data is pending", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setUsageQuotaResult({
+      signedIn: true,
+      hasTokenPlan: false,
+      subscriptionType: "mplan",
+      planName: "M Plan 标准版",
+      quota: {
+        fiveHour: { usedPercent: 65, resetAtMs: Date.now() + 60_000 },
+        weekly: { usedPercent: 25, resetAtMs: Date.now() + 3_600_000 },
+      },
+    });
+    window.__fixture.delayEvery("listUserModelProviders", {});
+  });
+  await openApp(page, "#session=A");
+  await page.locator('[data-testid="sidebar-user-menu-trigger"]').click();
+  await page.locator('[data-testid="user-menu-settings"]').click();
+  await expect(settingsDialog(page)).toBeVisible();
+  await page.locator('.webui-settings-nav [data-menu-key="usage"]').click();
+
+  await expect.poll(() =>
+    page.evaluate(() => window.__fixture.pending.some((item) => item.operation === "listUserModelProviders")),
+  ).toBe(true);
+  const usagePage = page.getByTestId("settings-usage-model");
+  await expect(usagePage).toHaveAttribute("data-webui-page-loading", "true");
+  await expect(page.locator('[data-testid="settings-usage-model"][data-webui-page-loading="true"]')).toHaveCount(1);
+  await expect(usagePage.locator('[data-testid$="-loading"]')).toHaveCount(0);
+  const quotaCard = usagePage.locator('[data-testid="settings-usage-plan"] .webui-settings-card');
+  await expect.poll(() => quotaCard.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  await expect.poll(() => usagePage.locator(".webui-page-skeleton-layout").evaluateAll((elements) =>
+    elements.every((element) => getComputedStyle(element).backgroundColor === "rgba(0, 0, 0, 0)"),
+  )).toBe(true);
+  await expect(usagePage.getByRole("progressbar")).toHaveCount(0);
+  const directSkeletonGaps = await usagePage.locator(".webui-page-skeleton-node").evaluateAll((parents) => parents.flatMap((parent) => {
+    const bars = [...parent.children]
+      .filter((child) => child.classList.contains("webui-skeleton"))
+      .map((child) => child.getBoundingClientRect())
+      .sort((left, right) => left.top - right.top);
+    return bars.slice(1).flatMap((bar, index) => {
+      const previous = bars[index];
+      return Math.abs(previous.left - bar.left) < 1 ? [bar.top - previous.bottom] : [];
+    });
+  }));
+  expect(directSkeletonGaps.length).toBeGreaterThan(0);
+  expect(directSkeletonGaps.every((gap) => gap >= 8)).toBe(true);
+  const projectedBlockGaps = await usagePage.locator(".webui-page-skeleton-node").evaluateAll((parents) => parents
+    .filter((parent) => !parent.classList.contains("webui-stack") && !parent.classList.contains("webui-inline"))
+    .flatMap((parent) => {
+      const blocks = [...parent.children]
+        .filter((child) => child.classList.contains("webui-page-skeleton-node"))
+        .map((child) => child.getBoundingClientRect())
+        .sort((left, right) => left.top - right.top);
+      return blocks.slice(1).flatMap((block, index) => {
+        const previous = blocks[index];
+        return Math.abs(previous.left - block.left) < 1 ? [block.top - previous.bottom] : [];
+      });
+    }));
+  expect(projectedBlockGaps.some((gap) => gap < 8)).toBe(false);
+
+  await page.evaluate(() => window.__fixture.resolveAllPending("listUserModelProviders", {}, []));
+  await expect(usagePage).not.toHaveAttribute("data-webui-page-loading", "true");
+  await expect(usagePage.locator('[data-testid$="-loading"]')).toHaveCount(0);
+  await expect(usagePage.getByRole("progressbar")).toHaveCount(2);
+});
 
 /**
  * Plugins › 管理 › MCP › 添加 MCP server.

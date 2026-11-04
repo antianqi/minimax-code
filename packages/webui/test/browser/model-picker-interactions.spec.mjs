@@ -111,6 +111,41 @@ test("opening and closing the panel leaves the chip where it was", async ({ page
   expect(closed?.y).toBe(before?.y);
 });
 
+test("the provider label reads as a caption over larger, darker model rows", async ({ page }) => {
+  await openApp(page, "#session=A");
+  await chip(page).click();
+  const panel = page.getByRole("dialog");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: /Fixture Configurable/ }).click();
+  const group = page.locator('[data-webui-model-list-group="fixture-provider"]');
+  await expect(group).toBeVisible();
+
+  // The provider header labels the rows under it, so it is the smaller and the
+  // lighter of the two rather than a heading competing with them, and its id
+  // sits on the same line as the name instead of adding a second row.
+  const label = await group.locator(".webui-model-list-group-name").evaluate((element) => {
+    const style = getComputedStyle(element);
+    const id = element.nextElementSibling.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    return {
+      fontSize: Number.parseFloat(style.fontSize),
+      color: style.color,
+      idTop: Math.round(id.top * 100) / 100,
+      nameTop: Math.round(rect.top * 100) / 100,
+      headerHeight: Math.round(element.parentElement.getBoundingClientRect().height * 100) / 100,
+    };
+  });
+  const row = await group.locator(".webui-model-list-row-name").first().evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { fontSize: Number.parseFloat(style.fontSize), color: style.color };
+  });
+
+  expect(label.fontSize).toBeLessThan(row.fontSize);
+  expect(label.color).not.toBe(row.color);
+  expect(label.idTop).toBe(label.nameTop);
+  expect(label.headerHeight).toBeLessThan(32);
+});
+
 test("the chip closes the panel it opened", async ({ page }) => {
   // The chip is the panel's trigger, so a press on it is the panel's own
   // business: the chip's activation closes the panel it opened. Read as a

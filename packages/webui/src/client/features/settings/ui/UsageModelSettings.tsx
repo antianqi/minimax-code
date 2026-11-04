@@ -20,7 +20,7 @@ import { useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiField, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiMotionSlot, WebuiSkeleton } from "../../../ui/page.js";
+import { useWebuiPageLoading, WebuiMotionSlot, WebuiSkeleton } from "../../../ui/page.js";
 
 type Props = {
   readonly sessionId?: string;
@@ -60,72 +60,6 @@ const NO_PROVIDER_COMMANDS: WebuiProviderFormCommands = {
   reorderProviderModels: async () => ({ status: "failed", category: "refused", error: new Error("当前运行时不支持修改提供商。") }),
   updateProvider: async () => { throw new Error("当前运行时不支持修改提供商。"); },
 };
-
-function UsageQuotaSkeleton(): ReactElement {
-  return <WebuiStack gap="roomy" className="w-full" aria-busy="true" data-testid="settings-usage-quota-loading">
-    <SettingsSection bare title={<WebuiSkeleton />}>
-      <WebuiStack gap="medium" className="w-full py-1">
-        {[0, 1].map((row) => <WebuiInline key={row} justify="between" className="w-full py-1">
-          <WebuiStack gap="small" className="w-1/2">
-            <WebuiSkeleton />
-            <WebuiSkeleton />
-          </WebuiStack>
-          <WebuiSkeleton />
-        </WebuiInline>)}
-      </WebuiStack>
-    </SettingsSection>
-    <SettingsSection bare title={<WebuiSkeleton />}>
-      <WebuiStack gap="medium" className="w-full py-1">
-        {[0, 1].map((row) => <WebuiInline key={row} justify="between" className="w-full py-1">
-          <WebuiStack gap="small" className="w-1/2">
-            <WebuiSkeleton />
-            <WebuiSkeleton />
-          </WebuiStack>
-          <WebuiStack gap="small" className="items-end">
-            <WebuiSkeleton />
-            <WebuiSkeleton />
-          </WebuiStack>
-        </WebuiInline>)}
-      </WebuiStack>
-    </SettingsSection>
-    <SettingsSection bare title={<WebuiSkeleton />}>
-      <WebuiStack gap="small" className="w-full py-1">
-        <WebuiSkeleton />
-        <WebuiSkeleton />
-      </WebuiStack>
-    </SettingsSection>
-  </WebuiStack>;
-}
-
-function ApiKeySkeleton(): ReactElement {
-  return <WebuiStack gap="medium" className="w-full" aria-busy="true" data-testid="settings-usage-api-key-loading">
-    <WebuiSkeleton />
-    <WebuiInline justify="between" className="w-full py-1">
-      <WebuiStack gap="small" className="w-1/2">
-        <WebuiSkeleton />
-        <WebuiSkeleton />
-      </WebuiStack>
-      <WebuiSkeleton />
-    </WebuiInline>
-  </WebuiStack>;
-}
-
-function ProviderListSkeleton(): ReactElement {
-  return <WebuiStack gap="medium" className="w-full" aria-busy="true" data-testid="settings-usage-provider-loading">
-    {[0, 1].map((provider) => <WebuiStack key={provider} gap="small" className="w-full">
-      <WebuiSkeleton />
-      <WebuiStack gap="medium" className="w-full py-1 pl-4">
-        {[0, 1, 2].map((model) => <WebuiInline key={model} justify="between" className="w-full py-1">
-          <WebuiSkeleton />
-          <WebuiInline gap="small" className="items-center">
-            <WebuiSkeleton />
-            <WebuiSkeleton />
-          </WebuiInline>
-        </WebuiInline>)}
-      </WebuiStack>
-    </WebuiStack>)}
-  </WebuiStack>;
-}
 
 export function UsageModelSettings({ sessionId }: Props): ReactElement {
   // The models/providers/api-key/model-source/codex answers come from the
@@ -288,9 +222,16 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const creditFallback = accountState.creditFallback;
   const creditResolved = creditFallback.enabled !== undefined;
   const creditLoading = creditFallback.status === "loading" && !creditResolved;
+  const pageLoading =
+    (quotaLoading && account?.canReadUsage !== false) ||
+    (apiLoading && account?.canReadApiKeyStatus !== false) ||
+    (providerLoading && models?.canManageProviders !== false) ||
+    ((settingsState.modelSource.status === "idle" || settingsState.modelSource.status === "loading") && settings?.canReadModelSource !== false) ||
+    creditLoading ||
+    accountState.codexOAuth.status === "loading";
 
 
-  return <SettingsPage testId="settings-usage-model">
+  return <SettingsPage testId="settings-usage-model" loading={pageLoading}>
     <WebuiInline gap="medium" justify="between" className="webui-usage-model-toolbar min-h-8 flex-wrap">
       <WebuiInline gap="medium" className="h-8">
       <WebuiDropdown
@@ -319,6 +260,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
                   variant="plain"
                   size="compact"
                   aria-pressed={sourceTab !== "custom"}
+                  skeletonOnPageLoading
                   data-testid="settings-usage-source-tab"
                   className="h-full min-w-[140px] pl-3 pr-1 text-left"
                 >
@@ -329,6 +271,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
                   type="button"
                   variant="quiet-action"
                   size="compact"
+                  skeletonOnPageLoading
                   aria-label="选择模型来源"
                   aria-haspopup={triggerProps["aria-haspopup"]}
                   aria-expanded={triggerProps["aria-expanded"]}
@@ -347,16 +290,16 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
         <WebuiButton role="menuitem" variant="selectable-row" size="compact" className="h-[30px] w-full rounded-[8px] px-3 text-left text-sm" onClick={() => { setSourceMenuOpen(false); void chooseSource("minimax_api_key"); }}>MiniMax API</WebuiButton>
       </WebuiDropdown>
       <div className="h-3 w-[0.5px] bg-border_default" />
-      <WebuiButton variant="segmented" size="compact" aria-pressed={sourceTab === "custom"} className="h-8 rounded-[8px] px-3 text-[14px] font-medium leading-5" onClick={() => setSourceTab("custom")}>自定义模型</WebuiButton>
+      <WebuiButton variant="segmented" size="compact" aria-pressed={sourceTab === "custom"} skeletonOnPageLoading className="h-8 rounded-[8px] px-3 text-[14px] font-medium leading-5" onClick={() => setSourceTab("custom")}>自定义模型</WebuiButton>
       </WebuiInline>
       {sourceTab === "custom" ? <WebuiInline gap="small" className="ml-auto">
-        <WebuiButton variant="secondary" size="compact" disabled={!models?.canManageProviders || !addProviderAction} onClick={() => addProviderAction?.()}>添加模型</WebuiButton>
+        <WebuiButton variant="secondary" size="compact" skeletonOnPageLoading disabled={!models?.canManageProviders || !addProviderAction} onClick={() => addProviderAction?.()}>添加模型</WebuiButton>
         {oauth?.state === "connected" ? <>
           <span className="self-center text-[13px] text-text_default_secondary">Codex OAuth 已连接</span>
-          <WebuiButton variant="secondary" size="compact" disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</WebuiButton>
+          <WebuiButton variant="secondary" size="compact" skeletonOnPageLoading disabled={!models?.canManageProviders} onClick={() => void models?.refreshModels?.()}>获取模型列表</WebuiButton>
         </> : <>
-          <WebuiButton variant="secondary" size="compact" disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</WebuiButton>
-          {oauthLoginId ? <WebuiButton variant="secondary" size="compact" disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</WebuiButton> : null}
+          <WebuiButton variant="secondary" size="compact" skeletonOnPageLoading disabled={!settings?.canStartCodexOAuth || Boolean(oauthLoginId)} onClick={() => void beginCodexLogin()}>{oauthLoginId ? "正在连接 Codex OAuth" : "连接 Codex OAuth"}</WebuiButton>
+          {oauthLoginId ? <WebuiButton variant="secondary" size="compact" skeletonOnPageLoading disabled={!settings?.canStartCodexOAuth} onClick={() => void cancelCodexLogin()}>取消</WebuiButton> : null}
         </>}
       </WebuiInline> : null}
     </WebuiInline>
@@ -364,44 +307,40 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     <div className="webui-usage-model-scroll">
     {sourceTab === "token-plan" ? <WebuiStack as="section" gap="roomy" className="w-full" data-testid="settings-usage-token-plan">
       {quotaError ? <SettingsErrorNotice message="加载失败" action={{ label: "重试", onClick: () => void loadQuota() }} /> : null}
-      {quotaLoading ? <UsageQuotaSkeleton /> : !quotaView ? <p>登录后查看用量</p> : <>
+      {!quotaView ? <p>登录后查看用量</p> : <>
         <SettingsSection title="当前套餐" testId="settings-usage-plan">
             <WebuiInline gap="large" className="min-h-[64px] w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div className="min-w-0"><span className="block text-[14px] leading-5" data-testid="settings-usage-plan-name">{planFacts ? formatPlanName(planFacts) : ""}</span>{quotaView.tokenPlanExpiresAt ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">{new Date(quotaView.tokenPlanExpiresAt < 1e12 ? quotaView.tokenPlanExpiresAt * 1000 : quotaView.tokenPlanExpiresAt).toLocaleDateString("sv-SE").replaceAll("-", ".")}{quotaView.willRenewal ? " 自动续费" : " 到期"}</span> : planFacts && !hasWebuiPlan(planFacts) ? <span className="mt-1 block text-[12px] leading-4 text-text_default_secondary" data-testid="settings-usage-plan-state">未订阅 M Plan</span> : null}</div></WebuiInline>
             <div className="h-[0.5px] bg-border_default" />
             <WebuiInline gap="large" className="min-h-[64px] w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><div><span className="block text-[14px] leading-5">积分</span><span className="mt-1 block text-[12px] leading-4 text-text_default_secondary">剩余 {quotaView.purchasedCredits !== undefined && quotaView.freeCredits !== undefined ? `${formatWebuiCredits(quotaView.purchasedCredits)} + ${formatWebuiCredits(quotaView.freeCredits)}` : formatWebuiCredits(quotaView.creditBalance)}</span></div></WebuiInline>
         </SettingsSection>
         {quotaData ? <SettingsSection title="用量" testId="settings-usage-limits">{([["5 小时限额", quotaData.fiveHour], ["周限额", quotaData.weekly], ...(quotaData.video ? [["视频限额", quotaData.video] as const] : [])] as const).map(([label, window]) => { const value = recordOf(window); const usedPercent = typeof value.usedPercent === "number" ? value.usedPercent : undefined; const usedCount = typeof value.usedCount === "number" ? value.usedCount : undefined; const totalCount = typeof value.totalCount === "number" ? value.totalCount : undefined; const percent = Math.round(usedPercent ?? (totalCount ? (usedCount ?? 0) / totalCount * 100 : 0)); const resetAtMs = typeof value.resetAtMs === "number" ? value.resetAtMs : undefined; const reset = resetLabel(resetAtMs); return <WebuiStack key={label} gap="small" justify="center" className="min-h-[72px] overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><WebuiInline gap="small" justify="between"><span className="text-[14px] font-normal leading-5 text-text_default_primary">{label}</span><span className="shrink-0 text-[13px] leading-5 text-text_default_secondary">{window.unlimited ? "无限制" : usedCount !== undefined ? `${usedCount}/${totalCount ?? 0}` : `${usedPercent ?? 0}% / 100%`}</span></WebuiInline><FeedbackProgress label={label} value={percent} className="w-full" trackClassName="bg-bg_interaction_tertiary_press" fillClassName="bg-text_default_primary" />{reset ? <span className="text-[12px] font-normal leading-4 text-text_default_secondary">{reset}</span> : null}</WebuiStack>; })}</SettingsSection> : null}
-        <SettingsSection bare={creditLoading} title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditLoading ? <WebuiInline justify="between" className="min-h-[48px] w-full px-3 py-1" aria-busy="true" data-testid="settings-usage-credit-fallback-loading"><WebuiSkeleton /><WebuiSkeleton /></WebuiInline> : creditResolved ? <WebuiInline gap="medium" justify="between" className="min-h-[48px] w-full px-3 py-1" data-testid="settings-usage-credit-fallback"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></WebuiInline> : null}</SettingsSection>
+        <SettingsSection title={<>积分 <InfoIcon /></>} testId="settings-usage-points">{creditResolved ? <WebuiInline gap="medium" justify="between" className="min-h-[48px] w-full px-3 py-1" data-testid="settings-usage-credit-fallback"><span>开启后，可以在对话中消耗你的积分（含赠予积分）。</span><ToggleSwitch checked={creditFallback.enabled === true} label="M Plan 达限后使用积分" disabled={creditFallback.saving} onChange={(next) => { void account?.setCreditFallback(next); }} testId="settings-usage-credit-fallback-toggle" className="shrink-0 disabled:opacity-60" /></WebuiInline> : null}</SettingsSection>
         <UsageResetCards account={account} state={accountState.resetCards} />
       </>}
     </WebuiStack> : null}
 
-    {sourceTab === "minimax-api" ? <WebuiStack as="section" gap="small" className="w-full pt-1" aria-busy={apiLoading || undefined} data-testid="settings-minimax-api-panel">
-      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span>{apiLoading ? <WebuiSkeleton testId="settings-usage-api-key-status-loading" /> : <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span>}</WebuiInline>
+    {sourceTab === "minimax-api" ? <WebuiStack as="section" gap="small" className="w-full pt-1" data-testid="settings-minimax-api-panel">
+      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span><span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span></WebuiInline>
       {apiError ? <SettingsErrorNotice message={apiError} action={{ label: "重试", onClick: () => void loadApiStatus() }} /> : null}
-      {apiLoading ? <ApiKeySkeleton /> : <>
-        <WebuiInline gap="medium" align="start"><WebuiField className="min-w-0 flex-[1_0_0]" label="API Key" required error={keyErrors.apiKey} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" value={apiKey} onChange={(event) => { setApiKey(event.target.value); clearFieldError("apiKey"); }} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} />} /><IconButton label="测试连通性" disabled={testingKey} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>
-        {/* 保存结果要被听到，播报通道交给共享契约。 */}
-        {keyResult ? <FeedbackLiveRegion>{keyResult}</FeedbackLiveRegion> : null}<WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
-      </>}
+      <WebuiInline gap="medium" align="start"><WebuiField className="min-w-0 flex-[1_0_0]" label="API Key" required error={keyErrors.apiKey} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" value={apiKey} onChange={(event) => { setApiKey(event.target.value); clearFieldError("apiKey"); }} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} />} /><IconButton label="测试连通性" disabled={testingKey} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>
+      {/* 保存结果要被听到，播报通道交给共享契约。 */}
+      {keyResult ? <FeedbackLiveRegion>{keyResult}</FeedbackLiveRegion> : null}<WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
     </WebuiStack> : null}
 
-    {sourceTab === "custom" ? <WebuiStack as="section" gap="medium" className="min-h-0 flex-1" aria-busy={providerLoading || undefined} data-testid="settings-custom-models-panel">
+    {sourceTab === "custom" ? <WebuiStack as="section" gap="medium" className="min-h-0 flex-1" data-testid="settings-custom-models-panel">
       {providerError ? <SettingsErrorNotice message={providerError} action={{ label: "重试", onClick: () => void loadProviders() }} /> : null}
-      {providerLoading ? <ProviderListSkeleton /> : <>
-        <ProviderFormPanel
-          providers={providers}
-          presets={presets}
-          commands={models ?? NO_PROVIDER_COMMANDS}
-          setProviderActionError={setProviderActionError}
-          editor={editor}
-          snapshot={providerEditorSnapshot}
-          onRegisterAddProviderAction={registerAddProviderAction}
-          providerPendingDelete={providerPendingDelete}
-          setProviderPendingDelete={setProviderPendingDelete}
-        />
-        {oauthError ? <SettingsErrorNotice message={oauthError} /> : null}
-      </>}
+      <ProviderFormPanel
+        providers={providers}
+        presets={presets}
+        commands={models ?? NO_PROVIDER_COMMANDS}
+        setProviderActionError={setProviderActionError}
+        editor={editor}
+        snapshot={providerEditorSnapshot}
+        onRegisterAddProviderAction={registerAddProviderAction}
+        providerPendingDelete={providerPendingDelete}
+        setProviderPendingDelete={setProviderPendingDelete}
+      />
+      {oauthError ? <SettingsErrorNotice message={oauthError} /> : null}
     </WebuiStack> : null}
     </div>
   </SettingsPage>;
@@ -429,6 +368,7 @@ export function DisabledBillingActions(): ReactElement {
 }
 
 function InfoIcon(): ReactElement {
+  if (useWebuiPageLoading()) return <WebuiSkeleton />;
   return <IconInfoCircle aria-hidden="true" size={16} stroke={1.4} className="text-icon_default_secondary" />;
 }
 
@@ -436,7 +376,8 @@ function DesktopGrayAction({ label, dropdown = false, external = false, disabled
   return <WebuiButton variant="surface-quiet" size="panel" disabled={disabled} aria-disabled={ariaDisabled} title={title}><span className="flex items-center justify-center gap-1">{label}{dropdown ? <ChevronDownIcon className="size-4 text-icon_default_secondary" /> : external ? <ExternalArrowIcon /> : null}</span></WebuiButton>;
 }
 
-function ChevronDownIcon({ className = "" }: { readonly className?: string }): ReactElement {
+function ChevronDownIcon({ className = "" }: { readonly className?: string }): ReactElement | null {
+  if (useWebuiPageLoading()) return null;
   return <IconChevronDown aria-hidden="true" className={className} size={16} stroke={1.5} />;
 }
 

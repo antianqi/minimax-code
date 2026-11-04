@@ -14,6 +14,7 @@ import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
+import { WebuiModelSelect, webuiBareModelValue } from "../../models/ui/ModelSelect.public.js";
 
 export interface AgentFormProps {
   readonly editing: Row | undefined;
@@ -96,12 +97,21 @@ export function AgentForm({
         )}
       />
       {/* The model belongs to the initial definition, which only a new agent
-          sends; an edit updates the agent's fields and leaves it alone. */}
+          sends; an edit updates the agent's fields and leaves it alone. The
+          field is the catalogue's own list: a definition stores a model name,
+          so it writes the bare id and offers the empty value back. */}
       {editing ? null : (
         <WebuiField
           label="模型"
           control={(props) => (
-            <WebuiTextInput {...props} value={model} placeholder="输入模型名称，留空使用默认模型" onChange={(event) => setModel(event.currentTarget.value)} />
+            <WebuiModelSelect
+              {...props}
+              value={model}
+              onChange={setModel}
+              formatValue={webuiBareModelValue}
+              placeholder="使用默认模型"
+              defaultLabel="使用默认模型"
+            />
           )}
         />
       )}

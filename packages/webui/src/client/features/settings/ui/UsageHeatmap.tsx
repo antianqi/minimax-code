@@ -37,6 +37,13 @@ interface HoveredCell {
   readonly top: number;
 }
 
+/**
+ * The widest month label the calendar draws (`11月`) at the row's 12px type.
+ * A label with less room than this to the calendar's right edge is anchored
+ * there instead of to its column.
+ */
+const MONTH_LABEL_WIDTH = 28;
+
 /** The four usage buckets, as the calendar colours them. */
 function levelClassName(level: WebuiUsageHeatmapCell["level"]): string {
   switch (level) {
@@ -162,15 +169,26 @@ export function UsageHeatmap({
         </div>
         {showMonths ? (
           <div className="relative mt-2 h-4 text-xs leading-4 text-text_default_tertiary">
-            {monthLabels.map((label) => (
-              <span
-                key={`${label.label}-${label.columnIndex}`}
-                className="absolute top-0"
-                style={{ left: 14 * label.visibleColumnIndex }}
-              >
-                {label.label}月
-              </span>
-            ))}
+            {monthLabels.map((label) => {
+              const left = 14 * label.visibleColumnIndex;
+              // The newest month can start on one of the last columns, leaving
+              // less than a label's width to its right. Left-anchored, that
+              // label would be squeezed to one character per line and its two
+              // lines would overflow the row (a scroll container with
+              // `overflow-x: auto` also scrolls vertically). It keeps one line
+              // and hangs on the calendar's right edge instead, so the row
+              // never grows past the calendar it labels.
+              const atRightEdge = width - left < MONTH_LABEL_WIDTH;
+              return (
+                <span
+                  key={`${label.label}-${label.columnIndex}`}
+                  className="absolute top-0 whitespace-nowrap"
+                  style={atRightEdge ? { right: 0 } : { left }}
+                >
+                  {label.label}月
+                </span>
+              );
+            })}
           </div>
         ) : null}
       </div>

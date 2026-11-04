@@ -27,14 +27,12 @@ import {
   IconCalendarEvent,
   IconChevronRight,
   IconSettings,
-  IconSwitchHorizontal,
   IconUserCircle,
 } from "@tabler/icons-react";
 import { WebuiIconBell, WebuiIconCommandUsage } from "../../../shell/icons.js";
 import { SigninClaimResult } from "@mavis/shared/daily-signin";
 import { SettingsModal } from "../../settings/ui/SettingsModal.public.js";
 import { AccountLoginPage } from "./AccountLoginPage.js";
-import type { WebuiAccountLoginPageMode } from "./AccountLoginPage.js";
 import type { MemoryHandoff } from "../../settings/contracts/memory-handoff.js";
 import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
@@ -101,11 +99,6 @@ function SigninGlyph(): ReactElement {
 
 function AccountGlyph(): ReactElement {
   return <IconUserCircle aria-hidden="true" size={18} stroke={1.7} />;
-}
-
-/** The switch-account row's glyph: the account is exchanged, not replaced. */
-function SwitchGlyph(): ReactElement {
-  return <IconSwitchHorizontal aria-hidden="true" size={18} stroke={1.7} />;
 }
 
 function UserMenuAvatar({
@@ -186,10 +179,6 @@ export function UserMenu({
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  // Which of the two ways into the login page the menu asked for: a sign-in,
-  // or a switch that signs the current account out first.
-  const [loginMode, setLoginMode] =
-    useState<WebuiAccountLoginPageMode>("sign-in");
   const [usageOpen, setUsageOpen] = useState(false);
   const [signinOpen, setSigninOpen] = useState(false);
   const panelCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -420,23 +409,10 @@ export function UserMenu({
               data-testid="user-menu-account-login"
               onClick={() => {
                 setOpen(false);
-                setLoginMode("sign-in");
                 setLoginOpen(true);
               }}
             >
               账号与登录
-            </WebuiMenuItem>
-            <WebuiMenuItem
-              className="webui-user-menu-item"
-              icon={<SwitchGlyph />}
-              data-testid="user-menu-switch-account"
-              onClick={() => {
-                setOpen(false);
-                setLoginMode("switch");
-                setLoginOpen(true);
-              }}
-            >
-              切换账号
             </WebuiMenuItem>
             <WebuiMenuSeparator />
             <div
@@ -537,7 +513,6 @@ export function UserMenu({
                 onRetry={() => loadUsage(true)}
                 onLogin={() => {
                   setOpen(false);
-                  setLoginMode("sign-in");
                   setLoginOpen(true);
                 }}
               />
@@ -547,7 +522,7 @@ export function UserMenu({
       </div>
       <AccountLoginPage
         open={loginOpen}
-        mode={loginMode}
+        mode="sign-in"
         scope={accountScope}
         onClose={() => setLoginOpen(false)}
         onAuthenticated={() => {

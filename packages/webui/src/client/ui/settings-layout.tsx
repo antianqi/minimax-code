@@ -77,7 +77,7 @@ export function SettingsSection({
         </div>
         {loading ? (actions ? <WebuiSkeletonProjection>{actions}</WebuiSkeletonProjection> : null) : actions ? <div className="webui-settings-section-actions">{actions}</div> : null}
       </div>
-      <div className={bare ? "webui-settings-card is-bare" : "webui-settings-card"}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
+      <div className={bare || loading ? "webui-settings-card is-bare" : "webui-settings-card"}><WebuiSkeletonProjection>{children}</WebuiSkeletonProjection></div>
     </section>
   );
 }

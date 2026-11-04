@@ -681,3 +681,160 @@
     }
   }
 }
+
+/* ---- the agent field -----------------------------------------------------
+ * A scheduled task names the agent it runs as, so the name has to be one the
+ * runtime has. The field borrows the field family's shape (the same border,
+ * radius, height and padding a text input in the same column uses) and opens
+ * this business's own agent list, so a peer renders the rows this business
+ * renders instead of its own copy of them. */
+.webui-agent-select {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The dropdown's own wrapper is the trigger's box: it has to take the field's
+ * width, or the trigger inside it sizes to its text and the control stops
+ * lining up with the inputs beside it. */
+.webui-agent-select-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.webui-agent-select .webui-agent-select-trigger {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing_8);
+  padding: 9px var(--spacing_12);
+  border: 1px solid var(--border_default);
+  border-radius: 9px;
+  background: var(--bg_default_primary);
+  color: var(--text_default_primary);
+  font-size: var(--size_14);
+  line-height: var(--line_height_20);
+  text-align: left;
+}
+
+.webui-agent-select .webui-agent-select-trigger--dense {
+  min-height: 36px;
+  padding: 0 var(--spacing_12);
+  border-radius: var(--radius_8);
+}
+
+.webui-agent-select .webui-agent-select-trigger:hover:not(:disabled) {
+  border-color: var(--border_tertiary_hover);
+}
+
+.webui-agent-select .webui-agent-select-trigger:focus-visible,
+.webui-agent-select .webui-agent-select-trigger[aria-expanded="true"] {
+  border-color: var(--border_accent);
+  outline: none;
+}
+
+.webui-agent-select .webui-agent-select-trigger:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.webui-agent-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webui-agent-select-label--placeholder {
+  color: var(--text_default_tertiary);
+}
+
+.webui-agent-select-chevron {
+  flex: none;
+  color: var(--icon_default_tertiary);
+}
+
+.webui-agent-menu {
+  display: flex;
+  width: min(350px, calc(100vw - 32px));
+  max-height: min(420px, calc(100dvh - 112px));
+  flex-direction: column;
+  padding: var(--spacing_12) var(--spacing_6);
+  border-radius: var(--radius_16);
+  overflow: hidden;
+}
+
+.webui-agent-popup {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.webui-agent-list {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.webui-agent-list-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 var(--spacing_8);
+}
+
+.webui-agent-list-title {
+  color: var(--text_default_tertiary);
+  font-size: var(--size_16);
+  line-height: var(--line_height_22);
+}
+
+.webui-agent-list-rows {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.webui-agent-list-rows::-webkit-scrollbar {
+  display: none;
+}
+
+.webui-agent-list-row {
+  width: 100%;
+  height: auto;
+  min-height: 40px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--spacing_6) var(--spacing_12);
+  text-align: left;
+}
+
+.webui-agent-list-row-name {
+  font-size: var(--size_14);
+  line-height: var(--line_height_20);
+}
+
+.webui-agent-list-row-description {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text_default_tertiary);
+  font-size: var(--size_12);
+  line-height: var(--line_height_16);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webui-agent-list-empty {
+  margin: 0;
+  padding: var(--spacing_16) var(--spacing_8);
+  color: var(--text_default_tertiary);
+  font-size: var(--size_14);
+  line-height: var(--line_height_20);
+  text-align: center;
+}

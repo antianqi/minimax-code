@@ -183,7 +183,11 @@
   .webui-workspace-edit-action { width: 34px; height: 34px; flex: 0 0 34px; }
   .webui-workspace-tree-toggle { width: 34px; height: 34px; flex: 0 0 34px; }
   .webui-workspace-file-tree-panel { display: flex; width: clamp(200px, 38cqi, 288px); flex: 0 0 clamp(200px, 38cqi, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); }
-  .webui-workspace-file-search { flex: 0 0 40px; margin: var(--spacing_8) var(--spacing_12); }
+  /* The shared search field is `width: 100%`. In this column that percentage is the
+   * panel's content width, and its own side margins are added on top, so the field
+   * hung 12px past the panel's right edge and lost its border off the clip. `auto`
+   * lets the column's stretch size it to the line minus those margins. */
+  .webui-workspace-file-search { width: auto; flex: 0 0 40px; margin: var(--spacing_8) var(--spacing_12); }
   .webui-workspace-file-tree-scroll { min-height: 0; flex: 1 1 auto; overflow: auto; padding: 0 var(--spacing_12) var(--spacing_12); }
   .webui-workspace-file-tree-scroll > [role="status"], .webui-workspace-file-tree-scroll > [role="alert"], .webui-workspace-tree-empty { padding: var(--spacing_8); color: var(--text_default_tertiary); font-size: var(--size_12); }
   .webui-file-tree-children { padding-left: var(--spacing_12); }

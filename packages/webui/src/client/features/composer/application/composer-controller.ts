@@ -61,6 +61,7 @@ const HOME_KEY = WEBUI_COMPOSER_HOME_KEY;
 /** Application coordinator for the existing composer store and owners. */
 export function createWebuiComposerController(deps: WebuiComposerControllerDeps): WebuiComposerController {
   let commandRunning = false;
+  let commandName: string | undefined;
   let goalSubmitting = false;
   let interactionError: string | undefined;
   let commandOutput: string | undefined;
@@ -76,6 +77,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     snapshot = {
       composer: deps.store.getSnapshot(),
       commandRunning,
+      ...(commandName === undefined ? {} : { commandName }),
       goalSubmitting,
       ...(interactionError === undefined ? {} : { interactionError }),
       ...(commandOutput === undefined ? {} : { commandOutput }),
@@ -271,6 +273,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         if (!deps.commandWorkflows.canRunCommand) return { kind: "ignored" };
         const captured = captureInput();
         commandRunning = true;
+        commandName = resolved.command.name;
         publish();
         try {
           const request: WebuiRunCommandRequest = {
@@ -292,6 +295,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
           return { kind: "failed", error: interactionError };
         } finally {
           commandRunning = false;
+          commandName = undefined;
           publish();
         }
       }

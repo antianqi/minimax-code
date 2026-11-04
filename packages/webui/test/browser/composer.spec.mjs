@@ -105,6 +105,32 @@ test("/compact from the slash palette reaches the runtime with its instruction",
   });
 });
 
+test("/compact shows progress while running and confirms the result", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.delayNext("runCommand", { command: "compact" });
+  });
+  await openApp(page, "#session=A");
+
+  const input = composer(page);
+  await input.fill("/compact");
+  const send = page.getByTestId("composer-send");
+  await expect(send).toBeEnabled();
+  await send.click();
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.pending.some(
+    (request) => request.operation === "runCommand" && request.body.command === "compact",
+  ))).toBe(true);
+  await expect(page.getByRole("status")).toContainText("正在执行 /compact");
+
+  await page.evaluate(() => window.__fixture.resolve(
+    "runCommand",
+    { command: "compact" },
+    { handled: true, output: "压缩已完成" },
+  ));
+  await expect(page.locator("[data-webui-command-output]")).toHaveText("压缩已完成");
+  await expect(input).toHaveValue("");
+});
+
 test("the composer's popups are placed by the shared layer, inside the viewport", async ({ page }) => {
   // A popup that is not placed is a popup that is somewhere else: the shared
   // layer places it against the composer, and a class of its own that claims a

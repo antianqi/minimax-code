@@ -8,11 +8,10 @@
  * edit at a time. As a read it has one definition and one test; the component
  * computes it once per render and hands the same value to both consumers.
  *
- * Two destinations satisfy a submission: sending (the substrate can send for
- * this session) and queueing (the substrate can enqueue for a known session).
- * Either is enough — a session that has been archived for sending but still
- * accepts a queue entry can be queued to — and something must be submitted: a
- * non-empty draft or at least one staged attachment.
+ * A normal turn can be sent or queued. A matched runnable slash command uses
+ * its own command transport, and does not require either turn destination.
+ * Something must still be submitted: a non-empty draft or at least one staged
+ * attachment.
  *
  * A submission already in flight blocks the next one: both the slash command
  * runner and a goal submit hold the gate, so a second Enter cannot start a
@@ -24,6 +23,8 @@ export interface WebuiComposerSubmitGateInput {
   readonly canCompose: boolean;
   /** The substrate publishes an enqueue for this session. */
   readonly canQueue: boolean;
+  /** A matched runnable slash command has its own transport path. */
+  readonly commandCanRun?: boolean;
   /** The draft as the editor holds it; whitespace counts, as it always has. */
   readonly draft: string;
   /** How many attachments and URL references are staged. */
@@ -45,7 +46,7 @@ export function readWebuiComposerSubmitGate(
   input: WebuiComposerSubmitGateInput,
 ): WebuiComposerSubmitGate {
   const hasInput = input.draft.length > 0 || input.attachmentCount > 0;
-  const sendable = (input.canCompose || input.canQueue) && hasInput;
+  const sendable = (input.canCompose || input.canQueue || input.commandCanRun === true) && hasInput;
   return {
     sendable,
     submitBlocked: !sendable || input.commandRunning || input.goalSubmitting,

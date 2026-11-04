@@ -24,6 +24,7 @@
 
 import { webuiPluginFailureTextFrom } from "../../../projection/common/plugin-failure-text.js";
 import type { PluginPort } from "../contracts/plugin-port.js";
+import type { WebuiAgentOption } from "../contracts/plugin-rows.js";
 import {
   createWebuiPluginActions,
   webuiPluginRows,
@@ -143,6 +144,12 @@ export interface WebuiPluginWorkflows {
   readonly getMcpServer: (name: string) => Promise<Record<string, unknown>>;
   readonly getAgent: (name: string) => Promise<Record<string, unknown>>;
   readonly readAgentAvatar: (name: string) => Promise<Record<string, unknown>>;
+  /**
+   * The agents a field may name, read from the same catalogue this business
+   * lists. Ids only plus the copy a list shows: the agent's system prompt and
+   * tools are the detail page's business, not a picker's.
+   */
+  readonly listAgentOptions: () => Promise<readonly WebuiAgentOption[]>;
   readonly previewGithubPlugin: (
     input: WebuiPluginActionInputs["previewGithubPlugin"],
   ) => Promise<unknown>;
@@ -642,6 +649,21 @@ export function createWebuiPluginWorkflows(deps: {
     readAgentAvatar: async (name) => {
       const result = await call("readAgentAvatar", { name });
       return result && typeof result === "object" ? (result as Record<string, unknown>) : {};
+    },
+    listAgentOptions: async () => {
+      // The same read the agents page uses, narrowed to what a name needs.
+      const result = await call("listAgents", {
+        limit: 100,
+        include: "identity,persona",
+      });
+      return webuiPluginRows(result, "agents")
+        .map((row) => {
+          const name = rowValue(row, "name", "pluginName", "plugin_name", "displayName", "display_name");
+          const displayName = rowValue(row, "displayName", "display_name") || name;
+          const description = rowValue(row, "description");
+          return { name, displayName, ...(description ? { description } : {}) };
+        })
+        .filter((agent) => agent.name.length > 0);
     },
     previewGithubPlugin: (input) => call("previewGithubPlugin", input),
     installPlugin: (input) => mutate("installPlugin", input),

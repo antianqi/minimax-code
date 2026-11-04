@@ -373,6 +373,7 @@ export function WebuiComposer({
     modelsScope === sessionId ? accountSnapshot.account.value : undefined;
   const commandOutput = controllerSnapshot.commandOutput;
   const commandRunning = controllerSnapshot.commandRunning;
+  const commandName = controllerSnapshot.commandName;
   // The staged attachments and URL references are the composer's own state, kept
   // by its owner module and read from the same snapshot as the queue.
   const attachments = composerSnapshot.staging.attachments;
@@ -688,7 +689,13 @@ export function WebuiComposer({
       )
     : WEBUI_SLASH_FALLBACK_SECTIONED;
   const commandSuggestions = commandRange
-    ? rankWebuiSlashPalette(slashSectioned, commandQuery)
+    ? rankWebuiSlashPalette(slashSectioned, commandQuery).filter((entry) =>
+        commandQuery.trim().length > 0 ||
+        entry.name === "goal" ||
+        entry.name === "plan" ||
+        entry.name === "compact" ||
+        entry.paletteSection === "skills",
+      )
     : [];
   const mentionQuery = mentionRange?.query.toLocaleLowerCase() ?? "";
   const mentionSuggestions: readonly WebuiComposerMentionChoice[] = mentionRange
@@ -869,6 +876,14 @@ export function WebuiComposer({
   const commandInvocation = /^\/([^\s/]+)(?:\s+([\s\S]*))?$/u.exec(
     draft.trim(),
   );
+  const commandCanRun = Boolean(
+    commandInvocation &&
+    sessionId &&
+    controllerSnapshot.canRunCommand &&
+    slashSectioned.some(
+      (entry) => entry.name === commandInvocation[1] && isWebuiRunnableCommand(entry),
+    ),
+  );
   const credentialMessage =
     sessionId && typeof selectedModel?.status?.lastErrorMessage === "string"
       ? selectedModel.status.lastErrorMessage
@@ -899,6 +914,7 @@ export function WebuiComposer({
   const { submitBlocked } = readWebuiComposerSubmitGate({
     canCompose,
     canQueue,
+    commandCanRun,
     draft: messageDraft,
     attachmentCount: attachments.length,
     commandRunning,
@@ -1013,6 +1029,16 @@ export function WebuiComposer({
         >
           {commandOutput}
         </pre>
+      ) : null}
+      {commandRunning ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-3 w-full text-text_default_secondary text-size_12 leading-line_height_16"
+          data-webui-command-running="true"
+        >
+          正在执行 {commandName ? `/${commandName}` : "斜杠命令"}…
+        </p>
       ) : null}
       {stream.transcriptIncomplete ? (
         <p

@@ -523,6 +523,12 @@ test("Agent add form is centered, fields are aligned and backdrop dismissal work
     window.__WEBUI_FIXTURE_SETUP__.push(() => {
       window.__fixture.setPluginManagementResult("listAgents", { agents: [] });
       window.__fixture.setPluginManagementResult("createAgent", { success: true });
+      // The 模型 field is the catalogue's own list, so the form needs a
+      // catalogue to choose from.
+      window.__fixture.setModels([
+        { providerId: "fixture", providerName: "Fixture Provider", modelId: "stub-model", displayName: "Stub Model" },
+        { providerId: "fixture", providerName: "Fixture Provider", modelId: "other-model", displayName: "Other Model" },
+      ]);
     });
   });
   await openManagement(page);
@@ -575,7 +581,10 @@ test("Agent add form is centered, fields are aligned and backdrop dismissal work
   await reopened.getByLabel("名称").fill("local-agent");
   await reopened.getByLabel("描述").fill("A synthetic local agent");
   await reopened.getByLabel("系统提示词").fill("Use only the local test workspace.");
-  await reopened.getByLabel("模型").fill("stub-model");
+  // The 模型 field is the catalogue's own list: open it and pick the row.
+  await reopened.getByLabel("模型").click();
+  await page.locator('[data-webui-model-list-row="fixture/stub-model/"]').click();
+  await expect(reopened.getByLabel("模型")).toContainText("Stub Model");
   await reopened.getByRole("button", { name: "保存" }).click();
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) =>
     request.operation === "pluginManagement" && request.body.action === "createAgent",

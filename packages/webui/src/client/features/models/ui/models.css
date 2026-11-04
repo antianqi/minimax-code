@@ -306,6 +306,71 @@
     opacity: 0.4;
     pointer-events: none;
   }
+  /* ---- the field control ------------------------------------------------
+   * The same catalogue behind a field. It borrows the field family's shape —
+   * the border, the radius, the height and the padding a text input in the same
+   * column uses — so replacing a text input with it does not change the form's
+   * rhythm; what it adds is the chevron that says a list opens. */
+  .webui-model-select {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+  /* The dropdown's own wrapper is the trigger's box; it has to take the
+   * field's width, or the trigger sizes to its text. */
+  .webui-model-select-field {
+    width: 100%;
+    min-width: 0;
+  }
+  .webui-model-select .webui-model-select-trigger {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing_8);
+    padding: 9px var(--spacing_12);
+    border: 1px solid var(--border_default);
+    border-radius: 9px;
+    background: var(--bg_default_primary);
+    color: var(--text_default_primary);
+    font-size: var(--size_14);
+    line-height: var(--line_height_20);
+    text-align: left;
+  }
+  .webui-model-select .webui-model-select-trigger--dense {
+    min-height: 36px;
+    padding: 0 var(--spacing_12);
+    border-radius: var(--radius_8);
+  }
+  .webui-model-select .webui-model-select-trigger:hover:not(:disabled) {
+    border-color: var(--border_tertiary_hover);
+  }
+  .webui-model-select .webui-model-select-trigger:focus-visible,
+  .webui-model-select .webui-model-select-trigger[aria-expanded="true"] {
+    border-color: var(--border_accent);
+    outline: none;
+  }
+  .webui-model-select .webui-model-select-trigger:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+  .webui-model-select-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .webui-model-select-label--placeholder {
+    color: var(--text_default_tertiary);
+  }
+  .webui-model-select-chevron {
+    flex: none;
+    color: var(--icon_default_tertiary);
+  }
+
   /* ---- the list state ---- */
   .webui-model-list {
     min-height: 0;
@@ -338,23 +403,34 @@
     border-top: 1px solid var(--border_light);
     padding-top: var(--spacing_12);
   }
-  /* The group's name and, under it, the identifier it answers to. A group
-   * header is two lines because the second line is the part that tells two
-   * same-named groups apart. */
+  /* The group's name and, beside it, the identifier it answers to. The header
+   * is a label, not a heading: one muted 12px line, so the provider's models —
+   * the rows a pointer picks from — stay the largest and darkest thing in the
+   * list. Two lines made the label block as tall as a row while reading at the
+   * same weight as one; side by side it is a caption the rows sit under. */
   .webui-model-list-group-header {
-    padding: 0 var(--spacing_12) var(--spacing_4);
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: var(--spacing_6);
+    padding: 0 var(--spacing_12) var(--spacing_6);
     text-align: left;
   }
   .webui-model-list-group-name {
-    color: var(--text_default_primary);
-    font-size: var(--size_14);
-    line-height: var(--line_height_20);
-    font-weight: 600;
+    flex: none;
+    color: var(--text_default_secondary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_16);
+    font-weight: var(--weight_medium);
   }
   .webui-model-list-group-subtitle {
+    min-width: 0;
+    overflow: hidden;
     color: var(--text_default_tertiary);
     font-size: var(--size_12);
     line-height: var(--line_height_16);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .webui-model-list-row {
     width: 100%;

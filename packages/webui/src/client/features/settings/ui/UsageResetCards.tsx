@@ -193,17 +193,7 @@ export function UsageResetCards({ account, state }: UsageResetCardsProps): React
       {cards.error && cards.items.length === 0 ? (
         <SettingsErrorNotice message={cards.error} action={{ label: WEBUI_RESET_CARD_COPY.retry, onClick: () => void account?.loadResetCards() }} />
       ) : null}
-      {cards.loading && cards.items.length === 0 ? (
-        <WebuiStack gap="small" className="px-3 py-2" aria-busy="true" data-testid="settings-usage-reset-card-loading">
-            {[0, 1, 2].map((row) => <WebuiInline key={row} justify="between" className="w-full py-2">
-              <WebuiStack gap="small" className="w-1/2">
-                <WebuiSkeleton />
-                <WebuiSkeleton />
-              </WebuiStack>
-              <WebuiSkeleton />
-            </WebuiInline>)}
-        </WebuiStack>
-      ) : cards.items.length === 0 ? (
+      {cards.loading && cards.items.length === 0 ? null : cards.items.length === 0 ? (
         <p
           data-testid="settings-usage-reset-card-empty"
           className="px-3 py-2 text-[13px] leading-5 text-text_default_secondary"

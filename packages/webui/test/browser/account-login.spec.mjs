@@ -13,8 +13,8 @@
 //   2. the page flips to its signed-in state when the server observes the
 //      credential (the fixture's setAccountLoginState stands in for the human
 //      authorizing);
-//   3. the user menu's 切换账号 item opens the same page in switch mode,
-//      which signs the current account out before offering a sign-in;
+//   3. a signed-in page switches accounts itself: its own 切换账号 signs the
+//      current account out and starts the fresh sign-in;
 //   4. the usage panel's signed-out block carries a 登录 button that opens
 //      the same page.
 //
@@ -22,7 +22,7 @@
 // real credential round trip needs a logged-out live server and a human at
 // the authorization page. What is assertable here is the browser half: every
 // entry opens the surface, every phase renders its contract, and the switch
-// path issues the sign-out before it offers a sign-in.
+// path issues the sign-out before it starts a new sign-in.
 
 import { expect } from "@playwright/test";
 
@@ -93,7 +93,7 @@ test("the account login page completes its shared surface exit on Escape", async
   await expect(login).toHaveCount(0);
 });
 
-test("切换账号 signs the current account out before offering a sign-in", async ({ page }) => {
+test("切换账号 on the signed-in page signs the current account out before the new sign-in", async ({ page }) => {
   await openApp(page, "#session=A");
   await page.evaluate(() =>
     window.__fixture.setAccountLoginState({ state: "authenticated" }),
@@ -103,13 +103,15 @@ test("切换账号 signs the current account out before offering a sign-in", asy
     page.evaluate(() => window.__fixture.requests.filter((r) => r.operation === "signOut").length);
   const before = await signOutCount();
 
-  await openFromUserMenu(page, "user-menu-switch-account");
+  await openFromUserMenu(page, "user-menu-account-login");
+  await expect(loginPage(page)).toHaveAttribute("data-webui-account-login-phase", "authenticated", { timeout: 6_000 });
 
   // The switch is a real sign-out — the operation that removes the
-  // credential — and the page then offers the sign-in the Desktop's login
-  // window offers.
+  // credential — and it is followed by a fresh device flow, so the page moves
+  // on from the account it just left instead of sitting on it.
+  await page.locator('[data-testid="account-login-switch"]').click();
   await expect.poll(signOutCount, { timeout: 6_000 }).toBe(before + 1);
-  await expect(loginPage(page)).toHaveAttribute("data-webui-account-login-phase", "signed-out", { timeout: 6_000 });
+  await expect(loginPage(page)).toHaveAttribute("data-webui-account-login-phase", "awaiting", { timeout: 6_000 });
 });
 
 test("the signed-out usage block carries a 登录 button into the same page", async ({ page }) => {
@@ -162,7 +164,7 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
 
 test("the legal notice names the account's own documents", async ({ page }) => {
   await openApp(page, "#session=A");
-  await openFromUserMenu(page, "user-menu-switch-account");
+  await openFromUserMenu(page, "user-menu-account-login");
 
   // The account scope travels with the handshake, and the scope decides the
   // account's site and the language its documents are published in.

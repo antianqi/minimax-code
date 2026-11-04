@@ -199,6 +199,37 @@ test("the workspace file tree uses the shared disclosure transition when a direc
   expect(await disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });
 
+test("the file tree's search field stays inside the panel on both sides", async ({ page }) => {
+  await configureFixture(page, () => undefined);
+  await openApp(page);
+  const tree = await openFilePanel(page);
+
+  // The shared search field is `width: 100%`; inside a column with side margins
+  // that percentage used to be the panel's content width plus those margins, so
+  // the field ran 12px past the panel's right edge and lost its right border to
+  // the clip. The row below it is the reference: the field aligns with it on the
+  // left and never reaches further right than the panel's own content box.
+  const geometry = await tree.evaluate((panel) => {
+    const field = panel.querySelector(".webui-workspace-file-search").getBoundingClientRect();
+    const row = panel.querySelector(".webui-file-tree-row").getBoundingClientRect();
+    const content = panel.querySelector(".webui-disclosure-content").getBoundingClientRect();
+    return {
+      fieldLeft: field.left,
+      fieldRight: field.right,
+      rowLeft: row.left,
+      contentRight: content.right,
+      panelLeft: panel.getBoundingClientRect().left,
+      panelRight: panel.getBoundingClientRect().right,
+    };
+  });
+
+  expect(geometry.fieldLeft).toBeCloseTo(geometry.rowLeft, 1);
+  // 12px of side margin inside the panel's own 1px left border.
+  expect(geometry.fieldLeft).toBeCloseTo(geometry.panelLeft + 13, 1);
+  expect(geometry.fieldRight).toBeLessThanOrEqual(geometry.contentRight);
+  expect(geometry.fieldRight).toBeLessThanOrEqual(geometry.panelRight - 12);
+});
+
 test("the file tree uses the shared horizontal disclosure while its workspace panel uses panel exit", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);

@@ -50,15 +50,19 @@ describe("desktop settings registry", () => {
     for (const tab of DESKTOP_SETTINGS_TABS) expect(iconPaths[tab.icon]).toBeTruthy();
   });
 
-  it("renders the usage source shell and its loading branch without a DOM runtime", () => {
+  it("renders one page-level usage loader without section-specific skeleton branches", () => {
     const markup = renderToStaticMarkup(<UsageModelSettings />);
-    // The source label follows the account's subscription kind, and the
-    // default kind reads "M Plan" — the legacy "Token Plan" name belongs to
-    // the legacy `token_plan` subscription only.
-    expect(markup).toContain("M Plan");
-    // The loading branch is the shared skeleton with its own marker; the plain
-    // 「加载中…」 line it used to draw was replaced when the page got its shell.
-    expect(markup).toContain('data-testid="settings-usage-quota-loading"');
+    // The whole settings page owns the initial loading state. Sections no
+    // longer add independent quota, credit, API key, provider, or reset-card
+    // skeletons on top of it.
+    expect(markup).toContain('data-webui-page-loading="true"');
+    expect((markup.match(/data-webui-page-loading="true"/gu) ?? [])).toHaveLength(1);
+    expect(markup).toContain('class="webui-skeleton webui-motion-loading"');
+    expect(markup).not.toContain('data-testid="settings-usage-quota-loading"');
+    expect(markup).not.toContain('data-testid="settings-usage-credit-fallback-loading"');
+    expect(markup).not.toContain('data-testid="settings-usage-api-key-loading"');
+    expect(markup).not.toContain('data-testid="settings-usage-provider-loading"');
+    expect(markup).not.toContain('data-testid="settings-usage-reset-card-loading"');
     expect(markup).toContain('aria-busy="true"');
   });
 

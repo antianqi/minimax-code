@@ -1,19 +1,15 @@
-// Unit tests for the workspace file tree's file-metadata column.
+// Unit tests for the workspace file tree's rows.
 //
-// `WebuiWorkspaceFile.size` (bytes) and `.modifiedAt` (epoch ms) are optional
-// by contract: absent for directories, and absent for any runtime that does
-// not stat. So the load-bearing case here is absence — a tree from such a
-// runtime must render the same row chrome minus the metadata, and must never
-// print `undefined`, `NaN` or `Invalid Date`. The sizes and times are asserted
-// on the markup rather than on a locale-dependent string, so these cases stay
-// true in any timezone.
+// A row reads the file's name and nothing else: `WebuiWorkspaceFile.size` and
+// `.modifiedAt` are still optional on the contract, so the load-bearing case
+// here is a runtime that sends them — the row must stay name-only and never
+// print a byte count, a timestamp, `undefined`, `NaN` or `Invalid Date`.
 
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { FileTree } from "../../src/client/features/workspace/ui/WorkspaceFileTree.js";
-import { formatWorkspaceFileModifiedAt, formatWorkspaceFileSize } from "../../src/client/features/workspace/projection/workspace-file-tree.js";
 import type { WebuiWorkspaceFile } from "../../src/shared/contracts/workspace.js";
 
 const MODIFIED_AT = Date.UTC(2026, 9, 4, 8, 51);
@@ -38,16 +34,15 @@ function renderTree(
   }));
 }
 
-describe("workspace file tree metadata column", () => {
-  it("renders a binary size and a UTC timestamp beside a stat-ed file", () => {
+describe("workspace file tree rows", () => {
+  it("renders the name alone for a file the runtime stat-ed", () => {
     const markup = renderTree([
       { path: "src/index.ts", name: "index.ts", type: "file", size: 1258291, modifiedAt: MODIFIED_AT },
     ]);
 
-    expect(markup).toContain("index.ts");
-    expect(markup).toContain("1.2 MB");
-    expect(markup).toContain("2026-10-04 08:51");
-    expect(markup).toContain("webui-file-tree-meta");
+    expect(markup).toContain('class="min-w-0 flex-1 truncate">index.ts</span>');
+    expect(markup).not.toContain("1.2 MB");
+    expect(markup).not.toContain("2026-10-04 08:51");
     expect(markup).not.toContain("undefined");
     expect(markup).not.toContain("NaN");
     expect(markup).not.toContain("Invalid Date");
@@ -75,8 +70,9 @@ describe("workspace file tree metadata column", () => {
     expect(markup).toContain('class="webui-motion webui-file-tree-disclosure"');
     expect(markup).toContain('class="webui-disclosure-content"');
     expect(markup).toMatch(/class="webui-motion webui-file-tree-disclosure">/u);
-    // The child file still carries its own metadata inside the expanded tree.
-    expect(markup).toContain("10 B");
+    // The child is a row of its own, so it reads by name like its parent.
+    expect(markup).toContain('class="min-w-0 flex-1 truncate">a.ts</span>');
+    expect(markup).not.toContain("10 B");
   });
 
   it("mounts a directory's content on first open and hides it while collapsed", () => {
@@ -100,25 +96,16 @@ describe("workspace file tree metadata column", () => {
     expect(markup).not.toContain("a.ts");
   });
 
-  it("renders the metadata without a container element when both fields are missing", () => {
-    const markup = renderTree([{ path: "src/legacy.ts", name: "legacy.ts", type: "file" }]);
+  it("drops unusable numbers instead of printing NaN or Invalid Date", () => {
+    const markup = renderTree([
+      { path: "broken.bin", name: "broken.bin", type: "file", size: Number.NaN, modifiedAt: Number.POSITIVE_INFINITY },
+      { path: "unreachable.bin", name: "unreachable.bin", type: "file", modifiedAt: 8.64e15 + 1 },
+    ]);
 
-    expect(markup).toContain("legacy.ts");
-    expect(markup).not.toContain("webui-file-tree-meta");
-    expect(markup).not.toContain("undefined");
+    expect(markup).toContain("broken.bin");
+    expect(markup).toContain("unreachable.bin");
     expect(markup).not.toContain("NaN");
     expect(markup).not.toContain("Invalid Date");
-    // The name still owns the truncating box, so the row does not reflow.
-    expect(markup).toContain('class="min-w-0 flex-1 truncate">legacy.ts</span>');
-  });
-
-  it("keeps whichever half the runtime did send when only one field is present", () => {
-    const sizeOnly = renderTree([{ path: "a.bin", name: "a.bin", type: "file", size: 2048 }]);
-    expect(sizeOnly).toContain("2 KB");
-    expect(sizeOnly).not.toContain("webui-file-tree-meta shrink-0 text-size_12 leading-line_height_16 text-text_default_tertiary\"> ·");
-
-    const timeOnly = renderTree([{ path: "b.bin", name: "b.bin", type: "file", modifiedAt: MODIFIED_AT }]);
-    expect(timeOnly).toContain("2026-10-04 08:51");
   });
 
   it("shows neither size nor time for a directory, even if a runtime sends them", () => {
@@ -130,52 +117,5 @@ describe("workspace file tree metadata column", () => {
     expect(markup).toContain("src");
     expect(markup).not.toContain("4 KB");
     expect(markup).not.toContain("2026-10-04");
-    expect(markup).not.toContain("webui-file-tree-meta");
-  });
-
-  it("formats byte-size boundaries and promotes the unit before rounding", () => {
-    const cases = [
-      { bytes: 0, expected: "0 B" },
-      { bytes: 999, expected: "999 B" },
-      { bytes: 1024, expected: "1 KB" },
-      { bytes: 348160, expected: "340 KB" },
-      { bytes: 1048575, expected: "1 MB" },
-    ] as const;
-    const markup = renderTree(cases.map((entry, index) => ({
-      path: `f${index}.bin`,
-      name: `f${index}.bin`,
-      type: "file",
-      size: entry.bytes,
-    })));
-
-    for (const { expected } of cases) expect(markup).toContain(expected);
-    // 1048575 is 1 B short of a megabyte: binary units promote, they never
-    // render a 1024 KB row.
-    expect(markup).not.toContain("1024 KB");
-  });
-
-  it("drops unusable numbers instead of printing NaN or Invalid Date", () => {
-    expect(formatWorkspaceFileSize(Number.NaN)).toBeUndefined();
-    expect(formatWorkspaceFileSize(-1)).toBeUndefined();
-    expect(formatWorkspaceFileModifiedAt(Number.NaN)).toBeUndefined();
-    // One millisecond past the largest representable Date.
-    expect(formatWorkspaceFileModifiedAt(8.64e15 + 1)).toBeUndefined();
-
-    const markup = renderTree([
-      { path: "broken.bin", name: "broken.bin", type: "file", size: Number.NaN, modifiedAt: Number.POSITIVE_INFINITY },
-      { path: "unreachable.bin", name: "unreachable.bin", type: "file", modifiedAt: 8.64e15 + 1 },
-    ]);
-    expect(markup).toContain("broken.bin");
-    expect(markup).not.toContain("NaN");
-    expect(markup).not.toContain("Invalid Date");
-    expect(markup).not.toContain("webui-file-tree-meta");
-  });
-
-  it("formats a fixed-width UTC timestamp independent of the host timezone", () => {
-    // 2026-01-01T00:30Z: 23:30 on 2025-12-31 in UTC+1, 01:30 in UTC+9. A
-    // locale formatter would disagree with the host; the UTC read is fixed.
-    expect(formatWorkspaceFileModifiedAt(Date.UTC(2026, 0, 1, 0, 30))).toBe("2026-01-01 00:30");
-    expect(formatWorkspaceFileModifiedAt(Date.UTC(2026, 0, 1, 23, 5))).toBe("2026-01-01 23:05");
-    expect(formatWorkspaceFileModifiedAt(0)).toBe("1970-01-01 00:00");
   });
 });

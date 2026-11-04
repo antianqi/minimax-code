@@ -103,24 +103,24 @@ describe("the two cross-surface jumps stay in the menu", () => {
   });
 
   it("sends the quota popover's login action on to the login dialog", () => {
-    // As a sign-in, not as a switch: this entry offers the account its login,
-    // and a switch would sign the current account out again. Switching is
-    // what the menu's own 切换账号 row is for.
-    expect(shell).toMatch(/onLogin=\{\(\) => \{\s*setOpen\(false\);\s*setLoginMode\("sign-in"\);\s*setLoginOpen\(true\);\s*\}/u);
+    // As a sign-in, and never through the switch: this entry offers the
+    // account its login, and a switch would sign the current account out.
+    expect(shell).toMatch(/onLogin=\{\(\) => \{\s*setOpen\(false\);\s*setLoginOpen\(true\);\s*\}\}/u);
   });
 });
 
-describe("the menu offers the switch-account row", () => {
-  it("opens the login page in switch mode", () => {
-    // The Desktop reaches its login page to change accounts; the browser's
-    // bottom-left menu offers the same entry point.
-    expect(shell).toContain('data-testid="user-menu-switch-account"');
-    expect(shell).toContain("切换账号");
-    expect(shell).toMatch(/setLoginMode\("switch"\);\s*setLoginOpen\(true\);/u);
+describe("the menu has no switch-account row of its own", () => {
+  it("leaves account switching to the signed-in login page", () => {
+    // The bottom-left menu opens the login page and nothing else. Switching
+    // accounts is the page's own action once it reports an account, so the
+    // menu carries no row for it and asks for no switch mode.
+    expect(shell).not.toContain('data-testid="user-menu-switch-account"');
+    expect(shell).not.toContain("切换账号");
+    expect(shell).not.toContain("switch");
   });
 
-  it("keeps the sign-in row on the page's other mode", () => {
-    expect(shell).toMatch(/setLoginMode\("sign-in"\);\s*setLoginOpen\(true\);/u);
+  it("keeps the account-and-login row on the page's sign-in mode", () => {
+    expect(shell).toMatch(/<AccountLoginPage\s+open=\{loginOpen\}\s+mode="sign-in"/u);
   });
 });
 

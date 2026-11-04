@@ -7,6 +7,18 @@
 /** A plugin-management row as the runtime sends it: an object with no declared shape. */
 export type WebuiPluginRow = Record<string, unknown>;
 
+/**
+ * One agent, in the shape a field that names one needs it.
+ *
+ * `name` is the identity the runtime addresses (it is what a scheduled task
+ * stores and what `getAgent` takes); `displayName` is what a reader sees.
+ */
+export interface WebuiAgentOption {
+  readonly name: string;
+  readonly displayName: string;
+  readonly description?: string;
+}
+
 /** The first of `keys` whose value is a string, else `""`. */
 export function readWebuiPluginRow(row: WebuiPluginRow, ...keys: readonly string[]): string {
   for (const key of keys) if (typeof row[key] === "string") return row[key] as string;

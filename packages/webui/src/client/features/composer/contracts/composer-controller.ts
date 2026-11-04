@@ -33,6 +33,7 @@ export interface WebuiComposerControllerSnapshot {
   readonly interactionError?: string;
   readonly commandOutput?: string;
   readonly commandRunning: boolean;
+  readonly commandName?: string;
   readonly goalSubmitting: boolean;
   readonly inspectionSessionId?: string;
   readonly canCompose: boolean;

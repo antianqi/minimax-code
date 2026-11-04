@@ -10,7 +10,7 @@
 // is in when they click the rail.
 import { expect } from "@playwright/test";
 
-import { openApp, screenshotOptions, test } from "./harness.mjs";
+import { configureFixture, openApp, screenshotOptions, test } from "./harness.mjs";
 
 test.describe("the scheduled-task panel", () => {
   test("opens from the rail and lists what is scheduled", async ({ page }) => {
@@ -57,6 +57,17 @@ test.describe("the scheduled-task panel", () => {
   });
 
   test("creates a task from a preset, turns one off, and deletes one", async ({ page }) => {
+    await configureFixture(page, () => {
+      window.__fixture.setPluginManagementResult("listAgents", {
+        agents: [
+          { name: "synthetic-A", displayName: "Synthetic A" },
+          { name: "synthetic-B", displayName: "Synthetic B" },
+        ],
+      });
+      window.__fixture.setModels([
+        { providerId: "fixture", providerName: "Fixture Provider", modelId: "stub-model", displayName: "Stub Model" },
+      ]);
+    });
     await openApp(page);
     await page.locator('[data-webui-nav-item="定时任务"]').click();
     const panel = page.locator('[data-webui-component="scheduling-panel"]');
@@ -68,9 +79,18 @@ test.describe("the scheduled-task panel", () => {
     await expect(editor).toBeVisible();
     await editor.locator('[data-webui-scheduling-field="name"]').fill("每日摘要");
     // The panel is opened from the rail, so no session is selected and this client has no agent to
-    // default to: the field is empty and the person names the agent the task runs as.
-    await expect(editor.locator('[data-webui-scheduling-field="agentName"]')).toHaveValue("");
-    await editor.locator('[data-webui-scheduling-field="agentName"]').fill("synthetic-A");
+    // default to: the field is empty and the person names the agent the task runs as — from the
+    // catalogue, so a task cannot name an agent the runtime does not have.
+    const agentField = editor.locator('[data-webui-scheduling-field="agentName"]');
+    await expect(agentField).toContainText("选择要执行任务的 agent");
+    await agentField.locator("button").click();
+    await page.locator('[data-webui-agent-list-row="synthetic-A"]').click();
+    await expect(agentField).toContainText("Synthetic A");
+    // The model is the catalogue's list too, and its empty value is the default model.
+    const modelField = editor.locator('[data-webui-scheduling-field="model"]');
+    await modelField.locator("button").click();
+    await page.locator('[data-webui-model-list-row="fixture/stub-model/"]').click();
+    await expect(modelField).toContainText("Stub Model");
     await editor.locator('[data-webui-scheduling-field="prompt"]').fill("Summarize the day.");
     await expect(editor).toHaveScreenshot("scheduling-editor.png", screenshotOptions);
     // The editor's submit control is the dialog footer's, so it is not inside the

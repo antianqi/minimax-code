@@ -974,10 +974,10 @@ describe("W0 · at-rules and animations W5/W6 must not remove", () => {
     const important = shellRules.filter((rule) =>
       rule.body.includes("!important"),
     );
-    // Eight: the shared skeleton's own surface (it has to beat the surface it
-    // stands in for), the skeleton's control shape, the button's dark hover,
-    // and the xterm viewport.
-    expect(important).toHaveLength(8);
+    // Seven: the shared skeleton's own surface (it has to beat the surface it
+    // stands in for), its node treatment and its non-surface transparency, the
+    // button's dark hover and its dimmed state, and the two xterm viewports.
+    expect(important).toHaveLength(7);
     expect(
       important.some((rule) =>
         rule.selector.includes(".webui-xterm-host .xterm-viewport"),

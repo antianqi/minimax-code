@@ -46,12 +46,19 @@ import {
   transcriptViewport,
   useWebuiTranscriptScroll,
 } from "../bindings/use-transcript-scroll.js";
+import { isWebuiSettledTurnCaughtUp, projectWebuiSettledTurnShape, type WebuiSettledTurnShape } from "../projection/settled-turn.js";
 import { WebuiWorkspaceFileUrlProvider } from "./markdown.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiSpinner } from "../../../ui/feedback.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
+
+/** Page reads a settled turn allows while its messages are still being written. */
+const SETTLED_PAGE_READS = 4;
+
+/** The gap between those reads: long enough for a turn's write to land. */
+const SETTLED_PAGE_READ_MS = 700;
 
 // --- TurnNavigator integration ------------------------------------------------
 //
@@ -222,16 +229,57 @@ function WebuiSessionTranscriptView({
     if (initialMessages) historyOwner?.seed(sessionId, initialMessages);
     void historyOwner?.loadPage(sessionId);
   }, [historyOwner, initialMessages, sessionId]);
+  // What a settled turn has to keep. The live view disappears the moment the
+  // phase settles, so the page that replaces it must be at least as complete:
+  // a page that only carries the reply's text takes away the files the reader
+  // just watched appear, until a reload brings them back.
+  const unsettledTurnRef = useRef<readonly WebuiSettledTurnShape[]>([]);
+  const unsettledReadsRef = useRef(0);
+  useEffect(() => {
+    if (!turnLive) return;
+    const shapes = stream.messages
+      .filter((message) => message.role !== "user")
+      .map((message) => projectWebuiSettledTurnShape({
+        msgId: message.id,
+        msgContent: message.answer,
+        ...(message.parts ? { parts: message.parts } : {}),
+      }));
+    if (shapes.length) unsettledTurnRef.current = shapes;
+  }, [stream.messages, turnLive]);
   useEffect(() => {
     const previous = previousTurnStateRef.current;
     previousTurnStateRef.current = { sessionId, turnLive };
     // 加载历史页只处理会话内的 live → idle 转换；切换会话由首屏请求负责。
-    if (previous.sessionId !== sessionId || !previous.turnLive || turnLive) return undefined;
+    if (previous.sessionId !== sessionId || !previous.turnLive || turnLive) return;
     // A settled turn has persisted messages the page we hold predates: this read
     // is the one that must not join an answer already in flight.
+    unsettledReadsRef.current = 0;
     void historyOwner?.refreshPage(sessionId);
-    return undefined;
   }, [historyOwner, sessionId, turnLive]);
+  // …and one read is not enough when the runtime is still writing the turn it
+  // just finished. Read again, a bounded number of times, until the page in
+  // hand actually carries the messages the live view was showing.
+  useEffect(() => {
+    const expected = unsettledTurnRef.current;
+    if (expected.length === 0) return;
+    if (isWebuiSettledTurnCaughtUp(expected, visiblePage.messages ?? [])) {
+      unsettledTurnRef.current = [];
+      unsettledReadsRef.current = 0;
+      return;
+    }
+    if (unsettledReadsRef.current >= SETTLED_PAGE_READS) {
+      // The page never caught up: keep what is on screen rather than reading
+      // forever. The next load (a reload, a session switch) will have it.
+      unsettledTurnRef.current = [];
+      unsettledReadsRef.current = 0;
+      return;
+    }
+    const timer = setTimeout(() => {
+      unsettledReadsRef.current += 1;
+      void historyOwner?.refreshPage(sessionId);
+    }, SETTLED_PAGE_READ_MS);
+    return () => clearTimeout(timer);
+  }, [historyOwner, sessionId, visiblePage]);
   // One view model, derived in one place (`projection/transcript-view-model.ts`);
   // this component renders what it returns.
   const view = useMemo(

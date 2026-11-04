@@ -52,6 +52,8 @@ export interface WebuiComposerSubmitHandlers {
    * select a session the user has already navigated away from.
    */
   readonly onSessionCreated?: (sessionId: string, selected: boolean) => void;
+  /** Await home-only preparation before sending the first message to this session. */
+  readonly prepareCreatedSession?: (sessionId: string) => Promise<void>;
   /** Record (or clear) the refusal the transcript banner renders. */
   readonly setRefusal: (refusal: string | undefined) => void;
   readonly readStream?: () => WebuiStreamState;

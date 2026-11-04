@@ -704,6 +704,7 @@
  * radius, height and padding a text input in the same column uses) and opens
  * this business's own agent list, so a peer renders the rows this business
  * renders instead of its own copy of them. */
+@layer components {
 .webui-agent-select {
   display: flex;
   width: 100%;
@@ -853,4 +854,5 @@
   font-size: var(--size_14);
   line-height: var(--line_height_20);
   text-align: center;
+}
 }

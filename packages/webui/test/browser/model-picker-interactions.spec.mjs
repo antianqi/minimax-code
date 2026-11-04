@@ -234,3 +234,93 @@ test("the slider sets the level, and the chip names it", async ({ page }) => {
   expect(ultraFillStyle.transitionProperty).toContain("opacity");
   expect(ultraFillStyle.transitionDuration).toContain("0.12s");
 });
+
+test("a custom model without reported effort levels uses the slider as a thinking switch", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setModels([{
+    providerId: "custom_provider:local",
+    providerName: "Local provider",
+    modelId: "local-model",
+    displayName: "Local Model",
+    selected: true,
+    variant: "",
+  }]));
+  await openApp(page, "#session=A");
+  await chip(page).click();
+
+  const slider = page.locator("[data-webui-model-effort-slider]");
+  await expect(slider).toBeVisible();
+  await expect(slider).toHaveAttribute("data-disabled", "false");
+  await expect(slider).toHaveAttribute("data-binary", "true");
+  await expect(slider.locator(".webui-model-effort-dot")).toHaveCount(2);
+
+  const rail = slider.locator(".webui-model-effort-rail");
+  const box = await rail.boundingBox();
+  expect(box).toBeTruthy();
+  await page.mouse.move(box.x + 20, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "selectModel",
+  ))).toHaveLength(1);
+  const request = await page.evaluate(() => window.__fixture.requests.find(
+    (entry) => entry.operation === "selectModel",
+  ));
+  expect(request.body).toMatchObject({
+    providerId: "custom_provider:local",
+    modelId: "local-model",
+    variant: "thinking",
+  });
+});
+
+test("a home-page model and thinking level are applied to the new session before its first message", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setModels([
+    {
+      providerId: "minimax",
+      providerName: "MiniMax",
+      modelId: "M3.1",
+      displayName: "M3.1",
+      selected: true,
+      effortOptions: ["default", "low", "medium", "high", "max"],
+      thinking: { effort: "high" },
+    },
+  ]));
+  await openApp(page, "#");
+  await expect(chip(page)).toContainText("M3.1");
+  await chip(page).click();
+  const rail = page.locator("[data-webui-model-effort-slider] .webui-model-effort-rail");
+  const railBox = await rail.boundingBox();
+  expect(railBox).toBeTruthy();
+  await page.mouse.move(railBox.x + railBox.width * 0.7, railBox.y + railBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(railBox.x + railBox.width - 2, railBox.y + railBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "selectModel" && request.body.thinking?.effort === "max",
+  ))).toHaveLength(1);
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "listModels" && !request.body.sessionId,
+  ))).toHaveLength(2);
+  await page.getByRole("textbox", { name: "Message" }).fill("hello from a new session");
+  await page.locator('[data-testid="composer-send"]').click();
+
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some(
+    (request) => request.operation === "sendMessage",
+  ))).toBe(true);
+  const requests = await page.evaluate(() => window.__fixture.requests);
+  const createIndex = requests.findIndex((request) => request.operation === "createSession");
+  const sessionModelIndex = requests.findIndex((request) =>
+    request.operation === "selectModel" && request.body.sessionId === "created-C",
+  );
+  const sendIndex = requests.findIndex((request) => request.operation === "sendMessage");
+  expect(createIndex).toBeGreaterThanOrEqual(0);
+  expect(sessionModelIndex).toBeGreaterThan(createIndex);
+  expect(sendIndex).toBeGreaterThan(sessionModelIndex);
+  expect(requests[sessionModelIndex].body).toMatchObject({
+    providerId: "minimax",
+    modelId: "M3.1",
+    thinking: { effort: "max" },
+    sessionId: "created-C",
+  });
+});

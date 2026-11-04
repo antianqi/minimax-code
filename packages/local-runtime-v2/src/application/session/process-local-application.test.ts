@@ -129,8 +129,10 @@ describe("composeProcessLocalApplication Mini App agent exposure", () => {
     expect(Object.keys(application.miniAppAgent ?? {}).sort()).toEqual([
       "agents",
       "answer",
+      "cancelObserve",
       "create",
       "models",
+      "observe",
       "open",
       "panelClosed",
       "panelOpened",

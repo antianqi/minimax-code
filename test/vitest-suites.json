@@ -440,6 +440,7 @@
       "packages/webui/test/unit/transcript-retry-affordance.test.tsx",
       "packages/webui/test/unit/transcript-retry-resend-wiring.test.tsx",
       "packages/webui/test/unit/transcript-scroll.test.ts",
+      "packages/webui/test/unit/transcript-settled-turn.test.ts",
       "packages/webui/test/unit/transcript-shape.test.ts",
       "packages/webui/test/unit/transcript-skeletons.test.tsx",
       "packages/webui/test/unit/turn-boundary-prohibitions.test.ts",

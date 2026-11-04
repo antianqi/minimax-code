@@ -161,7 +161,7 @@ describe("V30 · the two lifetime composition seams are dependencies, not constr
     // peer's factory and supplying its own writer.
     const source = read("features/interactions/application/interaction-session-owners.ts");
     expect(source).toContain("readonly commandsFor: (sessionId: string) => WebuiInteractionCommands;");
-    expect(source).toContain("const commands = deps.commandsFor(sessionId);");
+    expect(source).toContain("const commands = deps.commandsFor(recordKey);");
     for (const specifier of importSpecifiers(source)) {
       // The interface may be reached; the factory may not.
       expect(specifier, specifier).not.toContain("/sessions/application/session-commands.js");

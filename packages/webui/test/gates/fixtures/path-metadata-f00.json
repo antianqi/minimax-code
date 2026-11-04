@@ -6113,6 +6113,69 @@
       "role": "ui",
       "business": null,
       "home": "target"
+    },
+    {
+      "path": "client/features/models/ui/ModelSelect.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "models",
+      "home": "target"
+    },
+    {
+      "path": "client/features/plugins/ui/AgentSelect.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "plugins",
+      "home": "target"
+    },
+    {
+      "path": "client/features/plugins/ui/PluginIconSource.public.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "plugins",
+      "home": "target"
+    },
+    {
+      "path": "client/platform/app-mode.ts",
+      "layers": [
+        "infrastructure"
+      ],
+      "role": "platform",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/platform/browser-auto-open.ts",
+      "layers": [
+        "infrastructure"
+      ],
+      "role": "platform",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/projection/common/session-artifacts-boundary.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "projection-common",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "server/browser-bridge/trusted-extensions.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
     }
   ],
   "directions": [

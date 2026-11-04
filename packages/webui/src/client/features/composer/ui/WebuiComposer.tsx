@@ -99,6 +99,7 @@ import type {
   WebuiQuestionnaireRequest,
 } from "../../../../shared/contracts/interactions.js";
 import type { WebuiModelEntry } from "../../../../shared/contracts/models.js";
+import type { WebuiModelSelectionRequest } from "../../../features/models/contracts/model-view.js";
 import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
 import { formatUsageResetLabel } from "../../../features/account/projection/usage.public.js";
@@ -257,6 +258,10 @@ export function WebuiComposer({
 }): ReactElement {
 
   const { dom } = useWebuiBrowserCapabilities();
+  const pendingHomeModelSelectionRef = useRef<WebuiModelSelectionRequest | undefined>(undefined);
+  useEffect(() => {
+    if (sessionId) pendingHomeModelSelectionRef.current = undefined;
+  }, [sessionId]);
   const composerMascotVideoRef = useRef<HTMLVideoElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
     typeof window !== "undefined" &&
@@ -664,6 +669,9 @@ export function WebuiComposer({
       await modelsWorkflows.selectModel(
         buildWebuiModelSelectionRequest(model, draft, sessionId),
       );
+      if (!sessionId) {
+        pendingHomeModelSelectionRef.current = buildWebuiModelSelectionRequest(model, draft);
+      }
     } catch (error) {
       setInteractionError(
         error instanceof Error ? error.message : String(error),
@@ -994,6 +1002,9 @@ export function WebuiComposer({
     // draft clearing, auto-follow lock, error rendering) stay in this
     // function so the resolver itself can be tested without React.
     setInteractionError(undefined);
+    const pendingHomeModelSelection = sessionId
+      ? undefined
+      : pendingHomeModelSelectionRef.current;
     const outcome = await composerController.submit({
       draft: messageDraft,
       ...(command ? { commandMatch: command } : {}),
@@ -1005,6 +1016,23 @@ export function WebuiComposer({
       agentName,
       ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
       ...(teamModeOff ? { teamModeOff: true } : {}),
+      ...(pendingHomeModelSelection && modelsWorkflows
+        ? {
+            prepareCreatedSession: async (createdSessionId: string) => {
+              try {
+                await modelsWorkflows.selectModel({
+                  ...pendingHomeModelSelection,
+                  sessionId: createdSessionId,
+                });
+              } catch (error) {
+                setInteractionError(
+                  error instanceof Error ? error.message : String(error),
+                );
+                throw error;
+              }
+            },
+          }
+        : {}),
       onSessionCreated: (createdSessionId, selected) => {
         if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId, selected, teamModeOff);
       },
@@ -1140,6 +1168,7 @@ export function WebuiComposer({
               <div ref={composerInputContainerRef} className="message-input-container relative">
                 <WebuiTextarea
                   ref={textareaRef}
+                  textSize="large"
                   id={`${fieldId}-content`}
                   aria-label="Message"
                   name="content"

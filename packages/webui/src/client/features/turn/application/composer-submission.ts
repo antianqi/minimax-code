@@ -47,6 +47,7 @@ export function buildWebuiComposerHandlers(
     setSending: args.setSending,
     onNeedsSession: args.onNeedsSession,
     onSessionCreated: args.onSessionCreated,
+    prepareCreatedSession: args.prepareCreatedSession,
     onQueued: args.onQueued,
   };
 }
@@ -219,6 +220,7 @@ export function submitWebuiTurn(
           : { adoptedRevision: outcome.adoptedRevision }),
       });
       handlers.onSessionCreated?.(sessionId, outcome.selected);
+      await handlers.prepareCreatedSession?.(sessionId);
     }
     if (sessionId === undefined) return ({ kind: "failed", error: "No session to submit to" });
     if (args.sending || args.intent.kind === "queued") {

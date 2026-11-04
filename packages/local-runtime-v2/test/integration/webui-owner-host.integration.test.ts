@@ -96,17 +96,19 @@ describe('a host declared as webui', () => {
   );
 
   it(
-    'reports cron native and the channel bridge unsupported in its diagnostics',
+    'reports cron and the channel bridge native for a webui host',
     async () => {
       const host = await bootWebuiHost();
-      // Phase 2's correction, observed end to end: the surface table no longer claims
-      // services this host did not assemble.
+      // The surface table follows the owner policy rather than claiming fixed
+      // capabilities: a `webui` owner carries Desktop's `channelService` cell (the
+      // browser client's 远程 → 接入 IM surface binds and manages an IM channel), so
+      // both services are assembled and both are reported native.
       const diagnostics = host.apiHost.getProcessLocalRuntimeDiagnostics();
       const surfaces = diagnostics.surfaces as
         | Record<string, { status?: string }>
         | undefined;
       expect(surfaces?.cron?.status).toBe('native');
-      expect(surfaces?.channelBridge?.status).toBe('unsupported');
+      expect(surfaces?.channelBridge?.status).toBe('native');
     },
     120_000,
   );

@@ -41,6 +41,8 @@ export interface WebuiTurnSendIntent {
    */
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
+  /** Apply home-only composer choices to a new session before dispatch. */
+  readonly prepareCreatedSession?: (sessionId: string) => Promise<void>;
 }
 
 /** Commands exposed to a conversation surface by application composition. */

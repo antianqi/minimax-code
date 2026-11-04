@@ -142,7 +142,7 @@ describe("the button contract", () => {
         </>
       </WebuiSkeletonProjection>,
     );
-    expect(defaultMarkup).not.toContain('data-webui-page-skeleton-control="true"');
+    expect(defaultMarkup).not.toContain("webui-page-skeleton-node");
 
     const markup = renderToStaticMarkup(
       <WebuiSkeletonProjection loading>
@@ -153,9 +153,9 @@ describe("the button contract", () => {
         </>
       </WebuiSkeletonProjection>,
     );
-    const projectedControls = markup.match(/<(?:button|a)\b[^>]*data-webui-page-skeleton-control="true"[^>]*>/g) ?? [];
+    const projectedControls = markup.match(/<(?:button|a)\b[^>]*class="[^"]*webui-page-skeleton-node[^"]*"[^>]*>/g) ?? [];
     expect(projectedControls, projectedControls.join("\n")).toHaveLength(3);
-    expect(projectedControls.every((control) => control.includes("webui-motion-loading"))).toBe(true);
+    expect(projectedControls.every((control) => control.includes('aria-hidden="true"'))).toBe(true);
   });
 
   it("renders a link that looks like a button as a link", () => {

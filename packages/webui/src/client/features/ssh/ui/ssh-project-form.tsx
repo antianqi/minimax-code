@@ -18,6 +18,9 @@ export interface SshProjectFormProps {
   readonly hosts: readonly WebuiSshConnection[];
   /** The host the person asked a project for. */
   readonly alias?: string;
+  /** Whether the dialog is on screen; the caller owns the exit, so it can finish. */
+  readonly open: boolean;
+  readonly onExitComplete: () => void;
   readonly onSubmit: (request: WebuiSshProjectRequest) => void;
   readonly onCancel: () => void;
   /** Lists one remote directory. */
@@ -82,6 +85,8 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
   return (
     <WebuiDialog
       id="ssh-create-project-dialog"
+      open={props.open}
+      onExitComplete={props.onExitComplete}
       title="新建远程项目"
       onClose={props.onCancel}
       dismissOnEscape

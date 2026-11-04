@@ -202,8 +202,14 @@ it("a real agent turn resumes after refresh and drains a queued message in order
         response.write(frame({ role: "assistant", content: "Unrefreshed action probe response." }));
       } else if (latestUserContent.includes("Persisted source action probe.")) {
         response.write(frame({ role: "assistant", content: "Persisted source action response." }));
-      } else if (latestUserContent.includes("Summarize the referenced project file.")) {
+      } else if (latestUserContent.includes("Summarize the attached file.")) {
         response.write(frame({ role: "assistant", content: "Reference and attachment reached the runtime." }));
+      } else if (serializedMessages.includes("Keep this synthetic goal active.")) {
+        // A goal continuation turn is asked about the goal, so it answers here.
+        // This branch has to precede the Ask User one below: both read the whole
+        // history, and the earlier Ask User turn stays in it, so whichever comes
+        // first answers every later kickoff turn.
+        response.write(frame({ role: "assistant", content: "Synthetic goal progress acknowledged." }));
       } else if (serializedMessages.includes("Ask User continuation.")) {
         const askUserCompleted = serializedMessages.includes("call-ask-user-e2e");
         if (askUserCompleted) {
@@ -246,8 +252,6 @@ it("a real agent turn resumes after refresh and drains a queued message in order
         response.write(frame({ role: "assistant", content: "Fork-only response." }));
       } else if (latestUserContent.includes("Edited synthetic plan task.")) {
         response.write(frame({ role: "assistant", content: "Edited user message produced a fresh response." }));
-      } else if (serializedMessages.includes("Keep this synthetic goal active.")) {
-        response.write(frame({ role: "assistant", content: "Synthetic goal progress acknowledged." }));
       } else if (latestUserContent.includes("Stop this turn, then recover.")) {
         completedWithToolCall = true;
         // Longer than the runtime's 80-character output-safety window threshold, so
@@ -1108,7 +1112,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       .filter({ hasText: "Summarize the attached file." });
     await browserExpect(completedReferenceUserMessage).toBeVisible();
     const completedReferenceTranscript = (await page.locator("body").textContent()) ?? "";
-    const referencePromptPosition = completedReferenceTranscript.indexOf("Summarize the referenced project file.");
+    const referencePromptPosition = completedReferenceTranscript.indexOf("Summarize the attached file.");
     const referenceAnswerPosition = completedReferenceTranscript.indexOf("Reference and attachment reached the runtime.");
     expect(referencePromptPosition).toBeGreaterThanOrEqual(0);
     expect(referenceAnswerPosition).toBeGreaterThan(referencePromptPosition);

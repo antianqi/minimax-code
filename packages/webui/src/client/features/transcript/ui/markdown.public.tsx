@@ -24,6 +24,7 @@ import {
   Fragment,
   memo,
   useContext,
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -206,20 +207,47 @@ export function webuiInlineMediaKind(fileName: string): "image" | "video" | unde
   return WEBUI_INLINE_MEDIA_KINDS[name.split(".").at(-1)?.toLowerCase() ?? ""];
 }
 
+/** Failed loads a picture tolerates before it gives up and leaves just the link. */
+const MEDIA_LOAD_RETRY_LIMIT = 4;
+
+/** The delay before retry number `failures`, so a burst does not hammer the route. */
+const MEDIA_LOAD_RETRY_MS = 800;
+
 function WebuiMessageFileMedia({ kind, path }: { readonly kind: "image" | "video"; readonly path: string }): ReactElement | null {
   const build = useContext(WebuiWorkspaceFileUrlContext);
-  const [failed, setFailed] = useState(false);
   const url = build?.(path) ?? "";
-  if (!url || failed) return null;
+  // A picture mounts as soon as the turn names the file, which can happen
+  // before the write lands: the first request then 404s and, without a retry,
+  // that failure was permanent — the reader had to reload the whole page to see
+  // a file that had existed a moment after it was first asked for. Each failure
+  // re-mounts the element through `token`, a bounded number of times, so a file
+  // that never appears costs a few requests and then reads as a plain link.
+  const [failures, setFailures] = useState(0);
+  const [token, setToken] = useState(0);
+  const gaveUp = failures > MEDIA_LOAD_RETRY_LIMIT;
+  const loadedPathRef = useRef(url);
+  useEffect(() => {
+    if (loadedPathRef.current === url) return;
+    loadedPathRef.current = url;
+    setFailures(0);
+    setToken(0);
+  }, [url]);
+  useEffect(() => {
+    if (failures === 0 || gaveUp) return;
+    const timer = setTimeout(() => setToken((value) => value + 1), MEDIA_LOAD_RETRY_MS * failures);
+    return () => clearTimeout(timer);
+  }, [failures, gaveUp]);
+  if (!url || gaveUp) return null;
   const name = path.replace(/\\/gu, "/").split("/").at(-1) ?? path;
+  const retry = () => setFailures((value) => value + 1);
   // Deliberately not lazy: before the bytes arrive an image has no intrinsic
   // size, so a lazy one lays out at zero height and the viewport check never
   // fires — it would wait for a size it can only get by loading.
   return (
-    <span className="webui-message-file-media" data-webui-file-media={kind}>
+    <span className="webui-message-file-media" data-webui-file-media={kind} data-webui-file-media-attempt={failures}>
       {kind === "video"
-        ? <video src={url} aria-label={name} controls playsInline preload="metadata" onError={() => setFailed(true)} />
-        : <img src={url} alt={name} decoding="async" onError={() => setFailed(true)} />}
+        ? <video key={token} src={url} aria-label={name} controls playsInline preload="metadata" onError={retry} />
+        : <img key={token} src={url} alt={name} decoding="async" onError={retry} />}
     </span>
   );
 }

@@ -3,7 +3,7 @@
  * withholds.
  *
  * The gateway owns admission, run slots and the session ports. The facade is the only thing a client
- * sees, so it must carry the eleven operations and none of the gateway's own surface — no `bind`, no
+ * sees, so it must carry the thirteen operations and none of the gateway's own surface — no `bind`, no
  * `registerArena`, no ports.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -42,8 +42,10 @@ describe('createProcessLocalMiniAppAgentApplication', () => {
     expect(Object.keys(facade).sort()).toEqual([
       'agents',
       'answer',
+      'cancelObserve',
       'create',
       'models',
+      'observe',
       'open',
       'panelClosed',
       'panelOpened',

@@ -295,6 +295,7 @@ export interface WebuiSendTurnArgs {
   readonly enqueueMessage?: WebuiClientMessageEnqueuer;
   readonly createSessionWorkspaceDir?: string;
   readonly teamModeOff?: boolean;
+  readonly prepareCreatedSession?: (sessionId: string) => Promise<void>;
   /**
    * Builds the turn's writer. The owner is not an argument: the writer belongs
    * to the session this send is for (or to the home slot before that session
@@ -349,6 +350,9 @@ export function sendWebuiTurn(
     resetStreamForTurn: () => writer.resetStreamForTurn(),
     setRefusal: (refusal) => writer.setStreamRefusal(refusal),
     setSending: (sending) => writer.setTurnSending(sending),
+    ...(args.prepareCreatedSession
+      ? { prepareCreatedSession: args.prepareCreatedSession }
+      : {}),
     // The live slice, read through the key the turn's record lives under. A
     // first message creates its session and the record moves onto it, so the
     // key the turn started from is not the key the record is on any more — and
@@ -392,6 +396,9 @@ export function sendWebuiTurn(
     ...(args.taskSessions ? { submitTask: args.taskSessions } : {}),
     createSessionWorkspaceDir: args.createSessionWorkspaceDir,
     teamModeOff: args.teamModeOff,
+    ...(args.prepareCreatedSession
+      ? { prepareCreatedSession: args.prepareCreatedSession }
+      : {}),
   });
 }
 
@@ -636,6 +643,9 @@ export function createWebuiConversationTurnCommands(
           ? { createSessionWorkspaceDir: intent.createSessionWorkspaceDir }
           : {}),
         ...(intent.teamModeOff ? { teamModeOff: intent.teamModeOff } : {}),
+        ...(intent.prepareCreatedSession
+          ? { prepareCreatedSession: intent.prepareCreatedSession }
+          : {}),
         // The writer and, through it, the sink are built here: the caller names
         // no key and holds no factory.
         createWriter: () => writer,

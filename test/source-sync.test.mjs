@@ -1351,13 +1351,24 @@ test('TUI lint failure stops full and platform verification before compilation o
 function filesWritingVersion(repositoryRoot, version) {
   const offenders = [];
   const skipped = ['node_modules', 'dist', 'dist-webui', 'coverage', 'out'];
+  // Only a claim the cloud can read counts: a comment naming the Electron build,
+  // or a test fixture that reuses the release number in a semver comparison, is
+  // not a second declaration. Both are stripped before the match, so the check
+  // reports drift instead of prose.
+  const isTestFile = (relative) =>
+    /(^|\/)(tests?)\//u.test(relative) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(relative);
+  const withoutComments = (source) =>
+    source.replace(/\/\*[\s\S]*?\*\//gu, ' ').replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
   const walk = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || skipped.includes(entry.name)) continue;
       const full = path.join(directory, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.(?:ts|tsx|mts|mjs|cjs|js|jsx)$/u.test(entry.name) && readFileSync(full, 'utf8').includes(version)) {
-        offenders.push(path.relative(repositoryRoot, full));
+      else if (!/\.(?:ts|tsx|mts|mjs|cjs|js|jsx)$/u.test(entry.name)) continue;
+      else {
+        const relative = path.relative(repositoryRoot, full);
+        if (isTestFile(relative)) continue;
+        if (withoutComments(readFileSync(full, 'utf8')).includes(version)) offenders.push(relative);
       }
     }
   };

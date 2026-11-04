@@ -408,11 +408,10 @@ describe("WebUI shell", () => {
     // region already says.
     expect(markup).toContain("正在加载环境信息");
     expect(markup).toContain('role="status"');
-    // The reserved loading slot is the shared skeleton's now: the placeholder
-    // is a skeleton node, and the controls inside it are marked as controls
-    // so the projection knows what to replace.
+    // The reserved loading slot is the shared skeleton's: its structural
+    // wrappers are skeleton nodes, and what they contain is replaced by the
+    // shared bar, so the rows stay in place without reading as live controls.
     expect(markup).toContain("webui-page-skeleton-node");
-    expect(markup).toContain('data-webui-page-skeleton-control="true"');
     expect(markup).toContain("Existing progress");
     expect(markup).toContain("worker");
   });

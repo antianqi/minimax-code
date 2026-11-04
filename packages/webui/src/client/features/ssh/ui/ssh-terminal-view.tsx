@@ -12,6 +12,9 @@ import { useWebuiToastError } from "../../../ui/toast.js";
 
 export interface SshTerminalViewProps {
   readonly terminal: WebuiSshTerminalSnapshot;
+  /** Whether the window is on screen; the caller owns the exit, so it can finish. */
+  readonly open: boolean;
+  readonly onExitComplete: () => void;
   readonly onInput: (data: string) => void;
   readonly onResize: (cols: number, rows: number) => void;
   readonly onClose: () => void;
@@ -109,6 +112,8 @@ export function SshTerminalView(props: SshTerminalViewProps): ReactElement {
   return (
     <WebuiDialog
       id="ssh-remote-terminal-dialog"
+      open={props.open}
+      onExitComplete={props.onExitComplete}
       title={(
         <span className="webui-ssh-terminal-title">
           <span className="webui-ssh-terminal-title-icon"><IconTerminal2 size={17} stroke={1.8} /></span>

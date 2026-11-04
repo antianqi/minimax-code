@@ -61,6 +61,7 @@ export const WebuiTextInput = forwardRef<HTMLInputElement, WebuiTextInputProps>(
 export interface WebuiTextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "className" | "size"> {
   readonly controlSize?: "regular" | "compact" | "large" | "document";
   readonly appearance?: "default" | "document";
+  readonly textSize?: "small" | "regular" | "large";
   /** Layout only; the control appearance remains owned by this component. */
   readonly className?: string;
 }
@@ -68,11 +69,11 @@ export interface WebuiTextareaProps extends Omit<TextareaHTMLAttributes<HTMLText
 export const WebuiTextarea = forwardRef<
   HTMLTextAreaElement,
   WebuiTextareaProps
->(function WebuiTextarea({ controlSize = "regular", appearance = "default", className, rows = 12, ...props }, ref): ReactElement {
+>(function WebuiTextarea({ controlSize = "regular", appearance = "default", textSize = "regular", className, rows = 12, ...props }, ref): ReactElement {
   if (useWebuiPageLoading()) {
     return <WebuiSkeleton />;
   }
-  return <textarea {...props} rows={rows} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", className].filter(Boolean).join(" ")} />;
+  return <textarea {...props} rows={rows} ref={ref} className={["webui-control", "webui-motion-feedback", "webui-control--multiline", controlSize === "compact" ? "webui-control--compact" : "", controlSize === "large" ? "webui-control--large" : "", controlSize === "document" ? "webui-control--document" : "", appearance === "document" ? "webui-control--document-appearance" : "", textSize !== "regular" ? `webui-control--text-${textSize}` : "", className].filter(Boolean).join(" ")} />;
 });
 
 export interface WebuiSelectOption {

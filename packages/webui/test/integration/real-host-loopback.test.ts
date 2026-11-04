@@ -347,6 +347,7 @@ describe("real host over the loopback service", () => {
         const backdrop = node.parentElement!;
         const backdropRect = backdrop.getBoundingClientRect();
         const rect = node.getBoundingClientRect();
+        const surface = node as HTMLElement;
         const fields = node.querySelector(".webui-mcp-form-fields")!;
         const controls = [...fields.querySelectorAll("input:not([type=checkbox]), select")];
         return {
@@ -355,9 +356,11 @@ describe("real host over the loopback service", () => {
             backdropRect.right >= innerWidth && backdropRect.bottom >= innerHeight,
           // Centred in the mask, not in the window: the mask is what the surface
           // is laid out inside, and a scrollbar makes the window's centre differ
-          // from it by a few pixels.
-          centered: Math.abs(rect.left + rect.width / 2 - (backdropRect.left + backdropRect.width / 2)) < 3 &&
-            Math.abs(rect.top + rect.height / 2 - (backdropRect.top + backdropRect.height / 2)) < 3,
+          // from it by a few pixels. The layout box is what centring is about —
+          // the surface is measured while its enter motion is still running, and
+          // `getBoundingClientRect` would carry that movement.
+          centered: Math.abs(surface.offsetLeft + surface.offsetWidth / 2 - (backdropRect.left + backdropRect.width / 2)) < 3 &&
+            Math.abs(surface.offsetTop + surface.offsetHeight / 2 - (backdropRect.top + backdropRect.height / 2)) < 3,
           insideViewport: rect.left >= 0 && rect.top >= 0 &&
             rect.right <= innerWidth && rect.bottom <= innerHeight,
           fieldsGrid: getComputedStyle(fields).display === "grid",

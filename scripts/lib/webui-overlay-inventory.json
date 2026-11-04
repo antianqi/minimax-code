@@ -55,6 +55,10 @@
       "disposition": "managed",
       "note": "provider editor and delete confirmation use WebuiDialog; the preset and format pickers remain nested managed popovers"
     },
+    "features/models/ui/ModelSelect.public.tsx": {
+      "disposition": "managed",
+      "note": "the model list is one managed layer; the menu it opens reports its own layer id so the dismissal ladder stays with the shared coordinator"
+    },
     "features/plugins/ui/PluginCatalogue.tsx": {
       "disposition": "managed",
       "note": "the catalogue's filter menu"
@@ -82,6 +86,10 @@
     "features/plugins/ui/PluginItemDialog.tsx": {
       "disposition": "managed",
       "note": "the plugin editor and the MCP dialog, one layer each mount"
+    },
+    "features/plugins/ui/AgentSelect.public.tsx": {
+      "disposition": "managed",
+      "note": "the agent list is one managed layer, opened by the scheduled-task agent field through the shared coordinator"
     },
     "features/settings/ui/MemoryManagerDialog.tsx": {
       "disposition": "managed",
@@ -154,6 +162,10 @@
     "features/ssh/ui/ssh-connection-row.tsx": {
       "disposition": "managed",
       "note": "the row's menu is the shared dropdown, which registers with the coordinator and owns its own dismissal"
+    },
+    "features/browser/ui/BrowserAuthorizationSwitches.public.tsx": {
+      "disposition": "managed",
+      "note": "the installation-key dialog is WebuiDialog, so the shared scrim, focus return and dismissal policy own it"
     }
   }
 }

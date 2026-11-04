@@ -161,6 +161,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
     readonly planMode?: boolean;
     readonly createSessionWorkspaceDir?: string;
     readonly teamModeOff?: boolean;
+    readonly prepareCreatedSession?: WebuiComposerSubmitIntent["prepareCreatedSession"];
   }, captured: CapturedInput): WebuiSubmissionTicket | undefined => {
     // Intent and data only — no setter crosses this boundary. The draft is
     // consumed through the link the assembly installed on the command set, and the
@@ -176,6 +177,7 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ? { createSessionWorkspaceDir: turn.createSessionWorkspaceDir }
         : {}),
       ...(turn.teamModeOff ? { teamModeOff: turn.teamModeOff } : {}),
+      ...(turn.prepareCreatedSession ? { prepareCreatedSession: turn.prepareCreatedSession } : {}),
     });
     if (ticket && (ticket.admission.kind === "dispatching" || ticket.admission.kind === "queued")) {
       // The draft and the staged input are consumed by the same rule, on the same
@@ -335,6 +337,9 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
         ...(input.planMode ? { planMode: true } : {}),
         ...(input.createSessionWorkspaceDir ? { createSessionWorkspaceDir: input.createSessionWorkspaceDir } : {}),
         ...(input.teamModeOff ? { teamModeOff: true } : {}),
+        ...(input.prepareCreatedSession
+          ? { prepareCreatedSession: input.prepareCreatedSession }
+          : {}),
       }, captured);
       if (!ticket) return { kind: "ignored" };
       void ticket.creation.then((created) => {

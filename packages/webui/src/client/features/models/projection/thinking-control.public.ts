@@ -23,6 +23,7 @@ import type {
   WebuiModelPickerDraft,
   WebuiModelPickerEntry,
 } from "../contracts/model-view.js";
+import { CUSTOM_PROVIDER_ID_PREFIX } from "./token-plan-model.public.js";
 
 /** Which control shape a model's thinking options render as. */
 export type ThinkingControlShape = "switch" | "radiogroup" | null;
@@ -129,6 +130,10 @@ export function resolveEffortOptions(
     const declaredSwitch = model.thinkingConfig?.default_value !== undefined;
     if ((hasOff && hasOn) || declaredSwitch) return ["off", "on"];
   }
+  // A custom provider may not report MiniMax's reasoning-level metadata. In
+  // that case the control still represents the model's thinking variant, so
+  // expose the two-state switch instead of rendering a disabled slider.
+  if (model.providerId.startsWith(CUSTOM_PROVIDER_ID_PREFIX)) return ["off", "on"];
   return [];
 }
 

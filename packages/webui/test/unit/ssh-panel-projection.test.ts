@@ -178,6 +178,9 @@ describe("the SSH panel", () => {
       createElement(SshPanelView, {
         snapshot: { status: "ready", connections: [], projects: [] },
         terminal: { status: "closed", output: "" },
+        terminalOpen: false,
+        terminalExited: true,
+        onTerminalExitComplete: () => undefined,
         onOpenAdd: () => undefined,
         onToggleHost: () => undefined,
         onOpenDetails: () => undefined,
@@ -256,13 +259,17 @@ describe("the SSH panel", () => {
   it("mounts the terminal view for a live session and hands its output to xterm", () => {
     // The remote terminal is xterm inside the shared modal frame: xterm owns the
     // output, and the frame renders into a portal a server render does not have.
-    // The panel owes the branch, the view owes the write.
+    // The panel owes the branch, the view owes the write. The branch is
+    // `terminalOpen || !terminalExited`: a closed terminal stays mounted while the
+    // shared exit motion plays, and is dropped once the dialog reports it finished.
     const panelSource = readFileSync(
       new URL("../../src/client/features/ssh/ui/SshPanel.public.tsx", import.meta.url),
       "utf8",
     );
-    expect(panelSource).toContain('props.terminal.status === "closed"');
+    expect(panelSource).toContain('const terminalOpen = terminal.status !== "closed"');
+    expect(panelSource).toContain("props.terminalOpen || !props.terminalExited");
     expect(panelSource).toContain("<SshTerminalView");
+    expect(panelSource).toContain("open={props.terminalOpen}");
     const terminalSource = readFileSync(
       new URL("../../src/client/features/ssh/ui/ssh-terminal-view.tsx", import.meta.url),
       "utf8",
@@ -272,6 +279,7 @@ describe("the SSH panel", () => {
     // A server render of the same snapshot reaches the panel's own chrome only.
     const markup = view({
       terminal: { status: "running", output: "hello from the remote shell", terminalId: "t1" },
+      terminalOpen: true,
     });
     expect(markup).toContain('data-testid="ssh-connections-section"');
   });

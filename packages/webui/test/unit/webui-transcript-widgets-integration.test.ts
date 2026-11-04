@@ -132,17 +132,21 @@ const assistantWithAttachments: WebuiClientMessage[] = [
   },
 ];
 
+// The banner belongs to the weekly window. A five-hour window near its limit is
+// announced through the shared warning toast instead (see the usage-notice
+// effect in `WebuiClientFoundationApp`), so the header slot is driven by the
+// window that still owns it.
 const quotaHighUsage: WebuiUsageQuotaResult = {
   signedIn: true,
   quota: {
     fiveHour: {
-      usedPercent: 80,
+      usedPercent: 0,
       totalPercent: 100,
       resetAtMs: Date.now() + 3600_000,
       unlimited: false,
     },
     weekly: {
-      usedPercent: 0,
+      usedPercent: 80,
       totalPercent: 100,
       resetAtMs: Date.now() + 7 * 86_400_000,
       unlimited: false,
@@ -240,13 +244,13 @@ describe("WebUI transcript widget wiring", () => {
       signedIn: true,
       quota: {
         fiveHour: {
-          usedPercent: 80,
+          usedPercent: 0,
           totalPercent: 100,
           resetAtMs: Date.now() + 3600_000,
           unlimited: true,
         },
         weekly: {
-          usedPercent: 0,
+          usedPercent: 80,
           totalPercent: 100,
           resetAtMs: Date.now() + 7 * 86_400_000,
           unlimited: true,

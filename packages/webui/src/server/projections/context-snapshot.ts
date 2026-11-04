@@ -16,13 +16,18 @@ export function projectContextSnapshot(input: {
 }): WebuiContextSnapshotResponse {
   let compaction: WebuiContextSnapshotResponse["compaction"];
   let usage: Record<string, unknown> | undefined;
+  let detailedUsage: Record<string, unknown> | undefined;
   for (let index = input.messages.length - 1; index >= 0; index -= 1) {
     const message = input.messages[index];
     if (!message) continue;
     if (!compaction) compaction = projectCompactionMessage(message);
-    if (!usage && message.rawJson) usage = readUsage(message.rawJson);
-    if (compaction && usage) break;
+    if (message.rawJson) {
+      detailedUsage ??= readDetailedUsage(message.rawJson);
+      usage ??= readUsage(message.rawJson);
+    }
+    if (compaction && detailedUsage && usage) break;
   }
+  usage = detailedUsage ?? usage;
   if (!usage) return { status: input.active ? "loading" : "empty", ...(compaction ? { compaction } : {}) };
   // The runtime protocol's names, not invented ones. `total_tokens` is what the
   // turn CONSUMED against `context_window`, which is what the readout's
@@ -37,8 +42,14 @@ export function projectContextSnapshot(input: {
   // context readout at all: the page answered with a usage record, every
   // field of it under a name this projection did not look at, and the panel
   // had nothing to draw.
-  const window = numberValue(usage.context_window) ?? numberValue(usage.contextWindow);
-  const usedTokens = numberValue(usage.total_tokens) ?? numberValue(usage.totalTokens);
+  const window =
+    numberValue(usage.context_window) ??
+    numberValue(usage.contextWindow) ??
+    numberValue(usage.contextWindowTokens);
+  const usedTokens =
+    numberValue(usage.total_tokens) ??
+    numberValue(usage.totalTokens) ??
+    numberValue(usage.usedTokens);
   return {
     status: input.active ? "stale" : "live",
     // The snapshot publishes the protocol's names whatever the record it was
@@ -81,11 +92,27 @@ function readUsage(rawJson: string): Record<string, unknown> | undefined {
     if (!isRecord(value)) return undefined;
     // The persisted shape is `usage`, with the field names the runtime
     // protocol fixes: `total_tokens` / `context_window`
-    // (`agent-core/src/protocol/agent-message.ts`). Reading `contextUsage` /
-    // `context_usage` here instead matched nothing in the database — which is
-    // what made the composer's context readout render nowhere at all, with no
-    // error to point at it.
+    // (`agent-core/src/protocol/agent-message.ts`). Detailed local context
+    // snapshots are read separately from `contextUsage` / `context_usage`.
     return isRecord(value.usage) ? value.usage : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readDetailedUsage(rawJson: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(rawJson);
+    if (!isRecord(value)) return undefined;
+    const usage = value.context_usage ?? value.contextUsage;
+    if (
+      !isRecord(usage) ||
+      numberValue(usage.contextWindowTokens) === undefined ||
+      numberValue(usage.usedTokens) === undefined
+    ) {
+      return undefined;
+    }
+    return usage;
   } catch {
     return undefined;
   }

@@ -68,6 +68,18 @@ describe("effort options — the binary case", () => {
     ).toEqual(["default", "low", "high"]);
   });
 
+  it("gives a custom model with no reported levels a binary thinking switch", () => {
+    const custom = entry({ providerId: "custom_provider:local", variant: "" });
+
+    expect(resolveEffortOptions(custom)).toEqual(["off", "on"]);
+    expect(thinkingDraftPatch(custom, "on")).toEqual({ variant: "thinking" });
+    expect(resolveEffortOptions({ ...custom, effortOptions: ["low", "high"] })).toEqual([
+      "default",
+      "low",
+      "high",
+    ]);
+  });
+
   it("gives a model with no thinking contract nothing", () => {
     expect(resolveEffortOptions(entry())).toEqual([]);
     expect(resolveEffortOptions(entry({ thinkingConfig: { mode: "forced_on" } }))).toEqual([]);

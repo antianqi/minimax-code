@@ -54,6 +54,33 @@ test("the diff card reads its turn through the review owner", async ({ page }) =
   await expect.poll(() => requests(page, "getTurnDiff")).toBeGreaterThan(0);
 });
 
+test("the diff card header hover reaches the card's inner right edge", async ({ page }) => {
+  await openSessionWithDiff(page);
+  const card = page.locator('[data-testid="turn-diff-card"]');
+  const header = card.locator(".webui-diff-header");
+  await expect(header).toBeVisible();
+  await header.hover();
+  await expect
+    .poll(() => header.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe("rgba(0, 0, 0, 0)");
+
+  const geometry = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="turn-diff-card"]');
+    const header = card?.querySelector(".webui-diff-header");
+    if (!card || !header) return null;
+    const cardBounds = card.getBoundingClientRect();
+    const headerBounds = header.getBoundingClientRect();
+    const style = getComputedStyle(card);
+    return {
+      rightGap: cardBounds.right - headerBounds.right,
+      cardBorderRight: Number.parseFloat(style.borderRightWidth),
+    };
+  });
+
+  expect(geometry).not.toBeNull();
+  expect(Math.abs(geometry.rightGap - geometry.cardBorderRight)).toBeLessThanOrEqual(0.5);
+});
+
 test("an outside-workspace review entry opens that file in the workspace viewer on request", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);

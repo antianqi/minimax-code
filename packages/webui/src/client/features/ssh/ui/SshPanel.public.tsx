@@ -15,7 +15,7 @@
 //
 // The shape is the `设置 > 连接 > SSH` half: the hosts in one grouped card, a switch
 // and the host's own menu on each row, and one 「添加」 button that opens the host picker.
-import { useCallback, useEffect, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { IconLoader2, IconTerminal2 } from "@tabler/icons-react";
 
 import type {
@@ -53,7 +53,17 @@ import { useWebuiToastError, useWebuiToastSuccess } from "../../../ui/toast.js";
 
 export interface SshPanelViewProps {
   readonly snapshot: WebuiSshSnapshot;
+  /** The terminal window's snapshot: the live one, or the last one while it closes. */
   readonly terminal: WebuiSshTerminalSnapshot;
+  /** Whether the terminal window is on screen. */
+  readonly terminalOpen: boolean;
+  /** Whether the terminal window has finished its exit motion. */
+  readonly terminalExited: boolean;
+  /**
+   * The closing window stays mounted until the shared motion reports it finished,
+   * so the exit can play instead of the window disappearing in one frame.
+   */
+  readonly onTerminalExitComplete: () => void;
   /** The project form, rendered as a managed dialog by the panel. */
   readonly projectDialog?: ReactNode;
   /** The add dialog, rendered by the panel because it needs the overlay layer. */
@@ -203,14 +213,16 @@ export function SshPanelView(props: SshPanelViewProps): ReactElement {
             </li>
           ))}
         </WebuiStack>}
-      {props.terminal.status === "closed"
-        ? null
-        : <SshTerminalView
+      {props.terminalOpen || !props.terminalExited
+        ? <SshTerminalView
           terminal={props.terminal}
+          open={props.terminalOpen}
+          onExitComplete={props.onTerminalExitComplete}
           onInput={props.onTerminalInput}
           onResize={props.onTerminalResize}
           onClose={props.onCloseTerminal}
-        />}
+        />
+        : null}
       {props.addDialog}
       {props.projectDialog}
       {props.detailsDialog}
@@ -251,7 +263,9 @@ export function SshPanel(props: SshPanelProps): ReactElement {
   const [editing, setEditing] = useState<WebuiSshConnection | undefined>(undefined);
   const [details, setDetails] = useState<WebuiSshConnection | undefined>(undefined);
   const [removing, setRemoving] = useState<WebuiSshConnection | undefined>(undefined);
-  const [projectFor, setProjectFor] = useState<string | undefined>(undefined);
+  // The project form outlives its `open` flag: the panel keeps it mounted while
+  // the shared exit motion plays and drops it when the dialog reports it done.
+  const [projectForm, setProjectForm] = useState<{ alias: string; open: boolean } | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -261,6 +275,19 @@ export function SshPanel(props: SshPanelProps): ReactElement {
 
   const terminalId = terminal.terminalId;
   useEffect(() => props.owner.watchTerminal(), [props.owner, terminalId]);
+
+  // A closing terminal keeps the snapshot it was running with, so the exit motion
+  // replays the window being left rather than an emptied frame; the view is
+  // unmounted once that motion reports finished.
+  const terminalOpen = terminal.status !== "closed";
+  const retainedTerminal = useRef(terminal);
+  if (terminalOpen) retainedTerminal.current = terminal;
+  // Starts as "nothing to keep mounted": the panel opens with no terminal, and a
+  // view mounted there would announce a connection it was never asked to make.
+  const [terminalExited, setTerminalExited] = useState(!terminalOpen);
+  useEffect(() => {
+    if (terminalOpen) setTerminalExited(false);
+  }, [terminalOpen]);
 
   const openAdd = (): void => {
     setEditing(undefined);
@@ -373,18 +400,24 @@ export function SshPanel(props: SshPanelProps): ReactElement {
     />
   );
 
-  const projectDialog = projectFor === undefined
+  const closeProjectForm = (): void => {
+    setProjectForm((current) => (current ? { ...current, open: false } : undefined));
+  };
+
+  const projectDialog = projectForm === undefined
     ? undefined
     : <SshProjectForm
       hosts={snapshot.connections}
-      alias={projectFor}
+      alias={projectForm.alias}
+      open={projectForm.open}
+      onExitComplete={() => setProjectForm(undefined)}
       error={error}
       onBrowse={browseDirectories}
-      onCancel={() => setProjectFor(undefined)}
+      onCancel={closeProjectForm}
       onSubmit={(request) => {
         void props.owner.saveProject(request).then((answer) => {
           if (answer.ok) {
-            setProjectFor(undefined);
+            closeProjectForm();
             setNotice("已保存项目。");
             return;
           }
@@ -396,7 +429,10 @@ export function SshPanel(props: SshPanelProps): ReactElement {
   return (
     <SshPanelView
       snapshot={snapshot}
-      terminal={terminal}
+      terminal={terminalOpen ? terminal : retainedTerminal.current}
+      terminalOpen={terminalOpen}
+      terminalExited={terminalExited}
+      onTerminalExitComplete={() => setTerminalExited(true)}
       {...(projectDialog ? { projectDialog } : {})}
       {...(notice === undefined ? {} : { notice })}
       {...(error === undefined ? {} : { error })}
@@ -407,7 +443,7 @@ export function SshPanel(props: SshPanelProps): ReactElement {
         });
       }}
       onOpenDetails={(connection) => setDetails(connection)}
-      onCreateProject={(connection) => setProjectFor(connection.alias)}
+      onCreateProject={(connection) => setProjectForm({ alias: connection.alias, open: true })}
       onEditHost={(connection) => {
         setEditing(connection);
         setManual(true);

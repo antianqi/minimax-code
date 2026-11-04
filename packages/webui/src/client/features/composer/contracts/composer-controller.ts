@@ -16,6 +16,7 @@ export interface WebuiComposerSubmitIntent {
   readonly teamModeOff?: boolean;
   readonly forceTurn?: boolean;
   readonly onSessionCreated?: (sessionId: string, selected: boolean) => void;
+  readonly prepareCreatedSession?: (sessionId: string) => Promise<void>;
 }
 
 export type WebuiComposerSubmitOutcome =

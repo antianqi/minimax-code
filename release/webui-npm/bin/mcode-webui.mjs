@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import {
   WebuiService,
@@ -31,6 +32,67 @@ if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
 const dataDir = process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
 process.env.MAVIS_BUILTIN_AGENTS_V2_DIR ??= path.join(packageRoot, "assets/agents");
 process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents");
+
+/**
+ * Stop before the runtime does when a native module was not built.
+ *
+ * npm 12 blocks dependency install scripts unless they are named, and this
+ * package's SQLite and terminal modules are built by those scripts. When they
+ * are skipped the module loads as a package with no binding, and the first thing
+ * to notice is a database migration deep inside the runtime: the person sees
+ * `current_local_runtime_v2_migration_failed:sqlite:…:Could not locate the
+ * bindings file`, which names the migration rather than the skipped build step,
+ * and the fix — one install flag — is nowhere in it.
+ *
+ * The check is here, at the composition root, because it is the last place that
+ * knows both the dependency list and the package name a person can reinstall.
+ */
+const NATIVE_MODULES = ["better-sqlite3", "node-pty"];
+/**
+ * Load each module the way the runtime will.
+ *
+ * A plain `require` is not enough for `better-sqlite3`: it resolves its binding
+ * lazily, so the module imports cleanly and the missing binding only surfaces
+ * when something opens a database. Opening an in-memory database here is the
+ * cheapest way to make the check answer the question the person is about to ask.
+ */
+const NATIVE_PROBES = {
+  "better-sqlite3": (module) => {
+    new module(":memory:").close();
+  },
+  "node-pty": () => {},
+};
+const unbuilt = [];
+for (const name of NATIVE_MODULES) {
+  try {
+    NATIVE_PROBES[name](createRequire(import.meta.url)(name));
+  } catch (error) {
+    unbuilt.push(`${name}: ${String(error?.message ?? error).split("\n")[0]}`);
+  }
+}
+if (unbuilt.length > 0) {
+  const packageName = JSON.parse(
+    await readFile(path.join(packageRoot, "package.json"), "utf8"),
+  ).name;
+  console.error("[mcode-webui] a native module this package needs was not built:");
+  for (const line of unbuilt) console.error(`  ${line}`);
+  console.error("");
+  console.error(
+    "npm 12 blocks dependency install scripts unless they are allowed, and these modules are",
+  );
+  console.error("built by their own install scripts. Reinstall with them allowed:");
+  console.error("");
+  console.error(
+    `  npm install -g ${packageName} --allow-scripts=${NATIVE_MODULES.join(",")},bufferutil,utf-8-validate`,
+  );
+  console.error("");
+  console.error("or allow them for every global install:");
+  console.error("");
+  console.error(
+    `  npm config set allow-scripts=${NATIVE_MODULES.join(",")},bufferutil,utf-8-validate --location=user`,
+  );
+  process.exit(1);
+}
 
 /**
  * The published extension identities this package was built for.

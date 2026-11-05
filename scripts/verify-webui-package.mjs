@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,12 +57,28 @@ try {
   if (!publishedId) {
     throw new Error("The installed WebUI package carries no published extension identity; a published package is built with the store's public key");
   }
-  const packed = JSON.parse(run(npm, ["pack", packageDir, "--json", "--pack-destination", work]));
-  if (packed.length !== 1) throw new Error("Expected exactly one WebUI npm archive");
+  // `npm pack --json` answered with an array before npm 12 and with an object
+  // keyed by package name after it, so both shapes are read here.
+  const packOutput = JSON.parse(run(npm, ["pack", packageDir, "--json", "--pack-destination", work]));
+  const packed = Array.isArray(packOutput) ? packOutput : Object.values(packOutput);
+  if (packed.length !== 1) throw new Error(`Expected exactly one WebUI npm archive, got ${packed.length}`);
   const prefix = path.join(work, "install");
-  run(npm, ["install", "--prefix", prefix, "--no-audit", "--no-fund", path.join(work, packed[0].filename)]);
+  // npm 12 blocks dependency install scripts unless they are named, and the two
+  // native modules this package needs are built by those scripts. A global
+  // install is the shape that accepts the flag — npm 12 refuses it for a
+  // project-scoped install — so the acceptance installs the way a person must,
+  // which is also the only way the startup below can be exercised at all.
+  const npmMajor = Number(run(npm, ["--version"]).trim().split(".")[0]);
+  const archive = path.join(work, packed[0].filename);
+  const allowScripts = "better-sqlite3,bufferutil,node-pty,utf-8-validate";
+  run(
+    npm,
+    npmMajor >= 12
+      ? ["install", "-g", "--prefix", prefix, "--no-audit", "--no-fund", `--allow-scripts=${allowScripts}`, archive]
+      : ["install", "--prefix", prefix, "--no-audit", "--no-fund", archive],
+  );
   const manifest = JSON.parse(readFileSync(path.join(packageDir, "package.json"), "utf8"));
-  const installed = path.join(prefix, "node_modules", manifest.name);
+  const installed = resolveInstalledPackage(prefix, manifest.name);
   const probe = createServer();
   probe.listen(0, "127.0.0.1");
   await once(probe, "listening");
@@ -133,6 +149,24 @@ try {
     await exited;
   }
   rmSync(work, { recursive: true, force: true });
+}
+
+/**
+ * Where a prefix install put the package.
+ *
+ * A project install lands in `<prefix>/node_modules`; a global one lands in
+ * `<prefix>/lib/node_modules` on POSIX and in `<prefix>/node_modules` on
+ * Windows. Both candidates are tried, so the acceptance does not have to know
+ * which npm major installed it.
+ */
+function resolveInstalledPackage(prefix, name) {
+  for (const candidate of [
+    path.join(prefix, "lib", "node_modules", name),
+    path.join(prefix, "node_modules", name),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`The install did not place ${name} under ${prefix}`);
 }
 
 /**

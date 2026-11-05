@@ -1,47 +1,109 @@
-// The Mini App proxies the WebUI service owns.
+// The Mini App proxy the WebUI service owns.
 //
-// One listener per plugin, and this is where they live. Two properties make it a
-// registry rather than a local map in the operation handler:
+// One listener for every Mini App, and this is where it lives.
 //
-//   * **A listener outlives a request.** `openMiniApp` binds one, `stopMiniApp`
-//     closes it, and a service that shuts down while a Mini App is still running
-//     has to close it too — otherwise the process exits holding loopback ports
-//     that a restart then fails to rebind (the plugin's derived port is stable on
-//     purpose, ADR 0020, so a leaked listener is a *permanent* failure to start).
-//   * **The port is derived, so a second listener is never acceptable.** Binding
-//     it twice either fails or silently serves the page from a second origin,
-//     which discards the page's own storage. The registry closes the previous
-//     listener before binding the next, and never holds two for one plugin.
+//   * **A listener outlives a request.** `openMiniApp` registers a Mini App on
+//     it, `stopMiniApp` drops that registration, and a service that shuts down
+//     while a Mini App is still running has to close the listener too —
+//     otherwise the process exits holding the published port, and the next
+//     start fails to bind it.
+//   * **The port is fixed.** Every Mini App is published on one port, so a Mini
+//     App that arrives in the store does not ask the deployment for another
+//     firewall rule and another port forward. The Mini Apps are told apart by
+//     the path they are served under, not by the port they answer on.
+//   * **The listener is bound early.** It is bound when the service starts
+//     rather than when the first Mini App opens: the runtime draws its own Mini
+//     App ports from the same range, and a listener that waited would lose the
+//     port to a Mini App that has no business holding it.
 
-import { startMiniAppProxy, type MiniAppProxy, type StartMiniAppProxyInput } from "./proxy.js";
+import {
+  DEFAULT_MINIAPP_PROXY_PORT,
+  startMiniAppProxyHost,
+  type MiniAppProxy,
+  type MiniAppProxyHost,
+  type MiniAppProxyRegistration,
+  type MiniAppProxyStarter,
+} from "./proxy.js";
+import type { WebuiCredential } from "../credentials.js";
 
 export interface MiniAppProxyRegistry {
-  /** The listeners that are up, in binding order. */
+  /** The Mini Apps that are registered, in registration order. */
   readonly running: () => readonly MiniAppProxy[];
-  /** Binds a plugin's listener, replacing the one it already had. */
-  readonly start: (input: StartMiniAppProxyInput) => Promise<MiniAppProxy>;
-  /** Closes one plugin's listener, if it has one. */
+  /** Registers a Mini App on the shared listener, replacing the one it had. */
+  readonly start: (registration: MiniAppProxyRegistration) => Promise<MiniAppProxy>;
+  /** Drops one Mini App's registration, if it has one. */
   readonly close: (pluginId: string) => Promise<void>;
-  /** Closes every listener. The service calls this on the way down. */
+  /** Closes the listener and every registration. The service calls this on the way down. */
   readonly closeAll: () => Promise<void>;
+  /**
+   * Binds the shared listener before the first Mini App asks for it.
+   *
+   * A failure is not fatal: the port may be free by the time a Mini App opens,
+   * so the next registration tries again.
+   */
+  readonly prepare: () => Promise<void>;
+  /** The port the listener answers on, once it is bound. */
+  readonly boundPort: () => number | undefined;
 }
 
 export function createMiniAppProxyRegistry(
-  deps: { readonly start?: typeof startMiniAppProxy } = {},
+  deps: {
+    /**
+     * A substitute for the registration step.
+     *
+     * A test observes the registrations through it. It owns whatever listener
+     * it starts, so this registry neither binds nor closes one.
+     */
+    readonly start?: MiniAppProxyStarter;
+    /**
+     * The address the listener binds.
+     *
+     * It follows the WebUI service's own bind address, so a service published
+     * beyond loopback publishes its Mini App listener with it.
+     */
+    readonly host?: string;
+    /** The port every Mini App is published on. */
+    readonly port?: number;
+    /**
+     * The WebUI's per-start credential, for a listener bound beyond loopback.
+     */
+    readonly credential?: WebuiCredential;
+  } = {},
 ): MiniAppProxyRegistry {
-  const startProxy = deps.start ?? startMiniAppProxy;
   const proxies = new Map<string, MiniAppProxy>();
+  let listener: Promise<MiniAppProxyHost> | undefined;
+  let port: number | undefined;
+
+  const ensureListener = async (): Promise<MiniAppProxyHost> => {
+    if (!listener) {
+      listener = startMiniAppProxyHost({
+        ...(deps.host !== undefined ? { host: deps.host } : {}),
+        ...(deps.port !== undefined ? { port: deps.port } : {}),
+        ...(deps.credential !== undefined ? { credential: deps.credential } : {}),
+      }).catch((error: unknown) => {
+        // A listener that could not bind is tried again on the next Mini App:
+        // the port may have been freed since.
+        listener = undefined;
+        throw error;
+      });
+    }
+    const bound = await listener;
+    port = bound.port;
+    return bound;
+  };
 
   return {
     running: () => [...proxies.values()],
-    async start(input) {
-      const pluginId = input.target.pluginId;
+    async start(registration) {
+      const pluginId = registration.target.pluginId;
       const existing = proxies.get(pluginId);
       if (existing) {
         proxies.delete(pluginId);
         await existing.close();
       }
-      const proxy = await startProxy(input);
+      const proxy = deps.start
+        ? await deps.start(registration)
+        : await (await ensureListener()).register(registration);
       proxies.set(pluginId, proxy);
       return proxy;
     },
@@ -52,12 +114,31 @@ export function createMiniAppProxyRegistry(
       await proxy.close();
     },
     async closeAll() {
-      const listeners = [...proxies.values()];
+      const registrations = [...proxies.values()];
       proxies.clear();
-      // One failing listener must not keep the others bound, so each is closed
-      // on its own and a failure is swallowed here: the service is going away,
-      // and a teardown that threw would leave the rest of the shutdown unrun.
-      await Promise.all(listeners.map((proxy) => proxy.close().catch(() => undefined)));
+      // One failing registration must not keep the others bound, so each is
+      // closed on its own and a failure is swallowed here: the service is going
+      // away, and a teardown that threw would leave the rest of the shutdown
+      // unrun.
+      await Promise.all(registrations.map((proxy) => proxy.close().catch(() => undefined)));
+      const bound = listener;
+      listener = undefined;
+      port = undefined;
+      if (!bound) return;
+      const host = await bound.catch(() => undefined);
+      await host?.close().catch(() => undefined);
     },
+    async prepare() {
+      if (deps.start) return;
+      try {
+        await ensureListener();
+      } catch (error) {
+        console.warn("[webui] the Mini App proxy could not bind its port", {
+          port: deps.port ?? DEFAULT_MINIAPP_PROXY_PORT,
+          message: String(error),
+        });
+      }
+    },
+    boundPort: () => port,
   };
 }

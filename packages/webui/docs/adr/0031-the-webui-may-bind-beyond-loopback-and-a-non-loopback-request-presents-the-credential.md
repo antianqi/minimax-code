@@ -19,6 +19,19 @@ that the loopback bind was standing in for is stated directly:
   page served on a non-loopback interface loads with no script and no styles.
 - The page is told to connect back over the address it was reached on, so a wildcard bind hands the
   browser the person's LAN address rather than `0.0.0.0`.
+- A Mini App's proxy follows the bind address too, and asks for the same credential. It keeps its own
+  origin — a separate port — so the framed document is still not same-origin with the WebUI, and the
+  credential never reaches the Mini App: the frame response turns it into a cookie and redirects the
+  document to a URL without it, and the proxy strips it from the path it forwards.
+- A refusal is legible. An upgrade the admission refuses is answered with a status line the browser can
+  read — `401` for a credential that does not match, `403` for a `Host` or an `Origin` that does not —
+  and the socket is ended rather than destroyed: a destroyed socket can drop the response, and the browser
+  then reports "WebSocket is closed before the connection is established" for every cause alike. The
+  service logs the status, the reason, the `Host` and the `Origin` of every refusal, and the Mini App
+  proxy logs the requests it turns away. The page asks the service once over HTTP when its own socket
+  fails, so it can say whether the service is gone, whether the credential in the address has expired —
+  the usual cause, since the credential is per start — or whether the handshake was refused for another
+  reason.
 
 ## Considered Options
 

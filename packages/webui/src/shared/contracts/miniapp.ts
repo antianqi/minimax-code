@@ -225,8 +225,15 @@ export interface WebuiMiniAppView {
 // pinned together by the bridge test.
 // ---------------------------------------------------------------------------
 
-/** Absolute path on the Mini App's proxy origin that serves the bridge script. */
-export const WEBUI_MINIAPP_BRIDGE_PATH = "/__miniapp/bridge.js";
+/**
+ * Absolute path on the Mini App's proxy origin that serves that Mini App's bridge script.
+ *
+ * The bridge is served per Mini App: it carries that Mini App's name, because
+ * the routes it stamps and the storage it namespaces are that Mini App's own.
+ */
+export function webuiMiniAppBridgePath(pluginId: string): string {
+  return `/__miniapp/${encodeURIComponent(pluginId)}/bridge.js`;
+}
 
 /** The page's append request, page → host. */
 export const WEBUI_MINIAPP_BRIDGE_APPEND_REQUEST = "mcode:miniapp:message-append" as const;

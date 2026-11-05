@@ -33,8 +33,8 @@ import {
   watchMiniAppPresenterOperation,
 } from "../miniapp.js";
 import {
-  startMiniAppProxy,
   type MiniAppProxy,
+  type MiniAppProxyStarter,
   type MiniAppProxyTarget,
 } from "../../miniapp/proxy.js";
 import {
@@ -168,13 +168,13 @@ export interface MiniAppHandlerOptions {
   /** The host-owned presenter whose open/close requests the browser must enact. */
   readonly presenter?: MiniAppPresenterView;
   /**
-   * Starts one plugin's loopback listener. Defaults to the real proxy.
+   * Registers one plugin on the shared Mini App listener. Defaults to the real proxy.
    *
    * A test substitutes a wrapper over the real one to observe which target a
-   * launch produced and whether the previous listener was closed, without owning
-   * the port a plugin's URL is derived from.
+   * launch produced and whether the previous registration was closed, without
+   * owning the published port.
    */
-  readonly startProxy?: typeof startMiniAppProxy;
+  readonly startProxy?: MiniAppProxyStarter;
   /**
    * The registry those listeners live in.
    *
@@ -263,14 +263,15 @@ export function createMiniAppHandlerEntries(
     return run;
   }
 
-  /** Replaces the plugin's listener, closing the old one before binding the new. */
+  /** Replaces the plugin's registration, dropping the old one first. */
   function replaceProxy(target: MiniAppProxyTarget): Promise<MiniAppProxy> {
     return proxies.start({
       target,
       // The page bridge is injected into the document the proxy serves, and it has
       // to be there before the page's own scripts run — the Mini App asks for
-      // `window.mcode.miniapp` as it boots.
-      bridge: miniAppPageBridge(),
+      // `window.mcode.miniapp` as it boots. It is that Mini App's own bridge:
+      // it carries the name the proxy routes this Mini App's requests by.
+      bridge: miniAppPageBridge(target.pluginId),
     });
   }
 

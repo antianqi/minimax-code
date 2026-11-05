@@ -630,7 +630,7 @@ describe("the proxy registry", () => {
     const address = upstream.address();
     const upstreamPort = typeof address === "object" && address ? address.port : 0;
 
-    const registry = createMiniAppProxyRegistry();
+    const registry = createMiniAppProxyRegistry({ port: 0 });
     const proxy = await registry.start({
       target: {
         pluginId: "registry.case",
@@ -639,8 +639,7 @@ describe("the proxy registry", () => {
         credential: "credential-value",
         credentialHeader: "x-mavis-miniapp-token",
       },
-      bridge: miniAppPageBridge(),
-      port: 0,
+      bridge: miniAppPageBridge("registry.case"),
     });
     expect(registry.running()).toHaveLength(1);
 
@@ -652,8 +651,10 @@ describe("the proxy registry", () => {
       }).on("error", reject);
     });
     // The bridge is in the document, before the page's own scripts.
-    expect(body).toContain("/__miniapp/bridge.js");
-    expect(body.indexOf("/__miniapp/bridge.js")).toBeLessThan(body.indexOf("dashboard"));
+    expect(body).toContain("/__miniapp/registry.case/bridge.js");
+    expect(body.indexOf("/__miniapp/registry.case/bridge.js")).toBeLessThan(
+      body.indexOf("dashboard"),
+    );
 
     const freedPort = proxy.port;
     await registry.closeAll();

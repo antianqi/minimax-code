@@ -83,14 +83,24 @@ export class WebuiWebSocketServer {
       this.context.browserBridge.handleUpgrade(request, socket, head);
       return;
     }
-    if (
-      !admitWebSocketUpgrade(request, url, socket, {
-        host: this.context.host,
-        tcpPort: this.context.boundTcpPort,
-        credential: this.context.credential,
-        dev: this.context.dev,
-      })
-    ) {
+    const admission = admitWebSocketUpgrade(request, url, socket, {
+      host: this.context.host,
+      tcpPort: this.context.boundTcpPort,
+      credential: this.context.credential,
+      dev: this.context.dev,
+    });
+    if (!admission.admitted) {
+      // A refusal that leaves no trace on the server, and says only "closed
+      // before the connection is established" in the browser, is
+      // indistinguishable from a network problem. The status and the reason
+      // are what turn it into a diagnosis — the credential of an earlier run
+      // and a foreign origin look identical from the browser's side.
+      console.warn("[webui] websocket upgrade refused", {
+        status: admission.status,
+        reason: admission.reason,
+        host: request.headers.host,
+        origin: request.headers.origin,
+      });
       return;
     }
     this.server.handleUpgrade(request, socket, head, (ws) => {

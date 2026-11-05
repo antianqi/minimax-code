@@ -67,41 +67,65 @@ export function admitWebSocketUpgrade(
   url: URL,
   socket: Duplex,
   context: WebuiAdmissionContext,
-): boolean {
+): WebuiAdmissionOutcome {
   const urlHost = normalizeHostname(url.hostname);
   const requestHost = (request.headers.host ?? "").toLowerCase();
   const requestHostname = hostnameFromHostHeader(requestHost);
   const requestOrigin = (request.headers.origin ?? "").toLowerCase();
   if (!requestHostname || !isAdmittedHost(requestHostname, context.host)) {
     rejectUpgrade(socket, 403, "Forbidden Host");
-    return false;
+    return { admitted: false, status: 403, reason: "Forbidden Host" };
   }
   if (!isAdmittedUrlHost(urlHost, requestHostname)) {
     rejectUpgrade(socket, 403, "Forbidden Host");
-    return false;
+    return { admitted: false, status: 403, reason: "Forbidden Host" };
   }
   if (
     requestOrigin &&
     !isAllowedOrigin(requestOrigin, requestHostname, context.tcpPort())
   ) {
     rejectUpgrade(socket, 403, "Forbidden Origin");
-    return false;
+    return { admitted: false, status: 403, reason: "Forbidden Origin" };
   }
   const presented = url.searchParams.get("token");
   if (
     credentialRequired(requestHostname, context.dev) &&
     !credentialPresented(context.credential, presented, request.headers.cookie)
   ) {
+    // The credential is per start, so a refused credential usually means the
+    // page still carries the token of an earlier run: the address has to be
+    // opened again from the one the service printed at startup.
     rejectUpgrade(socket, 401, "Unauthorized");
-    return false;
+    return { admitted: false, status: 401, reason: "Unauthorized" };
   }
-  return true;
+  return { admitted: true };
 }
 
+/**
+ * The outcome of an admission decision.
+ *
+ * The status and the reason travel with it so the caller can log *why* a
+ * connection was refused. A refusal that leaves no trace on the server and
+ * only says "closed before the connection is established" in the browser is
+ * indistinguishable from a network problem.
+ */
+export interface WebuiAdmissionOutcome {
+  readonly admitted: boolean;
+  readonly status?: number;
+  readonly reason?: string;
+}
+
+/**
+ * Refuse a WebSocket upgrade.
+ *
+ * The response is written and the socket is *ended*, not destroyed: a
+ * destroyed socket can drop the response before it reaches the browser, and
+ * the browser then reports the refusal as "WebSocket is closed before the
+ * connection is established" instead of the status that explains it.
+ */
 export function rejectUpgrade(socket: Duplex, status: number, reason: string): void {
   const reasonLine = reason.replace(/[\r\n]/gu, " ");
-  socket.write(`HTTP/1.1 ${status} ${reasonLine}\r\nConnection: close\r\n\r\n`);
-  socket.destroy();
+  socket.end(`HTTP/1.1 ${status} ${reasonLine}\r\nConnection: close\r\n\r\n`);
 }
 
 export function parseWebSocketUrl(rawUrl: string | undefined): URL | undefined {

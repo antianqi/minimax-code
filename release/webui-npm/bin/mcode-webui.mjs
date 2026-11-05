@@ -13,6 +13,7 @@ import {
   WebuiBrowserExtensionPackage,
   createMiniAppProxyRegistry,
   createMiniAppPresenter,
+  createWebuiCredential,
 } from "../server/server.js";
 import {
   WebuiTerminalManager,
@@ -27,6 +28,16 @@ const portValue = process.env.WEBUI_SERVER_PORT?.trim() || "2233";
 const tcpPort = Number(portValue);
 if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
   throw new Error("WEBUI_SERVER_PORT must be an integer between 1 and 65535");
+}
+// The port every Mini App is published on.
+//
+// One port for all of them: a Mini App that arrives in the store does not ask
+// the deployment for another firewall rule and another port forward. The Mini
+// Apps are told apart by the path they are served under.
+const miniappPortValue = process.env.WEBUI_MINIAPP_PORT?.trim() || "49152";
+const miniappPort = Number(miniappPortValue);
+if (!Number.isInteger(miniappPort) || miniappPort < 1 || miniappPort > 65535) {
+  throw new Error("WEBUI_MINIAPP_PORT must be an integer between 1 and 65535");
 }
 
 const dataDir = process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
@@ -176,7 +187,15 @@ await browserBridge.start();
 // would show the first.
 const browser = createBrowserAdapter({ dataDir, bridge: browserBridge });
 const miniAppPresenter = createMiniAppPresenter({});
-const miniappProxies = createMiniAppProxyRegistry();
+// The credential is created here because two listeners need it: the WebUI
+// service, which issues it, and the Mini App proxies, which ask for it when
+// they are bound beyond loopback (ADR 0031).
+const credential = createWebuiCredential();
+const miniappProxies = createMiniAppProxyRegistry({
+  host: bindHost,
+  port: miniappPort,
+  credential,
+});
 const assembled = await createWebuiRuntimeHost({
   dataDir,
   appVersion: version,
@@ -213,6 +232,7 @@ const service = new WebuiService({
   terminal,
   host: bindHost,
   tcpPort,
+  credential,
   dev: true,
   clientDir: path.join(packageRoot, "client"),
   browserBridge,
@@ -253,7 +273,14 @@ try {
     info.tcpPort,
     info.credential.token,
   );
+  // The Mini App listener is bound before the first Mini App opens: the
+  // runtime draws its own Mini App ports from the same range, and a listener
+  // that waited would lose this one.
+  await miniappProxies.prepare();
   console.log(`[mcode-webui] WebUI running at ${browserUrl}`);
+  console.log(
+    `[mcode-webui] Mini App port: ${miniappPort} — forward it, or a Mini App loads blank`,
+  );
   printAccess(info, bindHost);
   openBrowser(browserUrl);
   console.log("Press Ctrl+C to stop the server.");

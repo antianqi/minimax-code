@@ -27,6 +27,10 @@ import {
 } from "./platform/storage.js";
 import { createWebuiApplication } from "./application/create-application.js";
 import { readWebuiAppMode } from "./platform/app-mode.js";
+import {
+  diagnoseWebuiStartup,
+  type WebuiStartupDiagnosis,
+} from "./platform/startup-diagnosis.js";
 import { readWebuiBrowserAutoOpen } from "./platform/browser-auto-open.js";
 import { createWebuiComposerStore } from "./features/composer/application/composer-store.js";
 import { createWebuiPortSlices } from "./application/port-slices.js";
@@ -371,10 +375,52 @@ else void transport.version().then((version) => {
   }
   renderApplication();
 }).catch((reason: unknown) => {
-  root.render(<WebuiStartupFallback
-    reason={reason instanceof Error ? reason.message : String(reason)}
-    detail="页面与服务未能建立兼容连接，请检查服务版本或连接后刷新重试。"
-    onReload={() => location.reload()}
-  />);
+  void reportStartupFailure(runtimeConfig, reason, root);
 });
+}
+
+/**
+ * Say what the failed startup actually was.
+ *
+ * The page's only channel is the WebSocket, so a refusal leaves the browser
+ * with one sentence that fits every cause. One HTTP request separates the
+ * three that matter, and the surface then names the one that applies — a
+ * person on another machine cannot see the service's log, and "页面与服务未能
+ * 建立兼容连接" sends them nowhere.
+ */
+async function reportStartupFailure(
+  config: WebuiRuntimeConfig,
+  reason: unknown,
+  root: Root,
+): Promise<void> {
+  const diagnosis = await diagnoseWebuiStartup({
+    websocketUrl: config.websocketUrl,
+    token: config.token,
+  });
+  const technical = reason instanceof Error ? reason.message : String(reason);
+  console.warn(`${WEBUI_STALL_DIAGNOSTIC_PREFIX} startup-failure`, {
+    diagnosis,
+    reason: technical,
+  });
+  root.render(
+    <WebuiStartupFallback
+      reason={`${technical} (${diagnosis})`}
+      detail={startupFailureDetail(diagnosis)}
+      onReload={() => location.reload()}
+    />,
+  );
+}
+
+/**
+ * The sentence that says what to do about the diagnosis.
+ */
+function startupFailureDetail(diagnosis: WebuiStartupDiagnosis): string {
+  switch (diagnosis) {
+    case "credential_rejected":
+      return "服务可达，但这个地址里的访问凭证（token）已失效，通常是服务重启过。请从服务启动日志里复制带 token 的新地址重新打开。";
+    case "service_reachable":
+      return "服务可达，但 WebSocket 握手被拒绝。请检查中间代理或防火墙是否放通 WebSocket 升级请求，以及页面来源（Origin）是否与服务地址一致。";
+    default:
+      return "连不上服务。请确认地址、端口与网络是否可达；内网访问时确认防火墙放通了该端口。";
+  }
 }

@@ -38,7 +38,7 @@ app is three capabilities, and each has a browser-side counterpart.
    coordinate protocol the electron app needs to keep the native view aligned with the panel
    does not exist here.
 
-The proxy must listen on its own loopback origin, separate from the WebUI's own origin. Serving a
+The proxy must listen on its own origin, separate from the WebUI's own origin. Serving a
 Mini App from the WebUI's origin would make the iframe same-origin: it would then run in the
 WebUI's renderer process, so a hung Mini App page would hang the whole client, and the page could
 read the WebUI session token off its parent frame. A separate origin keeps the page in its own
@@ -46,6 +46,14 @@ process and keeps the client credential out of its reach. The Mini App view is t
 sandboxed; its isolation comes from origin separation, not from a sandbox attribute. That is the
 opposite of the workspace file preview, which deliberately renders an untrusted document in a
 sandboxed, opaque-origin iframe.
+
+The proxy's origin is the loopback interface by default. When the WebUI service is bound beyond
+loopback ([0031](0031-the-webui-may-bind-beyond-loopback-and-a-non-loopback-request-presents-the-credential)),
+the proxy follows that bind address so the framed document is reachable from the reader's machine
+too, and it asks for the same per-start credential: the framed URL carries it once, the frame
+response turns it into a cookie and redirects the document to a URL without it, and the Mini App's
+own requests carry the cookie from then on. The proxy strips the credential from the path it
+forwards, so the Mini App never sees it.
 
 The bridge travels to the page through the proxy's HTML rewrite, and its calls travel from the page
 to the client over `postMessage`. The client is the host of that conversation: it validates that the
@@ -402,19 +410,31 @@ than leaving them as fields this client always answers with `false` and `0`. `de
 lease exists for this plugin"; the revision increments each time a lease is acquired, which is the
 same property it has in the electron app — a fast detach and attach that a poll would otherwise miss.
 
-## The proxy is one listener per Mini App
+## The proxy is one listener for every Mini App
 
 A Mini App's page refers to its own origin by absolute path — the scaffold serves `/dashboard`, and a
-real page also fetches `/api/…`, its assets and relative URLs for the rest. A single proxy origin with
-a per-Mini-App path prefix would rewrite exactly the URLs the page asks for, and patching them back
-means intercepting `fetch`, `XMLHttpRequest` and every absolute URL in the document. The proxy is
-therefore one loopback listener per running Mini App: paths are forwarded unchanged to the Mini App's
-origin, the credential is injected on the way out, the document is rewritten on the way back to carry
-the bridge, and WebSocket upgrades are forwarded under the same rules. At most three Mini Apps run at
-once, so at most three listeners exist, which is also how the runtime already gives each Mini App a
-port of its own. That listener's port is allocated per plugin rather than in order of opening, for the
-same reason the runtime's own is deterministic: the page's origin is what keys its `localStorage` and
-`IndexedDB`, so a port that moved between runs would silently discard the page's own state.
+real page also fetches `/api/…`, its assets and relative URLs for the rest. The proxy is therefore one
+listener that every Mini App is served on, and the Mini Apps are told apart by the path they are served
+under (`/<pluginId>/…`) rather than by the port they answer on. The credential is injected on the way
+out, the document is rewritten on the way back to carry the bridge, and WebSocket upgrades are
+forwarded under the same rules.
+
+The prefix is a routing address, and the document is what carries it. A request under a prefix
+loses it on the way out, so the Mini App still serves the paths it wrote; a request that names no prefix
+— the root-absolute paths a page asks for — is answered by the Mini App that page belongs to, which the
+page says itself: the injected bridge stamps the Mini App's name on the requests it makes, and the
+browser's `Referer` names the document a subresource came from. The document's own root-absolute URLs
+are rewritten onto the prefix, because a page's module graph is the case that needs it: a script loaded
+at the root imports its siblings at the root as well, where the shared port cannot say whose they are.
+What the page's script asks for at runtime is left alone, and the stamp is additive, so the request the
+page made unchanged still reaches its Mini App.
+
+The listener is published on one fixed port, because a Mini App that arrives in the store must not ask
+the deployment for another firewall rule and another port forward.
+
+The cost of one origin is that the Mini Apps share it: their `localStorage` and `IndexedDB` are one
+store and their cookies are one jar. The bridge namespaces the storage per Mini App and the proxy
+namespaces the cookies per Mini App, so two Mini Apps do not read each other's state.
 
 ## One owner per Mini App across clients
 
@@ -467,10 +487,10 @@ separate origin from the client's, so the rest of its policy governs a document 
 client anyway. Nothing is added: no header the page did not ask for, no CSP of the proxy's own.
 
 The document is the one response the proxy rewrites. The page bridge has to be in the document before the
-page's own scripts run, so the proxy injects a script tag for it before `</head>`, or after the opening
-`<body>` tag when a page has no head, or ahead of the document when it has neither, and restates the
-`Content-Length` because the body it sends is not the body it received. Everything else — paths, methods,
-status codes, the page's own headers — passes through unchanged.
+page's own scripts run, so the proxy injects a script tag for it at the start of the head, or after the
+opening `<body>` tag when a page has no head, or ahead of the document when it has neither, and restates
+the `Content-Length` because the body it sends is not the body it received. Everything else — paths,
+methods, status codes, the page's own headers — passes through unchanged.
 
 ## Bridge request and error behavior
 

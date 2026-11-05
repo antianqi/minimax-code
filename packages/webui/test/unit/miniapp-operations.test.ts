@@ -4,11 +4,11 @@
  * Three operations, one runtime capability, and one seam that has to stay sealed:
  * `openMiniApp` starts a Mini App through the runtime facade and answers with the
  * **proxy's** URL — the Mini App's own origin, surface path and launch credential
- * never appear in a response. The proxy itself is real here (a listener on a
- * loopback port forwarding to a real upstream `http.Server`), so "one proxy per
- * plugin" is asserted against a listener that actually binds rather than against a
- * call count alone: a second listener on the same derived port could not bind at
- * all.
+ * never appear in a response. The proxy itself is real here (one listener on a
+ * loopback port forwarding to a real upstream `http.Server`), so "one Mini App
+ * per registration on the shared port" is asserted against a listener that
+ * actually binds rather than against a call count alone: a second listener on
+ * the same port could not bind at all.
  *
  * The runtime side is a scripted facade behind the harness port (evidence level
  * 3). What is *not* covered here: the runtime's own start/stop path, the
@@ -37,11 +37,12 @@ import {
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import type { WebuiOperationRegistryEntry } from "../../src/server/operation/operation-contract.js";
 import {
-  deriveMiniAppProxyPort,
-  startMiniAppProxy,
+  startMiniAppProxyHost,
   type MiniAppProxy,
+  type MiniAppProxyHost,
+  type MiniAppProxyRegistration,
+  type MiniAppProxyStarter,
   type MiniAppProxyTarget,
-  type StartMiniAppProxyInput,
 } from "../../src/server/miniapp/proxy.js";
 import { WebuiErrorCode } from "../../src/shared/envelope.js";
 import { createMiniAppPresenter } from "../../src/server/miniapp/presenter.js";
@@ -179,7 +180,7 @@ function bodyOf(outcome: Outcome): unknown {
 /** One handler set, invoked through the same validate → handle path the wire uses. */
 function createHandlers(
   port: WebuiOperationPort,
-  startProxy?: typeof startMiniAppProxy,
+  startProxy?: MiniAppProxyStarter,
 ): (name: string, body: unknown) => Promise<unknown> {
   const entries = createMiniAppHandlerEntries(port, startProxy ? { startProxy } : {});
   return async (name, body) => {
@@ -198,19 +199,26 @@ interface StarterRecord {
   closed: boolean;
 }
 
+/** The path segment a Mini App is served under. */
+function segmentOf(pluginId: string): string {
+  return encodeURIComponent(pluginId);
+}
+
 /**
  * The real proxy, with the lifecycle it reports made observable.
  *
- * Wrapping rather than replacing: the listener, its derived port and its
- * forwarding are the production ones, so a leak would be a real second listener
- * and not a simulated one.
+ * Wrapping rather than replacing: the shared listener, its port and its
+ * forwarding are the production ones, so a leak would be a real second
+ * listener and not a simulated one.
  */
 function countingStarter() {
   const records: StarterRecord[] = [];
-  const startProxy = async (input: StartMiniAppProxyInput): Promise<MiniAppProxy> => {
-    const proxy = await startMiniAppProxy(input);
+  let host: MiniAppProxyHost | undefined;
+  const startProxy = async (registration: MiniAppProxyRegistration): Promise<MiniAppProxy> => {
+    host ??= await startMiniAppProxyHost({ port: 0 });
+    const proxy = await host.register(registration);
     const record: StarterRecord = {
-      target: input.target,
+      target: registration.target,
       viewUrl: proxy.viewUrl,
       proxy,
       closed: false,
@@ -231,8 +239,10 @@ function countingStarter() {
       record.closed = true;
       await record.proxy.close();
     }
+    await host?.close();
+    host = undefined;
   };
-  return { records, startProxy, closeAll };
+  return { records, startProxy, closeAll, port: () => host?.port ?? 0 };
 }
 
 interface Fetched {
@@ -457,11 +467,12 @@ describe("openMiniApp over a real loopback proxy", () => {
     const handle = createHandlers(port, starter.startProxy);
     try {
       const body = await handle("openMiniApp", { pluginId: VIEW_PLUGIN });
-      const proxyPort = deriveMiniAppProxyPort(VIEW_PLUGIN);
+      const proxyPort = starter.port();
+      const viewPath = `/${segmentOf(VIEW_PLUGIN)}${SURFACE_PATH}`;
 
       expect(body).toEqual({
         pluginId: VIEW_PLUGIN,
-        viewUrl: `http://127.0.0.1:${proxyPort}${SURFACE_PATH}`,
+        viewUrl: `http://127.0.0.1:${proxyPort}${viewPath}`,
         // The generation this start issued: what a page-bridge call must echo to
         // prove it is still the document being served.
         connection: 1,
@@ -487,7 +498,7 @@ describe("openMiniApp over a real loopback proxy", () => {
         credential: CREDENTIAL,
         credentialHeader: MINIAPP_LOOPBACK_TOKEN_HEADER,
       });
-      const fetched = await get(`http://127.0.0.1:${proxyPort}/`);
+      const fetched = await get(`http://127.0.0.1:${proxyPort}${viewPath}`);
       expect(fetched.status).toBe(200);
       expect(fetched.body).toBe("from-upstream");
       expect(seen.at(-1)?.headers[MINIAPP_LOOPBACK_TOKEN_HEADER]).toBe(CREDENTIAL);
@@ -502,14 +513,16 @@ describe("openMiniApp over a real loopback proxy", () => {
     const { port, calls } = createFacade();
     const starter = countingStarter();
     const handle = createHandlers(port, starter.startProxy);
-    const proxyPort = deriveMiniAppProxyPort(REPLACE_PLUGIN);
+    const viewPath = `/${segmentOf(REPLACE_PLUGIN)}${SURFACE_PATH}`;
     try {
       const first = await handle("openMiniApp", { pluginId: REPLACE_PLUGIN });
+      const proxyPort = starter.port();
       calls.rotateCredential(REPLACE_PLUGIN, SECOND_CREDENTIAL);
       const second = await handle("openMiniApp", { pluginId: REPLACE_PLUGIN });
 
-      // Two opens, two starts, and the second bound the same derived port — which
-      // it could not have done had the first listener still been listening.
+      // Two opens, two starts, and the second took the same route on the one
+      // shared port — which it could not have done had the first route still
+      // been there.
       expect(calls.opened).toHaveLength(2);
       expect(starter.records).toHaveLength(2);
       expect(starter.records[0]?.closed).toBe(true);
@@ -527,12 +540,12 @@ describe("openMiniApp over a real loopback proxy", () => {
       expect(firstShape).toEqual(secondShape);
       expect(secondConnection).toBe(firstConnection + 1);
       expect((second as { readonly viewUrl: string }).viewUrl).toBe(
-        `http://127.0.0.1:${proxyPort}${SURFACE_PATH}`,
+        `http://127.0.0.1:${proxyPort}${viewPath}`,
       );
 
-      // The live listener is the replacement: it injects the credential the second
-      // launch issued, not the one the closed proxy was built with.
-      await get(`http://127.0.0.1:${proxyPort}/`);
+      // The live route is the replacement: it injects the credential the second
+      // launch issued, not the one the closed registration was built with.
+      await get(`http://127.0.0.1:${proxyPort}${viewPath}`);
       expect(seen.at(-1)?.headers[MINIAPP_LOOPBACK_TOKEN_HEADER]).toBe(SECOND_CREDENTIAL);
     } finally {
       await handle("stopMiniApp", { pluginId: REPLACE_PLUGIN }).catch(() => undefined);
@@ -587,22 +600,25 @@ describe("openMiniApp over a real loopback proxy", () => {
 });
 
 describe("stopMiniApp", () => {
-  it("stops the runtime, closes that plugin's proxy and leaves no listener behind", async () => {
+  it("stops the runtime and drops that plugin's registration", async () => {
     const { port, calls } = createFacade();
     const starter = countingStarter();
     const handle = createHandlers(port, starter.startProxy);
-    const proxyPort = deriveMiniAppProxyPort(STOP_PLUGIN);
+    const viewPath = `/${segmentOf(STOP_PLUGIN)}${SURFACE_PATH}`;
     try {
       const opened = await handle("openMiniApp", { pluginId: STOP_PLUGIN });
+      const proxyPort = starter.port();
       expect((opened as { readonly viewUrl: string }).viewUrl).toBe(
-        `http://127.0.0.1:${proxyPort}${SURFACE_PATH}`,
+        `http://127.0.0.1:${proxyPort}${viewPath}`,
       );
-      expect((await get(`http://127.0.0.1:${proxyPort}/`)).status).toBe(200);
+      expect((await get(`http://127.0.0.1:${proxyPort}${viewPath}`)).status).toBe(200);
 
       expect(await handle("stopMiniApp", { pluginId: STOP_PLUGIN })).toEqual({ success: true });
       expect(calls.stopped).toEqual([STOP_PLUGIN]);
       expect(starter.records[0]?.closed).toBe(true);
-      await expect(get(`http://127.0.0.1:${proxyPort}/`)).rejects.toThrow();
+      // The shared listener stays up for the other Mini Apps, so the stopped
+      // one answers nothing rather than refusing the connection.
+      expect((await get(`http://127.0.0.1:${proxyPort}${viewPath}`)).status).toBe(404);
 
       // A stop for a plugin that is not running is still a stop: the runtime is
       // asked, and there is no listener to close.

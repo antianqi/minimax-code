@@ -78,7 +78,9 @@ const EXPECTED: Record<
     "watchMiniAppAgentTurn", "watchMiniAppAgentObservations", "miniAppAgentCall",
     "watchMiniAppToolApprovals", "replyMiniAppToolApproval", "miniAppToolCall",
   ],
-  composer: ["runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem"],
+  composer: [
+    "runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem", "steerQueueItem",
+  ],
   interactions: [
     "listPendingPermissions", "getPendingQuestionnaire", "replyPermission",
     "replyQuestionnaire", "dismissQuestionnaire",

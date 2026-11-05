@@ -9,7 +9,7 @@
 // tests pin that only the framed document on the framed origin is answered, and
 // that a view URL which cannot be parsed answers nothing at all.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runInNewContext } from "node:vm";
 
 import {
@@ -23,6 +23,8 @@ import {
   WEBUI_MINIAPP_COMPOSER_MAX_TEXT_LENGTH,
 } from "../../src/shared/contracts/miniapp.js";
 import { miniAppPageBridge } from "../../src/server/miniapp/bridge.js";
+import { miniAppRouteShim } from "../../src/server/miniapp/route-shim.js";
+import { miniappFrameUrl } from "../../src/client/platform/miniapp-frame-url.js";
 
 const VIEW_URL = "http://127.0.0.1:49152";
 
@@ -64,7 +66,7 @@ describe("the injected page capability list", () => {
       disconnect() {}
     }
     const document = { documentElement: surface, body: surface };
-    runInNewContext(miniAppPageBridge().script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
+    runInNewContext(miniAppPageBridge("fixture.miniapp").script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
     const has = (window.mcode as { miniapp: { capabilities: { has(name: string): boolean } } })
       .miniapp.capabilities.has;
 
@@ -198,5 +200,120 @@ describe("a confirmed append", () => {
     expect(webuiMiniAppDraftWithAppend("", "x")).toBe("x");
     expect(webuiMiniAppDraftWithAppend("a", "x")).toBe("a\nx");
     expect(webuiMiniAppDraftWithAppend("a\n", "x")).toBe("a\nx");
+  });
+});
+
+describe("the framed URL", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps a loopback view URL as it is", () => {
+    expect(miniappFrameUrl("http://127.0.0.1:49152/page?mode=dashboard")).toBe(
+      "http://127.0.0.1:49152/page?mode=dashboard",
+    );
+  });
+
+  it("replaces a wildcard host with the host the page was reached at", () => {
+    // A page opened on a LAN address cannot fetch a wildcard, and the
+    // loopback address it would fall back to is the reader's own machine.
+    vi.stubGlobal("window", { location: { hostname: "192.168.1.129" } });
+    expect(miniappFrameUrl("http://0.0.0.0:49152/page?mode=dashboard")).toBe(
+      "http://192.168.1.129:49152/page?mode=dashboard",
+    );
+  });
+
+  it("keeps the proxy's own port, so the Mini App stays on its own origin", () => {
+    vi.stubGlobal("window", { location: { hostname: "192.168.1.129" } });
+    const framed = miniappFrameUrl("http://0.0.0.0:49152/page");
+    expect(new URL(framed).port).toBe("49152");
+    expect(new URL(framed).origin).not.toBe("http://192.168.1.129:2233");
+  });
+
+  it("keeps a view URL it cannot parse", () => {
+    expect(miniappFrameUrl("not a url")).toBe("not a url");
+  });
+});
+
+describe("the Mini App route shim", () => {
+  const LOCATION = {
+    href: "http://127.0.0.1:49152/fixture.miniapp/page",
+    host: "127.0.0.1:49152",
+    origin: "http://127.0.0.1:49152",
+  };
+
+  it("names the Mini App on the requests its own page makes", async () => {
+    const stamped: (string | null)[] = [];
+    const window = {
+      location: LOCATION,
+      fetch: (
+        _input: string,
+        init?: { readonly headers?: { get?: (name: string) => string | null } },
+      ) => {
+        stamped.push(init?.headers?.get?.("x-mcode-miniapp-route") ?? null);
+        return Promise.resolve({});
+      },
+    };
+    runInNewContext(miniAppRouteShim("fixture.miniapp"), { window, Headers, URL, Promise });
+
+    await window.fetch("/api/bootstrap");
+    expect(stamped[0]).toBe("fixture.miniapp");
+
+    // Another origin is another server's business: a header there would ask
+    // for a preflight the Mini App never made.
+    await window.fetch("https://elsewhere.example/api");
+    expect(stamped[1]).toBe(null);
+  });
+
+  it("names the Mini App in a socket URL, where a header cannot travel", () => {
+    const opened: string[] = [];
+    class FakeWebSocket {
+      constructor(url: string) {
+        opened.push(url);
+      }
+    }
+    const window = { location: LOCATION, WebSocket: FakeWebSocket };
+    runInNewContext(miniAppRouteShim("fixture.miniapp"), { window, URL, Promise });
+
+    new window.WebSocket("ws://127.0.0.1:49152/socket");
+    expect(opened[0]).toBe("ws://127.0.0.1:49152/socket?mcode_route=fixture.miniapp");
+  });
+
+  it("keeps each Mini App's own storage, on an origin they now share", () => {
+    const store = new Map<string, string>();
+    const window = {
+      location: LOCATION,
+      localStorage: {
+        get length() {
+          return store.size;
+        },
+        key: (index: number) => [...store.keys()][index] ?? null,
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value);
+        },
+        removeItem: (key: string) => {
+          store.delete(key);
+        },
+        clear: () => store.clear(),
+      },
+    };
+    runInNewContext(miniAppRouteShim("fixture.miniapp"), { window, URL, Promise, Proxy });
+
+    window.localStorage.setItem("theme", "dark");
+    expect([...store.keys()]).toEqual(["mcode.miniapp.fixture.miniapp.theme"]);
+    expect(window.localStorage.getItem("theme")).toBe("dark");
+    expect(window.localStorage.length).toBe(1);
+
+    // A page that reads a key as a property sees its own value, and one that
+    // lists the keys it holds sees its own keys.
+    expect((window.localStorage as unknown as Record<string, unknown>).theme).toBe("dark");
+    expect(Object.keys(window.localStorage)).toEqual(["theme"]);
+
+    // Another Mini App's key is not this Mini App's key.
+    store.set("mcode.miniapp.other.miniapp.theme", "light");
+    expect(window.localStorage.getItem("theme")).toBe("dark");
+    expect(window.localStorage.length).toBe(1);
+    expect(Object.keys(window.localStorage)).toEqual(["theme"]);
   });
 });

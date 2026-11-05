@@ -60,6 +60,7 @@ import {
   webuiMiniAppBridgeSenderAllowed,
 } from "../application/miniapp-bridge.js";
 import { createWebuiMiniAppAgentBridge } from "../application/miniapp-agent-bridge.js";
+import { miniappFrameUrl } from "../../../platform/miniapp-frame-url.js";
 import {
   WEBUI_MINIAPP_BRIDGE_TOOL_RESULT,
   type WebuiMiniAppToolApprovalPrompt,
@@ -421,7 +422,7 @@ export function MiniAppView({
    */
   useEffect(() => {
     if (presentation?.kind !== "open" || detached) return;
-    const viewUrl = presentation.viewUrl;
+    const viewUrl = miniappFrameUrl(presentation.viewUrl);
     const onMessage = (event: MessageEvent): void => {
       const request = webuiMiniAppBridgeRequest(event.data);
       if (!request) return;
@@ -575,7 +576,7 @@ export function MiniAppView({
    */
   useEffect(() => {
     if (presentation?.kind !== "open" || detached) return;
-    const viewUrl = presentation.viewUrl;
+    const viewUrl = miniappFrameUrl(presentation.viewUrl);
     const onMessage = (event: MessageEvent): void => {
       const request = webuiMiniAppToolRequest(event.data);
       if (!request) return;
@@ -632,7 +633,7 @@ export function MiniAppView({
    */
   useEffect(() => {
     if (!workflows || presentation?.kind !== "open" || detached) return;
-    const viewUrl = presentation.viewUrl;
+    const viewUrl = miniappFrameUrl(presentation.viewUrl);
     const connection = presentation.connection;
     const hostSessionId = sessionId ?? "";
     const agentHost = createWebuiMiniAppAgentBridge({
@@ -758,7 +759,7 @@ export function MiniAppView({
       style={frameStyle}
       allow={grantsMicrophone ? "microphone" : undefined}
       title={title ?? name}
-      src={presentation.viewUrl}
+      src={miniappFrameUrl(presentation.viewUrl)}
       onLoad={() => {
         frameLoadsRef.current += 1;
         if (reloadPendingRef.current) {

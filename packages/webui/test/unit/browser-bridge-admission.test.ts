@@ -99,7 +99,12 @@ describe("WebUI bridge admission — protocol surface", () => {
     const result = admitBrowserBridgeUpgrade(request, "/somewhere-else", socket as never, context);
     expect(result).toBeDefined();
     expect(result?.status).toBe(400);
-    expect(socket.destroyed).toBe(true);
+    // The refusal is written and the socket is ended, not destroyed: a
+    // destroyed socket can drop the response before it reaches the browser,
+    // which then reports the refusal as a closed connection instead of the
+    // status that explains it.
+    expect(socket.written.join("")).toContain("HTTP/1.1 400 Bad Request");
+    expect(socket.writableEnded).toBe(true);
   });
 
   it("refuses an upgrade when the path is missing", () => {

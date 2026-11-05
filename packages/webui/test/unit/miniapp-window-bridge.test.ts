@@ -60,7 +60,7 @@ function page() {
   // in needs its own timers: collecting them is what lets a test answer "the host never
   // replied" without waiting.
   const timers: Array<() => void> = [];
-  runInNewContext(miniAppPageBridge().script, {
+  runInNewContext(miniAppPageBridge("fixture.miniapp").script, {
     window,
     Map,
     Math,

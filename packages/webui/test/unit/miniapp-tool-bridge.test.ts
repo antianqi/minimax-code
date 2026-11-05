@@ -52,7 +52,7 @@ function page() {
     disconnect() {}
   }
   const document = { documentElement: surface, body: surface };
-  runInNewContext(miniAppPageBridge().script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
+  runInNewContext(miniAppPageBridge("fixture.miniapp").script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
   const tools = (
     window.mcode as {
       miniapp: {
@@ -94,7 +94,7 @@ describe("the tools a page can ask for", () => {
       disconnect() {}
     }
     const document = { documentElement: surface, body: surface };
-    runInNewContext(miniAppPageBridge().script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
+    runInNewContext(miniAppPageBridge("fixture.miniapp").script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
     const has = (window.mcode as { miniapp: { capabilities: { has(name: string): boolean } } })
       .miniapp.capabilities.has;
 

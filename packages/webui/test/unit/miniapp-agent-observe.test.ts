@@ -56,7 +56,7 @@ function page() {
     disconnect() {}
   }
   const document = { documentElement: surface, body: surface };
-  runInNewContext(miniAppPageBridge().script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
+  runInNewContext(miniAppPageBridge("fixture.miniapp").script, { window, Map, Math, Date, Promise, Error, document, MutationObserver: MutationObserverStub, WeakMap });
   const agent = (window.mcode as { miniapp: { agent: AgentApi } }).miniapp.agent;
 
   const deliver = (data: Record<string, unknown>) => {

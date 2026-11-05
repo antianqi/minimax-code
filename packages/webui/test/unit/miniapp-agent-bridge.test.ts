@@ -104,7 +104,7 @@ function openPage(): PageHarness {
     Promise,
     console,
   });
-  vm.runInContext(miniAppPageBridge().script, context);
+  vm.runInContext(miniAppPageBridge("fixture.miniapp").script, context);
   const mcode = pageWindow.mcode as {
     miniapp: { agent: Record<string, (...a: unknown[]) => Promise<unknown>> };
   };

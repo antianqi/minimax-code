@@ -19,8 +19,8 @@
 import {
   WEBUI_MINIAPP_BRIDGE_APPEND_REPLY,
   WEBUI_MINIAPP_BRIDGE_APPEND_REQUEST,
-  WEBUI_MINIAPP_BRIDGE_PATH,
   WEBUI_MINIAPP_COMPOSER_MAX_TEXT_LENGTH,
+  webuiMiniAppBridgePath,
 } from "../../shared/contracts/miniapp.js";
 import {
   WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
@@ -40,6 +40,7 @@ import {
   WEBUI_MINIAPP_BRIDGE_WINDOW_STATE,
 } from "../../shared/contracts/miniapp-window.js";
 import type { MiniAppPageBridge } from "./proxy.js";
+import { miniAppRouteShim } from "./route-shim.js";
 
 /**
  * The script the proxy serves at `WEBUI_MINIAPP_BRIDGE_PATH`.
@@ -495,7 +496,17 @@ const SCRIPT = `(function () {
 })();
 `;
 
-/** The bridge the proxy injects into every document it serves. */
-export function miniAppPageBridge(): MiniAppPageBridge {
-  return { path: WEBUI_MINIAPP_BRIDGE_PATH, script: SCRIPT };
+/**
+ * The bridge the proxy injects into one Mini App's documents.
+ *
+ * The script carries two halves: the route and storage shim, which tells the
+ * proxy whose requests these are and keeps this Mini App's storage its own,
+ * and the page bridge itself, which is what `window.mcode.miniapp` exposes.
+ * The shim comes first, so it is in place before the page's own scripts run.
+ */
+export function miniAppPageBridge(pluginId: string): MiniAppPageBridge {
+  return {
+    path: webuiMiniAppBridgePath(pluginId),
+    script: `${miniAppRouteShim(pluginId)}\n${SCRIPT}`,
+  };
 }

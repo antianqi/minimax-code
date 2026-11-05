@@ -2704,6 +2704,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/transcript/projection/settled-turn.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "transcript",
+      "home": "target"
+    },
+    {
       "path": "client/features/transcript/ui/ActivityIndicator.tsx",
       "layers": [
         "bindings"
@@ -3542,6 +3551,33 @@
     },
     {
       "path": "client/platform/wire.ts",
+      "layers": [
+        "infrastructure"
+      ],
+      "role": "platform",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/platform/miniapp-frame-url.ts",
+      "layers": [
+        "infrastructure"
+      ],
+      "role": "platform",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/platform/page-host.ts",
+      "layers": [
+        "infrastructure"
+      ],
+      "role": "platform",
+      "business": null,
+      "home": "target"
+    },
+    {
+      "path": "client/platform/startup-diagnosis.ts",
       "layers": [
         "infrastructure"
       ],
@@ -5287,6 +5323,15 @@
       "home": "outside"
     },
     {
+      "path": "server/miniapp/route-shim.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "server/operation/account.ts",
       "layers": [
         "server"
@@ -6053,6 +6098,15 @@
     },
     {
       "path": "shared/session-transfer-format.ts",
+      "layers": [
+        "shared"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "shared/random-id.ts",
       "layers": [
         "shared"
       ],

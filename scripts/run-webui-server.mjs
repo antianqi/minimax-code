@@ -60,12 +60,16 @@ if (!process.env.WEBUI_SERVER_TSX) {
     createOperationRegistry,
     createMiniAppProxyRegistry,
     createMiniAppPresenter,
+    createWebuiCredential,
   } = await import("../packages/webui/src/server/index.ts");
   const { BrowserBridgeServer, WebuiBrowserExtensionPackage } =
     await import("../packages/webui/src/server/browser-bridge/index.ts");
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
   const tcpPort = Number(process.env.WEBUI_SERVER_PORT ?? 2233);
+  // The port every Mini App is published on: one port for all of them, so a
+  // Mini App that arrives in the store does not ask for another port forward.
+  const miniappPort = Number(process.env.WEBUI_MINIAPP_PORT ?? 49152);
   // The address the service binds to. Loopback is the default; a wider
   // address publishes the WebUI beyond this machine, which ADR 0031 allows
   // and gates: a request that did not arrive over loopback presents the
@@ -144,7 +148,15 @@ if (!process.env.WEBUI_SERVER_TSX) {
   // go to both the operation registry and the service, which closes them on the
   // way down.
   const miniAppPresenter = createMiniAppPresenter({});
-  const miniappProxies = createMiniAppProxyRegistry();
+  // The credential is created here because two listeners need it: the WebUI
+  // service, which issues it, and the Mini App proxies, which ask for it when
+  // they are bound beyond loopback (ADR 0031).
+  const credential = createWebuiCredential();
+  const miniappProxies = createMiniAppProxyRegistry({
+    host: bindHost,
+    port: miniappPort,
+    credential,
+  });
   const assembled = await createWebuiRuntimeHost({
     dataDir,
     appVersion: "webui-dev",
@@ -185,6 +197,7 @@ const port = createHarnessPortFromHost(assembled.host, {
     terminal,
     host: bindHost,
     tcpPort,
+    credential,
     dev: true,
     clientDir,
     browserBridge,
@@ -203,7 +216,11 @@ const port = createHarnessPortFromHost(assembled.host, {
     miniappProxies,
   });
   const info = await service.start();
+  // The Mini App listener is bound before the first Mini App opens, so the
+  // runtime cannot take this port for one of its own Mini Apps first.
+  await miniappProxies.prepare();
   console.log(`[webui] server listening at ${info.boundUrl}`);
+  console.log(`[webui] Mini App port: ${miniappPort}`);
   printAccess(info, bindHost);
   const close = async () => {
     await service.close();

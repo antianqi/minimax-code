@@ -85,6 +85,23 @@ test("environment loading skeleton geometry", async ({ page }) => {
   expect(rowGeometry.slice(1).every((rect, index) => rect.top - rowGeometry[index].bottom >= 8)).toBe(true);
 });
 
+test("the open terminal action uses a terminal icon", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setResponse("getWorkspaceEnvironment", {
+    isGitRepo: true,
+    branch: "synthetic-terminal-icon",
+    changedFiles: 0,
+    insertions: 0,
+    deletions: 0,
+    lineStatsStatus: "ready",
+  }));
+  await openApp(page);
+  await attachLiveTurn(page);
+
+  const action = page.getByRole("button", { name: "打开终端" });
+  await expect(action).toBeVisible();
+  await expect(action.locator("svg path")).toHaveCount(3);
+});
+
 test("the workspace commit dialog completes the shared exit motion before unmounting", async ({ page }) => {
   await configureFixture(page, () => window.__fixture.setResponse("getWorkspaceEnvironment", {
     isGitRepo: true,

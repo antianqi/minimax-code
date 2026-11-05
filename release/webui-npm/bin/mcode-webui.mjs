@@ -2,12 +2,14 @@
 
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   WebuiService,
   createOperationRegistry,
   BrowserBridgeServer,
+  WebuiBrowserExtensionPackage,
   createMiniAppProxyRegistry,
   createMiniAppPresenter,
 } from "../server/server.js";
@@ -147,6 +149,18 @@ const service = new WebuiService({
   dev: true,
   clientDir: path.join(packageRoot, "client"),
   browserBridge,
+  // The extension this package hands out.
+  //
+  // Nobody installs it from a store — the person downloads it from Settings and
+  // loads it unpacked — so the build ships inside this package and is served
+  // from here. A host with no sources to build from points the service at the
+  // build it carries (`builtDir`); without this the download route answers 404
+  // and the button in Settings does nothing, which reads like a broken page
+  // rather than a missing package.
+  browserExtensionPackage: new WebuiBrowserExtensionPackage({
+    builtDir: path.join(packageRoot, "extension"),
+    scratchDir: path.join(dataDir, "tmp"),
+  }),
   // Closed on shutdown: a leaked Mini App listener holds a plugin's derived port.
   miniappProxies,
 });
@@ -168,10 +182,57 @@ try {
   // endpoint; browsers need the http:// origin.
   const browserUrl = `http://${info.host}:${info.tcpPort}/`;
   console.log(`[mcode-webui] WebUI running at ${browserUrl}`);
+  openBrowser(browserUrl);
   console.log("Press Ctrl+C to stop the server.");
   process.once("SIGINT", () => void close().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void close().finally(() => process.exit(0)));
 } catch (error) {
   await close();
   throw error;
+}
+
+/**
+ * Open the WebUI in the person's default browser.
+ *
+ * The command exists to bring up a page, so printing a URL for someone to copy
+ * is the step it removes. `WEBUI_OPEN_BROWSER` decides it:
+ *
+ * - unset: open only when stdout is a terminal. A verification run, a CI job or
+ *   a supervisor that pipes this process's output must not take over the
+ *   desktop, and "piped" is exactly what those look like.
+ * - `0` / `false` / `no` / `off` / `never`: never open, even from a terminal.
+ * - anything else: open even without a terminal, for a launcher that wants the
+ *   page up.
+ *
+ * A launcher that is missing or refuses the URL is reported and nothing more.
+ * The server is already serving by this point, and failing the run because a
+ * browser could not start would turn a convenience into an outage.
+ */
+function openBrowser(url) {
+  const setting = process.env.WEBUI_OPEN_BROWSER?.trim().toLowerCase();
+  const disabled = setting === "0" || setting === "false" || setting === "no" || setting === "off" || setting === "never";
+  const enabled = setting === undefined || setting === "" ? Boolean(process.stdout.isTTY) : !disabled;
+  if (!enabled) return;
+  // Each platform names its launcher differently, and Windows' `start` is a
+  // shell builtin, so it needs a command interpreter in front of it. The empty
+  // argument is `start`'s window-title slot: without it a quoted URL is read as
+  // the title and no browser opens.
+  const [command, args] = process.platform === "darwin"
+    ? ["open", [url]]
+    : process.platform === "win32"
+      ? ["cmd", ["/c", "start", "", url]]
+      : ["xdg-open", [url]];
+  try {
+    const child = spawn(command, args, { stdio: "ignore", detached: true });
+    child.on("error", (error) => {
+      console.warn(`[mcode-webui] could not open a browser (${command}): ${error.message}`);
+      console.warn(`[mcode-webui] open ${url} yourself, or set WEBUI_OPEN_BROWSER=0 to stop this attempt.`);
+    });
+    // Detached so the browser is not a child of this server: closing the page
+    // must not signal the process, and stopping the server must not close the
+    // page the person is still reading.
+    child.unref();
+  } catch (error) {
+    console.warn(`[mcode-webui] could not open a browser (${command}): ${error.message}`);
+  }
 }

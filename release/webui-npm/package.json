@@ -15,6 +15,7 @@
     "assets/",
     "bin/",
     "client/",
+    "extension/",
     "server/",
     "LICENSE",
     "NOTICE",

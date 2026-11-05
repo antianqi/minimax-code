@@ -52,6 +52,15 @@ export {
   readAllowedExtensionIds,
   type BrowserBridgeServerOptions,
 } from "./browser-bridge/server.js";
+// The download the person installs into their own browser. A host that ships
+// the built extension rather than its sources points this at the build it
+// carries, and the composition root then hands it to the service, which is the
+// only place the download route is wired.
+export {
+  WebuiBrowserExtensionPackage,
+  type WebuiBrowserExtensionArchive,
+  type WebuiBrowserExtensionPackageOptions,
+} from "./browser-bridge/extension-package.js";
 export {
   WEBUI_PROTOCOL_VERSION,
   WebuiErrorCode,

@@ -7,7 +7,7 @@ import {
   useWebuiWorkspacePanelSurface,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
-import { WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconFile, WebuiIconRunLocation } from "../../../shell/icons.js";
+import { WebuiIconCheck, WebuiIconChevronDown, WebuiIconClose, WebuiIconFile, WebuiIconRunLocation, WebuiIconWorkspaceTerminal } from "../../../shell/icons.js";
 import { WebuiAgentAvatar } from "../../../ui/agent-avatar.js";
 import { WebuiField, WebuiTextarea, useWebuiFormValidation } from "../../../ui/field.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
@@ -188,7 +188,7 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
         <WebuiIconFile className="size-5" /><span>{PROGRESS_COPY.commit}</span>
       </WebuiButton>
       <WebuiButton variant="selectable-row" size="rail" className="webui-environment-action" onClick={onOpenTerminal} disabled={!onOpenTerminal}>
-        <WebuiIconRunLocation className="size-5" /><span>{PROGRESS_COPY.openTerminal}</span>
+        <WebuiIconWorkspaceTerminal className="size-5" /><span>{PROGRESS_COPY.openTerminal}</span>
       </WebuiButton>
     </div>
   </div>;

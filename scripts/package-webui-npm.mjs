@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import { spawnSync } from "node:child_process";
 import {
   cpSync,
   mkdirSync,
@@ -8,7 +9,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readStoreExtensionIds } from "./lib/extension-identity.mjs";
+import { extensionIdFromPublicKey, readStoreExtensionIds } from "./lib/extension-identity.mjs";
 import { copyLocalRuntimeAssets } from "./lib/local-runtime-assets.mjs";
 import { copyMcodeToolsArtifact } from "./lib/mcode-tools-artifact.mjs";
 import { readExtraction } from "./lib/release-metadata.mjs";
@@ -139,23 +140,49 @@ cpSync(path.join(root, "release/webui-npm/README.md"), path.join(outdir, "README
 cpSync(path.join(root, "release/webui-npm/bin"), path.join(outdir, "bin"), { recursive: true });
 cpSync(path.join(root, "release/webui-npm/package.json"), path.join(outdir, "package.json"));
 
-// The published extension this package is built for.
+// The extension the WebUI hands out from its own download button.
 //
-// A store build's identity is derived from the store's public key, so it is
-// a build-time constant: the id the browser will assign to the published
-// extension is known here, at package time, without asking the person who
-// installs the package. The id is written into the package so the packaged
-// host admits the published extension with no configuration at all.
+// This package is distributed self-hosted: nobody installs the extension from a
+// store, the person downloads it from Settings and loads it unpacked. Two
+// consequences follow, and both are this script's job.
 //
-// It was previously an environment variable instead, which asked the person
-// who installed the package to supply an identity the package already knew —
-// and which they had no way of learning, because it is a constant of the
-// release rather than a property of their machine.
+// The build has to travel with the package. A packaged host has no sources to
+// build from, so a package that ships only the server answers the download
+// route with 404 and the button in Settings does nothing.
 //
-// A missing public key leaves the package without a published identity, and
-// the packaged host then admits nothing. That is said out loud here rather
-// than left to be discovered by a refused connection.
-const storeExtensionIds = readStoreExtensionIds(process.env);
+// The identity has to be decided here. An extension's id is derived from the
+// public key its build carries in `manifest.key`, so a build that carries one
+// gets the same id on every machine no matter which directory it is loaded
+// from — which is what makes `bin/store-extension-ids.json` able to name it
+// without a store and without an operator's configuration.
+//
+// The build runs here rather than being copied from a working tree: the archive
+// a person downloads is then the one this package was made from, and a stale
+// `dist/` cannot be shipped by accident.
+const extensionSourceDir = path.join(root, "packages/browser-extension");
+const extensionBuild = spawnSync(
+  process.execPath,
+  [path.join(extensionSourceDir, "scripts/build.mjs")],
+  { cwd: extensionSourceDir, stdio: "inherit" },
+);
+if (extensionBuild.status !== 0) {
+  throw new Error(`browser extension build failed (exit ${extensionBuild.status ?? "signal"})`);
+}
+cpSync(path.join(extensionSourceDir, "dist"), path.join(outdir, "extension"), { recursive: true });
+
+// The identities this package admits, with nothing configured.
+//
+// The extension it ships carries a public key in its manifest, so the id that
+// build will have in the person's browser is a build-time constant: it is
+// derived here by the same function the host uses to read the same key. A store
+// key in the environment is still read, for the case where a package is built
+// against a store build instead; the shipped extension wins where the two
+// disagree, because it is the extension this package actually hands out.
+//
+// A package with no identity at all admits nobody, so that is said out loud
+// rather than left to be discovered by a refused connection.
+const shippedExtensionIds = readShippedExtensionIds(path.join(outdir, "extension/manifest.json"));
+const storeExtensionIds = { ...readStoreExtensionIds(process.env), ...shippedExtensionIds };
 writeFileSync(
   path.join(outdir, "bin", "store-extension-ids.json"),
   `${JSON.stringify(storeExtensionIds, null, 2)}\n`,
@@ -163,7 +190,7 @@ writeFileSync(
 );
 if (Object.keys(storeExtensionIds).length === 0) {
   console.warn(
-    "[package-webui-npm] no store public key is in the environment, so the package carries no published extension identity; the packaged host will refuse every extension until one is provided.",
+    "[package-webui-npm] the shipped extension carries no key and no store public key is in the environment, so the package carries no extension identity; the packaged host will refuse every extension until one is provided.",
   );
 }
 const packageJsonPath = path.join(outdir, "package.json");
@@ -177,3 +204,26 @@ metafile.artifactRoot = path.relative(root, outdir);
 metafile.integrity = recordBuildIntegrity(root, metafile);
 checkWebuiBuild(root, metafile, { packaged: true });
 console.log(`Packed ${packageJson.name}@${version} at ${outdir}`);
+
+/**
+ * The identities a package admits because of the extension it ships.
+ *
+ * `manifest.key` is a public key and the browser derives the extension's id
+ * from it, so a build carrying one has the same id everywhere — the derivation
+ * is `extensionIdFromPublicKey`, which the host reads the same file with.
+ *
+ * Both surfaces are named because the same build is loaded in Chrome and in
+ * Edge, and a key-derived id is identical in both.
+ */
+function readShippedExtensionIds(manifestPath) {
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch {
+    return {};
+  }
+  const key = typeof manifest.key === "string" ? manifest.key.trim() : "";
+  if (key.length === 0) return {};
+  const id = extensionIdFromPublicKey(key);
+  return { chrome: id, edge: id };
+}

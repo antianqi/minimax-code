@@ -363,7 +363,9 @@ export function WebuiWorkspaceTabStrip({
   }, [watchKey, dispatch, runScope]);
 
   return (
-    <div className="webui-workspace-tab-list" data-testid="workspace-tab-strip" ref={tabListRef}>
+    // The tab list is the row that owns the tabs, so it is the element that says
+    // `tablist`: a wrapper above it would own a plain div rather than the tabs.
+    <div className="webui-workspace-tab-list" role="tablist" aria-label="工作区面板标签" data-testid="workspace-tab-strip" ref={tabListRef}>
       {state.tabs.map((item) => (
         <WebuiMotionSlot key={item.id} kind="feedback">
         <div

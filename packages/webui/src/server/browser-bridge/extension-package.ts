@@ -10,7 +10,7 @@
 // person hands the browser, and because a store build is a zip too.
 
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -119,7 +119,13 @@ async function zipDirectory(
   fileName: string,
   scratchDir: string | undefined,
 ): Promise<Uint8Array | undefined> {
-  const scratch = await mkdtemp(path.join(scratchDir ?? tmpdir(), "webui-extension-"));
+  // The scratch directory is the host's, and a host may hand us one it has not
+  // created yet: a packaged host derives it from its data directory, which on a
+  // fresh machine does not exist until something writes there. Creating it here
+  // is what makes the first download work rather than the second.
+  const scratchParent = scratchDir ?? tmpdir();
+  await mkdir(scratchParent, { recursive: true });
+  const scratch = await mkdtemp(path.join(scratchParent, "webui-extension-"));
   const archivePath = path.join(scratch, fileName);
   try {
     const code = await run("zip", ["-r", "-q", archivePath, "."], directory);

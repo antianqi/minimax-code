@@ -739,7 +739,9 @@ test("Agent add form is centered, fields are aligned and backdrop dismissal work
     name: "local-agent",
     description: "A synthetic local agent",
     systemPrompt: "Use only the local test workspace.",
-    initialDefinition: { model: "stub-model" },
+    // The agent form writes the picker's only format, `providerId/modelId`: the
+    // runtime's canonical agent.md rejects a bare model id.
+    initialDefinition: { model: "fixture/stub-model" },
   });
   await expect(reopened).toHaveCount(0);
 });

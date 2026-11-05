@@ -875,7 +875,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   return <WebuiPage as="aside" kind="panel" present={!panelClosing} motion={{ kind: "panel", state: expansionMotion ?? "enter", direction: "right" }} ref={panelRef} className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelClosing ? "is-closing" : ""}`} onExitComplete={handlePanelExitComplete} style={panelWidth !== undefined && !state.expanded && surfaceTier === "split" ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab} data-webui-surface-tier={surfaceTier}>
     <div className="webui-workspace-panel-resize-handle" role="separator" aria-label="调整工作区面板宽度" aria-orientation="vertical" aria-valuenow={Math.round(panelWidth ?? 50)} tabIndex={state.expanded ? -1 : 0} onPointerDown={startPanelResize} onPointerMove={movePanelResize} onPointerUp={stopPanelResize} onPointerCancel={stopPanelResize} onKeyDown={nudgePanelResize} />
     <div className="webui-workspace-panel-header">
-      <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">
+      <div className="webui-workspace-tabs">
         <WebuiWorkspaceTabStrip state={state} dispatch={panelDispatch} sessionId={sessionId} />
       </div>
       <div className="webui-workspace-panel-actions">

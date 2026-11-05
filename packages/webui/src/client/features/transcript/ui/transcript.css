@@ -696,12 +696,26 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Measured against the surface these counters sit on. The status tokens they
+   * used carried 2.72:1 (green_400) and 3.77:1 (red_400) on white, and 3.62:1
+   * (red_500) on the dark surface — under the 4.5:1 a 12px counter needs, which
+   * the accessibility scan reports as colour-contrast. Same palette, one step
+   * darker in the light theme and one step lighter in the dark one: 6.88:1 and
+   * 6.24:1 light, 7.45:1 and 5.74:1 dark. */
   .webui-diff-add {
-    color: var(--code-theme-addition-foreground, var(--text_status_success));
+    color: var(--green_700);
   }
 
   .webui-diff-del {
-    color: var(--code-theme-deletion-foreground, var(--text_status_error));
+    color: var(--red_600);
+  }
+
+  .dark .webui-diff-add {
+    color: var(--green_300);
+  }
+
+  .dark .webui-diff-del {
+    color: var(--red_300);
   }
 
   .webui-diff-files {

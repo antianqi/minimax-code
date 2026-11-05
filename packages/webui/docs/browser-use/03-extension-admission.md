@@ -96,6 +96,39 @@ requires no extension id, no environment variable and no restart with a hand-wri
 store allowlist variables remain for a self-hosted store build, and they add to the published
 identity rather than replacing it.
 
+## The self-hosted build pins its own identity
+
+**`implemented`.** This distribution has no store. The person downloads the extension from Settings
+and loads it unpacked, so the packaged host has to admit a build that no store issued.
+
+An unpacked build with no key in its manifest gets an id derived from the **directory** it was loaded
+from — a different identity on every machine, and the reason the packaged host could not admit one.
+A manifest that carries `key` does not work that way: the browser derives the id from the key, which
+is what that field is for ("maintains the unique ID of an extension … when it is loaded during
+development", Chrome's manifest reference). One key, one id, from any directory on any machine.
+
+So the build that ships in the package carries a key, and the package decides its identity from that
+same key at package time:
+
+| Step | Where |
+| --- | --- |
+| The extension's source manifest carries a fixed `key` | `packages/browser-extension/manifest.json` |
+| Packaging builds the extension and copies the build into the artifact | `scripts/package-webui-npm.mjs`, `extension/` |
+| The derived id is written into the package | `bin/store-extension-ids.json`, by `extensionIdFromPublicKey` |
+| The packaged host serves that build from its own download button | `release/webui-npm/bin/mcode-webui.mjs`, `browserExtensionPackage` |
+
+Measured end to end, not reasoned about: the archive downloaded from a packaged host was unpacked and
+loaded into a real Chromium, which assigned `clhddcofpopmlmnjfmbjonhmcpnehpdi` — the id the same
+package wrote into `bin/store-extension-ids.json`. A WebSocket upgrade to that host's
+`/browser-bridge` from that origin was accepted; the same upgrade from an id the package does not name
+was refused with `403 Forbidden Origin`.
+
+Two consequences worth stating. The key is public — it is in the manifest of every downloaded copy —
+so the identity is not a secret; what admits a client is the id **plus** the pairing proof
+([`04-pairing-credentials.md`](04-pairing-credentials.md)), and the id only narrows who may attempt it.
+And the pin is permanent: changing the key later changes the id, so every installed copy would have to
+be reloaded from a new download.
+
 ## The development host learns the identity it is given
 
 The same reasoning applies to a development host, and for a stronger reason. An unpacked build's id
@@ -253,10 +286,11 @@ stale extension is the failure that reads like a network timeout and costs an af
 | The person is offered it in one place | `implemented` — 浏览器 → 下载最新扩展包, `packages/webui/src/client/features/browser/ui/BrowserSettingsPage.public.tsx` |
 | A host with no extension says so | `implemented` — the route answers `404`, never an empty archive, because an empty package reads like a download that worked |
 
-Loading the package costs one thing, and the Settings page says so: an unpacked extension's id is
-derived from the folder it is loaded from, so a new folder is a **new identity**. The person pairs
-it again with the installation key from the same Settings page, and the development host learns the
-new identity from that proof rather than from a configuration the person cannot know.
+Loading the package costs one thing: the pairing proof. The shipped build carries a fixed key, so a
+new folder is **not** a new identity — the host that ships it admits the build wherever it was
+unpacked. What the person does once is pair the extension with the installation key from the Settings
+page; a development host learns an identity it does not know from that proof rather than from a
+configuration the person cannot know, and the packaged host does not need to learn anything.
 
 ## Related
 

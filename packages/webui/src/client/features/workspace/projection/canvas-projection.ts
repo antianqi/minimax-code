@@ -10,6 +10,7 @@
 
 import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../../../shared/contracts/canvas.js";
 import type { WebuiCanvasDocument } from "../../../../shared/contracts/canvas.js";
+import { randomId } from "../../../../shared/random-id.js";
 
 export const DESKTOP_COPY = {
   canvasEmptyTitle: "把文件放到画布上",
@@ -264,11 +265,7 @@ export function createCanvasNodeId(): string {
 // it working. Same shape as `webuiClientRequestId` in
 // `client/features/sessions/projection/action-requests.public.ts`.
 function randomCanvasId(prefix: string): string {
-  const webCrypto = typeof crypto !== "undefined" ? crypto : undefined;
-  const unique = typeof webCrypto?.randomUUID === "function"
-    ? webCrypto.randomUUID()
-    : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-  return `${prefix}_${unique}`;
+  return `${prefix}_${randomId()}`;
 }
 
 /**

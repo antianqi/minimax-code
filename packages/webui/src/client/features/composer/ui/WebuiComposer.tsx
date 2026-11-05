@@ -33,6 +33,7 @@ import {
 import { WebuiComposerPermissionControl } from "./ComposerPermissionControl.js";
 import { WebuiComposerProjectRow } from "./ComposerProjectRow.js";
 import { WebuiFileInput, WebuiTextarea } from "../../../ui/field.js";
+import { randomId } from "../../../../shared/random-id.js";
 import { FeedbackBusy } from "../../../ui/feedback.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
@@ -1249,7 +1250,7 @@ export function WebuiComposer({
                       const end = event.currentTarget.selectionEnd;
                       composerInput.setPendingCaret(start);
                       onDraftChange(`${draft.slice(0, start)}${draft.slice(end)}`);
-                      setUrlReferences((current) => [...current, { id: crypto.randomUUID(), url: pastedText }]);
+                      setUrlReferences((current) => [...current, { id: randomId(), url: pastedText }]);
                     }
                   }}
                   onClick={(event) => {

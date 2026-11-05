@@ -39,6 +39,7 @@ import {
   unrefTimer,
 } from "./connection-health.js";
 import type { WebuiRuntimeEvent } from "../../shared/contracts/stream.js";
+import { randomId } from "../../shared/random-id.js";
 import { VERSION_OPERATION_NAME } from "../../shared/operation-names.js";
 import {
   decodeWebuiServerFrame,
@@ -351,7 +352,7 @@ export function createWebuiEventChannel(
       setState({ kind: "connecting" });
       const ws = new webSocket(websocketUrl());
       socket = ws;
-      const requestId = crypto.randomUUID();
+      const requestId = randomId();
       probedRequestId = requestId;
       // Fires when the server *accepts* the `watchEvents` request, not when
       // the socket is created and not when the request is written. It is an

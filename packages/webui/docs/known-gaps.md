@@ -76,10 +76,10 @@ Two things about this remain **unverified**:
   `mcode-tools-master` skill. Making the CLI work does not make the model reach for it. The original
   investigation observed this on a persisted transcript; no run on the current build has been
   recorded.
-- **No access-control decision exists.** A loopback-reachable browser surface with the connector
-  broker can call every App the user has connected on this machine. That is the same class of
-  concern ADR 0004 addresses by binding loopback-only, and it is not covered by an ADR. See
-  `open-questions.md`.
+- **No access-control decision exists.** A browser surface with the connector broker can call
+  every App the user has connected on this machine. That is the same class of concern ADR 0004 and
+  ADR 0031 address by binding the service and gating a non-loopback request with the per-start
+  credential, and it is not covered by an ADR. See `open-questions.md`.
 
 ## 2. Services gated to the Electron owner
 

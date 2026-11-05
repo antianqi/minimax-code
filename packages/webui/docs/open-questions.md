@@ -42,10 +42,10 @@ loopback-reachable browser page can call every App the user has connected on thi
 
 - **What a decision would change:** whether the beta feature stays the only gate, whether a
   per-surface permission is introduced, or whether connector access stays off for this client.
-- **Why it is not a mechanical fix:** ADR 0004 binds the service to loopback and validates Host and
-  Origin, which protects against other machines, not against a local page or a second local user. The
-  same question class was already recorded for Computer Use; the answer there does not transfer
-  automatically.
+- **Why it is not a mechanical fix:** ADR 0004 and ADR 0031 bind the service and validate Host,
+  Origin and the per-start credential, which protects against other machines reaching the port, not
+  against a local page or a second local user. The same question class was already recorded for
+  Computer Use; the answer there does not transfer automatically.
 
 ## 4. Is `titleSafetyBypass: true` the WebUI's permanent value?
 

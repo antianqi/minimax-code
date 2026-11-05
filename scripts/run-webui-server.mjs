@@ -66,6 +66,11 @@ if (!process.env.WEBUI_SERVER_TSX) {
   const dataDir =
     process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
   const tcpPort = Number(process.env.WEBUI_SERVER_PORT ?? 2233);
+  // The address the service binds to. Loopback is the default; a wider
+  // address publishes the WebUI beyond this machine, which ADR 0031 allows
+  // and gates: a request that did not arrive over loopback presents the
+  // per-start credential, so the printed URL carries it.
+  const bindHost = process.env.WEBUI_HOST?.trim() || "127.0.0.1";
   const clientDir = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "../dist-webui/client",
@@ -178,6 +183,7 @@ const port = createHarnessPortFromHost(assembled.host, {
     port,
     operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies, miniAppPresenter),
     terminal,
+    host: bindHost,
     tcpPort,
     dev: true,
     clientDir,
@@ -198,6 +204,7 @@ const port = createHarnessPortFromHost(assembled.host, {
   });
   const info = await service.start();
   console.log(`[webui] server listening at ${info.boundUrl}`);
+  printAccess(info, bindHost);
   const close = async () => {
     await service.close();
     await browser.close();
@@ -230,4 +237,55 @@ const port = createHarnessPortFromHost(assembled.host, {
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
+
+  /**
+   * The path a person opens, with the per-start credential on it.
+   *
+   * The token is not decoration: a request that did not arrive over loopback
+   * has to present it, so the printed path is the one that works from every
+   * address the service answers at.
+   */
+  function accessUrl(host, port, token) {
+    const literal = host.includes(":") ? `[${host}]` : host;
+    return `http://${literal}:${port}/?token=${token}`;
+  }
+
+  /**
+   * Print how to reach the service.
+   *
+   * A loopback bind is one address; a wildcard bind is every address this
+   * machine has. Either way the printed path carries the credential.
+   */
+  function printAccess(info, bindHost) {
+    const port = info.tcpPort;
+    const token = info.credential.token;
+    console.log(`[webui] credential token: ${token}`);
+    if (isWildcardBindAddress(bindHost)) {
+      console.log(`[webui] open ${accessUrl("127.0.0.1", port, token)}`);
+      const addresses = lanAddresses();
+      if (addresses.length === 0) {
+        console.log("[webui] no LAN address found; set WEBUI_HOST to the address to publish.");
+      }
+      for (const address of addresses) {
+        console.log(`[webui] open ${accessUrl(address, port, token)}`);
+      }
+      return;
+    }
+    console.log(`[webui] open ${accessUrl(bindHost, port, token)}`);
+  }
+
+  function isWildcardBindAddress(host) {
+    return host === "0.0.0.0" || host === "::" || host === "";
+  }
+
+  /** The routable IPv4 addresses of this machine, loopback excluded. */
+  function lanAddresses() {
+    const addresses = [];
+    for (const entries of Object.values(os.networkInterfaces())) {
+      for (const entry of entries ?? []) {
+        if (entry.family === "IPv4" && !entry.internal) addresses.push(entry.address);
+      }
+    }
+    return addresses;
+  }
 }

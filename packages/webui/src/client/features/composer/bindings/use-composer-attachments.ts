@@ -15,6 +15,8 @@
  */
 import { useCallback, useEffect } from "react";
 
+import { randomId } from "../../../../shared/random-id.js";
+
 import {
   webuiAttachmentLimitError,
   type WebuiComposerAttachment,
@@ -91,7 +93,7 @@ export function useComposerAttachments(
         const dataUrl = await readBrowserFile(file);
         const fileName = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
         return {
-          id: crypto.randomUUID(),
+          id: randomId(),
           fileName,
           mimeType: file.type || "application/octet-stream",
           sizeBytes: file.size,

@@ -9,6 +9,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { request as httpRequest } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -848,6 +849,41 @@ function openClient(
     );
   });
   return { ws, upgrade, closed };
+}
+
+/**
+ * One HTTP request with an explicit `Host` header.
+ *
+ * `fetch` treats `Host` as a forbidden header name, so the requests that
+ * prove the admission rules — a page reached on a LAN address rather than on
+ * the loopback interface — have to be written with the raw client.
+ */
+function requestWithHost(
+  port: number,
+  requestPath: string,
+  headers: Record<string, string>,
+): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      { host: "127.0.0.1", port, path: requestPath, method: "GET", headers },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => {
+          body += chunk;
+        });
+        response.on("end", () => {
+          resolve({
+            status: response.statusCode ?? 0,
+            body,
+            headers: response.headers,
+          });
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end();
+  });
 }
 
 function requestOnce(ws: WebSocket, request: unknown): Promise<unknown> {
@@ -3976,26 +4012,135 @@ describe("WebUI runtime host assembly", () => {
   });
 });
 
-describe("WebUI loopback binding invariant", () => {
-  it("refuses to construct the service when the host is a LAN address", async () => {
-    const harness = new ScriptedHarnessPort();
-    expect(() => new WebuiService({ port: harness, operations: createOperationRegistry(harness), host: "0.0.0.0" })).toThrow(
-      /loopback/i,
-    );
-    expect(() => new WebuiService({ port: harness, operations: createOperationRegistry(harness), host: "10.0.0.5" })).toThrow(
-      /loopback/i,
-    );
-    expect(
-      () => new WebuiService({ port: harness, operations: createOperationRegistry(harness), host: "evil.example" }),
-    ).toThrow(/loopback/i);
+describe("WebUI bind address", () => {
+  let harness: ScriptedHarnessPort;
+  let service: WebuiService | undefined;
+
+  beforeEach(() => {
+    harness = new ScriptedHarnessPort();
+  });
+
+  afterEach(async () => {
+    await service?.close();
+    service = undefined;
+  });
+
+  it("constructs for a bind address beyond loopback", async () => {
+    // ADR 0031: the bind address is a configuration decision, not a
+    // construction-time refusal. What a wider bind costs is paid at
+    // admission, not at construction.
+    const candidate = new WebuiService({
+      port: harness,
+      operations: createOperationRegistry(harness),
+      host: "0.0.0.0",
+    });
+    await candidate.close();
   });
 
   it("accepts the documented loopback addresses", async () => {
-    const harness = new ScriptedHarnessPort();
     for (const host of ["127.0.0.1", "localhost", "::1", "[::1]"]) {
       const candidate = new WebuiService({ port: harness, operations: createOperationRegistry(harness), host });
       await candidate.close();
     }
+  });
+
+  it("serves a request that arrived on a LAN address when it presents the credential", async () => {
+    service = new WebuiService({
+      port: harness,
+      operations: createOperationRegistry(harness),
+      host: "0.0.0.0",
+    });
+    await service.start();
+    const info = service.info();
+    const lanHost = `192.168.1.20:${info.tcpPort}`;
+    const anonymous = await requestWithHost(info.tcpPort, "/", { Host: lanHost });
+    expect(anonymous.status).toBe(401);
+    const authenticated = await requestWithHost(
+      info.tcpPort,
+      `/?token=${encodeURIComponent(info.credential.token)}`,
+      { Host: lanHost, Origin: `http://${lanHost}` },
+    );
+    expect(authenticated.status).toBe(200);
+    // The page connects back over the address it was reached on, not over
+    // the wildcard the service bound.
+    expect(authenticated.body).toContain(`ws://192.168.1.20:${info.tcpPort}`);
+  });
+
+  it("requires the credential for a non-loopback request even in dev mode", async () => {
+    service = new WebuiService({
+      port: harness,
+      operations: createOperationRegistry(harness),
+      host: "0.0.0.0",
+      dev: true,
+    });
+    await service.start();
+    const info = service.info();
+    const lanHost = `192.168.1.20:${info.tcpPort}`;
+    const anonymous = await requestWithHost(info.tcpPort, "/", { Host: lanHost });
+    expect(anonymous.status).toBe(401);
+    // The loopback interface keeps dev mode's credential-free page.
+    const loopback = await requestWithHost(info.tcpPort, "/", {
+      Host: `127.0.0.1:${info.tcpPort}`,
+    });
+    expect(loopback.status).toBe(200);
+  });
+
+  it("serves the page's relative assets to a LAN client that carries the credential cookie", async () => {
+    // The page is opened with the token in the query, but the browser asks
+    // for ./client.js and ./styles.css without it. The page response sets
+    // the cookie those requests carry, so the page loads with its script
+    // and its styles on an interface that requires the credential.
+    service = new WebuiService({
+      port: harness,
+      operations: createOperationRegistry(harness),
+      host: "0.0.0.0",
+    });
+    await service.start();
+    const info = service.info();
+    const lanHost = `192.168.1.20:${info.tcpPort}`;
+    const page = await requestWithHost(
+      info.tcpPort,
+      `/?token=${encodeURIComponent(info.credential.token)}`,
+      { Host: lanHost },
+    );
+    expect(page.status).toBe(200);
+    expect(String(page.headers["set-cookie"])).toContain("webui_credential=");
+    const withCookie = await requestWithHost(info.tcpPort, "/client.js", {
+      Host: lanHost,
+      Cookie: `webui_credential=${encodeURIComponent(info.credential.token)}`,
+    });
+    expect(withCookie.status).toBe(200);
+    // The same request without the cookie is refused.
+    const withoutCookie = await requestWithHost(info.tcpPort, "/client.js", {
+      Host: lanHost,
+    });
+    expect(withoutCookie.status).toBe(401);
+  });
+
+  it("refuses a request whose origin is another site", async () => {
+    service = new WebuiService({
+      port: harness,
+      operations: createOperationRegistry(harness),
+      host: "0.0.0.0",
+    });
+    await service.start();
+    const info = service.info();
+    const response = await requestWithHost(
+      info.tcpPort,
+      `/?token=${encodeURIComponent(info.credential.token)}`,
+      { Host: `192.168.1.20:${info.tcpPort}`, Origin: "http://evil.example" },
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it("refuses a host the service could not have been reached at", async () => {
+    service = new WebuiService({ port: harness, operations: createOperationRegistry(harness) });
+    await service.start();
+    const info = service.info();
+    const response = await requestWithHost(info.tcpPort, "/", {
+      Host: `evil.example:${info.tcpPort}`,
+    });
+    expect(response.status).toBe(403);
   });
 });
 

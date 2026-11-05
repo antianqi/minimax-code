@@ -1,7 +1,8 @@
 # WebUI technical documentation
 
-The reference set for `packages/webui`: a browser client and the loopback service in front of the
-process-local harness layer. Every document here describes **the code as it stands**. Where a
+The reference set for `packages/webui`: a browser client and the service in front of the
+process-local harness layer. The service binds loopback by default; ADR 0031 lets the bind address be
+configured and gates a non-loopback request with the per-start credential. Every document here describes **the code as it stands**. Where a
 statement and the tree disagree, the tree wins and the statement is a bug in this directory.
 
 Nested directories group documents by subject. The files at this level are the ones that describe the

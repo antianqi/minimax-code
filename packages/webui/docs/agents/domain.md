@@ -51,7 +51,7 @@ the project doesn't use (reconsider) or there's a real gap (note it for `/domain
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR 0004 (the WebUI owns its WebSocket transport, loopback-only), but worth reopening because…_
+> _Contradicts ADR 0004 (the WebUI owns its WebSocket transport) and ADR 0031 (the bind address and the credential gate), but worth reopening because…_
 
 A contradiction with a decision in force is a reason to write a new ADR that supersedes it, not a
 reason to leave the old one standing.

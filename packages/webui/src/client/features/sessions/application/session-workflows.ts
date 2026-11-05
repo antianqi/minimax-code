@@ -24,6 +24,7 @@ import type {
   WebuiClientSessionPage,
 } from "../contracts/session-view.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
+import { randomId } from "../../../../shared/random-id.js";
 import {
   patchWebuiCatalogEntity,
   reduceWebuiCatalogFlatAppended,
@@ -91,17 +92,14 @@ type MutationPort = Pick<
   | "createSession"
 >;
 
-// `crypto.randomUUID()` is reachable from any browser context that exposes the
-// standard WebCrypto API. The application workflows deliberately stay off the
-// `globalThis` surface (the IO / infrastructure layer is the intended owner),
-// so each `clientRequestId` goes through this tiny helper. The fallback keeps
-// SSR / test environments that ship without WebCrypto from blowing up.
+// `crypto.randomUUID()` is reachable only from a secure context: a page
+// served over plain HTTP on a LAN address is not one, and there the call
+// throws. The application workflows deliberately stay off the `globalThis`
+// surface (the IO / infrastructure layer is the intended owner), so each
+// `clientRequestId` goes through this tiny helper, which asks the shared id
+// helper for a value that works in every browser context.
 function generateForkClientRequestId(): string {
-  const cryptoSource = typeof crypto !== "undefined" ? crypto : undefined;
-  if (cryptoSource && typeof cryptoSource.randomUUID === "function") {
-    return cryptoSource.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return randomId();
 }
 
 /**

@@ -15,6 +15,7 @@
 
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
+import { randomId } from "../../shared/random-id.js";
 import type {
   WebuiMiniAppPresentationIntent,
   WebuiMiniAppPresentationState,
@@ -306,7 +307,7 @@ export function createWebuiWire({
     const connection = {
       open(operation: string, body: unknown, handlers: WebuiWireHandlers): WebuiWireSession {
         if (idleTimer) clearTimeout(idleTimer);
-        const requestId = crypto.randomUUID();
+        const requestId = randomId();
         const session = {
           close: () => {
             pending.delete(requestId);
@@ -371,7 +372,7 @@ export function createWebuiWire({
     handlers: WebuiWireHandlers,
   ): WebuiWireSession {
     const ws = new webSocket(websocketUrl());
-    const requestId = crypto.randomUUID();
+    const requestId = randomId();
     const session: WebuiWireSession = { close: () => ws.close() };
     ws.addEventListener("open", () =>
       ws.send(

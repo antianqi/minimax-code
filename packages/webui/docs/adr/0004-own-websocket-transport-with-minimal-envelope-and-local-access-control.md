@@ -7,10 +7,13 @@ reconnect cursors. The process-local contract cannot be exposed as-is — it car
 `AsyncIterable` sources and `AbortSignal` contexts, and it contains no RPC envelope,
 authentication headers or network identity of any kind.
 
-The service binds to loopback only, validates Host and Origin, requires a
-per-start credential, exposes an operation allowlist with runtime validation of
-every request body, and bounds message size and backpressure. It reads files and
-runs tools, so "a single local user" is not the same thing as "no access control".
+The service validates Host and Origin, requires a per-start credential, exposes an
+operation allowlist with runtime validation of every request body, and bounds
+message size and backpressure. It reads files and runs tools, so "a single local
+user" is not the same thing as "no access control". It binds loopback by default;
+[0031](0031-the-webui-may-bind-beyond-loopback-and-a-non-loopback-request-presents-the-credential)
+lets the bind address be configured and keeps the credential requirement for
+every request that did not arrive over loopback.
 
 ## Considered Options
 
@@ -23,9 +26,11 @@ runs tools, so "a single local user" is not the same thing as "no access control
 ## Consequences
 
 The browser never receives provider credentials; the server resolves them. Remote
-access is a separate decision, not a bind-address change: it would add
+access was a separate decision rather than a bind-address change: it would add
 authentication, TLS or a trusted reverse proxy, CSRF and Origin policy, deployment
-and upgrade handling, and a user-isolation model.
+and upgrade handling, and a user-isolation model. ADR 0031 takes the bind address
+and the credential gate out of that list and leaves the rest open — there is still
+no TLS and no user-isolation model.
 
 This decision is now realised as an explicit two-way contract split rather than a
 single file on one side of the wire: wire DTOs live in `src/shared/`, while the

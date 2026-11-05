@@ -5,8 +5,15 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { credentialMatches, type WebuiCredential } from "../credentials.js";
-import { admitHttpRequest } from "../access-policy.js";
+import {
+  credentialPresented,
+  type WebuiCredential,
+} from "../credentials.js";
+import {
+  admitHttpRequest,
+  credentialRequired,
+  hostnameFromHostHeader,
+} from "../access-policy.js";
 import { rejectHttp, parseHttpUrl } from "./responses.js";
 import { serveClientAsset } from "./client-assets.js";
 import { serveBrowserExtensionPackage } from "./browser-extension.js";
@@ -50,8 +57,20 @@ export async function serveHttpRequest(
     return;
   }
   const url = parseHttpUrl(request.url);
-  const presented = url?.searchParams.get("token");
-  if (!context.dev && !credentialMatches(context.credential, presented)) {
+  // Development mode drops the credential for the loopback interface only.
+  // A request that arrived on another interface has to present it in every
+  // mode: the service reads files and runs a terminal, and a wider bind
+  // publishes both (ADR 0031). The credential arrives in the query or in
+  // the cookie the page response set.
+  const requestHostname = hostnameFromHostHeader(request.headers.host ?? "");
+  if (
+    credentialRequired(requestHostname, context.dev) &&
+    !credentialPresented(
+      context.credential,
+      url?.searchParams.get("token"),
+      request.headers.cookie,
+    )
+  ) {
     rejectHttp(response, 401, "Unauthorized");
     return;
   }
@@ -119,5 +138,8 @@ export async function serveHttpRequest(
     tcpPort: context.boundTcpPort() ?? context.configuredTcpPort,
     token: context.credential.token,
     dataDir: context.port.version().dataDir,
+    // The address the person reached the page on, not the bound address: a
+    // wildcard bind has no address of its own to hand the browser.
+    requestHost: request.headers.host,
   });
 }

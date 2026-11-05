@@ -9,6 +9,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerResponse } from "node:http";
 
+import {
+  hostnameFromHostHeader,
+  portFromHostHeader,
+} from "../access-policy.js";
+import { credentialCookie } from "../credentials.js";
 import { rejectHttp } from "./responses.js";
 
 export interface WebuiClientAssetContext {
@@ -17,6 +22,12 @@ export interface WebuiClientAssetContext {
   readonly tcpPort: number;
   readonly token: string;
   readonly dataDir: string | undefined;
+  /**
+   * The `Host` header the page was requested with. The browser connects
+   * back over the address it reached the page on, so a wildcard bind hands
+   * the page the address the person used rather than `0.0.0.0`.
+   */
+  readonly requestHost?: string;
 }
 
 export async function serveClientAsset(
@@ -35,7 +46,7 @@ export async function serveClientAsset(
     let body = await readFile(fileName);
     if (name === "index.html") {
       const config = JSON.stringify({
-        websocketUrl: `ws://${context.host}:${context.tcpPort}`,
+        websocketUrl: websocketUrl(context),
         token: context.token,
         dataDir: context.dataDir,
       }).replace(/</gu, "\\u003c");
@@ -47,11 +58,32 @@ export async function serveClientAsset(
     response.writeHead(200, {
       "Content-Type": contentType(fileName),
       "Cache-Control": "no-store",
+      // The page's own relative requests carry the credential in this
+      // cookie: a browser that opened the page with the token in the query
+      // asks for ./client.js without it, and on a non-loopback interface
+      // that request would otherwise be refused.
+      ...(name === "index.html" ? { "Set-Cookie": credentialCookie(context.token) } : {}),
     });
     response.end(body);
   } catch {
     rejectHttp(response, 404, "Not Found");
   }
+}
+
+/**
+ * The WebSocket endpoint the page connects back to.
+ *
+ * The address in the `Host` header wins over the bound address: a service
+ * bound to `0.0.0.0` has no address of its own, and a browser that reached
+ * the page at `192.168.1.20:2233` has to reach the socket at the same one.
+ */
+export function websocketUrl(context: WebuiClientAssetContext): string {
+  const requestHost = context.requestHost;
+  const hostname = requestHost ? hostnameFromHostHeader(requestHost) : "";
+  if (!hostname) return `ws://${context.host}:${context.tcpPort}`;
+  const port = (requestHost ? portFromHostHeader(requestHost) : undefined) ?? context.tcpPort;
+  const literal = hostname.includes(":") ? `[${hostname}]` : hostname;
+  return `ws://${literal}:${port}`;
 }
 
 export function contentType(name: string): string {

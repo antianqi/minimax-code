@@ -30,6 +30,11 @@ if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {
 }
 
 const dataDir = process.env.MINIMAX_DATA_DIR?.trim() || path.join(os.homedir(), ".minimax");
+// The address the service binds to. Loopback is the default; a wider address
+// publishes the WebUI beyond this machine, which ADR 0031 allows and gates:
+// a request that did not arrive over loopback presents the per-start
+// credential, so the printed URL carries it.
+const bindHost = process.env.WEBUI_HOST?.trim() || "127.0.0.1";
 process.env.MAVIS_BUILTIN_AGENTS_V2_DIR ??= path.join(packageRoot, "assets/agents");
 process.env.MAVIS_BUILTIN_AGENTS_DIR ??= path.join(packageRoot, "assets/agents");
 
@@ -206,7 +211,7 @@ const service = new WebuiService({
   port,
   operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies, miniAppPresenter),
   terminal,
-  host: "127.0.0.1",
+  host: bindHost,
   tcpPort,
   dev: true,
   clientDir: path.join(packageRoot, "client"),
@@ -239,11 +244,17 @@ const close = () => {
 
 try {
   const info = await service.start();
-  // dev mode keeps the per-start credential off, so the shell page and its
-  // assets load without a query token. info.boundUrl is the bare ws://
-  // endpoint; browsers need the http:// origin.
-  const browserUrl = `http://${info.host}:${info.tcpPort}/`;
+  // Every printed address carries the per-start credential. The token is not
+  // decoration: a request that did not arrive over loopback has to present
+  // it (ADR 0031), so the printed path is the one that opens from any
+  // address the service is reachable at.
+  const browserUrl = accessUrl(
+    isWildcardBindAddress(bindHost) ? "127.0.0.1" : bindHost,
+    info.tcpPort,
+    info.credential.token,
+  );
   console.log(`[mcode-webui] WebUI running at ${browserUrl}`);
+  printAccess(info, bindHost);
   openBrowser(browserUrl);
   console.log("Press Ctrl+C to stop the server.");
   process.once("SIGINT", () => void close().finally(() => process.exit(0)));
@@ -251,6 +262,57 @@ try {
 } catch (error) {
   await close();
   throw error;
+}
+
+/**
+ * The path a person opens, with the per-start credential on it.
+ *
+ * The token is not decoration: a request that did not arrive over loopback
+ * has to present it, so the printed path is the one that works from every
+ * address the service answers at.
+ */
+function accessUrl(host, port, token) {
+  const literal = host.includes(":") ? `[${host}]` : host;
+  return `http://${literal}:${port}/?token=${token}`;
+}
+
+/**
+ * Print how to reach the service.
+ *
+ * A loopback bind is one address; a wildcard bind is every address this
+ * machine has. Either way the printed path carries the credential.
+ */
+function printAccess(info, bindHost) {
+  const port = info.tcpPort;
+  const token = info.credential.token;
+  console.log(`[mcode-webui] credential token: ${token}`);
+  if (isWildcardBindAddress(bindHost)) {
+    console.log(`[mcode-webui] open ${accessUrl("127.0.0.1", port, token)}`);
+    const addresses = lanAddresses();
+    if (addresses.length === 0) {
+      console.log("[mcode-webui] no LAN address found; set WEBUI_HOST to the address to publish.");
+    }
+    for (const address of addresses) {
+      console.log(`[mcode-webui] open ${accessUrl(address, port, token)}`);
+    }
+    return;
+  }
+  console.log(`[mcode-webui] open ${accessUrl(bindHost, port, token)}`);
+}
+
+function isWildcardBindAddress(host) {
+  return host === "0.0.0.0" || host === "::" || host === "";
+}
+
+/** The routable IPv4 addresses of this machine, loopback excluded. */
+function lanAddresses() {
+  const addresses = [];
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family === "IPv4" && !entry.internal) addresses.push(entry.address);
+    }
+  }
+  return addresses;
 }
 
 /**

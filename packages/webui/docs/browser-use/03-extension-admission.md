@@ -39,22 +39,28 @@ For reference, this is the rule the dedicated path must not inherit. From `admit
 
 | Step | Check | Refusal |
 | --- | --- | --- |
-| 1 | `Host` header is present and its host part is loopback (`127.0.0.1`, `localhost`, `::1`, `[::1]`) | `403 Forbidden Host` |
-| 2 | The URL hostname is `127.0.0.1` or `localhost` | `403 Forbidden Host` |
-| 3 | If an `Origin` is present, it is a loopback HTTP(S) origin | `403 Forbidden Origin` |
-| 4 | The `token` query parameter matches the per-start credential — **unless `dev` is true** | `401 Unauthorized` |
+| 1 | `Host` header is present and names an address the service could have been reached at: loopback, the bound address, or any host name when the bind is a wildcard | `403 Forbidden Host` |
+| 2 | The URL hostname is loopback or the host name the request carried | `403 Forbidden Host` |
+| 3 | If an `Origin` is present, it is the same origin as the request | `403 Forbidden Origin` |
+| 4 | The `token` query parameter matches the per-start credential — **unless `dev` is true and the request arrived over loopback** | `401 Unauthorized` |
 
-Refusals are written by `rejectUpgrade` (`access-policy.ts:83`) as a bare HTTP status line followed by
+ADR 0031 moved the bind address out of the construction-time refusal and into configuration, so
+step 1 and step 4 now read the bound address and the interface the request arrived on.
+
+Refusals are written by `rejectUpgrade` (`access-policy.ts:98`) as a bare HTTP status line followed by
 `Connection: close`.
 
 ## The `dev: true` bypass, and why it must not apply here
 
-Step 4 is skipped entirely when `context.dev` is true. The condition at
-`packages/webui/src/server/access-policy.ts:76` reads:
+Step 4 is skipped only when `context.dev` is true **and** the request arrived over the
+loopback interface. The condition at `packages/webui/src/server/access-policy.ts:88` reads:
 
 ```ts
 const presented = url.searchParams.get("token");
-if (!context.dev && !credentialMatches(context.credential, presented)) {
+if (
+  credentialRequired(requestHostname, context.dev) &&
+  !credentialMatches(context.credential, presented)
+) {
   rejectUpgrade(socket, 401, "Unauthorized");
   return false;
 }
@@ -68,9 +74,11 @@ and it is the current state of both composition roots:
 | `scripts/run-webui-server.mjs` | 74 | `dev: true` | development — the identities it has learned, plus `MAVIS_BROWSER_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_CHROME_EXTENSION_IDS` |
 | `release/webui-npm/bin/mcode-webui.mjs` | 93 | `dev: true` | **store** — the published identity the package was built for, plus `MAVIS_BROWSER_STORE_EDGE_EXTENSION_IDS`, `MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS` |
 
-So on a packaged WebUI today, the generic path already accepts any upgrade that passes the loopback
-Host, URL-host and origin checks **without presenting the token at all**. ADR 0019 already records that
-both entries run with `dev: true`.
+So on a packaged WebUI today, the generic path already accepts any upgrade that passes the
+Host, URL-host and origin checks **without presenting the token at all** — as long as the request
+arrived over loopback. ADR 0031 is what draws that line: a request that arrived on another
+interface presents the per-start credential in every mode. ADR 0019 already records that both entries
+run with `dev: true`.
 
 **The two entries differ in one more way, and it is the one that matters here.** The packaged entry
 passes `packaged: true` to the bridge, so it reads the **store** allowlist and never the development
@@ -241,10 +249,11 @@ identities differ and both must be registered.
 ## The origin check is not broadened
 
 **Required, and stated separately because it is the tempting shortcut.** `isAllowedOrigin`
-(`access-policy.ts:119`) is not modified. The rule that only loopback HTTP(S) origins are admitted
-stays exactly as it is. `chrome-extension://` is not added to it. A `chrome-extension://` origin
-continues to be rejected by the generic path, and that rejection is what forces the dedicated path to
-exist rather than being an inconvenience to work around.
+(`access-policy.ts:177`) is not broadened to admit extension origins. Its rule is the same origin as
+the request — ADR 0031 widened the host the origin may name, not the set of protocols it may use.
+`chrome-extension://` is not added to it. A `chrome-extension://` origin continues to be rejected by
+the generic path, and that rejection is what forces the dedicated path to exist rather than being an
+inconvenience to work around.
 
 Broadening the generic check would admit *every* extension origin against *every* WebSocket endpoint on
 the loopback interface, which is a much larger grant than admitting one known extension to one known

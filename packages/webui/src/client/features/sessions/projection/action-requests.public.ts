@@ -13,6 +13,7 @@ import type {
   WebuiForkSessionRequest,
   WebuiRewindSessionRequest,
 } from "../../../../shared/contracts/session.js";
+import { randomId } from "../../../../shared/random-id.js";
 
 /** Rewind a session to a specific user message, optionally reverting the
  *  file changes that turn produced. */
@@ -82,14 +83,10 @@ export function buildWebuiMessageForkRequest(
 }
 
 /** Generate a unique `clientRequestId` for an action request. Prefixes help
- *  the runtime tell the requests apart in the log; the random portion is
- *  a UUID when the runtime is available, otherwise a `Date.now()`-based
- *  fallback. */
+ *  the runtime tell the requests apart in the log; the random portion comes
+ *  from the shared id helper, which works in a browser context that has no
+ *  `crypto.randomUUID`. */
 export function webuiClientRequestId(prefix: string): string {
-  const random =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `${prefix}-${random}`;
+  return `${prefix}-${randomId()}`;
 }
 

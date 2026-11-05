@@ -61,9 +61,14 @@ const STORE_BUILD_DIRECTORIES = new Set(["dist-store-chrome", "dist-store-edge"]
  * produced by the build, not committed. Leaving them in would make the
  * inventory record a file the export does not carry, and the export gate
  * would fail with a difference that no one can act on.
+ *
+ * The npm package tarball (`*.tgz`) is the same kind of thing: the packed
+ * artifact of a release run, produced by the packaging step and never
+ * reviewed as source.
  */
 function isBuildOutput(name) {
   if (STORE_BUILD_DIRECTORIES.has(name)) return true;
+  if (name.endsWith(".tgz")) return true;
   return name.startsWith("dist-") && name.endsWith(".zip");
 }
 

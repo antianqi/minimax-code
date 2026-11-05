@@ -1,12 +1,12 @@
-// WebUI service: owns a runtime host, binds loopback, runs the wire
-// envelope with access control, and shuts down in order.
+// WebUI service: owns a runtime host, binds the address it is configured
+// with, runs the wire envelope with access control, and shuts down in order.
 //
 // This is the server seam. It composes:
 //   * a harness port (real: script of the host's `CliService` facade;
 //     test: scripted stand-in),
 //   * a per-start credential,
 //   * the operation registry the host assembled from that port,
-//   * the access control rules described in ADR 0004.
+//   * the access control rules described in ADR 0004 and ADR 0031.
 //
 // The network lifecycle now lives in dedicated modules:
 // `http-server.ts` (listener lifecycle), `websocket-server.ts` (upgrade, socket
@@ -34,7 +34,6 @@ import {
 import { WEBUI_OPERATION_BINDINGS } from "./operation/bind-handlers.js";
 import type { WebuiHarnessPort } from "../runtime/port.js";
 import type { WebuiTerminalProcessPort } from "../runtime/port.js";
-import { isLoopbackBindAddress } from "./access-policy.js";
 import {
   createHttpListener,
   listenHttpServer,
@@ -128,10 +127,11 @@ export interface WebuiServiceOptions {
    */
   readonly terminal?: WebuiTerminalProcessPort;
   /**
-   * Loopback host the service binds to. The service refuses to start
-   * when this is anything other than `127.0.0.1`, `localhost`, `::1` or
-   * `[::1]`; remote or LAN access requires a separate decision (ADR
-   * 0004), not a different bind address. Defaults to `127.0.0.1`.
+   * The host the service binds to. Loopback is the default; a wider address
+   * (`0.0.0.0`, `::`, or one LAN address) publishes the service beyond
+   * this machine, which ADR 0031 allows and gates: a request that did not
+   * arrive over loopback presents the per-start credential in every mode,
+   * and the origin has to be the one the page was served from.
    */
   readonly host?: string;
   /** TCP port; `0` asks the OS for a free port. Defaults to `0`. */
@@ -237,10 +237,6 @@ export class WebuiService {
   constructor(options: WebuiServiceOptions) {
     this.port = options.port;
     this.host = options.host ?? "127.0.0.1";
-    if (!isLoopbackBindAddress(this.host))
-      throw new Error(
-        `WebUI service may only bind to a loopback address; received ${JSON.stringify(this.host)}`,
-      );
     this.tcpPort = options.tcpPort ?? 0;
     this.maxMessageBytes = options.maxMessageBytes ?? WEBUI_MAX_MESSAGE_BYTES;
     this.webSocketHeartbeatIntervalMs =

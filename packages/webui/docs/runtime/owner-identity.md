@@ -53,10 +53,11 @@ capability gate reads it instead of comparing owner kinds.
   `unknown` (a kind string that is not in `RUNTIME_OWNER_KINDS`), which resolves a distinct row. The
   service gates and the compatibility gate disagree about what an absent owner means; the explicit
   rows are what keeps that disagreement from reaching the WebUI.
-- **Identity is not access control.** The WebUI is a loopback-reachable browser surface, and enabling
-  memory, cron or Computer Use for it means an agent running in that browser can act on this machine.
-  That is the same class of concern ADR 0004 addresses by binding loopback-only; a single local user
-  is not the same thing as no access control.
+- **Identity is not access control.** The WebUI is a browser surface the service can publish beyond
+  loopback, and enabling memory, cron or Computer Use for it means an agent running in that browser
+  can act on this machine. That is the same class of concern ADR 0004 and ADR 0031 address by
+  binding the service and gating a non-loopback request with the per-start credential; a single
+  local user is not the same thing as no access control.
 
 The cells themselves are read by the harness, not by this package. Searching `packages/webui/src` for
 each cell name returns nothing, and that is correct — see [`../known-gaps.md`](../known-gaps.md).

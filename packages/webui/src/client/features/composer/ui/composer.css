@@ -533,7 +533,7 @@
     width: auto;
     max-width: 220px;
     min-width: 0;
-    font-weight: var(--weight_medium);
+    font-weight: 500;
     color: var(--text_default_primary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -721,6 +721,12 @@
   }
   .webui-session-layout .webui-goal-composer-panel .webui-composer-card {
     box-shadow: 0 0 20px 0 var(--shadow_default);
+  }
+
+  .webui-queue-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .webui-send-stop-square {

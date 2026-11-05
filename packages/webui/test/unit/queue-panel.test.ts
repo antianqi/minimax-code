@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiQueuePanel } from "../../src/client/features/composer/ui/QueuePanel.js";
+import { createWebuiCommandWorkflows } from "../../src/client/features/composer/application/command-workflows.js";
 import type { WebuiQueueItem } from "../../src/shared/contracts/queue.js";
 
 function item(over: Partial<WebuiQueueItem> = {}): WebuiQueueItem {
@@ -19,7 +20,11 @@ function item(over: Partial<WebuiQueueItem> = {}): WebuiQueueItem {
 
 const render = (
   items: readonly WebuiQueueItem[],
-  over: { readonly paused?: boolean; readonly onRemove?: (item: WebuiQueueItem) => void } = {},
+  over: {
+    readonly paused?: boolean;
+    readonly onRemove?: (item: WebuiQueueItem) => void;
+    readonly onSendNow?: (item: WebuiQueueItem) => void;
+  } = {},
 ) => renderToStaticMarkup(createElement(WebuiQueuePanel, { items, ...over }));
 
 describe("WebuiQueuePanel", () => {
@@ -39,9 +44,10 @@ describe("WebuiQueuePanel", () => {
     expect(html).not.toMatch(/data-webui-queue="true"/u);
   });
 
-  it("counts the queued messages in its heading", () => {
+  it("exposes the queued message count on its accessible list label", () => {
     const html = render([item(), item({ itemId: "q2" }), item({ itemId: "q3" })]);
-    expect(html).toMatch(/排队消息（3）/u);
+    expect(html).toMatch(/aria-label="排队消息（3）"/u);
+    expect(html).toMatch(/data-webui-queue-count="3"/u);
   });
 
   it("lists every item, showing its content", () => {
@@ -86,6 +92,40 @@ describe("WebuiQueuePanel", () => {
     expect(html).toMatch(/移除/u);
   });
 
+  it("offers an operable immediate-send icon for a queued item", () => {
+    const html = render([item({ itemId: "q1" })], { onSendNow: () => undefined });
+    const tag = html.match(/<button[^>]*data-webui-send-queue-item="q1"[^>]*>/u)?.[0] ?? "";
+    expect(tag).not.toBe("");
+    expect(tag).toMatch(/aria-label="立即发送"/u);
+    expect(tag).not.toMatch(/\bdisabled\b/u);
+  });
+
+  it("matches each goal banner status row and uses its icon controls", () => {
+    const html = render([item({ itemId: "q1" })], {
+      onRemove: () => undefined,
+      onSendNow: () => undefined,
+    });
+    expect(html).not.toMatch(/webui-card/u);
+    expect(html).toMatch(/webui-goal-banner-row/u);
+    expect(html).toMatch(/webui-goal-banner-icon/u);
+    expect(html).toMatch(/webui-goal-status/u);
+    expect(html).toMatch(/tabler-icon-messages/u);
+    expect(html).not.toMatch(/tabler-icon-target/u);
+    expect(html).toMatch(/>排队中</u);
+    expect(html).toMatch(/webui-goal-objective/u);
+    expect(html.match(/webui-goal-action/gu)).toHaveLength(2);
+    expect(html).toMatch(/data-webui-remove-queue-item="q1"/u);
+    expect(html).toMatch(/data-webui-send-queue-item="q1"/u);
+  });
+
+  it("does not offer immediate sending for an item the runtime already picked up", () => {
+    const html = render(
+      [item({ itemId: "q1", status: "running" })],
+      { onSendNow: () => undefined },
+    );
+    expect(html).not.toMatch(/data-webui-send-queue-item/u);
+  });
+
   it("does not offer to remove an item that is already running or done", () => {
     // Removing a message the runtime has already started is not a thing the
     // user can mean. The button on such a row would look operable and do
@@ -128,7 +168,7 @@ describe("WebuiQueuePanel", () => {
     // The heading is styled as a strong element and reads as plain text; the
     // region is announced as a list of pending messages or not at all.
     const html = render([item()]);
-    expect(html).toMatch(/aria-label="排队消息"/u);
+    expect(html).toMatch(/aria-label="排队消息（1）"/u);
     expect(html).toMatch(/role="list"/u);
   });
 
@@ -141,6 +181,24 @@ describe("WebuiQueuePanel", () => {
     ]);
     expect(html).toMatch(/data-webui-queue-item="q1"/u);
     expect(html).toMatch(/data-webui-queue-item="q2"/u);
+  });
+});
+
+describe("immediate queue send workflow", () => {
+  it("steers the chosen queue identity through the runtime operation", async () => {
+    const calls: unknown[] = [];
+    const workflows = createWebuiCommandWorkflows({
+      port: {
+        steerQueueItem: async (request) => {
+          calls.push(request);
+          return { success: true, queueItemId: request.itemId, turnId: "turn-1" };
+        },
+      },
+    });
+
+    await workflows.steerQueued({ sessionId: "mvs_a", itemId: "q1" });
+
+    expect(calls).toEqual([{ id: "mvs_a", itemId: "q1" }]);
   });
 });
 
@@ -183,8 +241,26 @@ describe("the composer wiring", () => {
     // the button because the type allows an absent `onRemove` to hide it, and
     // the user is back to a message they cannot take back.
     expect(composer).toMatch(
-      /onRemove=\{\(item\) => void handleDeleteQueueItem\(item\)\}/u,
+      /onRemove=\{handleDeleteQueueItem\}/u,
     );
+  });
+
+  it("renders session queue content inside the bottom composer overlay panel", () => {
+    const overlay = composer.indexOf("data-webui-session-composer-overlay={sessionLayout ? \"true\" : undefined}");
+    const queue = composer.indexOf("<WebuiQueuePanel", overlay);
+    const panel = composer.indexOf("<WebuiComposerGoalPanel", overlay);
+    expect(overlay).toBeGreaterThanOrEqual(0);
+    expect(panel).toBeGreaterThan(overlay);
+    expect(queue).toBeGreaterThan(panel);
+  });
+
+  it("uses the runtime's atomic queue-steer operation for immediate sending", () => {
+    const handler = composer.slice(
+      composer.indexOf("const handleSendQueueItemNow"),
+      composer.indexOf("const handleSelectModel", composer.indexOf("const handleSendQueueItemNow")),
+    );
+    expect(handler).toMatch(/await composerController\.steerQueued\(\{\s*sessionId,\s*itemId: item\.itemId\s*\}\)/u);
+    expect(handler).not.toMatch(/turnCommands\?\.stop|removeQueued/u);
   });
 
   it("no longer carries its own copy of the queue markup", () => {

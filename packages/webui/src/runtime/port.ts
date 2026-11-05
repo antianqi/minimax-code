@@ -428,6 +428,10 @@ export interface WebuiHarnessPort {
     readonly id: string;
     readonly itemId: string;
   }): Promise<{ readonly item?: WebuiQueueItem }>;
+  steerQueueItem(request: {
+    readonly id: string;
+    readonly itemId: string;
+  }): Promise<{ readonly success?: boolean; readonly queueItemId?: string; readonly turnId?: string }>;
   listModels(request?: {
     readonly sessionId?: string;
   }): Promise<readonly WebuiModelEntry[]>;

@@ -8,7 +8,7 @@ export { getMessagesOperation, getSessionDiffOperation, getTurnDiffOperation, re
 export { isGoalEnabledOperation, getGoalOperation, createGoalOperation, patchGoalOperation, clearGoalOperation } from "./goal.js";
 export { sendMessageOperation, enqueueMessageOperation, resumeSessionOperation } from "./interaction.js";
 export { watchEventsOperation, listPendingPermissionsOperation, getPendingQuestionnaireOperation, replyPermissionOperation, replyQuestionnaireOperation, dismissQuestionnaireOperation } from "./questionnaire.js";
-export { abortSessionOperation, listQueueMessagesOperation, deleteQueueItemOperation, listModelsOperation, listSkillsOperation, selectModelOperation, getSessionUsageOperation } from "./queue.js";
+export { abortSessionOperation, listQueueMessagesOperation, deleteQueueItemOperation, steerQueueItemOperation, listModelsOperation, listSkillsOperation, selectModelOperation, getSessionUsageOperation } from "./queue.js";
 export {
   createCronTaskOperation,
   deleteCronTaskOperation,
@@ -420,6 +420,7 @@ export function createOperationRegistry(
   // operations, but without this registry entry the pet's all-session watch returned
   // `unknown_operation` and marked local activity unavailable.
   registerOperation(registry, entry("watchMiniAppAgentObservations"));
+  registerOperation(registry, entry("steerQueueItem"));
   return registry;
 }
 

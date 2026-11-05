@@ -13,7 +13,7 @@ import {
   IconFileTypeSvg, IconFileTypeTs, IconFileTypeTsx, IconFileTypeTxt, IconFileTypeVue,
   IconFileTypeXls, IconFileTypeXml, IconFileTypeZip, IconJson, IconMarkdown, IconPhoto,
   IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconHome, IconInfoCircle, IconLayoutDashboard, IconMaximize,
-  IconLayoutSidebar, IconMapPin, IconMessage, IconMessageCircle, IconMessageQuestion,
+  IconLayoutSidebar, IconMapPin, IconMessage, IconMessageCircle, IconMessageQuestion, IconMessages,
   IconMinimize, IconPaperclip, IconPin, IconPinFilled, IconPuzzle, IconRefresh, IconSearch,
   IconShieldCheck, IconShieldLock, IconShieldX, IconSparkles,
   IconTarget, IconTerminal2, IconThumbDown, IconThumbUp, IconTrash, IconWorld,
@@ -120,6 +120,7 @@ export function WebuiIconDiffFile({ className, fileName }: WebuiFileIconProps): 
 export function WebuiIconSend({ className }: WebuiIconProps): ReactElement { return glyph(IconArrowUp, className); }
 export function WebuiIconFolder({ className }: WebuiIconProps): ReactElement { return glyph(IconFolder, className); }
 export function WebuiIconSession({ className }: WebuiIconProps): ReactElement { return glyph(IconMessage, className); }
+export function WebuiIconQueuedMessages({ className }: WebuiIconProps): ReactElement { return glyph(IconMessages, className); }
 export function WebuiIconMore({ className }: WebuiIconProps): ReactElement { return glyph(IconDots, className); }
 export function WebuiIconProjectAdd({ className }: WebuiIconProps): ReactElement { return glyph(IconFolderPlus, className); }
 export function WebuiIconSessionPinMark({ className }: WebuiIconProps): ReactElement { return glyph(IconPin, className, 14); }

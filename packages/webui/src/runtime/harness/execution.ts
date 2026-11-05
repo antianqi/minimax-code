@@ -15,7 +15,7 @@ import {
 
 export function createExecutionAdapter(
   host: WebuiRuntimeHostHandle,
-): Pick<WebuiHarnessPort, "getActiveTurn" | "isGoalEnabled" | "getGoal" | "createGoal" | "patchGoal" | "clearGoal" | "sendMessage" | "enqueueMessage" | "resumeSession" | "watchEvents" | "abortSession" | "listQueueMessages" | "deleteQueueItem" | "requestCompaction"> {
+): Pick<WebuiHarnessPort, "getActiveTurn" | "isGoalEnabled" | "getGoal" | "createGoal" | "patchGoal" | "clearGoal" | "sendMessage" | "enqueueMessage" | "resumeSession" | "watchEvents" | "abortSession" | "listQueueMessages" | "deleteQueueItem" | "steerQueueItem" | "requestCompaction"> {
   return {
     async getActiveTurn(request) {
       return requireCliService(host).getActiveTurn(request.id);
@@ -85,6 +85,17 @@ export function createExecutionAdapter(
 
     async deleteQueueItem(request) {
       return requireCliService(host).deleteQueueItem(request);
+    },
+
+    async steerQueueItem(request) {
+      const result = await requireCliService(host).steerSession({
+        id: request.id,
+        queueItemId: request.itemId,
+      });
+      if (!result.success || !result.queueItemId || !result.turnId) {
+        throw new Error("Runtime did not return the steered queue item and turn identities.");
+      }
+      return { success: true, queueItemId: result.queueItemId, turnId: result.turnId };
     },
 
     async requestCompaction(request) {

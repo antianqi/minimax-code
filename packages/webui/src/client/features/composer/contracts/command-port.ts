@@ -37,4 +37,8 @@ export interface ComposerPort {
     readonly id: string;
     readonly itemId: string;
   }) => Promise<{ readonly item?: WebuiQueueItem }>;
+  readonly steerQueueItem?: (request: {
+    readonly id: string;
+    readonly itemId: string;
+  }) => Promise<{ readonly success?: boolean; readonly queueItemId?: string; readonly turnId?: string }>;
 }

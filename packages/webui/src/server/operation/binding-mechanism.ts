@@ -84,6 +84,7 @@ export type WebuiOperationPort = Pick<
   | "abortSession"
   | "listQueueMessages"
   | "deleteQueueItem"
+  | "steerQueueItem"
   | "listModels"
   | "selectModel"
   | "listSkills"
@@ -257,6 +258,7 @@ export interface RuntimeGroups {
     | "abortSession"
     | "listQueueMessages"
     | "deleteQueueItem"
+    | "steerQueueItem"
   >;
   readonly interactions: Pick<
     WebuiHarnessPort,

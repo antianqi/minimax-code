@@ -436,6 +436,9 @@ class FullPort implements WebuiHarnessPort {
   async deleteQueueItem() {
     return {};
   }
+  async steerQueueItem(request: { readonly id: string; readonly itemId: string }) {
+    return { success: true, queueItemId: request.itemId, turnId: "invariant-turn" };
+  }
   async listModels() {
     return [];
   }
@@ -695,6 +698,7 @@ describe("WebUI host-shape invariant (batch C seam)", () => {
   // gate. Every one of them is in the registry — see `operations.ts`,
   // where the six `if (port.<x> && port.<y>)` capability gates were deleted.
   const GATED_BUT_NOW_UNCONDITIONAL: readonly string[] = [
+    "steerQueueItem",
     // diff group (was: `if (port.getSessionDiff && port.getTurnDiff && port.revertTurnDiff && port.reapplyTurnDiff)`)
     getSessionDiffOperation.name,
     getTurnDiffOperation.name,

@@ -20,7 +20,7 @@ import type { ComposerPort } from "../contracts/command-port.js";
 
 type CommandPort = Pick<
   ComposerPort,
-  "runCommand" | "listQueueMessages" | "deleteQueueItem"
+  "runCommand" | "listQueueMessages" | "deleteQueueItem" | "steerQueueItem"
 >;
 
 export type WebuiRunCommandRequest = Parameters<
@@ -49,6 +49,11 @@ export interface WebuiCommandWorkflows {
     readonly sessionId: string;
     readonly itemId: string;
   }) => Promise<void>;
+  /** Route a queued item through the runtime's atomic immediate-send workflow. */
+  readonly steerQueued: (request: {
+    readonly sessionId: string;
+    readonly itemId: string;
+  }) => Promise<void>;
 }
 
 export function createWebuiCommandWorkflows(deps: {
@@ -72,6 +77,14 @@ export function createWebuiCommandWorkflows(deps: {
       const remove = port.deleteQueueItem;
       if (!remove) return;
       await remove({ id: request.sessionId, itemId: request.itemId });
+    },
+    steerQueued: async (request) => {
+      const steer = port.steerQueueItem;
+      if (!steer) throw new Error("Immediate queue sending is not available.");
+      const result = await steer({ id: request.sessionId, itemId: request.itemId });
+      if (!result.success || !result.queueItemId || !result.turnId) {
+        throw new Error("Runtime did not confirm the immediate queue send.");
+      }
     },
   };
 }

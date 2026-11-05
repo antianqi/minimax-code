@@ -19,6 +19,7 @@ import {
   useState,
   type FormEvent,
   type ReactElement,
+  type ReactNode,
 } from "react";
 import {
   WebuiComposerEditorStaging,
@@ -35,6 +36,7 @@ import { WebuiFileInput, WebuiTextarea } from "../../../ui/field.js";
 import { FeedbackBusy } from "../../../ui/feedback.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
+import { WebuiCard } from "../../../ui/card.js";
 import type {
   WebuiComposerPluginCatalogue,
   WebuiComposerPluginSummary,
@@ -123,6 +125,7 @@ import { isTurnLive } from "../../turn/contracts/stream-state.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiIconButton } from "../../../ui/button.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
+
 import {
 } from "../../../features/sessions/projection/action-requests.public.js";
 import { buildWebuiModelSelectionRequest } from "../../../features/models/contracts/model-selection.js";
@@ -156,6 +159,20 @@ const WEBUI_SLASH_FALLBACK_SECTIONED: SlashCommandEntry[] = await (async () => {
 // The viewport stays pinned through the short hand-off window where
 // the live turn is replaced by the refreshed historical transcript.
 
+function WebuiComposerGoalPanel({
+  children,
+  enabled,
+}: {
+  readonly children: ReactNode;
+  readonly enabled: boolean;
+}): ReactElement {
+  if (!enabled) return <div>{children}</div>;
+  return (
+    <WebuiCard as="section" className="webui-goal-composer-panel" data-webui-goal-composer-panel="true">
+      {children}
+    </WebuiCard>
+  );
+}
 
 
 
@@ -658,6 +675,19 @@ export function WebuiComposer({
     await composerController.removeQueued({ sessionId, itemId: item.itemId });
   };
 
+  const handleSendQueueItemNow = async (item: WebuiQueueItem) => {
+    if (!sessionId || item.sessionId !== sessionId || item.status !== "queued") return;
+    setInteractionError(undefined);
+    try {
+      // The runtime atomically claims and steers this queued item. Stopping the
+      // turn and deleting the item separately races the queue dispatcher: it can
+      // consume the item between those two operations.
+      await composerController.steerQueued({ sessionId, itemId: item.itemId });
+    } catch (error) {
+      setInteractionError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const handleSelectModel = async (
     model: WebuiModelEntry,
     draft: WebuiModelPickerDraft,
@@ -1072,14 +1102,14 @@ export function WebuiComposer({
           interactionError={interactionError}
         />
       ) : null}
-      {/* The pause notice was gated on a session while the queue list was not,
-          and the component keeps that split: there is no queue to pause before
-          a session exists, but the list is a pure function of `queueItems`. */}
-      <WebuiQueuePanel
-        items={queueItems}
-        paused={sessionId ? queuePaused : false}
-        onRemove={(item) => void handleDeleteQueueItem(item)}
-      />
+      {!sessionLayout ? (
+        <WebuiQueuePanel
+          items={queueItems}
+          paused={sessionId ? queuePaused : false}
+          onRemove={handleDeleteQueueItem}
+          onSendNow={handleSendQueueItemNow}
+        />
+      ) : null}
       {stream.refusal && !hidePlanReviewInProgressRefusal ? (
         <OutputError
           variant="output_error"
@@ -1140,8 +1170,30 @@ export function WebuiComposer({
           {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
           onChange={(event) => { void addFiles(event.currentTarget.files); event.currentTarget.value = ""; }}
         />
-        <div className={sessionLayout && sessionId && goalEnabled && goal ? "webui-goal-composer-panel" : undefined}>
-        {sessionId && goalEnabled && goal ? <WebuiGoalBanner goal={goal} patchGoal={goalCoordinator.patchGoal} clearGoal={goalCoordinator.clearGoal} onEditGoal={editGoalInComposer} onCleared={clearLocalGoal} interactionBlocked={Boolean(questionnaire || permissions.length > 0)} /> : null}
+        <WebuiComposerGoalPanel
+          enabled={Boolean(
+            sessionLayout &&
+              ((sessionId && goalEnabled && goal) || queueItems.length > 0 || queuePaused),
+          )}
+        >
+          {sessionLayout ? (
+            <WebuiQueuePanel
+              items={queueItems}
+              paused={sessionId ? queuePaused : false}
+              onRemove={handleDeleteQueueItem}
+              onSendNow={handleSendQueueItemNow}
+            />
+          ) : null}
+          {sessionId && goalEnabled && goal ? (
+            <WebuiGoalBanner
+              goal={goal}
+              patchGoal={goalCoordinator.patchGoal}
+              clearGoal={goalCoordinator.clearGoal}
+              onEditGoal={editGoalInComposer}
+              onCleared={clearLocalGoal}
+              interactionBlocked={Boolean(questionnaire || permissions.length > 0)}
+            />
+          ) : null}
         {!composerReplaced ? (
         <form
           onSubmit={submit}
@@ -1410,7 +1462,7 @@ export function WebuiComposer({
           </WebuiStack>
         </form>
         ) : null}
-        </div>
+        </WebuiComposerGoalPanel>
       </div>
     </section>
   );

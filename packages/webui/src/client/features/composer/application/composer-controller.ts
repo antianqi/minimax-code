@@ -409,6 +409,10 @@ export function createWebuiComposerController(deps: WebuiComposerControllerDeps)
       }
     },
     removeQueued: ({ sessionId, itemId }) => queueCommands.remove({ sessionId, itemId, selectedSessionId: deps.readSelectedSessionId() }),
+    steerQueued: async ({ sessionId, itemId }) => {
+      await deps.commandWorkflows.steerQueued({ sessionId, itemId });
+      refreshQueue(sessionId);
+    },
     refreshQueue: (sessionId) => refreshQueue(sessionId),
     selectSession: (sessionId) => {
       if (sessionId !== lastSelectedSessionId) deps.store.setModes({ goal: false });

@@ -84,6 +84,10 @@ function scriptedPort(): TestPort {
       calls.push("watchEvents");
       return events;
     },
+    steerQueueItem: async (request: { readonly id: string; readonly itemId: string }) => {
+      calls.push(`steerQueueItem:${request.itemId}`);
+      return { success: true, queueItemId: request.itemId, turnId: "turn-loopback" };
+    },
     close: async (): Promise<void> => {
       calls.push("close");
     },
@@ -318,6 +322,17 @@ describe("loopback to harness-port evidence", () => {
     });
     expect(listed.kind).toBe("response");
     expect(port.calls).toContain("listSessions");
+
+    const steered = await once_(first.ws, {
+      kind: "request",
+      protocolVersion: info.protocolVersion,
+      requestId: "r-steer-queue-item",
+      operation: "steerQueueItem",
+      body: { id: "s-loopback", itemId: "q-loopback" },
+    });
+    expect(steered.kind).toBe("response");
+    expect(steered.body).toEqual({ success: true, queueItemId: "q-loopback", turnId: "turn-loopback" });
+    expect(port.calls).toContain("steerQueueItem:q-loopback");
 
     // 4. The events subscription opens and delivers a live event frame.
     const watcher = new WebSocket(url);

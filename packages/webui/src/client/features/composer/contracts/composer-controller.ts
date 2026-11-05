@@ -51,6 +51,7 @@ export interface WebuiComposerController {
   readonly submit: (intent: WebuiComposerSubmitIntent) => Promise<WebuiComposerSubmitOutcome>;
   readonly retry: (input: WebuiComposerSubmitIntent & { readonly refusal?: string; readonly sessionId?: string }) => Promise<void>;
   readonly removeQueued: (input: { readonly sessionId: string; readonly itemId: string }) => Promise<void>;
+  readonly steerQueued: (input: { readonly sessionId: string; readonly itemId: string }) => Promise<void>;
   readonly refreshQueue: (sessionId: string) => void;
   readonly selectSession: (sessionId: string | undefined) => void;
   readonly attachView: (sessionId: string | undefined) => () => void;

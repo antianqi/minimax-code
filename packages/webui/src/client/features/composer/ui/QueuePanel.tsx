@@ -2,9 +2,9 @@ import type { ReactElement } from "react";
 
 import type { WebuiQueueItem } from "../../../../shared/contracts/queue.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
-import { WebuiButton } from "../../../ui/button.js";
+import { WebuiIconButton } from "../../../ui/button.js";
 import { WebuiStack } from "../../../ui/layout-primitives.js";
-import { WebuiCard } from "../../../ui/card.js";
+import { WebuiIconContextTrash, WebuiIconQueuedMessages, WebuiIconSend } from "../../../shell/icons.js";
 
 /**
  * The messages waiting behind a running turn, and whether the queue is held.
@@ -26,10 +26,12 @@ export function WebuiQueuePanel({
   items,
   paused,
   onRemove,
+  onSendNow,
 }: {
   readonly items: readonly WebuiQueueItem[];
   readonly paused?: boolean;
   readonly onRemove?: (item: WebuiQueueItem) => void;
+  readonly onSendNow?: (item: WebuiQueueItem) => void;
 }): ReactElement | null {
   // Paused with nothing queued still gets the notice: the user hit stop and
   // the answer they need is that the rest is held, not gone. With no items and
@@ -44,39 +46,67 @@ export function WebuiQueuePanel({
         </FeedbackLiveRegion>
       ) : null}
       {items.length > 0 ? (
-        <WebuiStack gap="small" className="mt-3 w-full" data-webui-queue="true">
-          <strong
-            aria-label="排队消息"
-            className="text-size_14"
-            data-webui-queue-count={items.length}
-          >
-            排队消息（{items.length}）
-          </strong>
-          <WebuiStack as="ul" gap="small" className="w-full" role="list">
-            {items.map((item) => (
-              <WebuiCard
-                as="li"
-                key={item.itemId}
-                data-webui-queue-item={item.itemId}
-                className="flex items-center gap-2 p-spacing_12"
-              >
-                <span className="min-w-0 flex-1 truncate text-size_14">
-                  {item.content || item.itemId}
-                </span>
-                {/* Only a message the runtime has not picked up can be taken
-                    * back out. The button appears on a running or finished row
-                    * it would look operable and do nothing. */}
-                {item.status === "queued" && onRemove ? (
-                  <WebuiButton variant="grouped" size="pill-compact"
-                    onClick={() => onRemove(item)}
-                    data-webui-remove-queue-item={item.itemId}
-                  >
-                    移除
-                  </WebuiButton>
-                ) : null}
-              </WebuiCard>
-            ))}
-          </WebuiStack>
+        <WebuiStack
+          as="ul"
+          gap="none"
+          className="webui-queue-list w-full"
+          role="list"
+          aria-label={`排队消息（${items.length}）`}
+          data-webui-queue="true"
+          data-webui-queue-count={items.length}
+        >
+          {items.map((item) => (
+            <li key={item.itemId} data-webui-queue-item={item.itemId} className="webui-goal-banner webui-queue-item">
+              <div className="webui-goal-banner-row">
+                <div className="webui-goal-banner-leading">
+                  <span className="webui-goal-banner-icon" aria-hidden="true"><WebuiIconQueuedMessages /></span>
+                  <FeedbackLiveRegion className="webui-goal-status">
+                    {paused
+                      ? "已暂停"
+                      : item.status === "queued"
+                        ? "排队中"
+                        : item.status === "running"
+                          ? "进行中"
+                          : "已完成"}
+                  </FeedbackLiveRegion>
+                </div>
+                <div className="webui-goal-banner-content-row">
+                  <div className="webui-goal-banner-objective-group">
+                    <span className="webui-goal-objective" title={item.content || item.itemId}>
+                      {item.content || item.itemId}
+                    </span>
+                  </div>
+                </div>
+                <div className="webui-goal-banner-actions-slot webui-queue-actions">
+                  {/* These actions use the goal banner's compact icon controls. */}
+                  {item.status === "queued" && onSendNow ? (
+                    <WebuiIconButton
+                      tone="bare"
+                      className="webui-goal-action"
+                      label="立即发送"
+                      title="立即发送"
+                      data-webui-send-queue-item={item.itemId}
+                      onClick={() => onSendNow(item)}
+                    >
+                      <WebuiIconSend />
+                    </WebuiIconButton>
+                  ) : null}
+                  {item.status === "queued" && onRemove ? (
+                    <WebuiIconButton
+                      tone="bare"
+                      className="webui-goal-action"
+                      label="移除排队消息"
+                      title="移除"
+                      data-webui-remove-queue-item={item.itemId}
+                      onClick={() => onRemove(item)}
+                    >
+                      <WebuiIconContextTrash />
+                    </WebuiIconButton>
+                  ) : null}
+                </div>
+              </div>
+            </li>
+          ))}
         </WebuiStack>
       ) : null}
     </WebuiStack>

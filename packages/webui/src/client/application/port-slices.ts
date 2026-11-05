@@ -17,7 +17,7 @@
 // | `sessions` | `WebuiSessionsSlice` | `SessionPort` | `loadProjects`, `listArchivedSessions`, `loadSessions`, `loadSessionTree`, `createSession`, `archiveSession`, `deleteSession`, `updateSession`, `getSessionForkOptions`, `forkSession`, `getSessionUsage` |
 // | `transcript` | `WebuiTranscriptSlice` | `TranscriptPort` | `loadMessages`, `getSessionDiff`, `getTurnDiff`, `revertTurnDiff`, `reapplyTurnDiff`, `getSessionRewindPreview`, `rewindSession`, `editSessionMessage` |
 // | `workspace` | `WebuiWorkspaceSlice` | `WorkspacePort` + `TerminalPort` | the fourteen workspace members plus the six terminal ones |
-// | `composer` | `WebuiComposerSlice` | `ComposerPort` | `runCommand`, `enqueueMessage`, `listQueueMessages`, `deleteQueueItem` |
+// | `composer` | `WebuiComposerSlice` | `ComposerPort` | `runCommand`, `enqueueMessage`, `listQueueMessages`, `deleteQueueItem`, `steerQueueItem` |
 // | `interactions` | `WebuiInteractionsSlice` | `InteractionPort` | `listPendingPermissions`, `getPendingQuestionnaire`, `replyPermission`, `replyQuestionnaire`, `dismissQuestionnaire` |
 // | `goal` | `WebuiGoalSlice` | `GoalPort` | `isGoalEnabled`, `getGoal`, `createGoal`, `patchGoal`, `clearGoal` |
 // | `models` | `WebuiModelsSlice` | `ModelsPort` | the fifteen catalogue, selection and provider members |
@@ -169,6 +169,7 @@ const COMPOSER_KEYS = [
   "enqueueMessage",
   "listQueueMessages",
   "deleteQueueItem",
+  "steerQueueItem",
 ] as const satisfies readonly (keyof ComposerPort)[];
 
 const INTERACTIONS_KEYS = [

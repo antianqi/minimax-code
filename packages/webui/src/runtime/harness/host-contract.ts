@@ -450,6 +450,10 @@ export interface WebuiRuntimeCliService {
     readonly id: string;
     readonly itemId: string;
   }): Promise<{ readonly item?: WebuiQueueItem }>;
+  steerSession(request: {
+    readonly id: string;
+    readonly queueItemId: string;
+  }): Promise<{ readonly success?: boolean; readonly queueItemId?: string; readonly turnId?: string }>;
   /** Converted in `result-conversion.ts`: the runtime lists untyped entries. */
   listModels(request?: {
     readonly sessionId?: string;

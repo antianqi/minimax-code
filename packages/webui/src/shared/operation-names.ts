@@ -106,6 +106,7 @@ export const DISMISS_QUESTIONNAIRE_OPERATION_NAME = "dismissQuestionnaire" as co
 export const ABORT_SESSION_OPERATION_NAME = "abortSession" as const;
 export const LIST_QUEUE_MESSAGES_OPERATION_NAME = "listQueueMessages" as const;
 export const DELETE_QUEUE_ITEM_OPERATION_NAME = "deleteQueueItem" as const;
+export const STEER_QUEUE_ITEM_OPERATION_NAME = "steerQueueItem" as const;
 export const LIST_MODELS_OPERATION_NAME = "listModels" as const;
 export const SELECT_MODEL_OPERATION_NAME = "selectModel" as const;
 export const LIST_SKILLS_OPERATION_NAME = "listSkills" as const;
@@ -788,6 +789,10 @@ export interface OperationSpec {
   deleteQueueItem: {
     request: { readonly id: string; readonly itemId: string };
     response: { readonly item?: WebuiQueueItem };
+  };
+  steerQueueItem: {
+    request: { readonly id: string; readonly itemId: string };
+    response: { readonly success?: boolean; readonly queueItemId?: string; readonly turnId?: string };
   };
   listModels: {
     request: { readonly sessionId?: string };

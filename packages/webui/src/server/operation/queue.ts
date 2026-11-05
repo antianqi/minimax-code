@@ -1,7 +1,7 @@
 import { WebuiErrorCode } from "../../shared/envelope.js";
 import type { WebuiOperation } from "./operation-contract.js";
 import { validateSessionIdBody, validateOptionalObjectBody } from "./common.js";
-import { ABORT_SESSION_OPERATION_NAME, LIST_QUEUE_MESSAGES_OPERATION_NAME, DELETE_QUEUE_ITEM_OPERATION_NAME, LIST_MODELS_OPERATION_NAME, SELECT_MODEL_OPERATION_NAME, LIST_SKILLS_OPERATION_NAME, GET_SESSION_USAGE_OPERATION_NAME } from "../../shared/operation-names.js";
+import { ABORT_SESSION_OPERATION_NAME, LIST_QUEUE_MESSAGES_OPERATION_NAME, DELETE_QUEUE_ITEM_OPERATION_NAME, STEER_QUEUE_ITEM_OPERATION_NAME, LIST_MODELS_OPERATION_NAME, SELECT_MODEL_OPERATION_NAME, LIST_SKILLS_OPERATION_NAME, GET_SESSION_USAGE_OPERATION_NAME } from "../../shared/operation-names.js";
 export const abortSessionOperation: WebuiOperation<
   {
     readonly id: string;
@@ -51,6 +51,31 @@ export const deleteQueueItemOperation: WebuiOperation<
         ok: false,
         code: WebuiErrorCode.invalidBody,
         message: "deleteQueueItem body requires id and itemId",
+      };
+    return { ok: true, body: { id, itemId } };
+  },
+};
+
+export const steerQueueItemOperation: WebuiOperation<
+  { readonly id: string; readonly itemId: string },
+  { readonly success?: boolean; readonly queueItemId?: string; readonly turnId?: string }
+> = {
+  name: STEER_QUEUE_ITEM_OPERATION_NAME,
+  validate: (body) => {
+    if (body === null || typeof body !== "object" || Array.isArray(body))
+      return {
+        ok: false,
+        code: WebuiErrorCode.invalidBody,
+        message: "steerQueueItem body must be an object",
+      };
+    const candidate = body as Record<string, unknown>;
+    const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    const itemId = typeof candidate.itemId === "string" ? candidate.itemId.trim() : "";
+    if (!id || !itemId)
+      return {
+        ok: false,
+        code: WebuiErrorCode.invalidBody,
+        message: "steerQueueItem body requires id and itemId",
       };
     return { ok: true, body: { id, itemId } };
   },

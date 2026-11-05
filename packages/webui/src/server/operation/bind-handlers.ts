@@ -71,6 +71,7 @@ import {
   abortSessionOperation,
   listQueueMessagesOperation,
   deleteQueueItemOperation,
+  steerQueueItemOperation,
   listModelsOperation,
   listSkillsOperation,
   selectModelOperation,
@@ -423,6 +424,11 @@ export const WEBUI_OPERATION_BINDINGS = {
   }),
   deleteQueueItem: bind("execution")("deleteQueueItem")("deleteQueueItem")({
     operation: deleteQueueItemOperation,
+    args: (body) => [body],
+    result: identity,
+  }),
+  steerQueueItem: bind("execution")("steerQueueItem")("steerQueueItem")({
+    operation: steerQueueItemOperation,
     args: (body) => [body],
     result: identity,
   }),

@@ -175,7 +175,6 @@ const MISMATCHED_RESULT_NAMES = [] as const satisfies readonly MismatchedResultN
 /** A sample of what the runtime declares and the WebUI deliberately does not forward. */
 const NOT_FORWARDED_NAMES = [
   "steer",
-  "steerSession",
   "getPeekContext",
   "listRuntimeSkills",
   "listBackgroundTasks",

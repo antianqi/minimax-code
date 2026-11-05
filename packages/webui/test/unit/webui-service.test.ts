@@ -612,6 +612,10 @@ class ScriptedHarnessPort implements WebuiHarnessPort {
     return {};
   }
 
+  async steerQueueItem(request: { readonly id: string; readonly itemId: string }) {
+    return { success: true, queueItemId: request.itemId, turnId: "service-turn" };
+  }
+
   async listModels() {
     return [];
   }
@@ -4162,6 +4166,9 @@ describe("WebUI shutdown order (criterion 7)", () => {
       async deleteQueueItem() {
         return {};
       },
+      async steerQueueItem(request) {
+        return { success: true, queueItemId: request.itemId, turnId: "recording-turn" };
+      },
       async listModels() {
         return [];
       },
@@ -4577,6 +4584,9 @@ describe("WebUI shutdown order (criterion 7)", () => {
       },
       async deleteQueueItem() {
         return {};
+      },
+      async steerQueueItem(request) {
+        return { success: true, queueItemId: request.itemId, turnId: "recording-turn" };
       },
       async listModels() {
         return [];

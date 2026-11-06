@@ -31,6 +31,17 @@ The server listens on `http://127.0.0.1:2233/`. Set `WEBUI_SERVER_PORT` to
 change the port or `MINIMAX_DATA_DIR` to change the local data directory. The
 default data directory is `~/.minimax`.
 
+Use `mcode-webui --help` or `mcode-webui --version` without starting the runtime
+or opening the database.
+
+When a schema migration or compatibility repair is needed, startup first creates
+and verifies a SQLite backup. It prints the copy progress and the start of the
+integrity check. The copy uses a stable WAL read snapshot so another host's writes
+do not restart it. A copy with no progress for 60 seconds, or taking more than
+10 minutes, stops before schema migration and removes its incomplete backup.
+Check available disk space and storage performance before retrying. The read
+snapshot can temporarily retain WAL pages while other hosts continue writing.
+
 `mcode-webui` opens the page in your default browser once the server is
 listening. Set `WEBUI_OPEN_BROWSER=0` to keep it from doing that; with the
 variable unset it stays quiet when the command's output is not a terminal, so a

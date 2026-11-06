@@ -6,7 +6,36 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import {
+import { parseArgs } from "node:util";
+
+const { values: args } = parseArgs({
+  options: {
+    help: { type: "boolean", short: "h" },
+    version: { type: "boolean", short: "v" },
+  },
+});
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { version } = JSON.parse(await readFile(path.join(packageRoot, "server/package-info.json"), "utf8"));
+if (args.help) {
+  console.log(`Usage: mcode-webui [--help | --version]
+
+Start the MiniMax Code WebUI. Configuration is read from environment variables:
+  MINIMAX_DATA_DIR     Data directory (default: ~/.minimax)
+  WEBUI_HOST          Bind address (default: 127.0.0.1)
+  WEBUI_SERVER_PORT   WebUI port (default: 2233)
+  WEBUI_MINIAPP_PORT  Mini App port (default: 49152)
+
+  -h, --help          Show help without starting the runtime
+  -v, --version       Show the installed version`);
+  process.exit(0);
+}
+if (args.version) {
+  console.log(version);
+  process.exit(0);
+}
+
+// Help/version must not load native modules, access user data or open listeners.
+const {
   WebuiService,
   createOperationRegistry,
   BrowserBridgeServer,
@@ -14,16 +43,14 @@ import {
   createMiniAppProxyRegistry,
   createMiniAppPresenter,
   createWebuiCredential,
-} from "../server/server.js";
-import {
+} = await import("../server/server.js");
+const {
   WebuiTerminalManager,
   createBrowserAdapter,
   createHarnessPortFromHost,
   createWebuiRuntimeHost,
-} from "../server/runtime.js";
+} = await import("../server/runtime.js");
 
-const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const { version } = JSON.parse(await readFile(path.join(packageRoot, "server/package-info.json"), "utf8"));
 const portValue = process.env.WEBUI_SERVER_PORT?.trim() || "2233";
 const tcpPort = Number(portValue);
 if (!Number.isInteger(tcpPort) || tcpPort < 1 || tcpPort > 65535) {

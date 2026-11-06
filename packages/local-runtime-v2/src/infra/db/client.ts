@@ -21,6 +21,10 @@ interface BetterSqlite3BackupProgress {
   readonly remainingPages: number;
 }
 
+export interface DatabaseBackupOptions {
+  readonly progress?: (progress: BetterSqlite3BackupProgress) => number | void;
+}
+
 interface BetterSqlite3OpenOptions {
   readonly readonly?: boolean;
   readonly fileMustExist?: boolean;
@@ -30,7 +34,7 @@ interface BetterSqlite3OpenOptions {
 export interface BetterSqlite3Instance {
   exec(sql: string): void;
   prepare(sql: string): BetterSqlite3Statement;
-  backup(filename: string): Promise<BetterSqlite3BackupProgress>;
+  backup(filename: string, options?: DatabaseBackupOptions): Promise<BetterSqlite3BackupProgress>;
   transaction<T>(fn: () => T): BetterSqlite3Transaction<T>;
   close(): void;
 }
@@ -79,9 +83,18 @@ export class DatabaseClient {
     return rawDb;
   }
 
-  /** Save the current connection to the specified file using SQLite's online backup API. */
-  async backup(destinationPath: string): Promise<void> {
-    await this.rawDb.backup(destinationPath);
+  /** Pin a WAL read snapshot so writes from another host cannot restart the online backup. */
+  async backup(destinationPath: string, options?: DatabaseBackupOptions): Promise<void> {
+    const database = this.rawDb;
+    database.exec('BEGIN');
+    try {
+      // BEGIN is deferred: a real read must establish the snapshot before the first backup step.
+      database.prepare('SELECT count(*) FROM sqlite_schema').get();
+      await database.backup(destinationPath, options);
+    } finally {
+      // Release the snapshot on success and on callback-driven cancellation before any migration.
+      database.exec('ROLLBACK');
+    }
   }
 
   /** Validate the backup through an independent read-only connection; only a single `ok` row passes. */

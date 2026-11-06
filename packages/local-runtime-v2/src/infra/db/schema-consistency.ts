@@ -53,6 +53,7 @@ const EXPECTED_TABLES = {
     'status',
     'created_at_ms',
     'execution_claimed_at_ms',
+    'owner_instance_id',
     'delivered_at_ms',
     'failed_at_ms',
     'error_code',

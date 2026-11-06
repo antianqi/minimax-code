@@ -1713,6 +1713,7 @@
     "packages/local-runtime-v2/test/integration/compaction-openai-transport.integration.test.ts",
     "packages/local-runtime-v2/test/integration/cron-claim-recovery.integration.test.ts",
     "packages/local-runtime-v2/test/integration/cron-two-hosts-slot.integration.test.ts",
+    "packages/local-runtime-v2/test/integration/database-startup-compatibility.integration.test.ts",
     "packages/local-runtime-v2/test/integration/mcp/local-mcp-public-facade.integration.test.ts",
     "packages/local-runtime-v2/test/integration/mcp/project-mcp.integration.test.ts",
     "packages/local-runtime-v2/test/integration/miniapp-permission-repository.integration.test.ts",

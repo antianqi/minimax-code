@@ -3,7 +3,8 @@ import { mkdir, lstat, readdir, realpath, rm } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import type { DatabaseClient } from './client.js';
+import type { DatabaseBackupOptions, DatabaseClient } from './client.js';
+import { logger } from '../logging/index.js';
 
 const BACKUP_DIRECTORY = join('v2', 'sqlite', 'backups');
 const BACKUP_FILE_PREFIX = 'runtime-state-before-v2-migration';
@@ -13,12 +14,17 @@ const BACKUP_FILE_PATTERN = new RegExp(
 );
 
 const DATABASE_BACKUP_INITIALIZATION_ERROR_CODE = 'LOCAL_RUNTIME_V2_DATABASE_BACKUP_FAILED';
+const BACKUP_NO_PROGRESS_TIMEOUT_MS = 60_000;
+const BACKUP_COPY_TIMEOUT_MS = 10 * 60_000;
+const BACKUP_PROGRESS_LOG_INTERVAL_MS = 5_000;
 
 class DatabaseBackupInitializationError extends Error {
   readonly code = DATABASE_BACKUP_INITIALIZATION_ERROR_CODE;
 
   constructor(cause?: unknown) {
-    super('Local runtime database backup failed');
+    super(
+      'Local runtime database backup failed; schema migration was not started. Check disk space and backup progress, then retry.',
+    );
     this.name = 'DatabaseBackupInitializationError';
     if (cause !== undefined) this.cause = cause;
   }
@@ -44,7 +50,7 @@ export type DatabaseBackupResult =
 export type CreatedDatabaseBackup = Extract<DatabaseBackupResult, { readonly created: true }>;
 
 interface DatabaseBackupPort {
-  backup(destinationPath: string): Promise<void>;
+  backup(destinationPath: string, options?: DatabaseBackupOptions): Promise<void>;
   hasValidIntegrity(databasePath: string): boolean;
 }
 
@@ -82,15 +88,22 @@ export async function createDatabaseBackupIfPending(
     }
     destinationPath = join(resolvedDataDir, BACKUP_DIRECTORY, fileName);
     const backupStartedAtMs = Date.now();
-    await options.database.backup(destinationPath);
+    reportBackupProgress('copy_started', {});
+    await options.database.backup(destinationPath, { progress: createBackupProgressMonitor() });
     const backupMs = Math.max(0, Date.now() - backupStartedAtMs);
     if (!(await hasPlainBackupDirectoryChain(resolvedDataDir))) {
       throw new Error('unsafe backup directory after write');
     }
     const integrityStartedAtMs = Date.now();
+    reportBackupProgress('integrity_check_started', { copy_ms: backupMs });
     const verifiedFileIdentity = await verifyCreatedBackup(options.database, destinationPath);
     const integrityMs = Math.max(0, Date.now() - integrityStartedAtMs);
     const sizeBytes = readIdentitySizeBytes(verifiedFileIdentity);
+    reportBackupProgress('completed', {
+      copy_ms: backupMs,
+      integrity_ms: integrityMs,
+      size_bytes: sizeBytes,
+    });
     return {
       created: true,
       backupId,
@@ -110,6 +123,48 @@ export async function createDatabaseBackupIfPending(
       await removeBackupFamily(destinationPath);
     }
     throw new DatabaseBackupInitializationError(error);
+  }
+}
+
+function createBackupProgressMonitor(): NonNullable<DatabaseBackupOptions['progress']> {
+  const startedAt = performance.now();
+  let lastProgressAt = startedAt;
+  let lastLogAt = -Infinity;
+  let bestRemainingPages = Infinity;
+  return ({ totalPages, remainingPages }) => {
+    const now = performance.now();
+    if (remainingPages < bestRemainingPages) {
+      bestRemainingPages = remainingPages;
+      lastProgressAt = now;
+    }
+    // Throw inside better-sqlite3's callback: it closes the native backup before rejecting.
+    // A Promise.race timeout would leave a writer running against a file being cleaned up.
+    if (now - lastProgressAt >= BACKUP_NO_PROGRESS_TIMEOUT_MS) {
+      throw new Error(
+        'Database backup made no progress for 60 seconds. Check disk space and storage activity, then retry.',
+      );
+    }
+    if (now - startedAt >= BACKUP_COPY_TIMEOUT_MS) {
+      throw new Error(
+        'Database backup exceeded 10 minutes. Check storage performance and pause other database writers before retrying.',
+      );
+    }
+    if (now - lastLogAt >= BACKUP_PROGRESS_LOG_INTERVAL_MS) {
+      lastLogAt = now;
+      reportBackupProgress('copy_progress', {
+        total_pages: totalPages,
+        remaining_pages: remainingPages,
+        elapsed_ms: Math.round(now - startedAt),
+      });
+    }
+  };
+}
+
+function reportBackupProgress(phase: string, fields: Record<string, unknown>): void {
+  try {
+    logger.info({ phase, ...fields }, 'Local runtime database backup');
+  } catch {
+    // Diagnostics must not affect the backup or its cleanup.
   }
 }
 

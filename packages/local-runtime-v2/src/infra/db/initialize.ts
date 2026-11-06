@@ -7,6 +7,10 @@ import {
 } from './backup.js';
 import { runMigrations } from './migrate.js';
 import { ALL_MIGRATIONS } from './migrations.js';
+import {
+  ensureCronRunClaimOwner,
+  needsCronRunClaimOwnerRepair,
+} from './migrations/cron/migration-0054-cron-run-claim-owner.js';
 import { migration as queryCollapseMigration } from './migrations/session/migration-0016-create-query-collapse-view-states.js';
 import { assertDatabaseSchemaConsistent } from './schema-consistency.js';
 import { disableLegacyCronsWithoutFutureRun } from './legacy-cron-recovery.js';
@@ -67,16 +71,19 @@ export async function initializeDatabase(options: {
   const pendingVersions = ALL_MIGRATIONS.filter((migration) => !applied.has(migration.version)).map(
     (migration) => migration.version,
   );
+  const claimOwnerRepairPending = needsCronRunClaimOwnerRepair(options.database.rawDb);
+  const pendingMigrationCount =
+    pendingVersions.length + Number(claimOwnerRepairPending && !pendingVersions.includes(54));
   // Opening the connection / reading version metadata precedes this interval.
   // Measure backup, recovery, all pending migrations and final schema validation.
   const startedAtEpochMs = options.onMigration ? migrationEpochNow() : undefined;
-  reportDatabaseMigration(options.onMigration, 'started', startedAtEpochMs, pendingVersions.length);
+  reportDatabaseMigration(options.onMigration, 'started', startedAtEpochMs, pendingMigrationCount);
   try {
     const backupStartedAtMs = Date.now();
     const backup = await createDatabaseBackupIfPending({
       database: options.database,
       dataDir: options.dataDir,
-      pending: pendingVersions.length > 0,
+      pending: pendingVersions.length > 0 || claimOwnerRepairPending,
     });
     const backupMs = Math.max(0, Date.now() - backupStartedAtMs);
     const migrationsStartedAtMs = Date.now();
@@ -104,6 +111,21 @@ export async function initializeDatabase(options: {
       migration32Pending: pendingVersions.includes(32),
     });
     runMigrations(options.database.rawDb, ALL_MIGRATIONS);
+    // A numeric receipt from another lineage is not proof of this column. Recheck after all
+    // historical migrations (some rebuild Cron tables), without rewriting shared history.
+    if (needsCronRunClaimOwnerRepair(options.database.rawDb)) {
+      options.database.rawDb
+        .transaction(() => {
+          if (!needsCronRunClaimOwnerRepair(options.database.rawDb)) return;
+          if (!backup.created) {
+            throw new Error(
+              'Cron schema changed during initialization; restart to back up and repair it',
+            );
+          }
+          ensureCronRunClaimOwner(options.database.rawDb);
+        })
+        .immediate();
+    }
     const migrationsMs = Math.max(0, Date.now() - migrationsStartedAtMs);
     const schemaCheckStartedAtMs = Date.now();
     assertDatabaseSchemaConsistent(options.database.rawDb);
@@ -112,7 +134,7 @@ export async function initializeDatabase(options: {
       options.onMigration,
       'completed',
       startedAtEpochMs,
-      pendingVersions.length,
+      pendingMigrationCount,
     );
     return {
       pendingVersions,
@@ -136,12 +158,7 @@ export async function initializeDatabase(options: {
       skippedSessionProjectRepairCount,
     };
   } catch (error) {
-    reportDatabaseMigration(
-      options.onMigration,
-      'failed',
-      startedAtEpochMs,
-      pendingVersions.length,
-    );
+    reportDatabaseMigration(options.onMigration, 'failed', startedAtEpochMs, pendingMigrationCount);
     throw error;
   }
 }

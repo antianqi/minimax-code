@@ -26,6 +26,26 @@ import { extensionIdFromPublicKey, parseExtensionIdList, readStoreExtensionIds }
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
+test('WebUI help and version do not import or start the runtime', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'webui-launcher-help-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, 'bin'));
+  mkdirSync(path.join(root, 'server'));
+  const launcher = path.join(root, 'bin/mcode-webui.mjs');
+  copyFileSync(new URL('../release/webui-npm/bin/mcode-webui.mjs', import.meta.url), launcher);
+  writeFileSync(path.join(root, 'server/package-info.json'), JSON.stringify({ version: '0.0.0-test' }));
+  // No runtime bundles or native dependencies: these commands must exit before importing them.
+  for (const argument of ['--help', '-h', '--version', '-v']) {
+    const result = spawnSync(process.execPath, [launcher, argument], {
+      encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, MINIMAX_DATA_DIR: path.join(root, 'untouched-data'), WEBUI_SERVER_PORT: 'invalid' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, argument === '--help' || argument === '-h' ? /Usage: mcode-webui/ : /0\.0\.0-test/);
+    assert.equal(existsSync(path.join(root, 'untouched-data')), false);
+  }
+});
+
 test('permanent loader approval follows tokens rather than line numbers', () => {
   const loader = 'const entry = new URL("./embedded/cli.mjs", import.meta.url); await import(entry.href);';
   assert.equal(sourceFingerprint('loader.ts', loader), sourceFingerprint('loader.ts', `// comment\n\n${loader}`));

@@ -17,16 +17,22 @@ const CRON_RUNS_TABLE = 'local_runtime_v2_cron_runs';
 export const migration: MigrationEntry = {
   version: 54,
   name: 'add_cron_run_claim_owner',
-  up(database: MigrationDatabase): void {
-    const columns = readColumns(database);
-    if (columns.size === 0) return;
-    if (columns.has('owner_instance_id')) return;
-    database.exec(`
+  up: ensureCronRunClaimOwner,
+};
+
+/** Shared profiles can retain a version receipt without this fork's column. */
+export function needsCronRunClaimOwnerRepair(database: MigrationDatabase): boolean {
+  const columns = readColumns(database);
+  return columns.size > 0 && !columns.has('owner_instance_id');
+}
+
+export function ensureCronRunClaimOwner(database: MigrationDatabase): void {
+  if (!needsCronRunClaimOwnerRepair(database)) return;
+  database.exec(`
       ALTER TABLE ${CRON_RUNS_TABLE}
         ADD COLUMN owner_instance_id TEXT;
     `);
-  },
-};
+}
 
 function readColumns(database: MigrationDatabase): Set<string> {
   return new Set(

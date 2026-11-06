@@ -79,6 +79,14 @@ try {
   );
   const manifest = JSON.parse(readFileSync(path.join(packageDir, "package.json"), "utf8"));
   const installed = resolveInstalledPackage(prefix, manifest.name);
+  const launcher = path.join(installed, manifest.bin["mcode-webui"]);
+  const helpDataDir = path.join(work, "help-must-not-create-data");
+  const infoEnvironment = { ...process.env, MINIMAX_DATA_DIR: helpDataDir, WEBUI_SERVER_PORT: "invalid" };
+  const help = run(process.execPath, [launcher, "--help"], { env: infoEnvironment });
+  const installedVersion = run(process.execPath, [launcher, "--version"], { env: infoEnvironment });
+  if (!help.includes("Usage: mcode-webui") || installedVersion.trim() !== manifest.version || existsSync(helpDataDir)) {
+    throw new Error("Installed WebUI help/version must exit without starting the runtime");
+  }
   const probe = createServer();
   probe.listen(0, "127.0.0.1");
   await once(probe, "listening");

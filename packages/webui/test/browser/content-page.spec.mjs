@@ -19,8 +19,8 @@ import { expect } from "@playwright/test";
 import { configureFixture, openApp, test } from "./harness.mjs";
 
 const VIEWPORTS = [
-  { name: "wide", width: 1440, height: 900 },
-  { name: "narrow", width: 390, height: 844 },
+  { name: "wide", width: 1440, height: 900, railMode: "column" },
+  { name: "narrow", width: 390, height: 844, railMode: "drawer" },
 ];
 const THEMES = ["light", "dark"];
 
@@ -97,6 +97,9 @@ for (const theme of THEMES) {
       // The page is measured at the enumerated viewport; it is *reached* at the wide
       // one, where the rail's rows are on screen.
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      // ResizeObserver commits the shell's mode after the viewport changes.
+      // Measure the content once the rail has handed its column width back.
+      await expect(page.locator('[data-webui-shell="two-column"]')).toHaveAttribute("data-webui-rail-mode", viewport.railMode);
       const panel = page.locator('[data-webui-component="scheduling-panel"]');
       await expect(panel).toBeVisible();
 
@@ -128,6 +131,7 @@ for (const theme of THEMES) {
       await railRow.click();
       await expect(page.getByTestId("remote-page")).toBeVisible();
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(page.locator('[data-webui-shell="two-column"]')).toHaveAttribute("data-webui-rail-mode", viewport.railMode);
 
       const measured = await measure(page, '[data-testid="remote-page"]');
       expect(measured?.pageScrolls, "the remote page does not scroll as a page").toBe(false);

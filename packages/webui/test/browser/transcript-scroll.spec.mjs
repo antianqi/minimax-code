@@ -28,9 +28,18 @@ const endGap = (page) =>
 const scrollTop = (page) => page.locator(VIEWPORT).evaluate((element) => element.scrollTop);
 
 async function setScrollTop(page, value) {
-  await page.locator(VIEWPORT).evaluate((element, top) => {
+  await page.locator(VIEWPORT).evaluate((element, top) => new Promise((resolve) => {
+    const previous = element.scrollTop;
+    // Let the binding observe each synthetic step before the next assignment:
+    // the browser otherwise coalesces "away, then back" into one end position.
+    const onScroll = () => resolve();
+    element.addEventListener("scroll", onScroll, { once: true });
     element.scrollTop = top;
-  }, value);
+    if (element.scrollTop === previous) {
+      element.removeEventListener("scroll", onScroll);
+      resolve();
+    }
+  }), value);
 }
 
 /** One assistant chunk with its own message id, so the transcript grows. */
@@ -108,13 +117,8 @@ test("the follower pins again once the reader is back at the end", async ({ page
   // Back at the end: the next growth is followed again.
   await setScrollTop(page, 100000);
   await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
-  // Let the scroll this assignment produced be processed BEFORE the content
-  // grows. Otherwise the browser may deliver it after the growth, when the
-  // viewport is no longer at the end, and the walk back is not read as a walk
-  // back — a race in the case, not in the policy, and one this wait removes.
-  await page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
+  // setScrollTop has waited for the native event, so the binding has observed
+  // both leaving and returning before the stream grows again.
   await grow(page, "m2", 40);
   await expect.poll(() => endGap(page)).toBeLessThanOrEqual(4);
 });

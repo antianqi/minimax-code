@@ -773,7 +773,7 @@ describe("watchMiniAppPresentation", () => {
     };
     /** Invoke the stream operation the way the dispatcher does, and keep its source. */
     const openLease = async (
-      body: { readonly pluginId: string; readonly sessionId: string },
+      body: { readonly pluginId: string; readonly sessionId?: string },
       signal?: AbortSignal,
     ): Promise<LeaseStream> => {
       const entry = entries.get(watchMiniAppPresentationOperation.name);
@@ -794,6 +794,27 @@ describe("watchMiniAppPresentation", () => {
   it("registers the lease beside the other three, so it is not an unknown operation", () => {
     const registry = createOperationRegistry({} as WebuiOperationPort);
     expect(registry.has(watchMiniAppPresentationOperation.name)).toBe(true);
+  });
+
+  it("holds a home-page lease without looking up or inventing a session", async () => {
+    const { port, calls } = createFacade();
+    const { handle, openLease } = createLeaseHarness(port);
+    const controller = new AbortController();
+    const lease = await openLease({ pluginId: LEASE_PLUGIN }, controller.signal);
+    expect((await lease.frames.next()).value).toEqual({
+      pluginId: LEASE_PLUGIN,
+      presentationRevision: 1,
+      session: "none",
+    });
+    expect(calls.sessions).toEqual([]);
+    expect(await handle("listMiniApps", undefined)).toMatchObject({
+      miniApps: expect.arrayContaining([expect.objectContaining({ pluginId: LEASE_PLUGIN, detached: true })]),
+    });
+    controller.abort();
+    await lease.frames.next();
+    expect(await handle("listMiniApps", undefined)).toMatchObject({
+      miniApps: expect.arrayContaining([expect.objectContaining({ pluginId: LEASE_PLUGIN, detached: false })]),
+    });
   });
 
   it("holds the lease while the stream is open, and the catalogue says so", async () => {

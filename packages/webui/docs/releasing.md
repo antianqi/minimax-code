@@ -1,6 +1,6 @@
 # WebUI package on the npm registry
 
-The WebUI is packaged as `@fectivnfy112358/minimax-code-web` and published to
+The WebUI is packaged as `@minimax-webui/minimax-code` and published to
 `https://registry.npmjs.org` under the `preview` dist-tag. Publishing is fully
 automatic: every push to the `webui` branch builds the standalone package and
 publishes a new preview version. No tag, no version edit, no manual step.
@@ -30,7 +30,7 @@ successful run recomputes the same version, sees it published, and no-ops.
 
 The workflow authenticates with the repository secret `NPM_TOKEN`, which must be
 a granular access token with **Read and write (publish and stage)** access to
-`@fectivnfy112358`. It is read as `NODE_AUTH_TOKEN`, which `actions/setup-node`
+`@minimax-webui`. It is read as `NODE_AUTH_TOKEN`, which `actions/setup-node`
 turns into the `//registry.npmjs.org/:_authToken` entry the publish step needs.
 
 Set it once:

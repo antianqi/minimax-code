@@ -357,19 +357,19 @@ export const replyMiniAppToolApprovalOperation: WebuiOperation<WebuiMiniAppToolA
 /**
  * Declares a standalone presentation, and holds it for the connection's life.
  *
- * Both ids are required: the lease names the plugin it presents and the session
- * its deep link carried, and the second is what lets the standalone view report an
- * ended session instead of silently rendering a page whose conversation is gone.
+ * The plugin is required. A session is optional for launches from the home page;
+ * when supplied it lets the view report an ended conversation.
  */
 export const watchMiniAppPresentationOperation: WebuiOperation<{
   readonly pluginId: string;
-  readonly sessionId: string;
+  readonly sessionId?: string;
 }> = {
   name: WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
   validate: (body) => {
     const plugin = validatePluginId(WATCH_MINI_APP_PRESENTATION_OPERATION_NAME, body);
     if (!plugin.ok) return plugin;
     const sessionId = (body as Record<string, unknown>).sessionId;
+    if (sessionId === undefined) return { ok: true, body: plugin.body };
     if (typeof sessionId !== "string" || !sessionId.trim())
       return {
         ok: false,

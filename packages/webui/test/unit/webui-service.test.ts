@@ -862,10 +862,11 @@ function requestWithHost(
   port: number,
   requestPath: string,
   headers: Record<string, string>,
+  method = "GET",
 ): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
   return new Promise((resolve, reject) => {
     const request = httpRequest(
-      { host: "127.0.0.1", port, path: requestPath, method: "GET", headers },
+      { host: "127.0.0.1", port, path: requestPath, method, headers },
       (response) => {
         let body = "";
         response.setEncoding("utf8");
@@ -4023,6 +4024,64 @@ describe("WebUI bind address", () => {
   afterEach(async () => {
     await service?.close();
     service = undefined;
+  });
+
+  it("full access serves HTTP components without a token or cookie on a published host", async () => {
+    const clientDir = await mkdtemp(path.join(os.tmpdir(), "webui-full-access-"));
+    try {
+      const importWorkflow = vi.fn(async () => ({ kind: "not-transfer-file" as const }));
+      Object.assign(harness, { importSessionTransferWorkflow: importWorkflow });
+      await mkdir(path.join(clientDir, "assets"));
+      await mkdir(path.join(clientDir, "fonts"));
+      for (const name of ["index.html", "client.js", "styles.css", "assets/test.svg", "fonts/test.woff2"]) {
+        await writeFile(path.join(clientDir, name), name === "index.html" ? "<html><head></head><body>full access</body></html>" : "synthetic-content");
+      }
+      service = new WebuiService({
+        port: harness, operations: createOperationRegistry(harness),
+        host: "0.0.0.0", dev: false, fullAccess: true, clientDir,
+      });
+      const info = await service.start();
+      const headers = { Host: `192.168.1.20:${info.tcpPort}` };
+      for (const requestPath of ["/", "/miniapp?plugin=demo", "/client.js", "/styles.css", "/assets/test.svg", "/fonts/test.woff2"]) {
+        const response = await requestWithHost(info.tcpPort, requestPath, headers);
+        expect(response.status, requestPath).toBe(200);
+        expect(response.headers["set-cookie"]).toBeUndefined();
+        expect(response.body).not.toContain(info.credential.token);
+      }
+      const filePath = `/workspace-file?dir=${encodeURIComponent(clientDir)}&path=client.js`;
+      expect((await requestWithHost(info.tcpPort, filePath, headers)).body).toBe("synthetic-content");
+      expect((await requestWithHost(info.tcpPort, filePath, headers, "HEAD")).status).toBe(200);
+      expect((await requestWithHost(info.tcpPort, filePath, { ...headers, Range: "bytes=0-2" })).status).toBe(206);
+      expect((await requestWithHost(info.tcpPort, "/session-transfer", headers)).status).toBe(400);
+      expect((await requestWithHost(info.tcpPort, "/session-import", headers, "POST")).status).toBe(400);
+      expect(importWorkflow).toHaveBeenCalledWith(expect.objectContaining({ file: undefined }));
+      expect((await requestWithHost(info.tcpPort, "/browser-extension", headers)).status).toBe(404);
+    } finally {
+      await service?.close();
+      await removeDataDir(clientDir);
+    }
+  });
+
+  it("full access accepts real WebSocket requests and streams without credentials", async () => {
+    service = new WebuiService({
+      port: harness, operations: createOperationRegistry(harness),
+      host: "0.0.0.0", dev: false, fullAccess: true,
+    });
+    const info = await service.start();
+    const ws = new WebSocket(`ws://127.0.0.1:${info.tcpPort}/`, {
+      headers: { Host: `192.168.1.20:${info.tcpPort}`, Origin: `http://192.168.1.20:${info.tcpPort}` },
+    });
+    try {
+      await once(ws, "open");
+      expect(await requestOnce(ws, {
+        protocolVersion: WEBUI_PROTOCOL_VERSION, kind: "request", requestId: "full-version", operation: "version",
+      })).toMatchObject({ kind: "response", requestId: "full-version" });
+      expect(await requestOnce(ws, {
+        protocolVersion: WEBUI_PROTOCOL_VERSION, kind: "request", requestId: "full-events", operation: "watchEvents",
+      })).toMatchObject({ kind: "response", requestId: "full-events" });
+    } finally {
+      ws.close();
+    }
   });
 
   it("constructs for a bind address beyond loopback", async () => {

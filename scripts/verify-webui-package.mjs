@@ -5,10 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { once } from "node:events";
+import { request as httpRequest } from "node:http";
 import { WebSocket } from "ws";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const { values } = parseArgs({ options: { "package-dir": { type: "string" } } });
+const { values } = parseArgs({ options: { "package-dir": { type: "string" }, "full-access": { type: "boolean", default: false } } });
 
 /**
  * The two extension identities the packaged host is configured with.
@@ -84,20 +85,19 @@ try {
   const infoEnvironment = { ...process.env, MINIMAX_DATA_DIR: helpDataDir, WEBUI_SERVER_PORT: "invalid" };
   const help = run(process.execPath, [launcher, "--help"], { env: infoEnvironment });
   const installedVersion = run(process.execPath, [launcher, "--version"], { env: infoEnvironment });
-  if (!help.includes("Usage: mcode-webui") || installedVersion.trim() !== manifest.version || existsSync(helpDataDir)) {
+  if (!help.includes("Usage: mcode-webui") || !help.includes("--full-access") || installedVersion.trim() !== manifest.version || existsSync(helpDataDir)) {
     throw new Error("Installed WebUI help/version must exit without starting the runtime");
   }
-  const probe = createServer();
-  probe.listen(0, "127.0.0.1");
-  await once(probe, "listening");
-  const port = probe.address().port;
-  await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
-  child = spawn(process.execPath, [path.join(installed, manifest.bin["mcode-webui"])], {
+  const port = await availablePort();
+  const miniappPort = await availablePort();
+  child = spawn(process.execPath, [path.join(installed, manifest.bin["mcode-webui"]), ...(values["full-access"] ? ["--full-access"] : [])], {
     cwd: work,
     env: {
       ...process.env,
       MINIMAX_DATA_DIR: path.join(work, "synthetic-data"),
       WEBUI_SERVER_PORT: String(port),
+      WEBUI_MINIAPP_PORT: String(miniappPort),
+      WEBUI_HOST: "0.0.0.0",
       // The packaged host is configured with both allowlists, on purpose: the
       // store identity has to be admitted and the development identity has to
       // be refused, and the only way to show that is to have both present.
@@ -121,6 +121,37 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   const origin = `http://127.0.0.1:${port}`;
+  const lanHost = `192.168.1.20:${port}`;
+  const guest = await new Promise((resolve, reject) => {
+    const request = httpRequest(`${origin}/`, { headers: { Host: lanHost } }, (response) => {
+      response.resume();
+      response.once("end", () => resolve(response.statusCode));
+    });
+    request.once("error", reject);
+    request.end();
+  });
+  if (guest !== (values["full-access"] ? 200 : 401)) throw new Error(`Installed WebUI guest HTTP admission returned ${guest}`);
+  const miniappGuest = await fetch(`http://127.0.0.1:${miniappPort}/unregistered-app`, { signal: AbortSignal.timeout(5000) });
+  if (miniappGuest.status !== (values["full-access"] ? 404 : 401)) throw new Error(`Installed Mini App guest admission returned ${miniappGuest.status}`);
+  await miniappGuest.arrayBuffer();
+  if (values["full-access"]) {
+    if (!output.includes(`WebUI running at ${origin}/`) || output.includes("?token=") || output.includes("credential token:")) {
+      throw new Error("Full-access startup must print token-free access URLs");
+    }
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, {
+      headers: { Host: lanHost, Origin: `http://${lanHost}` },
+    });
+    try {
+      await once(ws, "open");
+      const reply = once(ws, "message");
+      ws.send(JSON.stringify({ protocolVersion: 1, kind: "request", requestId: "full-access-version", operation: "version" }));
+      const [raw] = await reply;
+      const frame = JSON.parse(raw.toString());
+      if (frame.kind !== "response" || frame.requestId !== "full-access-version") throw new Error("Installed full-access WebSocket did not answer version");
+    } finally {
+      ws.close();
+    }
+  }
   const html = await fetch(origin, { signal: AbortSignal.timeout(5000) });
   if (!html.ok || !(await html.text()).includes("webui-root")) throw new Error("Installed WebUI did not serve the built HTML");
   for (const asset of ["client.js", "styles.css"]) {
@@ -149,7 +180,7 @@ try {
   const [code, signal] = await Promise.race([exited, new Promise((_, reject) => setTimeout(() => reject(new Error("Installed WebUI shutdown timed out")), 10_000).unref())]);
   if (code !== 0 || signal !== null) throw new Error(`Installed WebUI shutdown failed: ${code ?? signal}`);
   child = undefined;
-  console.log(`Installed WebUI package PASS: ${manifest.name}@${manifest.version}; archive installation, real runtime startup, HTTP assets, the packaged bridge's admission and shutdown`);
+  console.log(`Installed WebUI package PASS: ${manifest.name}@${manifest.version}; archive installation, real runtime startup, HTTP assets, full-access=${values["full-access"]}, the packaged bridge's admission and shutdown`);
 } finally {
   if (child?.pid && child.exitCode === null && child.signalCode === null) {
     const exited = once(child, "exit");
@@ -157,6 +188,15 @@ try {
     await exited;
   }
   rmSync(work, { recursive: true, force: true });
+}
+
+async function availablePort() {
+  const probe = createServer();
+  probe.listen(0, "127.0.0.1");
+  await once(probe, "listening");
+  const port = probe.address().port;
+  await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
+  return port;
 }
 
 /**

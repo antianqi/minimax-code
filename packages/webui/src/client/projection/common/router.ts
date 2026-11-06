@@ -12,14 +12,14 @@ export function route(pathname: string): WebuiRoute {
 /** The plugin and session a standalone Mini App's deep link names. */
 export interface WebuiMiniAppDeepLink {
   readonly pluginId: string;
-  readonly sessionId: string;
+  readonly sessionId?: string;
 }
 
 /**
  * What the standalone route points at, or `undefined` when the link is incomplete.
  *
- * Both ids are required: a tab that names no Mini App has nothing to show, and one
- * that names no session cannot say what conversation it was opened from. The
+ * The plugin is required. The optional session records the conversation it was
+ * opened from; the primary rail can also launch an app from the home page. The
  * session is carried in the query rather than the `#session=` hash because this
  * page selects nothing — it shows one page, which is the whole point of the
  * separate document.
@@ -32,8 +32,8 @@ export function miniAppDeepLink(search: string): WebuiMiniAppDeepLink | undefine
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const pluginId = params.get("plugin")?.trim();
   const sessionId = params.get("session")?.trim();
-  if (!pluginId || !sessionId) return undefined;
-  return { pluginId, sessionId };
+  if (!pluginId || (params.has("session") && !sessionId)) return undefined;
+  return { pluginId, ...(sessionId ? { sessionId } : {}) };
 }
 
 /**

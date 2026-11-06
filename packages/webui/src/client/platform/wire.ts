@@ -197,7 +197,7 @@ export interface WebuiWire {
    */
   watchMiniAppPresentation(
     operation: string,
-    requestBody: { readonly pluginId: string; readonly sessionId: string },
+    requestBody: { readonly pluginId: string; readonly sessionId?: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
     onFailure?: (error: Error) => void,
   ): () => void;
@@ -256,7 +256,7 @@ export interface WebuiWire {
    */
   miniappStandaloneUrl(input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }): string;
   /**
    * The process-event socket. It belongs to the wire rather than to the table
@@ -640,7 +640,7 @@ export function createWebuiWire({
    */
   function watchMiniAppPresentation(
     operation: string,
-    requestBody: { readonly pluginId: string; readonly sessionId: string },
+    requestBody: { readonly pluginId: string; readonly sessionId?: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
     onFailure?: (error: Error) => void,
   ): () => void {
@@ -913,13 +913,14 @@ export function createWebuiWire({
     sessionId,
   }: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }): string {
     // Same base rule as `workspaceFileUrl`: the socket URL carries the token, the
     // page route checks it, and `ws:`/`wss:` share a prefix so one substitution
     // reaches `http:`/`https:`.
     const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
-    const query = new URLSearchParams({ token, plugin: pluginId, session: sessionId });
+    const query = new URLSearchParams({ token, plugin: pluginId });
+    if (sessionId !== undefined) query.set("session", sessionId);
     return `${base}/miniapp?${query.toString()}`;
   }
 

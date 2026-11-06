@@ -1050,7 +1050,7 @@ export interface OperationSpec {
    * and release the record with it.
    */
   watchMiniAppPresentation: {
-    request: { readonly pluginId: string; readonly sessionId: string };
+    request: { readonly pluginId: string; readonly sessionId?: string };
     response: WebuiMiniAppPresentationStreamEnvelope;
   };
   /**

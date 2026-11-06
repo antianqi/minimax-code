@@ -11,7 +11,8 @@
 //     site must not be able to drive the session.
 //   * Does this request carry the per-start credential? Development mode
 //     drops that requirement for the loopback interface only: exposing the
-//     port must not silently publish the terminal and the file tools.
+//     port must not silently publish the terminal and the file tools. Only the
+//     explicit full-access startup option drops tokens on all interfaces.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
@@ -28,6 +29,7 @@ export interface WebuiAdmissionContext {
   readonly tcpPort: () => number | undefined;
   readonly credential: WebuiCredential;
   readonly dev: boolean;
+  readonly fullAccess?: boolean;
 }
 
 /**
@@ -89,7 +91,7 @@ export function admitWebSocketUpgrade(
   }
   const presented = url.searchParams.get("token");
   if (
-    credentialRequired(requestHostname, context.dev) &&
+    credentialRequired(requestHostname, context.dev, context.fullAccess) &&
     !credentialPresented(context.credential, presented, request.headers.cookie)
   ) {
     // The credential is per start, so a refused credential usually means the
@@ -189,11 +191,11 @@ export function isAdmittedUrlHost(urlHost: string, requestHostname: string): boo
  *
  * Development mode drops the credential for the loopback interface only, so
  * a developer opens the page without scraping a token out of the log. Every
- * other interface keeps the requirement in every mode: the service reads
+ * other interface keeps the requirement unless full access was explicitly selected: the service reads
  * files and runs a terminal, and a wildcard bind publishes both.
  */
-export function credentialRequired(hostname: string, dev: boolean): boolean {
-  return !dev || !isLoopbackHost(hostname);
+export function credentialRequired(hostname: string, dev: boolean, fullAccess = false): boolean {
+  return !fullAccess && (!dev || !isLoopbackHost(hostname));
 }
 
 /**

@@ -75,6 +75,13 @@ session transfer · the terminal process manager (one per service) · the six sl
 | Packaged service | `runtime/index.ts` + `server/index.ts` | The runtime's public entry and the server build entry. `scripts/build-webui.mjs` bundles both. |
 | npm preview package | `release/webui-npm/` | See [`../releasing.md`](../releasing.md). |
 
+The packaged `mcode-webui --full-access` flag explicitly disables WebUI token authentication.
+The launcher passes the same `fullAccess` option to `WebuiService` and the Mini App proxy registry,
+so HTTP routes, WebSocket channels and the shared Mini App listener agree. It prints token-free URLs
+and the client document receives no credential cookie or token. Host/Origin admission and the
+independent Chrome/Edge extension pairing remain in force. The flag does not change runtime account
+credentials, tool permissions, or the bind address. Default startup retains the credential policy.
+
 The dev launcher forwards `process.env` verbatim and constructs the host with `dataDir` and
 `appVersion`. The mcode-tools broker environment is prepared by the runtime assembly and passed to
 the embedded child entry; it is not supplied by the launcher.

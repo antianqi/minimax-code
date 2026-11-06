@@ -67,7 +67,7 @@ facets as directed there. The repository glossary is `CONTEXT.md` at the reposit
 | [`known-gaps.md`](known-gaps.md) | Capabilities the WebUI does not have, verified against the tree | Something looks missing and you want to know whether it is known |
 | [`browser-use/`](browser-use/) | The Browser Use validation evidence: the capability matrix, the bridge protocol, the extension admission rules, the pairing credentials, the target identity, the runtime authorization trace, the Browser Core layer, and the review record | You are changing a browser contract, or you want to know what was measured and what is still open |
 | [`open-questions.md`](open-questions.md) | Decisions deliberately left to the operator | You are about to pick a behaviour nobody has picked |
-| [`releasing.md`](releasing.md) | The npm preview release of `@fectivnfy112358/minimax-code-web` | You are changing packaging or the publish workflow |
+| [`releasing.md`](releasing.md) | The npm preview release of `@minimax-webui/minimax-code` | You are changing packaging or the publish workflow |
 
 ## Reference
 

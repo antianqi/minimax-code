@@ -31,7 +31,7 @@ import { WebuiPage } from "../../../ui/page.js";
 
 export interface MiniAppStandaloneProps {
   readonly pluginId: string;
-  readonly sessionId: string;
+  readonly sessionId?: string;
 }
 
 export function MiniAppStandalone({

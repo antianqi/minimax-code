@@ -30,6 +30,7 @@ export interface WebuiHttpRouterContext {
   readonly configuredTcpPort: number;
   readonly credential: WebuiCredential;
   readonly dev: boolean;
+  readonly fullAccess?: boolean;
   readonly clientDir: string | undefined;
   /**
    * The extension package this host offers for download.
@@ -58,13 +59,13 @@ export async function serveHttpRequest(
   }
   const url = parseHttpUrl(request.url);
   // Development mode drops the credential for the loopback interface only.
-  // A request that arrived on another interface has to present it in every
-  // mode: the service reads files and runs a terminal, and a wider bind
+  // A request that arrived on another interface has to present it unless full
+  // access was explicitly selected: the service reads files and runs a terminal, and a wider bind
   // publishes both (ADR 0031). The credential arrives in the query or in
   // the cookie the page response set.
   const requestHostname = hostnameFromHostHeader(request.headers.host ?? "");
   if (
-    credentialRequired(requestHostname, context.dev) &&
+    credentialRequired(requestHostname, context.dev, context.fullAccess) &&
     !credentialPresented(
       context.credential,
       url?.searchParams.get("token"),
@@ -136,7 +137,7 @@ export async function serveHttpRequest(
     clientDir: context.clientDir,
     host: context.host,
     tcpPort: context.boundTcpPort() ?? context.configuredTcpPort,
-    token: context.credential.token,
+    token: context.fullAccess ? "" : context.credential.token,
     dataDir: context.port.version().dataDir,
     // The address the person reached the page on, not the bound address: a
     // wildcard bind has no address of its own to hand the browser.

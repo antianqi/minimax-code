@@ -124,9 +124,9 @@ export interface WebuiMiniAppListing {
  */
 export interface WebuiMiniAppStandalone {
   readonly pluginId: string;
-  readonly sessionId: string;
+  readonly sessionId?: string;
   readonly presentationRevision: number;
-  readonly session: "live" | "ended" | "unresolved";
+  readonly session: "live" | "ended" | "unresolved" | "none";
 }
 
 /**
@@ -315,7 +315,7 @@ export interface WebuiMiniAppWorkflows {
    */
   readonly standaloneUrl: (input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }) => string | undefined;
   /**
    * Declare this document as the standalone presentation, and hold the lease.
@@ -326,7 +326,7 @@ export interface WebuiMiniAppWorkflows {
    */
   readonly claimStandalone: (input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }) => () => void;
 
   /**
@@ -491,19 +491,23 @@ export function createWebuiMiniAppWorkflows(deps: {
     return list;
   };
 
-  const loadListing = async (): Promise<void> => {
+  const loadListing = async (fresh = false): Promise<void> => {
     if (!available) return;
+    // A mutation must observe a read started after it settled, never reuse an
+    // older poll whose snapshot may still describe the pre-mutation runtime.
+    if (fresh && inFlight) await inFlight.catch(() => undefined);
     set((current) => ({ ...current, listing: { ...current.listing, loading: true } }));
+    const pending = inFlight ?? readCatalogue();
+    inFlight = pending;
     try {
-      inFlight = inFlight ?? readCatalogue();
-      await inFlight;
+      await pending;
     } catch (error) {
       set((current) => ({
         ...current,
         listing: { rows: current.listing.rows, loading: false, error: refusalOf(error).message },
       }));
     } finally {
-      inFlight = undefined;
+      if (inFlight === pending) inFlight = undefined;
     }
   };
 
@@ -603,7 +607,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       });
       // The catalogue can open a Mini App without mounting its panel view, so
       // nothing else would refresh the runtime status after a successful start.
-      await loadListing();
+      await loadListing(true);
       const revision = state.listing.rows.find((row) => row.pluginId === pluginId)?.presentationRevision;
       if (revision !== undefined) {
         const current = state.presentations[pluginId];
@@ -618,7 +622,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       setRefusal(pluginId, refusal);
       // The runtime refused to start, so the row it refused about is stale: a
       // capacity refusal names the running apps, and those names come from here.
-      await loadListing();
+      await loadListing(true);
       setRefusal(pluginId, refusal);
       return false;
     } finally {
@@ -691,7 +695,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       setRefusal(pluginId, refusalOf(error));
       return;
     }
-    await loadListing();
+    await loadListing(true);
   };
 
   const syncPresentations = async (): Promise<void> => {
@@ -728,7 +732,7 @@ export function createWebuiMiniAppWorkflows(deps: {
    */
   const standaloneUrl = (input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }): string | undefined => port.miniappStandaloneUrl?.(input);
 
   /**
@@ -741,7 +745,7 @@ export function createWebuiMiniAppWorkflows(deps: {
    */
   const claimStandalone = (input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }): (() => void) => {
     if (!available || !port.watchMiniAppPresentation) return () => undefined;
     return port.watchMiniAppPresentation(
@@ -1141,7 +1145,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       }));
       return;
     }
-    await loadListing();
+    await loadListing(true);
   };
 
   // Follow the selection owner: every change either keeps the shown session or

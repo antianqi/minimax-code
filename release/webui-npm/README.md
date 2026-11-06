@@ -34,6 +34,21 @@ default data directory is `~/.minimax`.
 Use `mcode-webui --help` or `mcode-webui --version` without starting the runtime
 or opening the database.
 
+To allow access without the WebUI's per-start token, start with:
+
+```sh
+mcode-webui --full-access
+```
+
+This disables token authentication for all WebUI HTTP routes and WebSocket channels,
+including files, session transfer/import, extension downloads and the Mini App proxy's
+HTTP and WebSocket services. The printed access URLs omit the token. To bind on all
+interfaces as well, set `WEBUI_HOST=0.0.0.0`; the flag itself does not change the bind
+address. Anyone who can reach these services has access to their WebUI operations.
+Host and Origin checks, Chrome/Edge extension pairing, account/provider credentials
+and Agent tool permission settings retain their existing behavior. Without the flag,
+the existing token authentication applies.
+
 When a schema migration or compatibility repair is needed, startup first creates
 and verifies a SQLite backup. It prints the copy progress and the start of the
 integrity check. The copy uses a stable WAL read snapshot so another host's writes

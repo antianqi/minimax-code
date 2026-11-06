@@ -130,7 +130,7 @@ export interface WebuiServiceOptions {
    * The host the service binds to. Loopback is the default; a wider address
    * (`0.0.0.0`, `::`, or one LAN address) publishes the service beyond
    * this machine, which ADR 0031 allows and gates: a request that did not
-   * arrive over loopback presents the per-start credential in every mode,
+   * arrive over loopback presents the per-start credential unless full access is explicit,
    * and the origin has to be the one the page was served from.
    */
   readonly host?: string;
@@ -142,11 +142,13 @@ export interface WebuiServiceOptions {
   readonly webSocketHeartbeatIntervalMs?: number;
   /** Optional credential override; tests supply one to assert its shape. */
   readonly credential?: WebuiCredential;
+  /** Explicitly allow all WebUI HTTP and WebSocket requests without a token. */
+  readonly fullAccess?: boolean;
   /** Optional server factory; tests inject an HTTP server without listening. */
   readonly httpServerFactory?: () => Server;
   /**
    * Development mode: when `true`, the HTTP and WebSocket paths do not
-   * require a credential so a developer can open the served page in a
+   * require a credential on loopback so a developer can open the served page in a
    * plain browser without scraping a per-start token out of the log.
    * Host and Origin discipline stay intact (ADR 0004). Default mode keeps
    * today's per-start credential requirement.
@@ -261,6 +263,7 @@ export class WebuiService {
       boundTcpPort: () => this.bound?.info.tcpPort,
       credential: this.credential,
       dev: this.dev,
+      fullAccess: options.fullAccess ?? false,
       operations: this.operations,
       isAccepting: () => this.accepting,
       ...(this.browserBridge ? { browserBridge: this.browserBridge } : {}),
@@ -271,6 +274,7 @@ export class WebuiService {
       configuredTcpPort: this.tcpPort,
       credential: this.credential,
       dev: this.dev,
+      fullAccess: options.fullAccess ?? false,
       clientDir: this.clientDirOverride,
       ...(this.browserExtensionPackage
         ? { browserExtensionPackage: this.browserExtensionPackage }

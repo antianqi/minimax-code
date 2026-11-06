@@ -111,16 +111,17 @@ export interface WebuiMiniAppCatalogue {
  * else's presentation. There is no `detached` field because this document *is* the
  * standalone presentation — the fact is the connection.
  *
- * `session` is `"ended"` only when the runtime confirmed there is no such session;
+ * `session` is `"none"` for a home-page launch without a session. It is `"ended"`
+ * only when the runtime confirmed there is no such session;
  * `"unresolved"` means lookup failed for another reason. Either way the answer is
  * reported rather than enforced: the Mini App is plugin-scoped, so a page outlives
  * the session it was opened from (ADR 0020).
  */
 export interface WebuiMiniAppPresentationState {
   readonly pluginId: string;
-  readonly sessionId: string;
+  readonly sessionId?: string;
   readonly presentationRevision: number;
-  readonly session: "live" | "ended" | "unresolved";
+  readonly session: "live" | "ended" | "unresolved" | "none";
 }
 
 /** A server-owned request for the client to show or close an agent-started app. */

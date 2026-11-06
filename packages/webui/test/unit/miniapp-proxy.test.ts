@@ -461,6 +461,59 @@ describe('Mini App proxy with an Agent-named path', () => {
 describe('a published Mini App proxy', () => {
   const WEBUI_CREDENTIAL = 'webui-credential-0123456789';
 
+  for (const [fullAccess, presented, status] of [
+    [false, 'none', 401], [false, 'query', 101], [false, 'cookie', 101],
+    [true, 'none', 101], [true, 'stale', 101],
+  ] as const) {
+    it(`published upgrades with fullAccess=${fullAccess} and ${presented} credentials return ${status}`, async () => {
+      const published = await startMiniAppProxyHost({
+        host: '0.0.0.0', port: 0, credential: { token: WEBUI_CREDENTIAL }, fullAccess,
+      });
+      try {
+        const proxy = await published.register({ target: {
+          pluginId: 'upgrade.miniapp', upstreamOrigin: `http://127.0.0.1:${upstreamPort}`,
+          surfacePath: '/page', credential: CREDENTIAL, credentialHeader: CREDENTIAL_HEADER,
+        } });
+        const requestPath = `/upgrade.miniapp/socket${presented === 'query' ? `?webui_credential=${WEBUI_CREDENTIAL}` : ''}`;
+        const response = await new Promise<string>((resolve, reject) => {
+          const socket = net.connect({ host: '127.0.0.1', port: proxy.port });
+          socket.once('connect', () => socket.write(
+            `GET ${requestPath} HTTP/1.1\r\nHost: 127.0.0.1:${proxy.port}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n${presented === 'cookie' || presented === 'stale' ? `Cookie: webui_credential=${presented === 'cookie' ? WEBUI_CREDENTIAL : 'stale'}\r\n` : ''}\r\n`,
+          ));
+          socket.once('data', (chunk) => { socket.destroy(); resolve(chunk.toString('utf8')); });
+          socket.once('error', reject);
+          socket.setTimeout(2_000, () => { socket.destroy(); reject(new Error('upgrade timed out')); });
+        });
+        expect(response).toContain(`HTTP/1.1 ${status}`);
+        if (status === 101) {
+          expect(seen.at(-1)?.url).toBe('/socket');
+          expect(seen.at(-1)?.headers[CREDENTIAL_HEADER]).toBe(CREDENTIAL);
+        }
+      } finally {
+        await published.close();
+      }
+    });
+  }
+
+  it('full access serves a published Mini App without a credential or redirect', async () => {
+    const published = await startMiniAppProxyHost({
+      host: '0.0.0.0', port: 0, credential: { token: WEBUI_CREDENTIAL }, fullAccess: true,
+    });
+    try {
+      const proxy = await published.register({ target: {
+        pluginId: 'full.miniapp', upstreamOrigin: `http://127.0.0.1:${upstreamPort}`,
+        surfacePath: '/page', credential: CREDENTIAL, credentialHeader: CREDENTIAL_HEADER,
+      } });
+      expect(proxy.viewUrl).not.toContain('webui_credential');
+      const response = await get(proxy.port, '/full.miniapp/page');
+      expect(response.status).toBe(200);
+      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(seen.at(-1)?.headers[CREDENTIAL_HEADER]).toBe(CREDENTIAL);
+    } finally {
+      await published.close();
+    }
+  });
+
   async function startPublished(): Promise<MiniAppProxyHost> {
     return startMiniAppProxyHost({
       port: 0,

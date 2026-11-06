@@ -62,7 +62,7 @@ export async function serveClientAsset(
       // cookie: a browser that opened the page with the token in the query
       // asks for ./client.js without it, and on a non-loopback interface
       // that request would otherwise be refused.
-      ...(name === "index.html" ? { "Set-Cookie": credentialCookie(context.token) } : {}),
+      ...(name === "index.html" && context.token ? { "Set-Cookie": credentialCookie(context.token) } : {}),
     });
     response.end(body);
   } catch {

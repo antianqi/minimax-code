@@ -35,13 +35,14 @@ test('WebUI help and version do not import or start the runtime', t => {
   copyFileSync(new URL('../release/webui-npm/bin/mcode-webui.mjs', import.meta.url), launcher);
   writeFileSync(path.join(root, 'server/package-info.json'), JSON.stringify({ version: '0.0.0-test' }));
   // No runtime bundles or native dependencies: these commands must exit before importing them.
-  for (const argument of ['--help', '-h', '--version', '-v']) {
-    const result = spawnSync(process.execPath, [launcher, argument], {
+  for (const arguments_ of [['--help'], ['-h'], ['--version'], ['-v'], ['--full-access', '--help'], ['--full-access', '--version']]) {
+    const result = spawnSync(process.execPath, [launcher, ...arguments_], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, MINIMAX_DATA_DIR: path.join(root, 'untouched-data'), WEBUI_SERVER_PORT: 'invalid' },
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, argument === '--help' || argument === '-h' ? /Usage: mcode-webui/ : /0\.0\.0-test/);
+    assert.match(result.stdout, arguments_.includes('--help') || arguments_.includes('-h') ? /Usage: mcode-webui/ : /0\.0\.0-test/);
+    if (arguments_.includes('--help')) assert.match(result.stdout, /--full-access/);
     assert.equal(existsSync(path.join(root, 'untouched-data')), false);
   }
 });

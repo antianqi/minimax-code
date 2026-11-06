@@ -71,6 +71,85 @@ async function runRowAction(page: Page, plugin: string, name: string): Promise<v
 }
 
 describe("the Mini App management surface against the real host", () => {
+  it("full-access launcher loads installed icons through the real file route", async () => {
+    const host = await bootRealHost({ fullAccess: true, serveBuiltClient: true });
+    const client = await connect(host.url);
+    await publishLocalPackage(host.dataDir, PLUGIN);
+    await client.call("pluginManagement", {
+      action: "enablePlugin", input: { pluginName: PLUGIN, source: LOCAL_SOURCE },
+    });
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({ locale: "zh-CN" });
+      await page.goto(`http://127.0.0.1:${host.tcpPort}/`);
+      expect(await page.evaluate(() => (window as Window & { __WEBUI_CONFIG__?: { token: string } }).__WEBUI_CONFIG__?.token)).toBe("");
+      await page.getByRole("button", { name: "应用", exact: true }).click();
+      const icon = page.getByTestId(`miniapp-launcher-icon-${PLUGIN}`);
+      await browserExpect(icon).toBeVisible();
+      await browserExpect.poll(() => icon.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true);
+      const source = new URL(await icon.getAttribute("src") ?? "", page.url());
+      expect(source.pathname).toBe("/workspace-file");
+      expect(source.searchParams.has("token")).toBe(false);
+      const image = await page.request.get(source.toString());
+      expect(image.status()).toBe(200);
+      expect(image.headers()["content-type"]).toContain("image/png");
+    } finally {
+      await browser.close();
+    }
+  }, 60_000);
+
+  for (const scenario of ["home", "return", "stop"] as const) {
+    it(`the rail launcher handles ${scenario} without reloading the main document`, async () => {
+      const host = await bootRealHost({ dev: true, serveBuiltClient: true });
+      const client = await connect(host.url);
+      await publishLocalPackage(host.dataDir, PLUGIN);
+      await client.call("pluginManagement", {
+        action: "enablePlugin",
+        input: { pluginName: PLUGIN, source: LOCAL_SOURCE },
+      });
+      let hash = "";
+      if (scenario !== "home") {
+        const created = await client.call("createSession", { name: "main", workspaceDir: host.dataDir });
+        expect(created.kind, JSON.stringify(created)).toBe("response");
+        const sessionId = (created.body as { session: { sessionId: string } }).session.sessionId;
+        hash = `#session=${sessionId}`;
+      }
+      const browser = await chromium.launch({ headless: true });
+      try {
+        const page = await browser.newPage({ locale: "zh-CN", viewport: { width: 1440, height: 900 } });
+        await page.goto(`http://127.0.0.1:${host.tcpPort}/?token=miniapp-real-flow-token${hash}`);
+        await page.getByRole("button", { name: "应用", exact: true }).click();
+        const card = page.getByTestId(`miniapp-launcher-card-${PLUGIN}`);
+        await browserExpect(card).toHaveAttribute("data-status", "stopped");
+        await browserExpect(card.getByRole("button", { name: "打开", exact: false })).toBeVisible();
+        const popupPromise = page.waitForEvent("popup");
+        await card.getByRole("button", { name: "打开", exact: false }).click({ timeout: 5_000 });
+        const popup = await popupPromise;
+        await browserExpect(popup.frameLocator("iframe").getByText(PAGE_MARKER).first()).toBeVisible();
+        if (scenario === "home") {
+          await browserExpect(popup.getByTestId("miniapp-standalone-session-ended")).toHaveCount(0);
+          const sessions = await client.call("listSessions", { name: "main" });
+          expect(sessions.kind, JSON.stringify(sessions)).toBe("response");
+          expect(sessions.body).toMatchObject({ sessions: [] });
+        } else if (scenario === "return") {
+          await page.bringToFront();
+          await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+          await browserExpect(card).toHaveAttribute("data-status", "running", { timeout: 8_000 });
+        } else {
+          await page.getByRole("button", { name: "应用", exact: true }).click();
+          await page.getByRole("button", { name: "应用", exact: true }).click();
+          await browserExpect(card).toHaveAttribute("data-status", "running");
+          await card.hover();
+          await card.getByRole("button", { name: "关闭", exact: false }).click();
+          await browserExpect(card).toHaveAttribute("data-status", "stopped", { timeout: 8_000 });
+          await browserExpect(popup.getByTestId("miniapp-view-frame")).toHaveCount(0);
+        }
+      } finally {
+        await browser.close();
+      }
+    }, 60_000);
+  }
+
   it("starts, shows, stops, disables, enables and uninstalls a Mini App", async () => {
     const host = await bootRealHost({ dev: true, serveBuiltClient: true });
     const client = await connect(host.url);

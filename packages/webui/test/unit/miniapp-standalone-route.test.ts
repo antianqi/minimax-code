@@ -48,9 +48,12 @@ describe("the client's routes", () => {
     });
   });
 
-  it("refuses a link that does not name both a plugin and a session", () => {
+  it("allows a home-page launch without a session", () => {
+    expect(miniAppDeepLink("?plugin=demo.miniapp")).toEqual({ pluginId: "demo.miniapp" });
+  });
+
+  it("refuses a missing plugin or an explicitly empty session", () => {
     expect(miniAppDeepLink("")).toBeUndefined();
-    expect(miniAppDeepLink("?plugin=demo.miniapp")).toBeUndefined();
     expect(miniAppDeepLink("?session=session-9")).toBeUndefined();
     expect(miniAppDeepLink("?plugin=%20&session=session-9")).toBeUndefined();
     expect(miniAppDeepLink("?plugin=demo.miniapp&session=%20")).toBeUndefined();

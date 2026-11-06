@@ -176,7 +176,7 @@ function WebuiClientRoot({
   /**
    * The standalone Mini App this document is, when the route says so.
    *
-   * Present only for `/miniapp?plugin=&session=`. The shell then mounts one
+   * Present only for `/miniapp?plugin=` with an optional `session`. The shell mounts one
    * published surface instead of the workspace: ADR 0020's standalone
    * presentation is the same client with a different composition, not a second
    * application.
@@ -349,7 +349,7 @@ const app = <WebuiClientRoot
  * A route that resolved to nothing.
  *
  * Two cases: a path this client does not serve, and the standalone route without
- * the plugin and session it is made of. Both are legitimate renders, and neither
+ * the required plugin. Both are legitimate renders, and neither
  * is an application failure to retry.
  */
 const unresolved = currentRoute === "404" || (currentRoute === "miniapp" && !standalone);

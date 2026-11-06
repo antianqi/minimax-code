@@ -68,6 +68,8 @@ export function createMiniAppProxyRegistry(
      * The WebUI's per-start credential, for a listener bound beyond loopback.
      */
     readonly credential?: WebuiCredential;
+    /** Explicitly omit the published listener's WebUI token gate. */
+    readonly fullAccess?: boolean;
   } = {},
 ): MiniAppProxyRegistry {
   const proxies = new Map<string, MiniAppProxy>();
@@ -80,6 +82,7 @@ export function createMiniAppProxyRegistry(
         ...(deps.host !== undefined ? { host: deps.host } : {}),
         ...(deps.port !== undefined ? { port: deps.port } : {}),
         ...(deps.credential !== undefined ? { credential: deps.credential } : {}),
+        ...(deps.fullAccess !== undefined ? { fullAccess: deps.fullAccess } : {}),
       }).catch((error: unknown) => {
         // A listener that could not bind is tried again on the next Mini App:
         // the port may have been freed since.

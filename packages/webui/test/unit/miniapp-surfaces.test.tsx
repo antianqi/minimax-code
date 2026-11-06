@@ -62,7 +62,7 @@ function port(input: {
   readonly miniApps: readonly WebuiMiniAppCatalogueRow[];
   readonly open?: (pluginId: string) => Promise<{ pluginId: string; viewUrl: string }>;
   readonly stop?: () => Promise<void>;
-  readonly standaloneUrl?: (input: { pluginId: string; sessionId: string }) => string;
+  readonly standaloneUrl?: (input: { pluginId: string; sessionId?: string }) => string;
   readonly permissions?: (
     pluginId: string,
   ) => Promise<{
@@ -71,7 +71,7 @@ function port(input: {
     items: readonly { id: string; enabled: boolean }[];
   }>;
   readonly watch?: (
-    request: { pluginId: string; sessionId: string },
+    request: { pluginId: string; sessionId?: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
     onFailure?: (error: Error) => void,
   ) => () => void;

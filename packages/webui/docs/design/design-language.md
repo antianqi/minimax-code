@@ -363,7 +363,8 @@ already tracks, or hands the control a promise-returning `onClick` / `onChange` 
 `useFeedbackActionLoading` follow it; the two combine, so a caller's own flag and a tracked action
 never disagree. While pending the control sets `disabled`, reports `aria-busy`, and renders the shared
 `FeedbackLoadingOverlay`: a portalled viewport cover with a `role="dialog"` surface, a spinner and the
-label. The treatment belongs to the control for the same reason its focus ring does — a control that
+label. This cover stays above interactive panels and popovers, with toasts above it. The treatment
+belongs to the control for the same reason its focus ring does — a control that
 a caller has to remember to disable, and a business that has to draw its own spinner, is two places
 for one state to drift. A caller keeps what only it knows: the label's words, and what happens when
 the promise settles.

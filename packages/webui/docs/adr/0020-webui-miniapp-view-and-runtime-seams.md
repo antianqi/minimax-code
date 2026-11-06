@@ -12,7 +12,8 @@ Both presentations belong to the client. **Inline**, the Mini App view occupies 
 WebUI workspace panel. **Standalone**, a browser tab is opened through a URL deep link; the tab runs
 the full WebUI client, but the only content it shows is the Mini App view. The standalone view has no
 in-page close control: the tab is the Mini App's own. The deep link selects a session and a Mini
-App, and the service injects its runtime configuration into every page it serves, so a tab opened
+App when launched from a conversation; the primary rail also launches a plugin without a session
+from the home page. The service injects its runtime configuration into every page it serves, so a tab opened
 this way is an ordinary client with the same credential as any other.
 
 The Mini App page is a first-party plugin page. The electron app hosts it in a native
@@ -376,20 +377,21 @@ workspace file preview already follows.
 
 The client router resolves exactly two outcomes today — `/` and `/archon` both to the client, anything
 else to 404 — and the session travels in the `#session=` hash. A standalone Mini App is
-`/miniapp?plugin=&session=`, which the service maps to the same document, so the runtime-configuration
+`/miniapp?plugin=&session=`, with `session` optional for a launch from the home page, which the service maps to the same document, so the runtime-configuration
 injection applies unchanged and the tab is an ordinary client. The shell needs one new concept to
 serve it: a presentation mode in which the full client renders only the Mini App view. That is a
 smaller change than the electron app's, which has to move a native view; here it is which component
 the shell mounts.
 
-The link that opens it is produced by the inline tab, which carries the action that moves this Mini App
-into its own browser tab; nothing else can produce a deep link a person would not type. The standalone
+The inline tab and the primary rail produce the link that opens a Mini App in its own browser tab.
+The primary rail needs no selected conversation and creates no conversation as a launch side effect. The standalone
 view offers no control back to the inline one — that would be the in-page close control it deliberately
 does not have — so returning is closing the tab, which releases the lease.
 
 The page is independent of the session named by its route: a confirmed missing session is reported as
 ended while the Mini App still shows. If session lookup fails for another reason, the page reports
 that the state is unresolved rather than claiming the session ended or dropping the presentation.
+An absent session is reported as `none`; no session lookup or ended-session notice is needed.
 A runtime that stops while the tab is open clears the view and reports the stop reason; it does not
 restart the Mini App, because the tab may be unattended and a retry would start work the user did not
 ask for. A retry is a user action.
@@ -397,7 +399,7 @@ ask for. A retry is a user action.
 ### The standalone presentation is a lease
 
 Because the two presentations are two client documents that share nothing but the service, the service
-holds the record of which one is live. A standalone client declares its plugin, its session and its
+holds the record of which one is live. A standalone client declares its plugin, its optional session and its
 presentation when it connects, and the record is released when that client's socket closes. If the
 watch connection drops unexpectedly while the document is still open, the client reconnects with
 backoff and declares a new lease; this restores presentation ownership but never starts the Mini App
@@ -409,6 +411,12 @@ That record is also what gives `detached` and `presentationRevision` meaning in 
 than leaving them as fields this client always answers with `false` and `0`. `detached` is "a standalone
 lease exists for this plugin"; the revision increments each time a lease is acquired, which is the
 same property it has in the electron app — a fast detach and attach that a poll would otherwise miss.
+
+The primary rail reads the catalogue on opening, on focus or visibility return, and every two seconds
+while the panel is open and the document is visible. Start, stop and package mutations require a read
+begun after the mutation settles, so an older in-flight catalogue response cannot leave the row in its
+previous runtime state. The close control follows the stop promise through the shared pending feedback;
+a refused stop is reported through the shared toast while the runtime state remains authoritative.
 
 ## The proxy is one listener for every Mini App
 

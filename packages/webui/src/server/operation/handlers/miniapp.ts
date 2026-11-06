@@ -327,7 +327,7 @@ export function createMiniAppHandlerEntries(
    */
   async function* presentationSource(input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
     readonly signal?: AbortSignal;
   }): AsyncGenerator<WebuiMiniAppPresentationState> {
     const lease = presentations.acquire({
@@ -337,7 +337,7 @@ export function createMiniAppHandlerEntries(
     try {
       let session: WebuiMiniAppPresentationState["session"];
       try {
-        session = await sessionStateOf(input.sessionId);
+        session = input.sessionId === undefined ? "none" : await sessionStateOf(input.sessionId);
       } catch {
         // Session lookup is observational. Keep the presentation lease alive and
         // report that the session could not be confirmed instead of treating the

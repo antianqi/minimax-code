@@ -703,8 +703,9 @@ export function MiniAppView({
   /**
    * Whether this view can offer the move at all.
    *
-   * A session is required because the deep link names one, and the URL comes from
-   * the wire because it carries the service token. A host that wires neither is a
+   * This inline action carries its workspace tab's session; the primary rail can
+   * launch independently. The URL comes from the wire because it carries the
+   * service token. A host that does not wire that URL is a
    * host where the standalone presentation does not exist, and the view then
    * simply does not offer it rather than offering a control that does nothing.
    */

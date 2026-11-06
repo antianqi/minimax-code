@@ -300,6 +300,19 @@ describe("the Mini App agent turn watch", () => {
 });
 
 describe("the Mini App presentation lease watch", () => {
+  it("serializes a home-page link and lease without a session", async () => {
+    const transport = transportWith(ControllableSocket);
+    const link = new URL(transport.miniappStandaloneUrl({ pluginId: "fixture.miniapp" }));
+    expect(link.pathname).toBe("/miniapp");
+    expect(link.searchParams.get("plugin")).toBe("fixture.miniapp");
+    expect(link.searchParams.get("token")).toBe("fixture-token");
+    expect(link.searchParams.has("session")).toBe(false);
+    const stop = transport.watchMiniAppPresentation({ pluginId: "fixture.miniapp" }, () => undefined);
+    await tick();
+    expect(ControllableSocket.latest!.request.body).toEqual({ pluginId: "fixture.miniapp" });
+    stop();
+  });
+
   it("reacquires the lease after an unexpected transport close", async () => {
     vi.useFakeTimers();
     try {

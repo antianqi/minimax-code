@@ -23,6 +23,7 @@ export interface WebuiWebSocketServerContext {
   readonly boundTcpPort: () => number | undefined;
   readonly credential: WebuiCredential;
   readonly dev: boolean;
+  readonly fullAccess?: boolean;
   readonly operations: ReadonlyMap<string, WebuiOperationRegistryEntry>;
   readonly isAccepting: () => boolean;
   /**
@@ -88,6 +89,7 @@ export class WebuiWebSocketServer {
       tcpPort: this.context.boundTcpPort,
       credential: this.context.credential,
       dev: this.context.dev,
+      fullAccess: this.context.fullAccess,
     });
     if (!admission.admitted) {
       // A refusal that leaves no trace on the server, and says only "closed

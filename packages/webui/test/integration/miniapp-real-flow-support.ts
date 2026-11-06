@@ -65,7 +65,7 @@ export async function closeAllBootedHosts(): Promise<void> {
  * the host, not part of the request path under test.
  */
 export async function bootRealHost(
-  options: { readonly dev?: boolean; readonly serveBuiltClient?: boolean } = {},
+  options: { readonly dev?: boolean; readonly serveBuiltClient?: boolean; readonly fullAccess?: boolean } = {},
 ): Promise<Booted> {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-miniapp-flow-"));
   const workspaceDir = join(dataDir, "workspace");
@@ -95,13 +95,14 @@ export async function bootRealHost(
   });
   const port = createHarnessPortFromHost(assembled.host);
   const terminal = new WebuiTerminalManager();
-  const proxies = createMiniAppProxyRegistry();
+  const proxies = createMiniAppProxyRegistry({ port: 0, fullAccess: options.fullAccess });
   const service = new WebuiService({
     port,
     operations: createOperationRegistry(port, terminal, undefined, undefined, proxies),
     terminal,
     tcpPort: 0,
     credential: { token: CREDENTIAL_TOKEN },
+    fullAccess: options.fullAccess,
     ...(options.dev ? { dev: true } : {}),
     ...(options.serveBuiltClient ? { clientDir: join(process.cwd(), "dist-webui/client") } : {}),
   });

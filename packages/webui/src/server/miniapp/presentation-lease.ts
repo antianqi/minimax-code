@@ -27,7 +27,7 @@
 /** One live standalone presentation. */
 export interface MiniAppPresentationLease {
   readonly pluginId: string;
-  readonly sessionId: string;
+  readonly sessionId?: string;
   /**
    * How many times a standalone presentation of this plugin has been acquired,
    * counting this one. Never `0` on a lease: the first acquisition is `1`.
@@ -39,7 +39,7 @@ export interface MiniAppPresentationLeases {
   /** Declare this document's presentation. Replaces a live one for the plugin. */
   acquire(input: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }): MiniAppPresentationLease;
   /**
    * Release one lease, if it is still the live one.

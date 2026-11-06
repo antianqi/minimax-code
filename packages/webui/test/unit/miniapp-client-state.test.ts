@@ -297,6 +297,34 @@ describe("the Mini App business", () => {
     });
   });
 
+  it("reads the stopped runtime after an older catalogue request finishes", async () => {
+    let releaseOld!: (value: { miniApps: WebuiMiniAppCatalogueRow[] }) => void;
+    const oldRead = new Promise<{ miniApps: WebuiMiniAppCatalogueRow[] }>((resolve) => { releaseOld = resolve; });
+    let reads = 0;
+    let stopped = false;
+    const port = scriptedPort({
+      miniApps: [],
+      open: async (pluginId) => ({ pluginId, viewUrl: "http://127.0.0.1:41002" }),
+      stop: async () => { stopped = true; },
+    });
+    const workflows = createWebuiMiniAppWorkflows({ port: {
+      ...port,
+      listMiniApps: async () => {
+        reads += 1;
+        if (reads === 2) return oldRead;
+        return { miniApps: [miniApp("app", stopped ? "stopped" : "running")] };
+      },
+    } });
+    await workflows.loadListing();
+    const refresh = workflows.loadListing();
+    const stop = workflows.stop("app");
+    await vi.waitFor(() => expect(stopped).toBe(true));
+    releaseOld({ miniApps: [miniApp("app", "running")] });
+    await Promise.all([refresh, stop]);
+    expect(workflows.getSnapshot().listing.rows[0]?.status).toBe("stopped");
+    expect(reads).toBe(3);
+  });
+
   it("names the three running apps when a fourth start is refused, and lets one be stopped", async () => {
     const running = [miniApp("one", "running"), miniApp("two", "running"), miniApp("three", "running")];
     let refuses = true;

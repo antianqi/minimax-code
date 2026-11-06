@@ -104,7 +104,7 @@ export interface MiniAppPort {
    * does to it.
    */
   readonly watchMiniAppPresentation?: (
-    request: { readonly pluginId: string; readonly sessionId: string },
+    request: { readonly pluginId: string; readonly sessionId?: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
     /**
      * The lease could not be established — a refused session lookup, a missing
@@ -178,6 +178,6 @@ export interface MiniAppPort {
   /** The standalone page's URL, token included. Built by the wire, not the UI. */
   readonly miniappStandaloneUrl?: (request: {
     readonly pluginId: string;
-    readonly sessionId: string;
+    readonly sessionId?: string;
   }) => string;
 }

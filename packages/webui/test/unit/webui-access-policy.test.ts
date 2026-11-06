@@ -55,6 +55,24 @@ const context = {
 };
 
 describe("the WebSocket admission", () => {
+  it("full access skips credentials while retaining Host and Origin checks", () => {
+    const openContext = { ...context, fullAccess: true };
+    const record = recordingSocket();
+    expect(admitWebSocketUpgrade(
+      requestWith({ host: "192.168.31.19:2233", origin: "http://192.168.31.19:2233" }) as never,
+      new URL("ws://192.168.31.19:2233/"), record.socket as never, openContext,
+    )).toEqual({ admitted: true });
+    expect(admitWebSocketUpgrade(
+      requestWith({ host: "192.168.31.19:2233", origin: "http://other.example" }) as never,
+      new URL("ws://192.168.31.19:2233/"), recordingSocket().socket as never, openContext,
+    )).toMatchObject({ admitted: false, status: 403, reason: "Forbidden Origin" });
+    expect(admitWebSocketUpgrade(
+      requestWith({ host: "other.example:2233" }) as never,
+      new URL("ws://other.example:2233/"), recordingSocket().socket as never,
+      { ...openContext, host: "127.0.0.1" },
+    )).toMatchObject({ admitted: false, status: 403, reason: "Forbidden Host" });
+  });
+
   it("admits a request from the page's own origin that presents the credential", () => {
     const record = recordingSocket();
     const outcome = admitWebSocketUpgrade(

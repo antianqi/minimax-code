@@ -23,6 +23,91 @@ import { expect } from "@playwright/test";
 
 import { configureFixture, openApp, openLauncherTile, test } from "./harness.mjs";
 
+for (const theme of ["light", "dark"]) {
+  test(`the full-access launcher loads local application icons in ${theme} theme`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("webui-theme", value), theme);
+    await configureFixture(page, () => {
+      window.__WEBUI_CONFIG__.token = "";
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.miniapp", displayName: "图标测试应用",
+        iconUrl: "/mavis/api/file/preview?path=%2Fplugins%2Fdemo%2Ficon.svg",
+        runtime: { kind: "process", status: "stopped" },
+      }] });
+    });
+    await page.route("**/workspace-file?*", (route) => route.fulfill({
+      status: 200, contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#168a62"/><circle cx="50" cy="50" r="24" fill="white"/></svg>',
+    }));
+    await openApp(page, "");
+    await page.getByRole("button", { name: "应用", exact: true }).click();
+    const icon = page.getByTestId("miniapp-launcher-icon-demo.miniapp");
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveAttribute("src", "/workspace-file?dir=%2Fplugins%2Fdemo&path=icon.svg");
+    await expect.poll(() => icon.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath(`full-access-icons-${theme}.png`) });
+  });
+}
+
+test("the rail launcher refreshes on return and while open without reloading", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("listMiniApps", { miniApps: [{
+      pluginId: "demo.miniapp", displayName: "演示应用",
+      runtime: { kind: "process", status: "stopped" },
+    }] });
+  });
+  await openApp(page);
+  await page.getByRole("button", { name: "应用", exact: true }).click();
+  const card = page.getByTestId("miniapp-launcher-card-demo.miniapp");
+  await expect(card).toHaveAttribute("data-status", "stopped");
+  await page.evaluate(() => {
+    window.__fixture.setResponse("listMiniApps", { miniApps: [{
+      pluginId: "demo.miniapp", displayName: "演示应用",
+      runtime: { kind: "process", status: "running" },
+    }] });
+    window.dispatchEvent(new Event("focus"));
+  });
+  await expect(card).toHaveAttribute("data-status", "running", { timeout: 1_000 });
+  await page.screenshot({ path: test.info().outputPath("launcher-running.png") });
+  await page.evaluate(() => window.__fixture.setResponse("listMiniApps", { miniApps: [{
+    pluginId: "demo.miniapp", displayName: "演示应用",
+    runtime: { kind: "process", status: "stopped" },
+  }] }));
+  await expect(card).toHaveAttribute("data-status", "stopped");
+});
+
+test("the rail close control reports pending and a refused stop", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("webui-theme", "dark"));
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("listMiniApps", { miniApps: [{
+      pluginId: "demo.miniapp", displayName: "演示应用",
+      runtime: { kind: "process", status: "running" },
+    }] });
+    window.__fixture.delayNext("stopMiniApp", {});
+  });
+  await openApp(page);
+  await page.getByRole("button", { name: "应用", exact: true }).click();
+  const card = page.getByTestId("miniapp-launcher-card-demo.miniapp");
+  await card.hover();
+  const stop = card.getByRole("button", { name: "关闭演示应用", exact: true });
+  await stop.click();
+  await expect(stop).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByRole("dialog", { name: "正在处理…" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "正在处理…" })).toBeInViewport();
+  await expect(page.getByRole("dialog", { name: "正在处理…" })).toHaveCSS("opacity", "1");
+  const layers = await page.evaluate(() => ({
+    feedback: Number(getComputedStyle(document.querySelector(".webui-feedback-loading-overlay")).zIndex),
+    launcher: Number(getComputedStyle(document.querySelector('[data-testid="miniapp-launcher"]')).zIndex),
+  }));
+  expect(layers.feedback).toBeGreaterThan(layers.launcher);
+  await page.screenshot({ path: test.info().outputPath("launcher-stopping-dark.png") });
+  await page.evaluate(() => window.__fixture.resolveAllPending("stopMiniApp", {}, { success: true }));
+  await expect(stop).not.toHaveAttribute("aria-busy", "true");
+  await page.evaluate(() => window.__fixture.refuseOperation("stopMiniApp", "harness_error", "synthetic stop refused"));
+  await stop.click();
+  await expect(page.getByTestId("miniapp-picker-refusal-demo.miniapp")).toContainText("synthetic stop refused");
+  await expect(card).toHaveAttribute("data-status", "running");
+});
+
 test("the launcher uses shared animated skeleton cards while the app list loads", async ({ page }) => {
   await configureFixture(page, () => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];

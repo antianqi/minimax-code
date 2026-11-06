@@ -53,6 +53,7 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
   const { dom } = useWebuiBrowserCapabilities();
   const rows = state.listing.rows;
   const portalTarget = dom.portalTarget();
+  useWebuiToastError(open ? state.listing.error : undefined);
 
   const placeSurface = useCallback(() => {
     const trigger = triggerRef.current?.getBoundingClientRect();
@@ -78,7 +79,18 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
   useEffect(() => {
     if (!open) return;
     void workflows?.loadListing();
-  }, [open, workflows]);
+    const refresh = () => {
+      if (!dom.isPageHidden()) void workflows?.loadListing();
+    };
+    window.addEventListener("focus", refresh);
+    const stopVisibility = dom.listenForVisibilityChange(refresh);
+    const timer = window.setInterval(refresh, 2_000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      stopVisibility();
+      window.clearInterval(timer);
+    };
+  }, [open, workflows, dom]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -152,9 +164,9 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
         </div>) : null}
         {rows.map((row) => {
           const running = row.enabled && row.status === "running";
-          const launchable = row.enabled && !running && row.status !== "starting" && row.status !== "stopping" && Boolean(sessionId);
+          const launchable = row.enabled && !running && row.status !== "starting" && row.status !== "stopping";
           const launch = () => {
-            if (!sessionId || !launchable) return;
+            if (!launchable) return;
             const href = workflows?.standaloneUrl({ pluginId: row.pluginId, sessionId });
             if (href) window.open(href, webuiMiniAppWindowName(row.pluginId));
           };
@@ -180,6 +192,10 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
             data-status={row.status}
             aria-disabled={!launchable && !running ? "true" : undefined}
           >
+            {open && state.refusals[row.pluginId] ? <MiniAppPickerRefusal
+              pluginId={row.pluginId}
+              text={webuiMiniAppRefusalText({ ...state.refusals[row.pluginId]!, rows })}
+            /> : null}
             {launchable ? <button className="webui-miniapp-launcher-open" type="button" onClick={launch} aria-label={`打开${row.name}`}>
               {content}
             </button> : <div className="webui-miniapp-launcher-face" aria-label={`${row.name}，${row.statusLabel}`}>
@@ -192,12 +208,11 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
               label={`关闭${row.name}`}
               title={`关闭${row.name}`}
               data-testid={`miniapp-launcher-stop-${row.pluginId}`}
-              onClick={() => void workflows?.stop(row.pluginId)}
+              onClick={() => workflows?.stop(row.pluginId)}
             ><IconX /></WebuiIconButton> : null}
           </div>;
         })}
       </div>
-      {!sessionId && rows.length > 0 ? <p className="webui-miniapp-launcher-hint">选择一个任务后即可打开应用</p> : null}
     </WebuiPage>,
     portalTarget,
   ) : null;

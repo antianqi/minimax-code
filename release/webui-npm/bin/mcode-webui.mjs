@@ -12,12 +12,13 @@ const { values: args } = parseArgs({
   options: {
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
+    "full-access": { type: "boolean", default: false },
   },
 });
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { version } = JSON.parse(await readFile(path.join(packageRoot, "server/package-info.json"), "utf8"));
 if (args.help) {
-  console.log(`Usage: mcode-webui [--help | --version]
+  console.log(`Usage: mcode-webui [--full-access] [--help | --version]
 
 Start the MiniMax Code WebUI. Configuration is read from environment variables:
   MINIMAX_DATA_DIR     Data directory (default: ~/.minimax)
@@ -26,7 +27,8 @@ Start the MiniMax Code WebUI. Configuration is read from environment variables:
   WEBUI_MINIAPP_PORT  Mini App port (default: 49152)
 
   -h, --help          Show help without starting the runtime
-  -v, --version       Show the installed version`);
+  -v, --version       Show the installed version
+      --full-access  Disable token authentication for WebUI HTTP, WebSocket and Mini App services`);
   process.exit(0);
 }
 if (args.version) {
@@ -222,6 +224,7 @@ const miniappProxies = createMiniAppProxyRegistry({
   host: bindHost,
   port: miniappPort,
   credential,
+  fullAccess: args["full-access"],
 });
 const assembled = await createWebuiRuntimeHost({
   dataDir,
@@ -260,6 +263,7 @@ const service = new WebuiService({
   host: bindHost,
   tcpPort,
   credential,
+  fullAccess: args["full-access"],
   dev: true,
   clientDir: path.join(packageRoot, "client"),
   browserBridge,
@@ -291,14 +295,12 @@ const close = () => {
 
 try {
   const info = await service.start();
-  // Every printed address carries the per-start credential. The token is not
-  // decoration: a request that did not arrive over loopback has to present
-  // it (ADR 0031), so the printed path is the one that opens from any
-  // address the service is reachable at.
+  // Full access prints plain URLs. Otherwise each address carries the credential
+  // a non-loopback request needs (ADR 0031).
   const browserUrl = accessUrl(
     isWildcardBindAddress(bindHost) ? "127.0.0.1" : bindHost,
     info.tcpPort,
-    info.credential.token,
+    args["full-access"] ? "" : info.credential.token,
   );
   // The Mini App listener is bound before the first Mini App opens: the
   // runtime draws its own Mini App ports from the same range, and a listener
@@ -319,27 +321,24 @@ try {
 }
 
 /**
- * The path a person opens, with the per-start credential on it.
- *
- * The token is not decoration: a request that did not arrive over loopback
- * has to present it, so the printed path is the one that works from every
- * address the service answers at.
+ * The path a person opens, with the credential unless full access is enabled.
  */
 function accessUrl(host, port, token) {
   const literal = host.includes(":") ? `[${host}]` : host;
-  return `http://${literal}:${port}/?token=${token}`;
+  return `http://${literal}:${port}/${token ? `?token=${encodeURIComponent(token)}` : ""}`;
 }
 
 /**
  * Print how to reach the service.
  *
  * A loopback bind is one address; a wildcard bind is every address this
- * machine has. Either way the printed path carries the credential.
+ * machine has. Token-authenticated mode includes the credential on each URL.
  */
 function printAccess(info, bindHost) {
   const port = info.tcpPort;
-  const token = info.credential.token;
-  console.log(`[mcode-webui] credential token: ${token}`);
+  const token = args["full-access"] ? "" : info.credential.token;
+  if (args["full-access"]) console.log("[mcode-webui] full access enabled: token authentication disabled");
+  else console.log(`[mcode-webui] credential token: ${token}`);
   if (isWildcardBindAddress(bindHost)) {
     console.log(`[mcode-webui] open ${accessUrl("127.0.0.1", port, token)}`);
     const addresses = lanAddresses();

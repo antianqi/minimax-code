@@ -172,6 +172,8 @@ export interface MiniAppProxyHostOptions {
    * route to the port.
    */
   readonly credential?: WebuiCredential;
+  /** Explicitly omit the WebUI token gate; upstream Mini App credentials stay internal. */
+  readonly fullAccess?: boolean;
 }
 
 /**
@@ -191,6 +193,7 @@ export async function startMiniAppProxyHost(
   // cookie the frame response sets carries it from then on.
   const published = !isLoopbackHost(bindHost);
   const credential = options.credential;
+  const requireCredential = published && credential !== undefined && !options.fullAccess;
   /** The routes, by the path segment each Mini App is served under. */
   const bySegment = new Map<string, MiniAppRoute>();
   /** The routes, by plugin id: the bridge stamps the raw id on its requests. */
@@ -199,7 +202,7 @@ export async function startMiniAppProxyHost(
   const sockets = new Set<{ destroy(): void }>();
 
   const server = http.createServer((request, response) => {
-    if (published && credential) {
+    if (requireCredential && credential) {
       const gate = presentedProxyCredential(request, credential);
       if (!gate.presented) {
         // A published listener that refuses a request is invisible from the
@@ -333,6 +336,10 @@ export async function startMiniAppProxyHost(
   });
 
   server.on('upgrade', (request, clientSocket, head) => {
+    if (requireCredential && credential && !presentedProxyCredential(request, credential).presented) {
+      clientSocket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      return;
+    }
     const url = new URL(request.url ?? '/', 'http://miniapp.invalid');
     const segments = url.pathname.split('/').filter((segment) => segment.length > 0);
     const resolved = resolveRoute(request, url, segments, bySegment, byPlugin);
@@ -419,7 +426,7 @@ export async function startMiniAppProxyHost(
       // what keeps the Mini App on an origin of its own (ADR 0020).
       const viewUrl = new URL(`http://${urlHost(bindHost)}:${boundPort}/${segment}${framed.pathname}`);
       if (framed.search) viewUrl.search = framed.search;
-      if (published && credential) viewUrl.searchParams.set(PROXY_CREDENTIAL_PARAM, credential.token);
+      if (requireCredential && credential) viewUrl.searchParams.set(PROXY_CREDENTIAL_PARAM, credential.token);
       if (framed.hash) viewUrl.hash = framed.hash;
       return {
         port: boundPort,

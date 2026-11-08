@@ -14,7 +14,20 @@ import { WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-export type WebuiDialogWidth = "compact" | "standard" | "wide";
+/**
+ * The sizes a dialog can be drawn at.
+ *
+ * "compact" and "standard" are the usual surfaces; "wide" is the roomy form
+ * a list or a form needs; "expanded" is the room a terminal needs — a shell
+ * with a fixed grid, which fits far fewer columns than a text editor would.
+ *
+ * The sizes are the shared shell's: a caller that needs a different capacity
+ * says which one it needs and the shell draws it. A caller that reached into
+ * the shell's own rules to widen its window would be dressing another
+ * contract's class names, and the shell would not know how wide it had been
+ * made.
+ */
+export type WebuiDialogWidth = "compact" | "standard" | "wide" | "expanded";
 
 export interface WebuiDialogProps {
   readonly id?: string;

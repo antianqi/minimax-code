@@ -196,6 +196,7 @@ export function UsageHeatmap({
         ? createPortal(
             <WebuiTooltip
               as="div"
+              appearance="card"
               visible={hovered !== null}
               className="webui-account-usage-cell-tip"
               style={{

@@ -616,6 +616,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/composer/application/queue-send-workflow.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "composer",
+      "home": "target"
+    },
+    {
       "path": "client/features/composer/application/turn-retry.ts",
       "layers": [
         "application"
@@ -2533,6 +2542,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/ssh/ui/ssh.css",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "ssh",
+      "home": "target"
+    },
+    {
       "path": "client/features/ssh/ui/SshPanel.public.tsx",
       "layers": [
         "bindings"
@@ -2579,6 +2597,15 @@
     },
     {
       "path": "client/features/transcript/application/message-feedback.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "transcript",
+      "home": "target"
+    },
+    {
+      "path": "client/features/transcript/application/transcript-settlement.ts",
       "layers": [
         "application"
       ],

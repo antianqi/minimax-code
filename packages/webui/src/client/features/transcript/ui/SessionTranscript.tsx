@@ -34,7 +34,7 @@ import {
 import { WebuiWorkspaceFileUrlProvider } from "./markdown.public.js";
 import { WebuiButton } from "../../../ui/button.js";
 
-import { FeedbackBusy, FeedbackEmpty } from "../../../ui/feedback.js";
+import { FeedbackBusy, FeedbackEmpty, FeedbackLiveRegion } from "../../../ui/feedback.js";
 const EMPTY_TRANSCRIPT_PAGE: WebuiClientMessagePage = {};
 
 
@@ -329,7 +329,10 @@ function WebuiSessionTranscriptView({
         ) : null}
         {transcriptState.synchronization?.phase === "failed" ? (
           <WebuiInline gap="small" data-webui-transcript-sync="failed">
-            <span role="status">回复内容已保留，历史记录尚未同步。</span>
+            {/* The synchronization notice is said through the shared live
+                region: the family owns how a message is announced, and this
+                surface keeps the words, the place and the way out. */}
+            <FeedbackLiveRegion>回复内容已保留，历史记录尚未同步。</FeedbackLiveRegion>
             <WebuiButton variant="plain" size="regular" onClick={() => settlementOwner?.retry(sessionId)}>重试同步</WebuiButton>
           </WebuiInline>
         ) : null}

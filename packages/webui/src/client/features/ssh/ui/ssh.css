@@ -1,0 +1,90 @@
+/* The SSH terminal window's own appearance (the SSH business's rules).
+ *
+ * The window is a shared `WebuiDialog`, and the dialog owns the frame: the
+ * surface, the header, the heading, the close control and the body's own
+ * padding are the shared shell's, and this file does not restate them. The
+ * rules that used to reach into `.webui-dialog-surface` from the settings
+ * stylesheet are gone; the dialog they dressed is the dialog every other
+ * modal in the client draws.
+ *
+ * What stays here is the terminal's own: the title's mark, the connection
+ * state beside it, and the viewport the terminal is drawn in.
+ *
+ * The chrome — the mark and the connection state — is drawn with the theme's
+ * tokens, because it sits on the shared frame and has to read in both themes.
+ * The viewport and the surface that stands in for it when the terminal could
+ * not open keep their own dark colours: they are the terminal's own surface,
+ * and a terminal is dark in either theme. The viewport is the exception the
+ * surface asks for, and it is scoped to the host the SSH view renders, not to
+ * the dialog around it.
+ *
+ * The body's own class carries the one thing the viewport needs from its
+ * container: no padding, so the host's own margins are the inset the terminal
+ * has always had, and no scrolling, so the terminal scrolls and the dialog
+ * does not.
+ */
+@layer components {
+  .webui-ssh-terminal-body {
+    overflow: hidden;
+    padding: 0;
+  }
+  .webui-ssh-terminal-title { display: inline-flex; align-items: center; gap: 10px; }
+  /* The window's own chrome sits on the shared frame, so it is drawn with the
+   * theme's tokens: the mark is a plain tile on the surface, and the icon in
+   * it is the secondary icon colour. The colours this chrome used to carry
+   * were chosen for a dark frame of its own and read at 2.3:1 on the shared
+   * frame in the light theme. */
+  .webui-ssh-terminal-title-icon {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border_default);
+    border-radius: 9px;
+    background: var(--bg_grouped_tertiary);
+    color: var(--icon_default_secondary);
+  }
+  /* The connection state is a wash with the theme's primary text on it: the
+   * words are the meaning, and they have to be readable in both themes. The
+   * dot beside them carries the hue. */
+  .webui-ssh-terminal-status { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border_default); border-radius: 999px; padding: 5px 9px; color: var(--text_default_primary); font-size: 11px; line-height: 14px; }
+  .webui-ssh-terminal-status.is-connected { background: var(--bg_status_positive); }
+  .webui-ssh-terminal-status.is-connected svg { color: var(--text_label_positive_secondary_default); }
+  .webui-ssh-terminal-status.is-error { background: var(--bg_status_error); }
+  .webui-ssh-terminal-status.is-error svg { color: var(--text_label_danger_secondary_default); }
+  /* The viewport: the box the terminal is drawn in. Its geometry — the inset
+     from the dialog's edge, the padding around the terminal, the radius and
+     the ink — is the terminal's own and is unchanged; the frame around it is
+     the dialog's. */
+  .webui-ssh-terminal-body > .webui-ssh-xterm-host {
+    box-sizing: border-box;
+    width: calc(100% - 40px);
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0%;
+    flex-shrink: 1;
+    overflow: hidden;
+    margin: 18px 20px 20px;
+    border: 1px solid #1d2736;
+    border-radius: 12px;
+    background: #030609;
+    padding: 18px;
+  }
+  .webui-ssh-xterm-host .xterm { height: 100%; font-feature-settings: "liga" 0; border-radius: 8px; }
+  .webui-ssh-xterm-host .xterm-viewport { background: transparent !important; scrollbar-color: #354258 transparent; scrollbar-width: thin; }
+  .webui-ssh-xterm-host .xterm-screen { padding-bottom: 4px; }
+  .webui-ssh-terminal-error {
+    box-sizing: border-box;
+    min-height: 0;
+    flex: 1 1 0%;
+    margin: 18px 20px 20px;
+    overflow: auto;
+    border: 1px solid #382834;
+    border-radius: 12px;
+    background: radial-gradient(ellipse at 50% -35%, rgb(93 37 48 / 28%), transparent 64%), #080c12;
+    padding: 18px;
+    color: #f3a1a1;
+  }
+}

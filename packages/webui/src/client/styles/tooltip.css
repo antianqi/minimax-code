@@ -20,9 +20,14 @@
  * be a fidelity regression dressed up as a fix. The 6px radius is antd's
  * `borderRadius` default for the same reason.
  *
- * The account page's calendar tip (`.webui-account-usage-cell-tip`) is NOT
- * one of these: it is a two-line card with its own radius and its own colour,
- * so it stays outside this primitive and keeps its own rule.
+ * The second shape here is the CARD. A tip that carries more than a line — the
+ * account page's calendar tip, which is two lines of ink — is not a bubble: it
+ * has no arrow, its own radius and its own padding. It used to be one of the
+ * bubbles anyway, because the shared tooltip added the bubble's shape to every
+ * caller and the caller then corrected it in its own stylesheet. The two
+ * shapes are declared here instead, and the caller names the one it draws: the
+ * account page's tip keeps its geometry and stops fighting a bubble it never
+ * wanted.
  */
 @layer components {
   .webui-tooltip-bubble {
@@ -42,5 +47,18 @@
     border-top-color: rgb(0 0 0 / 85%);
     content: "";
     transform: translateX(-50%);
+  }
+  /* The card: the same dark ink, without the bubble's arrow and with the
+   * padding a tip that carries two lines needs. It is a shape of its own, not
+   * a bubble with its internals overridden — the caller states where it goes
+   * and what it says, and the shape stays here. */
+  .webui-tooltip-card {
+    width: max-content;
+    border-radius: var(--radius_4);
+    background: rgb(0 0 0 / 85%);
+    padding: 8px 10px;
+    color: var(--text_default_inverted_static);
+    font-size: var(--size_12);
+    pointer-events: none;
   }
 }

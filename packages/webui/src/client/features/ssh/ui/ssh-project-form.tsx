@@ -47,6 +47,13 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
   useEffect(() => {
     if (requestedAlias) setAlias(requestedAlias);
   }, [requestedAlias]);
+  // The host LIST can change while the form is open too: a host that was
+  // removed is not a host the project may be created on, so the picker falls
+  // back to the first host that is still there, or to nothing at all.
+  useEffect(() => {
+    if (alias && props.hosts.some((host) => host.alias === alias)) return;
+    setAlias(props.hosts[0]?.alias ?? "");
+  }, [alias, props.hosts]);
 
   const browse = useCallback(async (target: string): Promise<void> => {
     if (!alias) return;
@@ -134,6 +141,9 @@ export function SshProjectForm(props: SshProjectFormProps): ReactElement {
               {...controlProps}
               data-webui-ssh-project-host="true"
               labelId={field.labelId}
+              // There is nothing to pick when no host is saved: the picker
+              // says so instead of opening a list of nothing.
+              disabled={props.hosts.length === 0}
               options={props.hosts.map((host) => ({
                 value: host.alias,
                 label: `${host.displayName || host.alias} · ${host.endpoint.host || host.alias}`,

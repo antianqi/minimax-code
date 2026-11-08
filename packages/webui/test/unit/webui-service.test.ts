@@ -1950,6 +1950,10 @@ describe("WebUI service", () => {
       for (const listener of listeners.get("visibilitychange") ?? []) listener();
       await Promise.resolve();
       expect(socketsOpened).toBe(2);
+      // The replaced socket's queued acknowledgement must not mark the new
+      // subscription ready; wait for the new socket's own response.
+      expect(reconnects).toBe(0);
+      for (let tick = 0; tick < 8 && reconnects === 0; tick += 1) await Promise.resolve();
       expect(reconnects).toBe(1);
       unsubscribe();
     } finally {

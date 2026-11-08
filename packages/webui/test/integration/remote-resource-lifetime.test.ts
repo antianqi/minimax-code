@@ -78,7 +78,7 @@ describe("remote resource lifetime through the production seams", () => {
       const assembled = route === "assembly" ? await createWebuiRuntimeHost({
         dataDir: dir,
         mcodeTools: { prepare: async () => ({ requested: false, ready: false, category: "disabled" as const, ensureCommandPath: () => undefined, dispose: async () => { calls.push("broker"); } }) },
-        factory: async () => ({ ...host(dir), apiHost: { close: closeHost } }),
+        factory: async () => ({ apiHost: { close: closeHost }, dataDir: dir, cliService: host(dir).cliService }),
       }) : undefined;
       const port = assembled?.harnessPort ?? createHarnessPortFromHost({ ...host(dir), apiHost: { close: closeHost } });
       await port.getRemoteControlStatus();

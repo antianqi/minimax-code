@@ -85,6 +85,15 @@ describe("assertWebuiTransferFile", () => {
 });
 
 describe("importWebuiSessionFile", () => {
+  it.each(["retained", "failed"] as const)("carries %s recovery through the client refusal", async (kind) => {
+    const recovery = { sessionId: "mvs_partial", stage: "title", failure: "title failed", compensation: kind === "failed" ? { kind, failure: "cleanup failed" } : { kind } };
+    const fetchImpl = vi.fn(async () => jsonResponse(422, { error: "Session import failed", ...recovery })) as unknown as typeof fetch;
+    const error = await importWebuiSessionFile(blob(TRANSFER), options(fetchImpl)).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(WebuiSessionImportRefused);
+    expect(error).toMatchObject({ recovery, message: expect.stringContaining("mvs_partial") });
+    expect((error as Error).message).toContain("title failed");
+    if (kind === "failed") expect((error as Error).message).toContain("cleanup failed");
+  });
   it("posts the file and returns the new session", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse(200, {

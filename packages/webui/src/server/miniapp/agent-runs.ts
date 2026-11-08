@@ -100,6 +100,7 @@ export function createMiniAppAgentRuns(): MiniAppAgentRuns {
       entry = {
         handle,
         cancelTurn() {
+          if (controller.signal.aborted) return;
           controller.abort();
           cancelled?.();
         },

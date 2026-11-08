@@ -235,6 +235,8 @@ export class WebuiService {
   private accepting = true;
   private startedPromise: Promise<WebuiServiceInfo> | undefined;
   private bound: { info: WebuiServiceInfo } | undefined;
+  /** Concurrent callers await the same release and failure outcome. */
+  private closing: Promise<void> | undefined;
 
   constructor(options: WebuiServiceOptions) {
     this.port = options.port;
@@ -326,25 +328,44 @@ export class WebuiService {
    * Stop accepting new operations, drain every connection, then close
    * the harness port. The order matters: refuse new work first, then
    * release resources, then tear down the host.
+   *
+   * Attempt every owner in order and report all failures after release.
    */
-  async close(): Promise<void> {
-    this.terminal?.disposeBySession();
-    if (!this.accepting && !this.bound) return;
+  close(): Promise<void> {
+    this.closing ??= this.#closeOwners();
+    return this.closing;
+  }
+
+  async #closeOwners(): Promise<void> {
+    /** One owner that failed, kept with its name for the aggregate. */
+    const failures: { readonly owner: string; readonly error: unknown }[] = [];
+    const attempt = async (
+      owner: string,
+      step: () => void | Promise<void>,
+    ): Promise<void> => {
+      try {
+        await step();
+      } catch (error) {
+        failures.push({ owner, error });
+      }
+    };
+
     this.accepting = false;
-    // Force-terminate every connection before the server closes; otherwise
-    // `wsServer.close()` waits for the client to ack the close handshake
-    // and can hang for the duration of the platform TCP timeout.
-    this.wsServer.closeConnections();
-    await this.wsServer.close();
-    // The bridge closes after the WebSocket connections: its own server is a
-    // second listener on the same process, and an extension still mid-handshake
-    // would otherwise be terminated by the HTTP listener going away first.
-    await this.browserBridge?.close();
-    // The Mini App listeners are closed before the harness port: the runtime
-    // stops the applications afterwards, and a listener whose upstream is gone
-    // would answer 502 for the rest of the shutdown.
-    await this.miniappProxies?.closeAll();
-    await closeHttpListener(this.httpServer);
-    await this.port.close();
+    await attempt("terminal", () => this.terminal?.disposeBySession());
+    // Terminate sockets before waiting for their listener to close.
+    await attempt("websocket-connections", () => this.wsServer.closeConnections());
+    await attempt("websocket", () => this.wsServer.close());
+    // Bridge and proxy listeners are released before the HTTP listener and host.
+    await attempt("browser-bridge", () => this.browserBridge?.close());
+    await attempt("miniapp-proxies", () => this.miniappProxies?.closeAll());
+    await attempt("http-listener", () => closeHttpListener(this.httpServer));
+    await attempt("harness", () => this.port.close());
+
+    if (failures.length === 0) return;
+    if (failures.length === 1) throw failures[0]!.error;
+    throw new AggregateError(
+      failures.map((failure) => failure.error),
+      `WebUI service shutdown failed: ${failures.map((failure) => failure.owner).join(", ")}`,
+    );
   }
 }

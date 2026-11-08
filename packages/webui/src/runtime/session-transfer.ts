@@ -26,23 +26,14 @@ export type WebuiSessionImportCapabilities = Pick<
 >;
 
 /** The wire body a successful import answers with. */
-export interface WebuiSessionImportBody {
-  readonly sessionId: string;
-  readonly canonicalMessages: number;
-  readonly displayMessages: number;
-  readonly revision: string;
-}
+export type WebuiSessionImportBody = Extract<WebuiSessionImportOutcome, { kind: "imported" }>["body"];
 
 /**
  * What the import workflow did, independent of the transport that called it.
  * The HTTP route maps these onto the exact status codes and bodies it served
  * before the workflow moved out of the handler.
  */
-export type WebuiSessionImportOutcome =
-  | { readonly kind: "imported"; readonly body: WebuiSessionImportBody }
-  | { readonly kind: "create-failed" }
-  | { readonly kind: "not-transfer-file" }
-  | { readonly kind: "import-failed" };
+export type WebuiSessionImportOutcome = Awaited<ReturnType<NonNullable<WebuiHarnessPort["importSessionTransferWorkflow"]>>>;
 
 /**
  * Recreate a session from a transfer file.
@@ -56,11 +47,8 @@ export type WebuiSessionImportOutcome =
  * the whole import down with it. The file contributes its history and its
  * title; the caller contributes who and where.
  *
- * The title is applied after the history lands. The session is created first
- * and the history written into it second, so a malformed payload leaves
- * nothing behind: the failure path deletes the session it just made rather
- * than leaving an empty shell in the sidebar for every bad file the user
- * tries.
+ * Validation failures delete the empty shell when possible and report cleanup
+ * failures. Later history or title failures retain the session for recovery.
  */
 export async function importWebuiSessionTransfer(
   port: WebuiSessionImportCapabilities,
@@ -87,12 +75,14 @@ export async function importWebuiSessionTransfer(
     return { kind: "create-failed" };
   }
 
+  let stage: "history" | "title" = "history";
   try {
     const result = await port.importSessionTransfer({
       targetSessionId: sessionId,
       sourceSessionId: readImportSourceId(input.file),
       file: input.file,
     });
+    stage = "title";
     const title = readImportTitle(input.file);
     if (title) await port.updateSession({ id: result.sessionId, title });
     return {
@@ -105,12 +95,24 @@ export async function importWebuiSessionTransfer(
       },
     };
   } catch (error) {
-    await port.deleteSession({ id: sessionId }).catch(() => undefined);
     // "Not a transfer file at all" is the user's mistake and worth saying so;
     // anything else means the file parsed but could not be replayed.
     const foreign = (error as { readonly code?: unknown } | undefined)?.code === "not-a-transfer-file";
+    const code = (error as { readonly code?: unknown } | undefined)?.code;
+    let compensation: Extract<WebuiSessionImportOutcome, { kind: "not-transfer-file" | "import-failed" }>["compensation"] = { kind: "retained" };
+    // Validation errors precede all writes. Any later failure may already have
+    // published canonical history; retain it for recovery, including title errors.
+    if (stage === "history" && (foreign || code === "malformed-transfer-file")) {
+      try {
+        const deleted = await port.deleteSession({ id: sessionId });
+        if (!deleted.success) throw new Error("Session cleanup was not confirmed");
+        compensation = { kind: "deleted" };
+      } catch (cleanupError) {
+        compensation = { kind: "failed", failure: describeError(cleanupError) };
+      }
+    }
     console.error(`[webui] session import failed: ${describeError(error)}`);
-    return { kind: foreign ? "not-transfer-file" : "import-failed" };
+    return { kind: foreign ? "not-transfer-file" : "import-failed", sessionId, stage, failure: describeError(error), compensation };
   }
 }
 

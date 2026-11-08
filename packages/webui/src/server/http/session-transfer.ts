@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { rejectHttp, respondJson } from "./responses.js";
 import type { WebuiHarnessPort } from "../../runtime/port.js";
-import type { WebuiSessionInfo } from "../../shared/contracts/session.js";
+import { isConfirmedMissingSession, type WebuiSessionInfo } from "../../shared/contracts/session.js";
 import {
   WEBUI_DEFAULT_IMPORT_AGENT,
   webuiSessionTransferFileName,
@@ -71,10 +71,7 @@ export async function handleSessionTransfer(
     rejectHttp(response, 400, "Bad Request");
     return;
   }
-  // `getSession` rejects for an unknown id rather than returning an empty
-  // result, so both the rejection and an empty `session` mean "no such
-  // session". Letting the rejection reach the outer catch answered 500 for a
-  // request that was simply asking about something that is not there.
+  // Only producer-confirmed absence establishes that the session is missing.
   let session: WebuiSessionInfo;
   try {
     const found = await port.getSession({ id: sessionId });
@@ -83,8 +80,9 @@ export async function handleSessionTransfer(
       return;
     }
     session = found.session;
-  } catch {
-    rejectHttp(response, 404, "Not Found");
+  } catch (error) {
+    if (isConfirmedMissingSession(error)) rejectHttp(response, 404, "Not Found");
+    else rejectHttp(response, 500, "Internal Server Error");
     return;
   }
   try {
@@ -155,5 +153,9 @@ export async function handleSessionImport(
   const foreign = outcome.kind === "not-transfer-file";
   respondJson(response, foreign ? 400 : 422, {
     error: foreign ? "Not a session transfer file" : "Session import failed",
+    sessionId: outcome.sessionId,
+    stage: outcome.stage,
+    failure: outcome.failure,
+    compensation: outcome.compensation,
   });
 }

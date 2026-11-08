@@ -13,6 +13,17 @@
 
 export const WEBUI_SESSION_TRANSFER_FORMAT = "mcode-webui-session-transfer@1";
 
+/** Recovery information for a session import that did not fully settle. */
+export interface WebuiSessionImportRecovery {
+  readonly sessionId: string;
+  readonly stage: "history" | "title";
+  readonly failure: string;
+  readonly compensation:
+    | { readonly kind: "deleted" }
+    | { readonly kind: "failed"; readonly failure: string }
+    | { readonly kind: "retained" };
+}
+
 /**
  * A filesystem-safe name for an exported session file.
  *

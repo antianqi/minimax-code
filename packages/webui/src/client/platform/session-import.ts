@@ -29,7 +29,7 @@
 //     rejected here by name rather than as a generic parse failure, so the
 //     user is told which file they picked and why it cannot come back.
 
-import { WEBUI_SESSION_TRANSFER_FORMAT } from "../../shared/session-transfer-format.js";
+import { WEBUI_SESSION_TRANSFER_FORMAT, type WebuiSessionImportRecovery } from "../../shared/session-transfer-format.js";
 import { readWebuiSessionTransferTarget } from "./session-transfer-target.js";
 
 export interface WebuiSessionImportResult {
@@ -48,6 +48,7 @@ export class WebuiSessionImportRefused extends Error {
   constructor(
     readonly reason: "not-a-transfer-file" | "legacy-client-export" | "not-json" | "unreadable",
     message: string,
+    readonly recovery?: WebuiSessionImportRecovery,
   ) {
     super(message);
   }
@@ -135,13 +136,24 @@ export async function importWebuiSessionFile(
     ...(options.signal ? { signal: options.signal } : {}),
   });
 
-  const body = (await response.json().catch(() => ({}))) as Partial<WebuiSessionImportResult> & {
+  const body = (await response.json().catch(() => ({}))) as Partial<WebuiSessionImportResult & WebuiSessionImportRecovery> & {
     readonly error?: string;
   };
   if (!response.ok) {
+    const recovery = typeof body.sessionId === "string" && body.sessionId &&
+      (body.stage === "history" || body.stage === "title") && typeof body.failure === "string" &&
+      (body.compensation?.kind === "deleted" || body.compensation?.kind === "retained" ||
+        (body.compensation?.kind === "failed" && typeof body.compensation.failure === "string"))
+      ? { sessionId: body.sessionId, stage: body.stage, failure: body.failure, compensation: body.compensation }
+      : undefined;
+    const message = typeof body.error === "string" ? body.error : `导入失败（HTTP ${response.status}）`;
+    const detail = recovery && recovery.compensation.kind !== "deleted"
+      ? ` 会话 ${recovery.sessionId}${recovery.compensation.kind === "retained" ? "已保留" : "的清理未确认"}，导入阶段：${recovery.stage === "title" ? "标题" : "历史"}；${recovery.failure}。${recovery.compensation.kind === "failed" ? `清理失败：${recovery.compensation.failure}。` : ""}`
+      : "";
     throw new WebuiSessionImportRefused(
       response.status === 400 ? "not-a-transfer-file" : "unreadable",
-      typeof body.error === "string" ? body.error : `导入失败（HTTP ${response.status}）`,
+      message + detail,
+      recovery,
     );
   }
   if (typeof body.sessionId !== "string" || !body.sessionId) {

@@ -19,6 +19,7 @@
 // (`../../miniapp/presentation-lease.ts`).
 import { WebuiCapabilityUnavailableError } from "../../../shared/envelope.js";
 import { MINIAPP_CAPABILITY_ABSENT } from "../../../runtime/port.js";
+import { isConfirmedMissingSession } from "../../../shared/contracts/session.js";
 import type { WebuiOperationPort } from "../bind-handlers.js";
 import {
   callMiniAppToolOperation,
@@ -199,29 +200,6 @@ export interface MiniAppHandlerOptions {
    */
   readonly panels?: MiniAppAgentPanels;
   readonly runs?: MiniAppAgentRuns;
-}
-
-/**
- * Whether a lookup failed because the session is not there.
- *
- * The runtime answers a missing session with an `AppError` carrying `status: 404`
- * and `key: "SESSION_NOT_FOUND"`; an adapter on another host could carry the code
- * instead, so both spellings are accepted. Nothing else is — a transport failure,
- * a refused capability or a thrown string says nothing about the session.
- */
-function isConfirmedMissingSession(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const { status, key, code } = error as {
-    readonly status?: unknown;
-    readonly key?: unknown;
-    readonly code?: unknown;
-  };
-  return (
-    status === 404 ||
-    key === "SESSION_NOT_FOUND" ||
-    code === "SESSION_NOT_FOUND" ||
-    code === "not_found"
-  );
 }
 
 export function createMiniAppHandlerEntries(

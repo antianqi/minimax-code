@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   WebuiBrowserService,
@@ -252,6 +252,106 @@ const ALL_OFF: WebuiBrowserAuthorization = {
 };
 
 describe("browser service", () => {
+  it("keeps same-surface browser identities separate when target ids collide", async () => {
+    const { service, provider } = createService({ ...ALL_OFF, isolatedChromium: true });
+    const list = provider.listTargets.bind(provider);
+    provider.listTargets = async () => {
+      const targets = await list();
+      return [...targets, ...targets.map((target) => ({ ...target, id: { ...target.id, browserId: "browser-2", generation: 1 } }))];
+    };
+    await service.listTargets("isolated-chromium");
+    await service.selectTarget(tab("tab-1"), "first-browser");
+    await service.selectTarget({ ...tab("tab-1"), browserId: "browser-2" }, "second-browser");
+    provider.announceTargetChange(2);
+    const afterNavigation = await service.listTargets("isolated-chromium", "second-browser");
+    expect(afterNavigation.targets.find((target) => target.selected)?.id).toEqual({ ...tab("tab-1"), browserId: "browser-2" });
+    await service.closeWebTab(tab("tab-1", 2));
+    const afterClose = await service.listTargets("isolated-chromium", "second-browser");
+    expect(afterClose.targets.find((target) => target.selected)?.id.browserId).toBe("browser-2");
+    await service.close();
+  });
+
+  it("shares a successful first acquisition across callers and closes it once", async () => {
+    const provider = new RecordingProvider();
+    const close = vi.spyOn(provider, "close");
+    let release!: (provider: WebuiBrowserSurfaceProvider) => void;
+    let started!: () => void;
+    const starting = new Promise<void>((resolve) => { started = resolve; });
+    const create = vi.fn(() => { started(); return new Promise<WebuiBrowserSurfaceProvider>((resolve) => { release = resolve; }); });
+    const authorization = { ...ALL_OFF, isolatedChromium: true };
+    const service = new WebuiBrowserService({ authorization: { read: async () => authorization, write: async () => authorization }, dataDir: "unused", createIsolatedProvider: create });
+    const first = service.listTargets("isolated-chromium");
+    const second = service.listTargets("isolated-chromium");
+    await starting;
+    await Promise.resolve();
+    release(provider);
+    await Promise.all([first, second]);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(provider.targetChangeListeners.size).toBe(1);
+    await service.close();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+  it("keeps colliding tabs scoped across navigation and close", async () => {
+    const edge = new RecordingProvider(["tab-1"], "edge");
+    const { service, provider } = createService({ ...ALL_OFF, isolatedChromium: true, edge: true }, ["tab-1"], edge);
+    await service.listTargets("isolated-chromium");
+    await service.listTargets("edge");
+    await service.selectTarget(tab("tab-1"), "isolated-run");
+    const external = { ...tab("tab-1"), surface: "edge" as const };
+    await service.selectTarget(external, "edge-run");
+    provider.announceTargetChange(2);
+    await service.sendCommandToSelection("edge", "edge-run", "reload");
+    expect(edge.commands).toHaveLength(1);
+    expect(await selectedTargetOf(service, "edge-run", "edge")).toBe("tab-1");
+    await service.closeWebTab(tab("tab-1", 2));
+    expect(await selectedTargetOf(service, "edge-run", "edge")).toBe("tab-1");
+    await service.close();
+  });
+
+  it("preserves a selection made while a person's tab is opening", async () => {
+    const { service, provider } = createService({ ...ALL_OFF, isolatedChromium: true });
+    await service.listTargets("isolated-chromium");
+    let release!: (target: WebuiBrowserTargetId) => void;
+    let started!: () => void;
+    const opening = new Promise<void>((resolve) => { started = resolve; });
+    provider.openTab = () => { started(); return new Promise((resolve) => { release = resolve; }); };
+    const pending = service.openWebTab("run-race", {}, undefined, "person");
+    await opening;
+    await service.selectTarget(tab("tab-1"), "run-race");
+    release(tab("tab-new"));
+    await pending;
+    expect(await selectedTargetOf(service, "run-race")).toBe("tab-1");
+    await service.close();
+  });
+
+  it.each(["disable", "close"] as const)("shares pending acquisition and releases a launch revoked by %s", async (action) => {
+    const provider = new RecordingProvider();
+    let release!: (provider: WebuiBrowserSurfaceProvider) => void;
+    let started!: () => void;
+    const launching = new Promise<void>((resolve) => { started = resolve; });
+    const create = vi.fn(() => { started(); return new Promise<WebuiBrowserSurfaceProvider>((resolve) => { release = resolve; }); });
+    let authorization = { ...ALL_OFF, isolatedChromium: true };
+    const service = new WebuiBrowserService({
+      authorization: { read: async () => authorization, write: async (input) => (authorization = { ...authorization, ...input }) },
+      dataDir: "unused-recording-provider",
+      createIsolatedProvider: create,
+    });
+    const first = service.listTargets("isolated-chromium");
+    const second = service.listTargets("isolated-chromium");
+    await launching;
+    // Both callers have entered the acquisition before revocation.
+    await Promise.resolve();
+    expect(create).toHaveBeenCalledTimes(1);
+    const stopping = action === "disable" ? service.writeAuthorization({ isolatedChromium: false }) : service.close();
+    await Promise.resolve();
+    await Promise.resolve();
+    release(provider);
+    await Promise.allSettled([first, second, stopping]);
+    expect(provider.closed).toBe(true);
+    expect(provider.frameHandlers.size).toBe(0);
+    expect(provider.targetChangeListeners.size).toBe(0);
+    await service.close();
+  });
   it("refuses a surface that is not authorized before touching the provider", async () => {
     const { service, provider } = createService(ALL_OFF);
     await expect(service.listTargets("isolated-chromium")).rejects.toMatchObject({

@@ -8,6 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { checkWorkspaceFence } from "../workspace-real-path.js";
 
 import {
   WORKSPACE_ARCHIVE_MAX_ARCHIVE_BYTES,
@@ -72,6 +73,7 @@ export async function prepareExtractionRoot(
   if (!destination.trim()) throw new Error("解压目标为空。");
   const root = await realpath(path.resolve(workspaceDir));
   const requested = resolveInside(root, destination, "解压目标");
+  await assertWriteFence(root, requested);
   await mkdir(requested, { recursive: true });
   const resolved = await realpath(requested);
   // Re-anchored on the resolved path: the same check that passed above can pass
@@ -130,6 +132,7 @@ export async function writeTarMember(
   budget: ExpansionBudget,
 ): Promise<void> {
   const parent = path.dirname(target);
+  await assertWriteFence(root, parent);
   await mkdir(parent, { recursive: true });
   const resolvedParent = await realpath(parent);
   if (resolvedParent !== root && !resolvedParent.startsWith(rootPrefix(root))) {
@@ -177,6 +180,7 @@ export async function writeExtractedFile(
   budget: ExpansionBudget,
 ): Promise<void> {
   const parent = path.dirname(target);
+  await assertWriteFence(root, parent);
   await mkdir(parent, { recursive: true });
   const resolvedParent = await realpath(parent);
   if (resolvedParent !== root && !resolvedParent.startsWith(rootPrefix(root))) {
@@ -190,6 +194,11 @@ export async function writeExtractedFile(
   await writeFile(path.join(resolvedParent, path.basename(target)), data, {
     flag: "wx",
   });
+}
+
+async function assertWriteFence(root: string, target: string): Promise<void> {
+  const verdict = await checkWorkspaceFence(root, target);
+  if (!verdict.allowed) throw new Error("压缩包条目试图通过符号链接写出解压目录，或路径无法解析。");
 }
 
 function isMissingPath(error: unknown): boolean {

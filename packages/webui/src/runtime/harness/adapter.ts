@@ -71,7 +71,8 @@ export function createHarnessPortFromHost(
         }
       : {}),
   };
-  let closed = false;
+  /** One host release and outcome, shared by concurrent close callers. */
+  let closePromise: Promise<void> | undefined;
   const port: Omit<WebuiHarnessPort, "runCommand" | "importSessionTransferWorkflow"> = {
     version() {
       return version;
@@ -92,10 +93,11 @@ export function createHarnessPortFromHost(
     ...createSshAdapter(host),
     ...createRemoteControlAdapter(host, options.browserPort),
     ...createChannelAdapter(host),
-    async close() {
-      if (closed) return;
-      closed = true;
-      await host.apiHost.close();
+    close() {
+      closePromise ??= (async () => {
+        await host.apiHost.close();
+      })();
+      return closePromise;
     },
   };
   const harnessPort: WebuiHarnessPort = {

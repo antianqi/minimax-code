@@ -1175,6 +1175,22 @@ describe("WebUI service", () => {
     expect((await closed).code).not.toBe(1000);
   });
 
+  it.each(["%", "%E0%A4%A"])("refuses malformed credential %s over real HTTP and WebSocket", async (cookie) => {
+    await bootService();
+    const info = service.info();
+    const headers = { Cookie: `webui_credential=${cookie}` };
+    const response = await fetch(`http://127.0.0.1:${info.tcpPort}/session-transfer?sessionId=synthetic`, { headers });
+    expect(response.status).toBe(401);
+    const ws = new WebSocket(`ws://127.0.0.1:${info.tcpPort}/`, { headers });
+    await expect(new Promise<void>((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); })).rejects.toThrow(/401/);
+    // A valid token retains precedence, and the service still answers requests.
+    const admitted = new WebSocket(`ws://127.0.0.1:${info.tcpPort}/?token=${info.credential.token}`, { headers });
+    await once(admitted, "open");
+    const closed = once(admitted, "close");
+    admitted.close();
+    await closed;
+  });
+
   it("refuses connections that present a wrong credential", async () => {
     await bootService();
     const info = service.info();
@@ -5183,6 +5199,133 @@ describe("WebUI assembly unconditionally forwards the quarantined startup policy
     } finally {
       await removeDataDir(dataDir);
     }
+  });
+});
+
+describe("the service shutdown", () => {
+  it.each(["connections", "websocket", "bridge", "proxies", "http", "harness"])("attempts later owners after %s fails", async (failed) => {
+    const attempted: string[] = [];
+    const check = (name: string) => { attempted.push(name); if (failed === name) throw new Error(`${name} failed`); };
+    const service = new WebuiService({
+      port: { version: () => ({ protocolVersion: 1 }), close: async () => check("harness") } as unknown as WebuiHarnessPort,
+      operations: new Map(), tcpPort: 0,
+      browserBridge: { close: async () => check("bridge") } as never,
+      miniappProxies: { prepare: async () => {}, closeAll: async () => check("proxies") } as never,
+    });
+    await service.start();
+    const internals = service as unknown as {
+      wsServer: { closeConnections(): void; close(): Promise<void> };
+      httpServer: import("node:http").Server;
+    };
+    const connections = internals.wsServer.closeConnections.bind(internals.wsServer);
+    const websocket = internals.wsServer.close.bind(internals.wsServer);
+    vi.spyOn(internals.wsServer, "closeConnections").mockImplementation(() => { connections(); check("connections"); });
+    vi.spyOn(internals.wsServer, "close").mockImplementation(async () => { await websocket(); check("websocket"); });
+    const http = internals.httpServer.close.bind(internals.httpServer);
+    vi.spyOn(internals.httpServer, "close").mockImplementation((callback) => http(() => {
+      attempted.push("http");
+      callback?.(failed === "http" ? new Error("http failed") : undefined);
+    }));
+    const first = service.close();
+    const second = service.close();
+    expect(second).toBe(first);
+    await expect(first).rejects.toThrow(`${failed} failed`);
+    await expect(second).rejects.toThrow(`${failed} failed`);
+    expect(attempted).toEqual(["connections", "websocket", "bridge", "proxies", "http", "harness"]);
+    expect(internals.httpServer.listening).toBe(false);
+  });
+  /**
+   * A port that does nothing but answer `version()` and close.
+   *
+   * The shutdown is the thing under test, so nothing here needs a scripted
+   * runtime: the owners whose failure the shutdown has to survive are the
+   * terminal, the Mini App listeners and the harness itself.
+   */
+  function shutdownPort(close: () => Promise<void>): WebuiHarnessPort {
+    return {
+      version: () => ({ version: "0.0.0", protocolVersion: WEBUI_PROTOCOL_VERSION }),
+      close,
+    } as unknown as WebuiHarnessPort;
+  }
+
+  it("attempts every later owner after an early failure and reports them together", async () => {
+    const attempted: string[] = [];
+    const service = new WebuiService({
+      port: shutdownPort(async () => {
+        attempted.push("harness");
+        throw new Error("harness did not close");
+      }),
+      operations: new Map(),
+      // A terminal that throws is the case that used to stop the whole
+      // shutdown: it ran before `accepting` was cleared, so the sockets, the
+      // listeners and the harness were never reached.
+      terminal: {
+        disposeBySession: () => {
+          attempted.push("terminal");
+          throw new Error("a terminal process did not stop");
+        },
+      } as never,
+      miniappProxies: {
+        running: () => [],
+        start: async () => {
+          throw new Error("unused");
+        },
+        close: async () => undefined,
+        closeAll: async () => {
+          attempted.push("miniapp");
+          throw new Error("a Mini App listener did not close");
+        },
+        prepare: async () => undefined,
+        boundPort: () => undefined,
+      },
+      tcpPort: 0,
+    });
+    await service.start();
+
+    const closing = service.close();
+    await expect(closing).rejects.toBeInstanceOf(AggregateError);
+    // Every owner was still attempted, in the documented order.
+    expect(attempted).toEqual(["terminal", "miniapp", "harness"]);
+    const failure = await closing.catch((error: unknown) => error);
+    if (!(failure instanceof AggregateError)) throw new Error("expected aggregate shutdown failure");
+    expect(failure.errors).toHaveLength(3);
+    expect(failure.message).toContain("terminal");
+    expect(failure.message).toContain("miniapp-proxies");
+    expect(failure.message).toContain("harness");
+  });
+
+  it("gives every concurrent caller the same shutdown completion", async () => {
+    let release!: () => void;
+    let closes = 0;
+    const service = new WebuiService({
+      port: shutdownPort(() => {
+        closes += 1;
+        return new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }),
+      operations: new Map(),
+      tcpPort: 0,
+    });
+    await service.start();
+
+    let settled = false;
+    const first = service.close();
+    const second = service.close();
+    // One shutdown, not two: the second caller waits for the first rather than
+    // being told the service is already closed.
+    expect(second).toBe(first);
+    void second.then(() => {
+      settled = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(settled, "a concurrent close resolved before the host was released").toBe(false);
+    expect(closes).toBe(1);
+
+    release();
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBeUndefined();
+    expect(settled).toBe(true);
   });
 });
 

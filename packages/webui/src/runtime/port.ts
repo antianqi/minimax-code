@@ -10,6 +10,7 @@ import type {
 } from "@mavis/shared/miniapp-surface";
 import type { AskQuestionnaireReplyAnswer } from "@mavis/shared/questionnaire";
 import type { WebuiPluginManagementRequest } from "../shared/plugin-management.js";
+import type { WebuiSessionImportRecovery } from "../shared/session-transfer-format.js";
 import type {
   WebuiCronRun,
   WebuiCronRunListRequest,
@@ -283,8 +284,7 @@ export interface WebuiHarnessPort {
         };
       }
     | { readonly kind: "create-failed" }
-    | { readonly kind: "not-transfer-file" }
-    | { readonly kind: "import-failed" }
+    | ({ readonly kind: "not-transfer-file" | "import-failed" } & WebuiSessionImportRecovery)
   >;
   getSessionDiff(
     request: WebuiGetSessionDiffRequest,

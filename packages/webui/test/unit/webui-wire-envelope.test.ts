@@ -34,6 +34,32 @@ function socket(): { readyState: number; OPEN: number; sent: string[]; send(payl
 }
 
 describe("the service judges an inbound frame", () => {
+  it("observes a rejecting finalizer once when abort interrupts a parked pull", async () => {
+    const ws = socket();
+    const controller = new AbortController();
+    let pulled!: () => void;
+    const pulling = new Promise<void>((resolve) => { pulled = resolve; });
+    let returns = 0;
+    const source = {
+      [Symbol.asyncIterator]() { return this; },
+      next: () => { pulled(); return new Promise<IteratorResult<unknown>>(() => {}); },
+      return: async () => { returns += 1; throw new Error("subscription cleanup failed"); },
+    };
+    const entry = {
+      operation: { validate: () => ({ ok: true, body: {} }) },
+      handle: async () => ({ stream: { ok: true, source } }),
+    } as unknown as WebuiOperationRegistryEntry;
+    const dispatch = dispatchWebuiFrame(ws as unknown as WebSocket,
+      { protocolVersion: 1, kind: "request", requestId: "cleanup", operation: "watch", body: {} },
+      new Map([["watch", entry]]), true, () => controller.signal);
+    await pulling;
+    controller.abort();
+    await dispatch;
+    expect(returns).toBe(1);
+    expect(ws.sent.map((frame) => JSON.parse(frame))).toEqual([
+      { protocolVersion: 1, kind: "error", requestId: "cleanup", code: "harness_error", message: "subscription cleanup failed" },
+    ]);
+  });
   it("accepts a well-formed frame and narrows it", () => {
     const judged = judgeWebuiFrame({
       protocolVersion: 1,

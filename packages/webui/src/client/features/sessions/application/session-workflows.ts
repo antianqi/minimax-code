@@ -163,6 +163,25 @@ export interface WebuiComposerInputSource {
   ) => void;
 }
 
+function mergeRetainedComposerItems<T extends { readonly id: string }>(
+  current: readonly T[],
+  incoming: readonly T[],
+  sameItem: (left: T, right: T) => boolean,
+): readonly T[] {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  const additions: T[] = [];
+  for (const item of incoming) {
+    const existing = byId.get(item.id);
+    if (existing) {
+      if (!sameItem(existing, item)) throw new Error("保留内容与当前任务的附件或引用标识冲突，请先分别保存内容。");
+    } else {
+      byId.set(item.id, item);
+      additions.push(item);
+    }
+  }
+  return additions.length === 0 ? current : [...current, ...additions];
+}
+
 /**
  * Builds the delete's view of the composer from the composer store.
  *
@@ -196,12 +215,26 @@ export function createWebuiSessionComposerAccess(
       };
     },
     writeUnsent: (sessionId, input) => {
-      source.setDraft?.(sessionId ?? options.homeKey ?? "", input.draft);
-      if (input.attachments.length === 0 && input.urlReferences.length === 0) return;
-      source.setStaging?.({
-        attachments: input.attachments,
-        urlReferences: input.urlReferences,
-      });
+      const key = sessionId ?? options.homeKey ?? "";
+      const hasStaging = input.attachments.length > 0 || input.urlReferences.length > 0;
+      if (input.draft !== "" && (!source.readDraft || !source.setDraft))
+        throw new Error("当前任务未提供草稿合并能力，保留内容未转移。");
+      if (hasStaging && (!source.readStaging || !source.setStaging))
+        throw new Error("当前任务未提供附件合并能力，保留内容未转移。");
+      const currentDraft = source.readDraft?.(key) ?? "";
+      const staged = hasStaging ? source.readStaging!() : undefined;
+      // Validate both collections before publishing any change. A conflicting
+      // identity must preserve the destination and the retained source intact.
+      const merged = staged ? {
+        attachments: mergeRetainedComposerItems(staged.attachments, input.attachments, (left, right) =>
+          left.fileName === right.fileName && left.mimeType === right.mimeType && left.sizeBytes === right.sizeBytes && left.dataUrl === right.dataUrl && left.kind === right.kind),
+        urlReferences: mergeRetainedComposerItems(staged.urlReferences, input.urlReferences, (left, right) => left.url === right.url),
+      } : undefined;
+      if (input.draft !== "") {
+        const separator = currentDraft === "" || currentDraft.endsWith("\n") ? "" : "\n";
+        source.setDraft!(key, `${currentDraft}${separator}${input.draft}`);
+      }
+      if (merged) source.setStaging!(merged);
     },
   };
 }
@@ -215,7 +248,7 @@ export interface WebuiSessionComposerAccess {
    * so an externally deleted session's text can be retained instead of dropped.
    */
   readonly readUnsent: (sessionId: string) => WebuiUnsentComposerInput;
-  /** Put retained input back into a slot, for an explicit transfer. */
+  /** Merge retained components into a slot without replacing existing input. */
   readonly writeUnsent: (
     sessionId: string | undefined,
     input: WebuiUnsentComposerInput,
@@ -265,9 +298,9 @@ export interface WebuiSessionWorkflows {
   /** Acknowledged text copy consumes only text; uncopied attachments/references remain. */
   readonly copyRetainedDeletionDraft: (sessionId: string, copy: (text: string) => Promise<void>) => Promise<void>;
   /**
-   * Hand the retained input to a task. With no target it goes to the composer's
-   * current slot, which is where "continue this elsewhere" starts; the record
-   * retires either way, because transferring is the user acting on it.
+   * Merge retained input into the named task, or Home when no target is supplied.
+   * The caller names the currently selected task. The record retires only after
+   * the merge succeeds; a refused transfer leaves both inputs available.
    */
   readonly transferRetainedDeletionDraft: (
     sessionId: string,
@@ -523,13 +556,15 @@ export function createWebuiSessionWorkflows(deps: {
   ): WebuiUnsentComposerInput | undefined => {
     const retained = retainedDrafts.get(sessionId);
     if (!retained) return undefined;
+    if (targetSessionId && removedSessionIds.has(targetSessionId))
+      throw new Error("请选择仍存在的任务或新建任务后合并保留内容。");
     const input: WebuiUnsentComposerInput = {
       draft: retained.draft,
       attachments: retained.attachments,
       urlReferences: retained.urlReferences,
     };
     composer.writeUnsent(targetSessionId, input);
-    dropRetained(sessionId);
+    if (retainedDrafts.get(sessionId) === retained) dropRetained(sessionId);
     return input;
   };
 

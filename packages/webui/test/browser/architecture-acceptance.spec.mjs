@@ -214,6 +214,78 @@ test("V36 another page's rename/model/mode facts reach the installed ingress", a
   } finally { await other.close(); }
 });
 
+for (const [destination, sourceState] of [["home", "copied"], ["B", "copied"], ["home", "attachment-only"], ["B", "uncopied"]]) {
+  test(`C11 retained ${sourceState} transfer preserves populated ${destination} composer input`, async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => undefined } });
+    });
+    await openApp(page, "#session=A");
+    const input = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
+    const addFile = (name) => page.getByLabel("添加文件或图片", { exact: true }).setInputFiles({ name, mimeType: "text/plain", buffer: Buffer.from(name) });
+    const pasteUrl = async (url) => {
+      await input.evaluate((element, text) => {
+        const clipboardData = new DataTransfer();
+        clipboardData.setData("text/plain", text);
+        element.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }));
+      }, url);
+    };
+    await input.fill(sourceState === "attachment-only" ? "" : "source draft");
+    await addFile("source.txt");
+    await expect(page.getByRole("button", { name: "移除 source.txt", exact: true })).toBeVisible();
+    await pasteUrl("https://example.test/source");
+    await expect(page.getByRole("textbox", { name: "URL 引用" })).toHaveValue("https://example.test/source");
+    await page.evaluate(() => window.__fixture.publishSessionFact("A", {}, {
+      type: "session.deleted", payload: { sessionId: "A" }, timestamp: Date.now(), source: "fixture",
+    }));
+    const notice = page.getByTestId("external-deletion-draft-A");
+    await expect(notice).toBeVisible();
+    if (sourceState === "copied") {
+      await notice.getByRole("button", { name: "复制文本", exact: true }).click();
+      await expect(notice.getByTestId("external-deletion-draft-text")).toHaveCount(0);
+    }
+    // Remove the old visible staging after retention so source and destination
+    // have distinct data; the retained owner must still hold the source items.
+    await page.getByRole("button", { name: "移除 source.txt", exact: true }).click();
+    await page.getByRole("button", { name: "移除 URL 引用", exact: true }).click();
+    if (destination === "home") {
+      await page.locator(".webui-brand-create-button").click();
+      await expect(page).not.toHaveURL(/#session=/u);
+    } else {
+      await page.locator('[data-webui-session-link="B"]').first().click({ position: { x: 12, y: 12 } });
+      await expect(page.locator('[data-webui-transcript="B"]')).toBeVisible();
+      await expect(page.locator('[data-webui-session-link="B"]').first()).toHaveAttribute("data-webui-session-active", "true");
+    }
+    await input.fill("target draft");
+    await expect(input).toHaveValue("target draft");
+    await addFile("target.txt");
+    await expect(page.getByRole("button", { name: "移除 target.txt", exact: true })).toBeVisible();
+    await pasteUrl("https://example.test/target");
+    await expect(page.getByRole("textbox", { name: "URL 引用" })).toHaveValue("https://example.test/target");
+    await notice.getByRole("button", { name: "合并到当前任务", exact: true }).click();
+    await expect(notice).toHaveCount(0);
+    const expectedDraft = sourceState === "uncopied" ? "target draft\nsource draft" : "target draft";
+    await expect(input).toHaveValue(expectedDraft);
+    await expect(page.getByRole("button", { name: "移除 target.txt", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "移除 source.txt", exact: true })).toBeVisible();
+    await expect.poll(() => page.getByRole("textbox", { name: "URL 引用" }).evaluateAll((elements) => elements.map((element) => element.value))).toEqual(["https://example.test/target", "https://example.test/source"]);
+    if (destination === "home") {
+      await page.locator('[data-webui-session-link="B"]').first().click({ position: { x: 12, y: 12 } });
+      await expect(page.locator('[data-webui-session-link="B"]').first()).toHaveAttribute("data-webui-session-active", "true");
+      await page.evaluate(() => { window.location.hash = ""; });
+    } else {
+      // Route navigation preserves drafts; the explicit New Task command also
+      // resets input and is a different user intent from this round trip.
+      await page.evaluate(() => { window.location.hash = ""; });
+      await expect(page).not.toHaveURL(/#session=B/u);
+      await expect(page.locator('[data-webui-session-link="B"]').first()).toHaveAttribute("data-webui-session-active", "false");
+      await page.locator('[data-webui-session-link="B"]').first().click({ position: { x: 12, y: 12 } });
+      await expect(page.locator('[data-webui-session-link="B"]').first()).toHaveAttribute("data-webui-session-active", "true");
+    }
+    await expect(input).toHaveValue(expectedDraft);
+    expect(await requestCount(page, "sendMessage")).toBe(0);
+  });
+}
+
 test("V15 cross-page deletion retains reachable unsent input and fences a late read", async ({ page, context }) => {
   await openApp(page);
   const composer = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");

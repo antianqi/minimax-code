@@ -1091,6 +1091,53 @@ describe("V36 · this page can act on a session fact another client published", 
     expect(workflows.retainedDeletionDrafts()).toBe(replacement);
   });
 
+  it.each(["copied", "attachment-only", "uncopied"])("merges %s retained input into a populated composer without losing either side", async (state) => {
+    const { workflows, composer } = factFixture({ a: state === "attachment-only" ? "" : "source draft" });
+    const attachment = (id: string) => ({ id, fileName: `${id}.txt`, mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const });
+    const sourceFile = attachment("source");
+    const targetFile = attachment("target");
+    const sourceUrl = { id: "source-url", url: "https://example.test/source" };
+    const targetUrl = { id: "target-url", url: "https://example.test/target" };
+    composer.setStaging({ attachments: [sourceFile], urlReferences: [sourceUrl] });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    if (state === "copied") await workflows.copyRetainedDeletionDraft("a", async () => undefined);
+    expect(workflows.retainedDeletionDrafts()).toHaveLength(1);
+    composer.setDraft("target", "target draft");
+    composer.setStaging({ attachments: [targetFile], urlReferences: [targetUrl], busy: true, seedToken: "target-seed" });
+    workflows.transferRetainedDeletionDraft("a", "target");
+    expect(composer.readDraft("target")).toBe(state === "uncopied" ? "target draft\nsource draft" : "target draft");
+    expect(composer.readStaging()).toEqual({ attachments: [targetFile, sourceFile], urlReferences: [targetUrl, sourceUrl], busy: true, seedToken: "target-seed" });
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
+  it.each(["attachment", "reference"])("retains both sides and performs no write when %s identities conflict", (kind) => {
+    const { workflows, composer } = factFixture();
+    const sourceFile = { id: "same-id", fileName: "source.txt", mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const };
+    const sourceUrl = { id: "same-url-id", url: "https://example.test/source" };
+    composer.setStaging({ attachments: [sourceFile], urlReferences: [sourceUrl] });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const retained = workflows.retainedDeletionDrafts();
+    composer.setDraft("target", "target draft");
+    composer.setStaging({
+      attachments: [{ ...sourceFile, ...(kind === "attachment" ? { fileName: "target.txt" } : {}) }],
+      urlReferences: [{ ...sourceUrl, ...(kind === "reference" ? { url: "https://example.test/target" } : {}) }],
+    });
+    const target = composer.getSnapshot();
+    expect(() => workflows.transferRetainedDeletionDraft("a", "target")).toThrow(/标识/u);
+    expect(composer.getSnapshot()).toBe(target);
+    expect(workflows.retainedDeletionDrafts()).toBe(retained);
+  });
+
+  it("refuses merging into a deleted destination and preserves the retained input", () => {
+    const { workflows, composer } = factFixture();
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const retained = workflows.retainedDeletionDrafts();
+    const target = composer.getSnapshot();
+    expect(() => workflows.transferRetainedDeletionDraft("a", "a")).toThrow(/仍存在的任务/u);
+    expect(composer.getSnapshot()).toBe(target);
+    expect(workflows.retainedDeletionDrafts()).toBe(retained);
+  });
+
   it("keeps the retained record until the clipboard promise acknowledges success", async () => {
     const { workflows } = factFixture();
     workflows.applyFact({ kind: "deleted", sessionId: "a" });

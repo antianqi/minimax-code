@@ -25,7 +25,7 @@ export interface WebuiExternalDeletionNoticeProps {
   readonly drafts: readonly WebuiRetainedDeletionDraft[];
   /** Requests text copy; the owner preserves input the clipboard cannot copy. */
   readonly onCopy: (sessionId: string) => void;
-  /** Puts the input into the composer's current slot. */
+  /** Merges retained input into the current task, preserving its existing input. */
   readonly onTransfer: (sessionId: string) => void;
   readonly onDiscard: (sessionId: string) => void;
 }
@@ -57,7 +57,7 @@ export function WebuiExternalDeletionNotice({
                 复制文本
               </WebuiButton>
               <WebuiButton variant="quiet-secondary" size="inline" onClick={() => onTransfer(draft.sessionId)}>
-                转移到当前任务
+                合并到当前任务
               </WebuiButton>
               <WebuiButton variant="danger" size="inline" onClick={() => onDiscard(draft.sessionId)}>
                 丢弃

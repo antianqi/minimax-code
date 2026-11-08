@@ -1259,7 +1259,11 @@ export function WebuiClientFoundationApp(
                     }).catch((error: unknown) => setPageError(error instanceof Error ? error.message : String(error)));
                   }}
                   onTransfer={(sessionId) => {
-                    sessionWorkflows.transferRetainedDeletionDraft(sessionId);
+                    try {
+                      sessionWorkflows.transferRetainedDeletionDraft(sessionId, selectedSessionId);
+                    } catch (error: unknown) {
+                      setPageError(error instanceof Error ? error.message : String(error));
+                    }
                   }}
                   onDiscard={(sessionId) => {
                     sessionWorkflows.discardRetainedDeletionDraft(sessionId);

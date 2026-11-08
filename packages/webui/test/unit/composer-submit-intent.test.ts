@@ -101,7 +101,11 @@ describe("buildWebuiComposerSubmitIntent", () => {
     expect(intent.prepareCreatedSession).toBeTypeOf("function");
     await intent.prepareCreatedSession!("session-created");
     expect(applied).toEqual([{ request: HOME_SELECTION, createdSessionId: "session-created" }]);
-    // The model travels on the created session, never on the submitted one.
+    // What this pins: the builder hands the captured request through unchanged
+    // and passes the created session's id beside it. The surface is what merges
+    // the id into the request (`{ ...request, sessionId: createdSessionId }`)
+    // before calling the models owner — that merge is not exercised here. Its
+    // evidence is the submission path itself, not this test.
     expect(applied[0]!.request).toBe(HOME_SELECTION);
   });
 

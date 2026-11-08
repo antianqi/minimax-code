@@ -625,7 +625,25 @@
       "home": "target"
     },
     {
+      "path": "client/features/composer/bindings/use-composer-catalogue.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "composer",
+      "home": "target"
+    },
+    {
       "path": "client/features/composer/bindings/use-composer-controller.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "composer",
+      "home": "target"
+    },
+    {
+      "path": "client/features/composer/bindings/use-composer-goal-mode.ts",
       "layers": [
         "bindings"
       ],
@@ -644,6 +662,24 @@
     },
     {
       "path": "client/features/composer/bindings/use-composer-layout.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "composer",
+      "home": "target"
+    },
+    {
+      "path": "client/features/composer/bindings/use-composer-permission-mode.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "composer",
+      "home": "target"
+    },
+    {
+      "path": "client/features/composer/bindings/use-composer-submission.ts",
       "layers": [
         "bindings"
       ],
@@ -779,6 +815,15 @@
     },
     {
       "path": "client/features/composer/projection/submission-gate.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "composer",
+      "home": "target"
+    },
+    {
+      "path": "client/features/composer/projection/submit-intent.ts",
       "layers": [
         "view"
       ],
@@ -3217,6 +3262,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/workspace/bindings/use-workspace-terminal.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
       "path": "client/features/workspace/contracts/panel-command.ts",
       "layers": [
         "contracts"
@@ -3254,6 +3308,15 @@
     },
     {
       "path": "client/features/workspace/projection/canvas-projection.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
+      "path": "client/features/workspace/projection/file-highlight.ts",
       "layers": [
         "view"
       ],
@@ -3371,6 +3434,24 @@
     },
     {
       "path": "client/features/workspace/ui/WorkspaceCanvas.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
+      "path": "client/features/workspace/ui/WorkspaceDiffFileSection.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "workspace",
+      "home": "target"
+    },
+    {
+      "path": "client/features/workspace/ui/WorkspaceFilePreview.tsx",
       "layers": [
         "bindings"
       ],

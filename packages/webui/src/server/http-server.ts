@@ -44,7 +44,10 @@ export function listenHttpServer(
 }
 
 export function closeHttpListener(server: Server): Promise<void> {
-  return new Promise<void>((resolve) => {
-    server.close(() => resolve());
+  return new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error && (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING") reject(error);
+      else resolve();
+    });
   });
 }

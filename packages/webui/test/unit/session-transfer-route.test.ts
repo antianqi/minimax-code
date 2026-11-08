@@ -186,13 +186,20 @@ describe("GET /session-transfer", () => {
 
   it("answers 404, not 500, for a session the port rejects", async () => {
     // The regression this file was originally created for.
-    const url = await serve({ getSession: async () => { throw new Error("Session not found: mvs_gone"); } });
+    const url = await serve({ getSession: async () => { throw Object.assign(new Error("Session not found: mvs_gone"), { key: "SESSION_NOT_FOUND" }); } });
     expect((await fetch(`${url}/session-transfer?sessionId=mvs_gone&token=${token}`)).status).toBe(404);
   });
 
   it("answers 404 for a session the port resolves to nothing", async () => {
     const url = await serve({ getSession: async () => ({}) });
     expect((await fetch(`${url}/session-transfer?sessionId=mvs_none&token=${token}`)).status).toBe(404);
+  });
+
+  it.each([new Error("disk unavailable"), { code: "capability_unavailable" }, "Session not found"])("keeps an unconfirmed lookup failure as 500: %s", async (failure) => {
+    const exportSessionTransfer = vi.fn();
+    const url = await serve({ getSession: async () => { throw failure; }, exportSessionTransfer });
+    expect((await fetch(`${url}/session-transfer?sessionId=mvs_1&token=${token}`)).status).toBe(500);
+    expect(exportSessionTransfer).not.toHaveBeenCalled();
   });
 
   it("answers 400 when no session id is supplied", async () => {
@@ -328,7 +335,31 @@ describe("POST /session-import", () => {
       deleteSession: async () => { throw new Error("already gone"); },
       importSessionTransfer: async () => { throw Object.assign(new Error("bad"), { code: "malformed-transfer-file" }); },
     });
-    expect((await post(url, TRANSFER_FILE, `?token=${token}`)).status).toBe(422);
+    const response = await post(url, TRANSFER_FILE, `?token=${token}`);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      sessionId: "mvs_new", stage: "history", failure: "bad",
+      compensation: { kind: "failed", failure: "already gone" },
+    });
+  });
+
+  it.each(["history", "title"] as const)("retains written history when %s settlement fails", async (stage) => {
+    const sessions = new Map<string, string>();
+    const deleteSession = vi.fn(async () => { sessions.delete("mvs_new"); return { success: true }; });
+    const url = await serve({
+      deleteSession,
+      importSessionTransfer: async () => {
+        sessions.set("mvs_new", "canonical history");
+        if (stage === "history") throw new Error("display write failed");
+        return { sessionId: "mvs_new", canonicalMessages: 1, displayMessages: 1, revision: "r1" };
+      },
+      updateSession: async () => { throw new Error("title write failed"); },
+    });
+    const response = await post(url, TRANSFER_FILE, `?token=${token}`);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ sessionId: "mvs_new", stage, compensation: { kind: "retained" } });
+    expect(sessions.get("mvs_new")).toBe("canonical history");
+    expect(deleteSession).not.toHaveBeenCalled();
   });
 
   it("answers 500 when no session can be created at all", async () => {

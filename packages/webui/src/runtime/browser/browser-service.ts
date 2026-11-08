@@ -166,6 +166,8 @@ export class WebuiBrowserService {
   readonly #options: WebuiBrowserServiceOptions;
   readonly #registry = new WebuiBrowserTargetRegistry();
   readonly #providers = new Map<WebuiBrowserSurface, WebuiBrowserSurfaceProvider>();
+  #acquisition: { promise: Promise<WebuiBrowserSurfaceProvider | undefined>; revoked: boolean } | undefined;
+  #closed = false;
   /** Input events for one page must reach its provider in the order received. */
   readonly #inputQueues = new Map<string, Promise<void>>();
   /**
@@ -245,7 +247,7 @@ export class WebuiBrowserService {
   #followGeneration(identity: WebuiBrowserTargetState): void {
     for (const selections of this.#selected.values()) {
       for (const [runId, selection] of [...selections]) {
-        if (selection.target.targetId !== identity.id.targetId) continue;
+        if (!sameTab(selection.target, identity.id)) continue;
         if (selection.target.generation === identity.id.generation) continue;
         selections.set(runId, { ...selection, target: identity.id });
       }
@@ -423,13 +425,14 @@ export class WebuiBrowserService {
   async closeWebTab(target: WebuiBrowserTargetId): Promise<WebuiBrowserWebTabClose> {
     const surface = target.surface;
     for (const [runId, tabs] of [...this.#webTabs.get(surface) ?? new Map()]) {
-      if (!tabs.has(target.targetId)) continue;
+      const tab = tabs.get(target.targetId);
+      if (!tab || !sameTab(tab, target)) continue;
       tabs.delete(target.targetId);
       this.#publishWebTabs(surface, runId);
     }
     for (const selections of this.#selected.values()) {
       for (const [runId, selection] of [...selections]) {
-        if (selection.target.targetId !== target.targetId) continue;
+        if (!sameTab(selection.target, target)) continue;
         selections.delete(runId);
         this.#publishWebTabs(surface, runId);
       }
@@ -570,6 +573,8 @@ export class WebuiBrowserService {
   }
 
   async #applyAuthorization(authorization: WebuiBrowserAuthorization): Promise<void> {
+    if (!isBrowserSurfaceUsable(authorization, "isolated-chromium") && this.#acquisition)
+      this.#acquisition.revoked = true;
     await this.#applyBridgeAuthorization(authorization);
     await this.#applyIsolatedAuthorization(authorization);
   }
@@ -580,6 +585,10 @@ export class WebuiBrowserService {
   ): Promise<void> {
     for (const surface of ["isolated-chromium", "edge", "chrome"] as const) {
       const usable = isBrowserSurfaceUsable(authorization, surface);
+      if (!usable && surface === "isolated-chromium" && this.#acquisition) {
+        this.#acquisition.revoked = true;
+        await this.#acquisition.promise;
+      }
       const provider = this.#providers.get(surface);
       if (!usable && provider) {
         await this.#stopProvider(surface, provider);
@@ -600,6 +609,7 @@ export class WebuiBrowserService {
   async #ensureProvider(
     surface: WebuiBrowserSurface,
   ): Promise<WebuiBrowserSurfaceProvider | undefined> {
+    if (this.#closed) return undefined;
     const existing = this.#providers.get(surface);
     if (existing) return existing;
     if (surface !== "isolated-chromium") {
@@ -627,6 +637,27 @@ export class WebuiBrowserService {
       });
       return provider;
     }
+    if (this.#acquisition) {
+      const pending = this.#acquisition;
+      const provider = await pending.promise;
+      if (pending.revoked && !this.#closed) {
+        const authorization = await this.readAuthorization();
+        if (isBrowserSurfaceUsable(authorization, surface)) return this.#ensureProvider(surface);
+      }
+      return provider;
+    }
+    const acquisition: { revoked: boolean; promise: Promise<WebuiBrowserSurfaceProvider | undefined> } = {
+      revoked: false,
+      promise: Promise.resolve().then(() => this.#launchIsolatedProvider(acquisition)).finally(() => {
+        if (this.#acquisition === acquisition) this.#acquisition = undefined;
+      }),
+    };
+    this.#acquisition = acquisition;
+    return acquisition.promise;
+  }
+
+  async #launchIsolatedProvider(acquisition: { revoked: boolean }): Promise<WebuiBrowserSurfaceProvider | undefined> {
+    const surface = "isolated-chromium";
     const create =
       this.#options.createIsolatedProvider ??
       ((options: { readonly dataDir: string; readonly chromePath?: string }) =>
@@ -635,6 +666,21 @@ export class WebuiBrowserService {
       dataDir: this.#options.dataDir,
       ...(this.#options.chromePath ? { chromePath: this.#options.chromePath } : {}),
     });
+    let authorization: WebuiBrowserAuthorization;
+    try {
+      authorization = await this.readAuthorization();
+    } catch (error) {
+      try {
+        await provider.close();
+      } catch (closeError) {
+        throw new AggregateError([error, closeError], "Browser acquisition cleanup failed");
+      }
+      throw error;
+    }
+    if (acquisition.revoked || this.#closed || !isBrowserSurfaceUsable(authorization, surface)) {
+      await provider.close();
+      return undefined;
+    }
     this.#providers.set(surface, provider);
     // The provider is the only party that knows when the page behind a target
     // is replaced. The registry has to hear about it, or an input recorded
@@ -1220,16 +1266,7 @@ export class WebuiBrowserService {
         `Browser surface "${surface}" cannot open a tab.`,
       );
     }
-    // Whether the run has a selection is read **before** the page is created,
-    // and it is read across every surface: the Agent acts on one page, so the
-    // bootstrap is about the run and not about a surface. A run working in
-    // Edge still has a selection, and a person opening a tab must not take it.
-    //
-    // The bootstrap is decided at the moment the page is opened, and the page
-    // takes a moment to open: a run that selected a page while the person's
-    // page was opening must not have its selection taken away by the
-    // bootstrap afterwards.
-    const runHadNoSelection = this.selectionSurfaceOf(runId) === undefined;
+    // Bootstrap eligibility is checked after opening, across every surface.
     const identity = (await awaitAbortableCommand(
       provider.openTab(params),
       signal,
@@ -1250,7 +1287,7 @@ export class WebuiBrowserService {
     // has none, so a person who opens a tab in a running session never moves the
     // Agent off the page it is working on, and a run with nothing to act on is
     // not a dead end.
-    if (opener === "agent" || runHadNoSelection) {
+    if (opener === "agent" || this.selectionSurfaceOf(runId) === undefined) {
       // The registry's generation is the current one. A page that is still
       // loading is observed as a replaced page when its first load lands, and
       // that observation may have arrived before this answer did — a selection
@@ -1472,10 +1509,19 @@ export class WebuiBrowserService {
 
   /** Releases every provider this service started. */
   async close(): Promise<void> {
+    this.#closed = true;
+    if (this.#acquisition) {
+      this.#acquisition.revoked = true;
+      await this.#acquisition.promise;
+    }
     for (const [surface, provider] of [...this.#providers]) {
       await this.#stopProvider(surface, provider);
     }
   }
+}
+
+function sameTab(left: WebuiBrowserTargetId, right: WebuiBrowserTargetId): boolean {
+  return left.surface === right.surface && left.browserId === right.browserId && left.targetId === right.targetId;
 }
 
 /**

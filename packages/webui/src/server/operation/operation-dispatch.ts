@@ -109,26 +109,24 @@ export async function dispatchWebuiFrame(
           result.stream.source as AsyncIterable<unknown> | Iterable<unknown>,
         );
         const signal = getSignal();
-        // One finalisation, two routes to reach it.
-        //
-        // The abort listener exists for the case that made this non-obvious: a
-        // client that disconnects mid-stream leaves the pump parked on a `next()`
-        // that may never settle, so the `finally` below would never run. The
-        // listener is the only thing that can finish that iterator.
-        //
-        // But when the pull DOES settle, the loop breaks and the `finally` runs
-        // too — and calling `return()` twice on a live async iterator is a real
-        // double-close on whatever subscription it holds. Hence one idempotent
-        // gate rather than two call sites. A local `let` is enough: the
-        // listener and the `finally` share this closure and this invocation.
-        let finalised = false;
-        const finalise = async (): Promise<void> => {
-          if (finalised) return;
-          finalised = true;
-          await iterator.return?.();
+        // Abort wakes a parked pump. Both paths share finalization, and finally
+        // reports its outcome through the existing request error handling.
+        let finalisation: Promise<void> | undefined;
+        const finalise = (): Promise<void> => {
+          finalisation ??= Promise.resolve().then(async () => { await iterator.return?.(); });
+          return finalisation;
         };
-        const close = () => void finalise();
+        let releaseAbort!: () => void;
+        const aborted = new Promise<IteratorResult<unknown>>((resolve) => {
+          releaseAbort = () => resolve({ done: true, value: undefined });
+        });
+        const close = () => {
+          // finally owns the failure; observe it here while next is parked.
+          void finalise().catch(() => undefined);
+          releaseAbort();
+        };
         signal?.addEventListener("abort", close, { once: true });
+        if (signal?.aborted) close();
         // Acknowledge before pumping, but only for the operations that opt
         // in. The data streams keep their original wire shape so any
         // consumer expecting only `event` frames is unaffected. "Accepted"
@@ -139,7 +137,7 @@ export async function dispatchWebuiFrame(
           sendFrame(ws, responseFrame(parsed.requestId, { stream: true }));
         try {
           while (!signal?.aborted) {
-            const next = await iterator.next();
+            const next = await Promise.race([iterator.next(), aborted]);
             if (next.done || signal?.aborted) break;
             sendFrame(ws, eventFrame(parsed.requestId, next.value));
           }

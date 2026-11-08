@@ -46,10 +46,9 @@ export function createWebuiRuntimeLifecycle(
   owners: WebuiRuntimeResourceOwners,
 ): WebuiRuntimeLifecycle {
   let hostClose: (() => Promise<void>) | undefined;
-  let closed = false;
-  const close = async (): Promise<void> => {
-    if (closed) return;
-    closed = true;
+  /** One completion and failure outcome for all close callers. */
+  let closing: Promise<void> | undefined;
+  const closeOwners = async (): Promise<void> => {
     const failures: unknown[] = [];
     try {
       owners.disposeAuth();
@@ -74,6 +73,10 @@ export function createWebuiRuntimeLifecycle(
     if (failures.length === 1) throw failures[0];
     if (failures.length > 1)
       throw new AggregateError(failures, "WebUI runtime shutdown failed");
+  };
+  const close = (): Promise<void> => {
+    closing ??= closeOwners();
+    return closing;
   };
   const closeAcquiredResources = async (): Promise<void> => {
     const failures: unknown[] = [];

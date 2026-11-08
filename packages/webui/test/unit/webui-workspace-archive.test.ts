@@ -47,6 +47,7 @@ import {
   extractWorkspaceArchiveDirectory,
   readWorkspaceArchiveListing,
 } from "../../src/runtime/workspace-archive.js";
+import { prepareExtractionRoot, writeExtractedFile, writeTarMember } from "../../src/runtime/workspace-archive/archive-filesystem.js";
 import { createHarnessPortFromHost } from "../../src/runtime/harness/adapter.js";
 import type { WebuiRuntimeCliService } from "../../src/runtime/harness/host-contract.js";
 import type { WebuiWorkspaceArchiveListing } from "../../src/shared/contracts/workspace.js";
@@ -530,6 +531,25 @@ describe("workspace archive listing", () => {
 // ---------------------------------------------------------------------------
 
 describe("workspace archive extraction", () => {
+  it.each([false, true])("refuses symlinked extraction roots before creating outside directories (dangling=%s)", async (dangling) => {
+    const root = mkdtempSync(path.join(workspace, "fence-root-"));
+    const outside = mkdtempSync(path.join(workspace, "fence-outside-"));
+    symlinkSync(dangling ? path.join(outside, "missing") : outside, path.join(root, "escape"), "dir");
+    await expect(prepareExtractionRoot(root, "escape/new/nested")).rejects.toThrow();
+    expect(readdirSync(outside)).toEqual([]);
+  });
+
+  it.each(["buffered", "tar"])("fences nested %s entry parents before mkdir", async (kind) => {
+    const root = mkdtempSync(path.join(workspace, "entry-root-"));
+    const outside = mkdtempSync(path.join(workspace, "entry-outside-"));
+    symlinkSync(outside, path.join(root, "escape"), "dir");
+    const target = path.join(root, "escape/new/file.txt");
+    const budget = { remaining: 100 };
+    await expect(kind === "tar"
+      ? writeTarMember({} as never, root, target, budget)
+      : writeExtractedFile(root, target, {} as never, budget)).rejects.toThrow();
+    expect(readdirSync(outside)).toEqual([]);
+  });
   it.skipIf(!HAS_ZIP)(
     "writes the current directory into a destination beside the archive",
     async () => {

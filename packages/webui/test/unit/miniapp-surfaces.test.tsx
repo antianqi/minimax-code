@@ -621,6 +621,20 @@ describe("the standalone presentation's controls", () => {
 });
 
 describe("the proxy registry", () => {
+  it("attempts every registration and retains all shutdown failures", async () => {
+    const attempted: string[] = [];
+    const failures = [new Error("first proxy close failed"), new Error("second proxy close failed")];
+    const registry = createMiniAppProxyRegistry({ start: async (registration) => {
+      const id = registration.target.pluginId;
+      return { pluginId: id, close: async () => { attempted.push(id); throw failures[id === "first" ? 0 : 1]; } } as never;
+    } });
+    for (const pluginId of ["first", "second"]) await registry.start({ target: { pluginId } } as never);
+    const result = await registry.closeAll().catch((error: unknown) => error);
+    expect(result).toBeInstanceOf(AggregateError);
+    expect((result as AggregateError).errors).toEqual(failures);
+    expect(attempted).toEqual(["first", "second"]);
+    expect(registry.running()).toEqual([]);
+  });
   it("binds a listener per plugin, serves the bridge, and frees every port on close", async () => {
     const upstream = http.createServer((request, response) => {
       response.writeHead(200, { "content-type": "text/html" });

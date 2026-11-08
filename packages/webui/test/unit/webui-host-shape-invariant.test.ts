@@ -25,7 +25,7 @@
 //      `tsconfig.test.json` compiles, so a missing port member breaks that
 //      program instead of failing at runtime. Nothing in this file imports it.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
 import {
   createOperationRegistry,
@@ -566,6 +566,28 @@ class FullPort implements WebuiHarnessPort {
 }
 
 describe("WebUI host-shape invariant (batch C seam)", () => {
+  it.each([false, true])("shares harness close completion, including failure=%s", async (fails) => {
+    let finish!: () => void;
+    let entered!: () => void;
+    const entering = new Promise<void>((resolve) => { entered = resolve; });
+    const failure = new Error("host close failed");
+    const close = vi.fn(async () => {
+      entered();
+      await new Promise<void>((resolve) => { finish = resolve; });
+      if (fails) throw failure;
+    });
+    const port = createHarnessPortFromHost({ cliService: {}, apiHost: { close } } as never);
+    const first = port.close();
+    const second = port.close();
+    await entering;
+    expect(second).toBe(first);
+    const results = Promise.allSettled([first, second]);
+    finish();
+    expect(await results).toEqual(fails
+      ? [{ status: "rejected", reason: failure }, { status: "rejected", reason: failure }]
+      : [{ status: "fulfilled", value: undefined }, { status: "fulfilled", value: undefined }]);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
   it("requires the candidate and the model id at ingress and forwards the checked body", async () => {
     const calls: unknown[] = [];
     const port = createHarnessPortFromHost({

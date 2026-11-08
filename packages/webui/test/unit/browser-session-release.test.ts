@@ -142,6 +142,7 @@ function createReleaseHarness(): {
         archiveSession: async () => ({ success: true }),
         deleteSession: async () => ({ success: true }),
         createSession: async () => ({ sessionId: "imported-session" }),
+        importSessionTransfer: async () => { throw Object.assign(new Error("invalid transfer"), { code: "malformed-transfer-file" }); },
         getBrowserAuthorization: async () => authorization,
         setBrowserAuthorization: async () => authorization,
       } as never,

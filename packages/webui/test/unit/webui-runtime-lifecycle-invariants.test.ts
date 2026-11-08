@@ -33,6 +33,7 @@ import { resetDefaultLocalRuntimeConfig } from "@mavis/local-runtime-v2";
 
 import { createWebuiRuntimeHost } from "../../src/runtime/index.js";
 import { createWebuiAuthSession } from "../../src/runtime/auth-session.js";
+import { createWebuiRuntimeLifecycle } from "../../src/runtime/lifecycle.js";
 
 // `vi.mock` factories are hoisted above the imports, so the counters they
 // close over must be hoisted too.
@@ -220,5 +221,61 @@ describe("WebUI runtime single-owner invariants", () => {
       vi.useRealTimers();
       await removeDataDir(dataDir);
     }
+  });
+});
+
+/**
+ * The close owner's completion.
+ *
+ * `close()` used to be idempotent in the sense that it did no second work: the
+ * second caller was answered "already closed" and resolved at once, while the
+ * first was still releasing owners — so a caller awaiting `close()` could
+ * return before the host, the broker or the Browser profile were gone, and
+ * never saw a failure that happened after it returned.
+ */
+describe("the runtime close owner", () => {
+  it("shares one completion and one failure between concurrent callers", async () => {
+    let rejectBroker!: (error: unknown) => void;
+    const broker = new Promise<void>((_resolve, reject) => {
+      rejectBroker = reject;
+    });
+    let authDisposals = 0;
+    let providerCloses = 0;
+    const lifecycle = createWebuiRuntimeLifecycle({
+      disposeAuth: () => {
+        authDisposals += 1;
+      },
+      disposeMcodeTools: () => broker,
+      closeBrowserProvider: () => {
+        providerCloses += 1;
+      },
+    });
+
+    const first = lifecycle.close();
+    const second = lifecycle.close();
+    // One close, shared: the second caller is not told "already closed" while
+    // the first is still tearing owners down.
+    expect(second).toBe(first);
+    rejectBroker(new Error("the broker did not stop"));
+
+    await expect(first).rejects.toThrow("the broker did not stop");
+    await expect(second).rejects.toThrow("the broker did not stop");
+    expect(authDisposals).toBe(1);
+    // The owner after the failing one was still released.
+    expect(providerCloses).toBe(1);
+  });
+
+  it("keeps the settled close after it failed", async () => {
+    let attempts = 0;
+    const lifecycle = createWebuiRuntimeLifecycle({
+      disposeAuth: () => {
+        attempts += 1;
+        throw new Error("auth watch did not stop");
+      },
+      disposeMcodeTools: async () => undefined,
+    });
+    await expect(lifecycle.close()).rejects.toThrow("auth watch did not stop");
+    await expect(lifecycle.close()).rejects.toThrow("auth watch did not stop");
+    expect(attempts).toBe(1);
   });
 });

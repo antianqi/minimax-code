@@ -43,18 +43,62 @@ export function credentialCookie(token: string): string {
 }
 
 /**
- * The credential a request presented in its cookies, if any.
+ * What a request's cookies say about the credential.
+ *
+ * Three answers rather than a `string | undefined`, because "no cookie" and
+ * "a cookie I cannot decode" are different facts and both callers (HTTP
+ * dispatch and the WebSocket upgrade) have to refuse without the parser
+ * escaping into them. A cookie header is untrusted input: `decodeURIComponent`
+ * throws a `URIError` on `webui_credential=%` or on a truncated UTF-8 escape,
+ * and an escaping parser would turn a malformed request into an exception
+ * raised from a synchronous upgrade listener or an unawaited promise instead
+ * of the 401 the request earns.
  */
-export function credentialFromCookie(header: string | undefined): string | undefined {
-  if (!header) return undefined;
+export type WebuiCookieCredential =
+  | { readonly kind: "absent" }
+  | { readonly kind: "invalid"; readonly reason: string }
+  | { readonly kind: "presented"; readonly token: string };
+
+/**
+ * The credential a request presented in its cookies, if any.
+ *
+ * Every occurrence of the cookie is considered and the first one that decodes
+ * wins: a request may carry more than one cookie of that name — two paths, an
+ * earlier and a later start — and a decodable value is a fact about the
+ * credential, not noise. When none decodes, the answer is `invalid` rather than
+ * `absent`, so a caller can say "your cookie is malformed" instead of claiming
+ * nothing was presented.
+ */
+export function credentialFromCookie(header: string | undefined): WebuiCookieCredential {
+  if (!header) return { kind: "absent" };
+  let malformed = false;
   for (const part of header.split(";")) {
     const separator = part.indexOf("=");
     if (separator < 0) continue;
     const name = part.slice(0, separator).trim();
     if (name !== WEBUI_CREDENTIAL_COOKIE) continue;
-    return decodeURIComponent(part.slice(separator + 1).trim());
+    const token = decodeCookieValue(part.slice(separator + 1).trim());
+    if (token !== undefined) return { kind: "presented", token };
+    malformed = true;
   }
-  return undefined;
+  return malformed
+    ? { kind: "invalid", reason: "the credential cookie is not valid percent-encoded text" }
+    : { kind: "absent" };
+}
+
+/**
+ * One cookie value, decoded, or `undefined` when it is not decodable.
+ *
+ * The failure is caught here, at the parse, and not at the caller: the cookie
+ * is the part of the request an untrusted client chooses, and a parser that
+ * throws makes every admission path carry a `try` it does not own.
+ */
+function decodeCookieValue(raw: string): string | undefined {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -66,7 +110,8 @@ export function credentialPresented(
   cookieHeader: string | undefined,
 ): boolean {
   if (credentialMatches(credential, queryToken)) return true;
-  return credentialMatches(credential, credentialFromCookie(cookieHeader));
+  const cookie = credentialFromCookie(cookieHeader);
+  return cookie.kind === "presented" && credentialMatches(credential, cookie.token);
 }
 
 /**

@@ -382,3 +382,9 @@ export interface WebuiEditSessionMessageResult {
   readonly historyRevision?: string;
   readonly deletedMessageIds?: readonly string[];
 }
+/** Runtime AppError status/key and adapter codes establish absence; arbitrary failures do not. */
+export function isConfirmedMissingSession(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { status, key, code } = error as { status?: unknown; key?: unknown; code?: unknown };
+  return status === 404 || key === "SESSION_NOT_FOUND" || code === "SESSION_NOT_FOUND" || code === "not_found";
+}

@@ -677,7 +677,7 @@ function presentedProxyCredential(
     return { presented: true, inQuery: true };
   }
   const cookie = credentialFromCookie(request.headers.cookie);
-  if (credentialMatches(credential, cookie)) {
+  if (cookie.kind === "presented" && credentialMatches(credential, cookie.token)) {
     return { presented: true, inQuery: false };
   }
   return { presented: false, inQuery: false };

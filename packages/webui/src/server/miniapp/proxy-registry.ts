@@ -119,17 +119,37 @@ export function createMiniAppProxyRegistry(
     async closeAll() {
       const registrations = [...proxies.values()];
       proxies.clear();
-      // One failing registration must not keep the others bound, so each is
-      // closed on its own and a failure is swallowed here: the service is going
-      // away, and a teardown that threw would leave the rest of the shutdown
-      // unrun.
-      await Promise.all(registrations.map((proxy) => proxy.close().catch(() => undefined)));
+      // Every registration is closed and every failure is kept. Stopping at
+      // the first failure would leave the other Mini Apps bound; swallowing it
+      // — which this used to do — reported a clean shutdown while a listener
+      // still held the published port, so the next start could not bind it and
+      // nothing said why.
+      const failures: unknown[] = [];
+      for (const proxy of registrations) {
+        try {
+          await proxy.close();
+        } catch (error) {
+          failures.push(error);
+        }
+      }
       const bound = listener;
       listener = undefined;
       port = undefined;
-      if (!bound) return;
-      const host = await bound.catch(() => undefined);
-      await host?.close().catch(() => undefined);
+      if (bound) {
+        // A listener that never bound has nothing to close and its bind failure
+        // was already reported by whoever awaited it.
+        const host = await bound.catch(() => undefined);
+        if (host) {
+          try {
+            await host.close();
+          } catch (error) {
+            failures.push(error);
+          }
+        }
+      }
+      if (failures.length === 1) throw failures[0];
+      if (failures.length > 1)
+        throw new AggregateError(failures, "Mini App proxy shutdown failed");
     },
     async prepare() {
       if (deps.start) return;

@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import { admitWebSocketUpgrade } from "../../src/server/access-policy.js";
+import { credentialFromCookie, credentialPresented } from "../../src/server/credentials.js";
 
 interface RecordedSocket {
   readonly written: string;
@@ -130,5 +131,95 @@ describe("the WebSocket admission", () => {
       context,
     );
     expect(outcome.admitted).toBe(true);
+  });
+});
+
+/**
+ * A cookie is the part of a request an untrusted client writes.
+ *
+ * `decodeURIComponent` throws `URIError` on a malformed escape, and both
+ * admission paths run this parse — one inside the synchronous upgrade listener,
+ * one inside an unawaited dispatch — so an escaping parser turns a wrong
+ * request into an exception raised from code that owns no `try`. The parser
+ * answers with a verdict instead: absent, invalid, or the token it found.
+ */
+describe("the credential a cookie carries", () => {
+  it("answers invalid rather than throwing on a malformed percent escape", () => {
+    expect(credentialFromCookie("webui_credential=%")).toEqual({
+      kind: "invalid",
+      reason: "the credential cookie is not valid percent-encoded text",
+    });
+    // A truncated multi-byte escape is the same failure from a different byte:
+    // `decodeURIComponent` refuses both, so both become the one verdict.
+    expect(credentialFromCookie("webui_credential=%E0%A4%A").kind).toBe("invalid");
+  });
+
+  it("tells no cookie from an undecodable one", () => {
+    expect(credentialFromCookie(undefined)).toEqual({ kind: "absent" });
+    expect(credentialFromCookie("other=1; another=2")).toEqual({ kind: "absent" });
+    expect(credentialFromCookie("webui_credential=")).toEqual({
+      kind: "presented",
+      token: "",
+    });
+  });
+
+  it("decodes the value the page was sent", () => {
+    const token = "0b6f2e1c-8a4d-4f6b-9c0e-2d7a1b3c4d5e";
+    expect(credentialFromCookie(`webui_credential=${encodeURIComponent(token)}`)).toEqual({
+      kind: "presented",
+      token,
+    });
+  });
+
+  it("reads every occurrence, and takes the first one that decodes", () => {
+    // Two paths can both hold the cookie, and a browser sends both. A
+    // decodable value is a fact about the credential, not noise beside a
+    // broken one.
+    expect(
+      credentialFromCookie("webui_credential=%; webui_credential=current-token"),
+    ).toEqual({ kind: "presented", token: "current-token" });
+    expect(
+      credentialFromCookie("webui_credential=first; webui_credential=second"),
+    ).toEqual({ kind: "presented", token: "first" });
+    expect(credentialFromCookie("webui_credential=%; webui_credential=%")).toEqual({
+      kind: "invalid",
+      reason: "the credential cookie is not valid percent-encoded text",
+    });
+  });
+
+  it("refuses a malformed cookie at the WebSocket admission instead of raising", () => {
+    const record = recordingSocket();
+    const outcome = admitWebSocketUpgrade(
+      requestWith({
+        host: "192.168.31.19:2233",
+        origin: "http://192.168.31.19:2233",
+        cookie: "webui_credential=%",
+      }) as never,
+      new URL("ws://192.168.31.19:2233/"),
+      record.socket as never,
+      context,
+    );
+    expect(outcome).toMatchObject({ admitted: false, status: 401, reason: "Unauthorized" });
+    expect(record.written).toContain("401 Unauthorized");
+  });
+
+  it("lets a valid query token short-circuit a malformed cookie", () => {
+    // The query is the credential's first channel, so a page that presents it
+    // there is admitted whatever a stale cookie beside it looks like.
+    const outcome = admitWebSocketUpgrade(
+      requestWith({
+        host: "192.168.31.19:2233",
+        origin: "http://192.168.31.19:2233",
+        cookie: "webui_credential=%",
+      }) as never,
+      new URL("ws://192.168.31.19:2233/?token=current-token"),
+      recordingSocket().socket as never,
+      context,
+    );
+    expect(outcome.admitted).toBe(true);
+    expect(
+      credentialPresented({ token: "current-token" }, "current-token", "webui_credential=%"),
+    ).toBe(true);
+    expect(credentialPresented({ token: "current-token" }, null, "webui_credential=%")).toBe(false);
   });
 });

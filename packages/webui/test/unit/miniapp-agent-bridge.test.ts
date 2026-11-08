@@ -684,6 +684,36 @@ describe("the agent operations at the service boundary", () => {
     expect(frames).toEqual([{ kind: "failure", code: "cancelled" }]);
     expect(runs.size()).toBe(0);
   });
+
+  it("duplicate cancellation owns one watchdog and releases it on settlement", async () => {
+    vi.useFakeTimers();
+    try {
+      const { connections, runs, panels } = registries();
+      connections.register({ pluginId: PLUGIN, runId: "gen-1" });
+      let rejectTurn!: (error: unknown) => void;
+      let started!: () => void;
+      const starting = new Promise<void>((resolve) => { started = resolve; });
+      const entries = createMiniAppAgentHandlerEntries(agentPort({
+        runMiniAppAgentTurn: () => { started(); return new Promise((_resolve, reject) => { rejectTurn = reject; }); },
+      }), { connections, runs, panels });
+      const outcome = await entries.get("watchMiniAppAgentTurn")!.handle({ requestId: "wire" }, BODY) as { stream: { source: AsyncIterable<WebuiMiniAppAgentTurnFrame> } };
+      const frames: WebuiMiniAppAgentTurnFrame[] = [];
+      const consuming = (async () => { for await (const frame of outcome.stream.source) frames.push(frame); })();
+      await starting;
+      const cancel = () => runs.cancel({ pluginId: PLUGIN, requestId: BODY.requestId });
+      expect(cancel()).toBe(true);
+      expect(cancel()).toBe(true);
+      runs.cancelPlugin(PLUGIN);
+      expect(vi.getTimerCount()).toBe(1);
+      rejectTurn(Object.assign(new Error("aborted"), { code: "REQUEST_CANCELLED" }));
+      await consuming;
+      expect(frames).toEqual([{ kind: "failure", code: "cancelled" }]);
+      expect(runs.size()).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("the shown presentation", () => {

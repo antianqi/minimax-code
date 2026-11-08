@@ -12,20 +12,27 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { once } from "node:events";
+import { WebSocket } from "ws";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createWebuiRuntimeHost } from "../../src/runtime/assembly.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
+import { WebuiService } from "../../src/server/service.js";
+import { webuiCronDraftFromTask, webuiCronUpdateRequest } from "../../src/client/features/scheduling/projection/scheduling-panel.js";
+import type { WebuiCronTask } from "../../src/shared/contracts/cron.js";
 
 const disposers: Array<() => Promise<void> | void> = [];
 
 afterEach(async () => {
   for (const dispose of disposers.splice(0).reverse()) await dispose();
+  vi.unstubAllEnvs();
 });
 
 async function boot() {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-cron-mutations-"));
+  vi.stubEnv("MINIMAX_DATA_DIR", dataDir);
   disposers.push(() => rm(dataDir, { recursive: true, force: true }));
   await mkdir(join(dataDir, "workspace"), { recursive: true });
   const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "cron-mutations" });
@@ -41,6 +48,41 @@ async function boot() {
 }
 
 describe("scheduled-task mutations over the real service and the real host", () => {
+  it("B13/B14 carries an edited draft over loopback and persists hidden fields and explicit clears", async () => {
+    const { assembled } = await boot();
+    const service = new WebuiService({ port: assembled.harnessPort, operations: createOperationRegistry(assembled.harnessPort), credential: { token: "synthetic-cron-test" } });
+    disposers.push(() => service.close());
+    const info = await service.start();
+    const socket = new WebSocket(`ws://127.0.0.1:${info.tcpPort}/?token=${info.credential.token}`);
+    disposers.push(() => { socket.close(); });
+    await once(socket, "open");
+    let request = 0;
+    const callWire = async (op: string, body: unknown): Promise<unknown> => {
+      const response = once(socket, "message");
+      socket.send(JSON.stringify({ kind: "request", protocolVersion: info.protocolVersion, requestId: `cron-${++request}`, operation: op, body }));
+      const [raw] = await response;
+      const frame = JSON.parse(String(raw));
+      expect(frame.kind, JSON.stringify(frame)).toBe("response");
+      return frame.body;
+    };
+    const created = await callWire("createCronTask", {
+      name: "synthetic edit", agentName: "agent-one", prompt: "Do nothing.",
+      project: "/synthetic/project", model: "minimax/MiniMax-M3",
+      schedule: { kind: "recurring", expression: "0 9 * * *", timezone: "Asia/Shanghai", maxRuns: 7 },
+      sessionTarget: { mode: "new" },
+    }) as WebuiCronTask;
+    const draft = webuiCronDraftFromTask(created);
+    const update = webuiCronUpdateRequest({ ...draft, time: "10:30", model: "", project: "" }, draft, created, Date.now());
+    expect(update.ok).toBe(true);
+    if (!update.ok) throw new Error(update.message);
+    await callWire("updateCronTask", update.request);
+    const page = await callWire("listCronTasks", {}) as { items: WebuiCronTask[] };
+    expect(page.items[0]).toMatchObject({ cronId: created.cronId, project: null, model: null,
+      schedule: { kind: "recurring", expression: "30 10 * * *", timezone: "Asia/Shanghai", maxRuns: 7 } });
+    const stored = assembled.host.cliService?.listCronTasks?.().items.find((item) => item.cronId === created.cronId);
+    expect(stored).toMatchObject({ project: null, model: null,
+      schedule: { kind: "recurring", expression: "30 10 * * *", timezone: "Asia/Shanghai", maxRuns: 7 } });
+  }, 240_000);
   it("creates, edits, disables and deletes a task, and the runtime follows each step", async () => {
     const { assembled, call } = await boot();
     const cliService = assembled.host.cliService;

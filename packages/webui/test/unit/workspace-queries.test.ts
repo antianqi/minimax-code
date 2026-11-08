@@ -5,7 +5,11 @@
 // rather than applied, and that a mutation invalidates exactly the views it
 // affects — not the world.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createWebuiWorkspaceCanvasOwner } from "../../src/client/features/workspace/application/workspace-canvas-owner.js";
+import { createWebuiWorkspaceArchiveOwner } from "../../src/client/features/workspace/application/workspace-archive-owner.js";
+import { createWebuiWorkspaceFilesOwner } from "../../src/client/features/workspace/application/workspace-files-owner.js";
+import { createWebuiWorkspaceEnvironmentOwner } from "../../src/client/features/workspace/application/workspace-environment-owner.js";
 
 import type { WebuiWorkspaceArchiveListing } from "../../src/shared/contracts/workspace.js";
 
@@ -41,6 +45,105 @@ function deferred<T>(): {
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("B03-B05 workspace publication lifetimes", () => {
+  it("an archive disposed during extraction refuses later commands and publications", async () => {
+    const pending = deferred<never>();
+    const extract = vi.fn(() => pending.promise);
+    const owner = createWebuiWorkspaceArchiveOwner({ port: { extractWorkspaceArchive: extract } });
+    const request = { workspaceDir: "/w", path: "a.zip", destination: "/out" };
+    const accepted = owner.extract(request); owner.dispose(); const before = owner.state();
+    pending.resolve({} as never); await accepted; await owner.extract(request);
+    expect(owner.state()).toBe(before); expect(extract).toHaveBeenCalledTimes(1);
+  });
+  it("B08 reports malformed directory data and recovers on retry", async () => {
+    let invalid = true;
+    const files = createWebuiWorkspaceFilesOwner({ port: { browseWorkspaceDirs: async () => invalid
+      ? { dir: "/w" } as never : { dir: "/w", entries: [], truncated: false } } });
+    files.browse(); await flush();
+    expect(files.state().directoryBrowse).toEqual({ status: "error", error: "目录列表响应格式无效，请重试。" });
+    invalid = false; files.browse(); await flush();
+    expect(files.state().directoryBrowse).toEqual({ status: "ready", listing: { dir: "/w", entries: [], truncated: false } });
+  });
+  it.each(["navigate", "release", "dispose"])("settles an accepted canvas write after %s without restoring its document", async (action) => {
+    const write = deferred<never>();
+    const apply = vi.fn(() => write.promise);
+    const owner = createWebuiWorkspaceCanvasOwner({ port: {
+      readCanvas: async ({ sessionId }) => ({ sessionId, nodes: [] }) as never,
+      applyCanvas: apply,
+    } });
+    owner.read("A");
+    await flush();
+    const pending = owner.apply("A", {} as never);
+    if (action === "navigate") { owner.read("B"); await flush(); }
+    if (action === "release") owner.release("A");
+    if (action === "dispose") owner.dispose();
+    const before = owner.state();
+    write.resolve({ document: { sessionId: "A" } } as never);
+    expect(await pending).toBe(true);
+    expect(owner.state()).toBe(before);
+    if (action === "dispose") {
+      owner.read("C");
+      expect(await owner.apply("C", {} as never)).toBe(false);
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(owner.state()).toBe(before);
+    }
+  });
+
+  it.each(["resolve", "reject"])("keeps extraction outcome with its origin on late %s", async (settlement) => {
+    const pending = deferred<never>();
+    const owner = createWebuiWorkspaceArchiveOwner({ port: {
+      readWorkspaceArchive: async ({ path }) => ({ archivePath: path, entries: [], totalEntries: 0, truncated: false }),
+      extractWorkspaceArchive: () => pending.promise,
+    } });
+    owner.read({ workspaceDir: "/w", path: "A.zip" });
+    const write = owner.extract({ workspaceDir: "/w", path: "A.zip", destination: "/out" });
+    owner.read({ workspaceDir: "/w", path: "B.zip" });
+    await flush();
+    const before = owner.state();
+    if (settlement === "resolve") pending.resolve({} as never);
+    else pending.reject(new Error("A failed"));
+    await write;
+    expect(owner.state()).toBe(before);
+    expect(owner.state().extract.status).toBe("idle");
+  });
+
+  it("fences every workspace owner's state and commands and releases environment timers", async () => {
+    const file = deferred<WebuiWorkspaceFileContent>();
+    const archive = deferred<never>();
+    const environment = deferred<never>();
+    const git = deferred<Record<string, unknown>>();
+    const readFile = vi.fn(() => file.promise);
+    const readArchive = vi.fn(() => archive.promise);
+    const readEnvironment = vi.fn(() => environment.promise);
+    const mutateGit = vi.fn(() => git.promise);
+    const invalidateReview = vi.fn();
+    const files = createWebuiWorkspaceFilesOwner({ port: { readWorkspaceFile: readFile } });
+    const archives = createWebuiWorkspaceArchiveOwner({ port: { readWorkspaceArchive: readArchive } });
+    const env = createWebuiWorkspaceEnvironmentOwner({ port: { getWorkspaceEnvironment: readEnvironment, mutateWorkspaceGit: mutateGit }, invalidateReview });
+    files.readFile("tab", "/w", "a");
+    archives.read({ workspaceDir: "/w", path: "a.zip" });
+    env.load("/w");
+    const mutation = env.mutateGit({ workspaceDir: "/w", action: "commit" });
+    vi.useFakeTimers();
+    env.invalidate("/w", 350);
+    expect(vi.getTimerCount()).toBe(1);
+    files.dispose(); archives.dispose(); env.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+    const before = [files.state(), archives.state(), env.state(), env.revision()];
+    file.resolve({ type: "text", content: "late", resolvedPath: "a" });
+    archive.resolve({} as never); environment.resolve({} as never); git.resolve({ success: true });
+    await mutation; await flush();
+    files.readFile("new", "/w", "b");
+    archives.read({ workspaceDir: "/w", path: "b.zip" }); env.load("/w"); env.invalidate("/w", 0);
+    await expect(env.mutateGit({ workspaceDir: "/w", action: "commit" })).rejects.toThrow("released");
+    expect([files.state(), archives.state(), env.state(), env.revision()]).toEqual(before);
+    expect(readFile).toHaveBeenCalledTimes(1); expect(readArchive).toHaveBeenCalledTimes(1);
+    expect(readEnvironment).toHaveBeenCalledTimes(1); expect(mutateGit).toHaveBeenCalledTimes(1);
+    expect(invalidateReview).not.toHaveBeenCalled();
+  });
+});
 
 const summary = (snapshotId: string): WebuiWorkspaceReviewSummary => ({
   repositoryId: "repo",

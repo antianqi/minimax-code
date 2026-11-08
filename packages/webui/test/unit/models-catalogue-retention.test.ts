@@ -16,6 +16,24 @@ import { createWebuiModelsWorkflows } from "../../src/client/features/models/app
 
 const noStatusRefresh = async (): Promise<void> => {};
 
+it("B06 retires retained answers with every credential/configuration epoch and session release", async () => {
+  const { createWebuiIdentityEpochs } = await import("../../src/client/application/identity-epochs.js");
+  const epochs = createWebuiIdentityEpochs();
+  const owner = createWebuiModelsWorkflows({ identityEpochs: epochs,
+    port: { listModels: async () => [{ providerId: "p", modelId: "m" }] }, refreshApiKeyStatus: noStatusRefresh });
+  for (let i = 0; i < 12; i += 1) {
+    await owner.loadModels("A");
+    expect(owner.diagnostics()).toEqual({ catalogueKeys: 1, retainedCatalogues: 1 });
+    epochs.advance(i % 2 === 0 ? "credentials" : "configuration");
+    // 当前选中项绑定到新 epoch，但旧答案已全部退休。
+    expect(owner.diagnostics()).toEqual({ catalogueKeys: 1, retainedCatalogues: 0 });
+    expect(owner.readModelsFor("A").value).toBeUndefined();
+  }
+  await owner.loadModels("A"); owner.releaseSession("A");
+  expect(owner.diagnostics()).toEqual({ catalogueKeys: 0, retainedCatalogues: 0 });
+  owner.dispose();
+});
+
 /** A port whose second read waits for the test to let it through. */
 function gatedPort() {
   let release: (() => void) | undefined;

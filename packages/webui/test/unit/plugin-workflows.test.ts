@@ -18,6 +18,49 @@ import type { WebuiPluginIntent } from "../../src/client/features/plugins/contra
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
+describe("B15 marketplace and manageable-skill continuation", () => {
+  it("stops acquiring pages when the selected listing was superseded", async () => {
+    let finish!: (value: unknown) => void;
+    let skillCalls = 0;
+    const workflows = createWebuiPluginWorkflows({ port: { pluginManagement: async ({ action }) => {
+      if (action !== "listManageableSkills") return { plugins: [] };
+      skillCalls += 1;
+      return new Promise((resolve) => { finish = resolve; });
+    } } });
+    const first = workflows.loadListing({ ...initialWebuiPluginSelection, area: "skills", view: "personal" });
+    await workflows.loadListing(initialWebuiPluginSelection);
+    finish({ skills: [], hasMore: true, nextCursor: "next" }); await first;
+    expect(skillCalls).toBe(1);
+    expect(workflows.getSnapshot().listing.selection.area).toBe("plugins");
+    expect(workflows.getSnapshot().listing.error).toBeUndefined();
+  });
+  it.each(["plugins", "skills"] as const)("collects all %s pages", async (area) => {
+    const calls: Array<string | undefined> = [];
+    const workflows = createWebuiPluginWorkflows({ port: { pluginManagement: async ({ action, input }) => {
+      if (action === "listInstalledPlugins") return { plugins: [] };
+      const cursor = input?.cursor as string | undefined; calls.push(cursor);
+      return { [area]: [{ name: cursor ? "two" : "one" }], hasMore: !cursor, ...(!cursor ? { nextCursor: "next" } : {}) };
+    } } });
+    await workflows.loadListing({ ...initialWebuiPluginSelection, area, view: area === "skills" ? "personal" : "market" });
+    expect(workflows.getSnapshot().listing.rows.map((r) => r.name)).toEqual(["one", "two"]);
+    expect(calls).toEqual([undefined, "next"]);
+  });
+  it.each(["plugins", "skills"] as const)("refuses missing/repeating %s cursors", async (area) => {
+    for (const nextCursor of [undefined, "same"]) {
+      let calls = 0;
+      const workflows = createWebuiPluginWorkflows({ port: { pluginManagement: async ({ action }) => {
+        if (action === "listInstalledPlugins") return { plugins: [] };
+        calls += 1;
+        if (calls > 3) throw new Error("unbounded paging");
+        return { [area]: [], hasMore: true, nextCursor };
+      } } });
+      await workflows.loadListing({ ...initialWebuiPluginSelection, area, view: area === "skills" ? "personal" : "market" });
+      expect(workflows.getSnapshot().listing.error).toContain("returned an invalid cursor");
+      expect(calls).toBe(nextCursor ? 2 : 1);
+    }
+  });
+});
+
 describe("the plugin listing has one owner", () => {
   it("drops a listing answer for a selection the owner has left", async () => {
     let resolveFirst: (value: unknown) => void = () => undefined;

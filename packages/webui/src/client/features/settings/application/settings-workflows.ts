@@ -35,6 +35,7 @@ import {
   runWebuiMutation,
   createWebuiKeyedResource,
   idleWebuiResourceState,
+  serializeWebuiResourceKey,
   webuiResourceMessage,
   type WebuiKeyedResource,
   type WebuiResourceKey,
@@ -238,7 +239,7 @@ export function createWebuiSettingsWorkflows(deps: {
   // render them. The fence belongs to the keyed resources below, which is why
   // this store knows nothing about reads: a read that was superseded reports
   // itself to its caller and never reaches a field.
-  const { getSnapshot, subscribe, set } =
+  const { getSnapshot, subscribe, set, isDisposed, dispose: disposeSnapshot } =
     createWebuiSnapshotStore(initialWebuiSettingsWorkflowsState);
   const withResource = <Field extends keyof WebuiSettingsWorkflowsState, T>(
     current: WebuiSettingsWorkflowsState,
@@ -251,6 +252,35 @@ export function createWebuiSettingsWorkflows(deps: {
     error: string,
   ): void => {
     set((current) => withResource(current, field, { status: "error", error }));
+  };
+
+  /**
+   * How this owner publishes one resource into the snapshot.
+   *
+   * One subscription per (field, key) for the owner's whole life, established
+   * the first time that read is asked for — not one per read. A read used to
+   * subscribe on every invocation and drop the unsubscribe, so every later
+   * notification ran one more callback, published one more snapshot and
+   * notified one more time, and nothing removed those callbacks until the
+   * application was torn down. The subscription is the *publication* lifetime;
+   * the read is the request. They are different lifetimes and only the request
+   * belongs to the caller.
+   */
+  const publishedSlots = new Map<string, () => void>();
+  const publishResource = <Field extends keyof WebuiSettingsWorkflowsState, T>(
+    field: Field,
+    resource: WebuiKeyedResource<T>,
+    key: WebuiResourceKey,
+  ): void => {
+    const slot = `${String(field)}:${serializeWebuiResourceKey(key)}`;
+    if (isDisposed() || publishedSlots.has(slot)) return;
+    publishedSlots.set(
+      slot,
+      resource.subscribe(() => {
+        const entry = resource.read(key);
+        set((current) => withResource(current, field, entry ?? idleWebuiResourceState()));
+      }),
+    );
   };
 
   /**
@@ -270,10 +300,7 @@ export function createWebuiSettingsWorkflows(deps: {
     capability: string,
     fetch: () => Promise<T>,
   ): Promise<WebuiResourceLoadOutcome<T>> => {
-    resource.subscribe(() => {
-      const entry = resource.read(key);
-      set((current) => withResource(current, field, entry ?? idleWebuiResourceState()));
-    });
+    publishResource(field, resource, key);
     return resource.load(key, fetch).then((outcome) => {
       // A host that says it cannot answer at all is recorded as not supporting
       // the capability, so the surface stops offering a control that would keep
@@ -716,6 +743,9 @@ export function createWebuiSettingsWorkflows(deps: {
     savePermissionMode,
     loadVersion,
     dispose: () => {
+      disposeSnapshot();
+      for (const unsubscribe of publishedSlots.values()) unsubscribe();
+      publishedSlots.clear();
       // Disposal fences every read: an answer still in flight can no longer
       // commit, and a read started afterwards reports `disposed` without issuing
       // a request. This is the same rule the primitive applies everywhere, not a

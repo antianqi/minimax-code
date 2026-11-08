@@ -26,6 +26,24 @@ const instructions = (content: string): WebuiGlobalInstructionsView => ({
   maxBytes: 32 * 1024,
 });
 
+it("B17 repeated reads have constant publication work and disposal releases publication", async () => {
+  const workflows = createWebuiSettingsWorkflows({ port: { getGlobalInstructions: async () => instructions("x") } });
+  let notifications = 0;
+  workflows.subscribe(() => { notifications += 1; });
+  const counts: number[] = [];
+  for (let i = 0; i < 20; i += 1) {
+    const before = notifications;
+    await workflows.loadInstructions();
+    counts.push(notifications - before);
+  }
+  expect(counts).toEqual(Array(20).fill(2));
+  const snapshot = workflows.getSnapshot();
+  workflows.dispose();
+  expect((await workflows.loadInstructions()).status).toBe("disposed");
+  expect(workflows.getSnapshot()).toBe(snapshot);
+  expect(notifications).toBe(40);
+});
+
 describe("the settings owner discards a superseded read", () => {
   it("keeps the newest instructions answer when an older one lands later", async () => {
     // The invalidation here is a write, which is what retires an answer in

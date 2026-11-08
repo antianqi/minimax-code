@@ -19,6 +19,7 @@ import type {
   WebuiCronTaskUpdateRequest,
 } from "../../../../shared/contracts/cron.js";
 import type { SchedulingPort } from "../contracts/scheduling-port.js";
+import { collectWebuiPages } from "../../../conversation/pagination.js";
 
 export type WebuiSchedulingStatus = "idle" | "loading" | "ready" | "error";
 
@@ -112,8 +113,8 @@ export function createWebuiSchedulingOwner(
     publish({ ...snapshot, status: "loading" });
     inFlight = (async () => {
       try {
-        const page: WebuiCronTaskPage = await read({});
-        publish({ status: "ready", tasks: page.items, loadedAtMs: nowMs() });
+        const tasks = await collectWebuiPages(async (cursor): Promise<WebuiCronTaskPage> => read({ cursor }), { label: "Scheduled tasks" });
+        publish({ status: "ready", tasks, loadedAtMs: nowMs() });
       } catch (error) {
         publish({
           status: "error",
@@ -185,8 +186,8 @@ export function createWebuiSchedulingOwner(
       const read = options.port.listCronTaskRuns;
       if (!read) return { ok: false, message: WEBUI_SCHEDULING_UNAVAILABLE };
       try {
-        const page = await read({ cronId });
-        return { ok: true, runs: page.items };
+        const runs = await collectWebuiPages((cursor) => read({ cronId, cursor }), { label: "Scheduled task runs" });
+        return { ok: true, runs };
       } catch (error) {
         return { ok: false, message: failureMessage(error) };
       }

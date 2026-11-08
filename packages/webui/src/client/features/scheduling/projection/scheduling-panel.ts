@@ -156,6 +156,24 @@ export interface WebuiCronDraft {
   readonly project: string;
   /** A fresh session per run, or a fixed one the person names. */
   readonly sessionId: string;
+  /**
+   * The recurring schedule's fields the form does not expose, carried from the
+   * task this draft was opened from.
+   *
+   * `timezone` and `maxRuns` are part of the schedule a task stores, but not
+   * part of the four presets a person edits here. Rebuilding a schedule from the
+   * draft alone therefore dropped them: changing a task's time silently reset a
+   * schedule that had been created elsewhere with an explicit zone or run cap.
+   * The draft keeps them so the conversion can put them back; the form still
+   * shows only the fields it offers, and a draft for a new task carries none.
+   */
+  readonly retainedSchedule?: WebuiCronRetainedSchedule;
+}
+
+/** The recurring-schedule fields the editor keeps without showing them. */
+export interface WebuiCronRetainedSchedule {
+  readonly timezone?: string;
+  readonly maxRuns?: number;
 }
 
 export const WEBUI_CRON_PRESET_LABELS: Readonly<Record<WebuiCronSchedulePreset, string>> = {
@@ -187,6 +205,29 @@ export type WebuiCronScheduleFromDraft =
 
 const TIME_PATTERN = /^([01]?\d|2[0-3]):([0-5]\d)$/u;
 
+/**
+ * A recurring schedule built from an expression, with the fields the form does
+ * not show carried over from the task being edited.
+ *
+ * Present-but-absent matters here: `timezone` is left out when the source had
+ * none, rather than written as `undefined` or `""`, so an edit cannot invent a
+ * zone the task never had. `maxRuns` travels when it is a number, including `0`.
+ */
+function recurringSchedule(
+  draft: WebuiCronDraft,
+  expression: string,
+): WebuiCronSchedule {
+  const retained = draft.retainedSchedule;
+  const timezone = retained?.timezone;
+  const maxRuns = retained?.maxRuns;
+  return {
+    kind: "recurring",
+    expression,
+    ...(typeof timezone === "string" && timezone !== "" ? { timezone } : {}),
+    ...(typeof maxRuns === "number" ? { maxRuns } : {}),
+  };
+}
+
 /** The schedule a draft stands for, or the field that stopped it. */
 export function webuiCronScheduleFromDraft(
   draft: WebuiCronDraft,
@@ -197,7 +238,7 @@ export function webuiCronScheduleFromDraft(
     if (expression.split(/\s+/u).filter(Boolean).length !== 5) {
       return { ok: false, field: "expression", message: "自定义表达式需要五段。" };
     }
-    return { ok: true, schedule: { kind: "recurring", expression } };
+    return { ok: true, schedule: recurringSchedule(draft, expression) };
   }
   if (draft.preset === "once") {
     const runAtMs = Date.parse(draft.onceAt);
@@ -207,6 +248,8 @@ export function webuiCronScheduleFromDraft(
     if (runAtMs <= nowMs) {
       return { ok: false, field: "onceAt", message: "执行时间需要晚于现在。" };
     }
+    // A one-off schedule has no zone or run cap to carry, and inventing one
+    // would attach recurring-schedule fields to a schedule that has none.
     return { ok: true, schedule: { kind: "once", runAtMs } };
   }
   if (draft.preset === "hourly") {
@@ -214,7 +257,7 @@ export function webuiCronScheduleFromDraft(
     if (!Number.isInteger(minute) || minute < 0 || minute > 59) {
       return { ok: false, field: "time", message: "分钟需要在 0 到 59 之间。" };
     }
-    return { ok: true, schedule: { kind: "recurring", expression: `${String(minute)} * * * *` } };
+    return { ok: true, schedule: recurringSchedule(draft, `${String(minute)} * * * *`) };
   }
   const match = TIME_PATTERN.exec(draft.time.trim());
   if (!match) return { ok: false, field: "time", message: "时间格式需要是 HH:MM。" };
@@ -223,7 +266,7 @@ export function webuiCronScheduleFromDraft(
   if (draft.preset === "daily") {
     return {
       ok: true,
-      schedule: { kind: "recurring", expression: `${String(minute)} ${String(hour)} * * *` },
+      schedule: recurringSchedule(draft, `${String(minute)} ${String(hour)} * * *`),
     };
   }
   const weekday = Number(draft.weekday);
@@ -232,17 +275,26 @@ export function webuiCronScheduleFromDraft(
   }
   return {
     ok: true,
-    schedule: {
-      kind: "recurring",
-      expression: `${String(minute)} ${String(hour)} * * ${String(weekday)}`,
-    },
+    schedule: recurringSchedule(draft, `${String(minute)} ${String(hour)} * * ${String(weekday)}`),
   };
 }
 
 /** The draft an existing task opens in, so editing does not start from a blank form. */
 export function webuiCronDraftFromTask(task: WebuiCronTask): WebuiCronDraft {
+  // The recurring schedule's zone and run cap are not edited by this form, but
+  // they belong to the schedule: a draft that dropped them would rebuild the
+  // schedule without them on the next save.
+  const retainedSchedule: WebuiCronRetainedSchedule | undefined =
+    task.schedule.kind === "recurring" &&
+    (task.schedule.timezone !== undefined || task.schedule.maxRuns !== undefined)
+      ? {
+          ...(task.schedule.timezone === undefined ? {} : { timezone: task.schedule.timezone }),
+          ...(task.schedule.maxRuns === undefined ? {} : { maxRuns: task.schedule.maxRuns }),
+        }
+      : undefined;
   const draft: WebuiCronDraft = {
     ...WEBUI_CRON_EMPTY_DRAFT,
+    ...(retainedSchedule === undefined ? {} : { retainedSchedule }),
     name: task.name,
     agentName: task.agentName,
     prompt: task.prompt,
@@ -342,6 +394,11 @@ export function webuiCronScheduleUnchanged(
  *
  * `schedule` is present only when the schedule changed. That is the whole reason this lives in the
  * projection rather than in the component: it is a rule about what the wire may carry.
+ *
+ * `model` and `project` are always carried, as a value or as an explicit `null`. The shared update
+ * contract treats an absent field as "leave it" and `null` as "clear it", so omitting a blank field
+ * left the old value in place: clearing a task's model or project in this editor did nothing. The
+ * editor always saves the whole form it shows, so a blank field is a decision, not an omission.
  */
 export function webuiCronUpdateRequest(
   draft: WebuiCronDraft,
@@ -357,6 +414,8 @@ export function webuiCronUpdateRequest(
   if (converted !== undefined && !converted.ok) {
     return { ok: false, message: converted.message };
   }
+  const model = draft.model.trim();
+  const project = draft.project.trim();
   return {
     ok: true,
     request: {
@@ -367,8 +426,8 @@ export function webuiCronUpdateRequest(
       sessionTarget: draft.sessionId.trim()
         ? { mode: "sessionId" as const, sessionId: draft.sessionId.trim() }
         : { mode: "new" as const },
-      ...(draft.model.trim() ? { model: draft.model.trim() } : {}),
-      ...(draft.project.trim() ? { project: draft.project.trim() } : {}),
+      model: model === "" ? null : model,
+      project: project === "" ? null : project,
     },
   };
 }

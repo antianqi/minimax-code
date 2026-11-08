@@ -112,13 +112,13 @@ export function WorkspaceCanvas({ sessionId }: {
   const [draftPath, setDraftPath] = useState("");
   const gestureRef = useRef<CanvasGestureState>();
   const viewportRef = useRef<HTMLDivElement>(null);
-  // Identifies the newest read or apply so a late reply from a session the user
-  // has already left cannot overwrite the current document.
+  // View-side effects have a different lifetime from accepted host writes.
+  // Navigation, unmount or a newer operation retires the old callback.
   const applySeqRef = useRef(0);
 
   useEffect(() => {
-    if (!sessionId) return;
-    queries?.readCanvas(sessionId);
+    if (sessionId) queries?.readCanvas(sessionId);
+    return () => { applySeqRef.current += 1; };
   }, [queries, sessionId]);
 
   // A different session is a different world: start it at the origin.
@@ -150,9 +150,11 @@ export function WorkspaceCanvas({ sessionId }: {
     }
     setLocalError(undefined);
     setNotice(undefined);
+    const viewOperation = ++applySeqRef.current;
     void queries.applyCanvas(targetSessionId, operation).then((landed: boolean) => {
-      // The owner dropped the answer if the session moved on; only a landed
-      // operation clears the optimistic preview.
+      // `landed` answers host settlement. It grants no right to edit another
+      // session's draft or clear a newer operation's optimistic preview.
+      if (viewOperation !== applySeqRef.current) return;
       if (!landed) { setPreview(undefined); return; }
       setPreview(undefined);
       onSuccess?.();
@@ -263,7 +265,7 @@ export function WorkspaceCanvas({ sessionId }: {
     if (readOnly) { setLocalError(DESKTOP_COPY.canvasReadOnly); return; }
     applyMutations(
       [buildCanvasAddFileMutation(createCanvasNodeId(), nextCanvasNodeLayout(confirmedNodes), { relativePath })],
-      () => setDraftPath(""),
+      () => setDraftPath((current) => current === draftPath ? "" : current),
     );
   };
 

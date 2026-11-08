@@ -14,6 +14,7 @@ import type {
   CanvasOperation,
   WebuiCanvasDocument,
 } from "../../../../shared/contracts/canvas.js";
+import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 
 export interface WebuiWorkspaceCanvasPort {
   readonly readCanvas?: (request: {
@@ -51,8 +52,9 @@ export interface WebuiWorkspaceCanvasOwner {
   /** Read the session's canvas. A read for a session already left is dropped. */
   readonly read: (sessionId: string) => void;
   /**
-   * Run one canvas operation. Resolves with `true` when it landed, so the surface
-   * can run its own post-success work (clearing a preview, closing a draft field).
+   * Run one canvas operation. Resolves with `true` when the host accepted it.
+   * This settlement survives navigation; the surface must independently fence
+   * post-success edits to its current draft and preview by its own lifetime.
    */
   readonly apply: (
     sessionId: string,
@@ -77,17 +79,9 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
   readonly port: WebuiWorkspaceCanvasPort;
 }): WebuiWorkspaceCanvasOwner {
   const { port } = deps;
-  let state = initialWebuiWorkspaceCanvasState;
-  const listeners = new Set<() => void>();
-  let readSeq = 0;
-  let applySeq = 0;
-
-  const set = (update: (current: WebuiWorkspaceCanvasState) => WebuiWorkspaceCanvasState): void => {
-    const next = update(state);
-    if (next === state) return;
-    state = next;
-    for (const listener of [...listeners]) listener();
-  };
+  const { getSnapshot, subscribe, set, dispose, isDisposed } =
+    createWebuiSnapshotStore(initialWebuiWorkspaceCanvasState);
+  let revision = 0;
 
   /**
    * Drop the session's canvas: supersede its in-flight read, then clear the entry
@@ -95,13 +89,15 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
    * than inheriting a document that belonged to a session that no longer exists.
    */
   const release = (sessionId: string): void => {
-    readSeq += 1;
+    if (getSnapshot().sessionId !== sessionId) return;
+    revision += 1;
     set((current) => (current.sessionId === sessionId ? initialWebuiWorkspaceCanvasState : current));
   };
 
   const read = (sessionId: string): void => {
+    if (isDisposed()) return;
     const readCanvas = port.readCanvas;
-    const mine = ++readSeq;
+    const mine = ++revision;
     if (!readCanvas) {
       set(() => ({ sessionId, status: "idle", busy: false }));
       return;
@@ -113,11 +109,11 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
     );
     void readCanvas({ sessionId })
       .then((document) => {
-        if (mine !== readSeq) return;
+        if (mine !== revision) return;
         set(() => ({ sessionId, document, status: "ready", busy: false }));
       })
       .catch((reason: unknown) => {
-        if (mine !== readSeq) return;
+        if (mine !== revision) return;
         set(() => ({
           sessionId,
           status: "error",
@@ -131,16 +127,17 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
     sessionId: string,
     operation: CanvasOperation,
   ): Promise<boolean> => {
+    if (isDisposed()) return false;
     const applyCanvas = port.applyCanvas;
     if (!applyCanvas) {
       set((current) => ({ ...current, error: "当前运行时不支持画布操作。" }));
       return false;
     }
-    const mine = ++applySeq;
-    set((current) => ({ ...current, busy: true, error: undefined }));
+    const mine = ++revision;
+    set((current) => ({ ...(current.sessionId === sessionId ? current : initialWebuiWorkspaceCanvasState), sessionId, busy: true, error: undefined }));
     try {
       const result = await applyCanvas({ sessionId, operation });
-      if (mine !== applySeq) return false;
+      if (mine !== revision || isDisposed()) return true;
       set((current) => ({
         ...current,
         sessionId,
@@ -151,7 +148,7 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
       }));
       return true;
     } catch (reason: unknown) {
-      if (mine !== applySeq) return false;
+      if (mine !== revision || isDisposed()) return false;
       // The stored document is still the last one this owner read, so the surface
       // drops its optimistic preview and reports the refusal instead of keeping it.
       set((current) => ({ ...current, busy: false, error: message(reason) }));
@@ -160,20 +157,13 @@ export function createWebuiWorkspaceCanvasOwner(deps: {
   };
 
   return {
-    state: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    state: getSnapshot,
+    subscribe,
     canRead: port.readCanvas !== undefined,
     canApply: port.applyCanvas !== undefined,
     read,
     apply,
     release,
-    dispose: () => {
-      listeners.clear();
-    },
+    dispose,
   };
 }

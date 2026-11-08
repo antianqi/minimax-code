@@ -146,20 +146,21 @@ export function createWebuiComposerPluginCatalogue(deps: {
       if (started) return started;
       const request = actions
         .invoke("listInstalledPlugins", { limit: COMPOSER_PLUGIN_LIMIT })
-        .then((result) =>
-          webuiPluginRows(result, "plugins").map((row): WebuiComposerPluginSummary => {
+        .then((result) => {
+          if (disposed || pluginReads.get(key) !== request) throw new Error("插件目录读取已失效，请重试。");
+          return webuiPluginRows(result, "plugins").map((row): WebuiComposerPluginSummary => {
             // The runtime spells a plugin's name three ways; the menu only ever
             // needed one, and which one it picked was decided here.
             const name = text(row, "name") || text(row, "pluginName");
             const displayName = text(row, "displayName") || name;
             const description = text(row, "description");
             return { name, displayName, ...(description ? { description } : {}) };
-          }).filter((plugin) => plugin.name),
-        )
+          }).filter((plugin) => plugin.name);
+        })
         .catch((reason: unknown) => {
           // A failed read must not be cached as the answer, or the menu would
           // stay empty until the page reloaded.
-          pluginReads.delete(key);
+          if (pluginReads.get(key) === request) pluginReads.delete(key);
           throw reason;
         })
         .finally(() => {
@@ -200,16 +201,17 @@ export function createWebuiComposerPluginCatalogue(deps: {
           // belong in the palette; the management page reads them separately.
           includePluginSkills: true,
         })
-        .then((result) =>
-          webuiPluginRows(result, "skills")
+        .then((result) => {
+          if (disposed || skillReads.get(key)?.read !== request) throw new Error("技能目录读取已失效，请重试。");
+          return webuiPluginRows(result, "skills")
             .map(toSkillSummary)
             .filter((skill): skill is WebuiComposerSkillSummary => skill !== undefined)
             // A turned-off skill is not offered: the agent cannot run it, so
             // the palette must not offer it either.
-            .filter((skill) => skill.enabled !== false),
-        )
+            .filter((skill) => skill.enabled !== false);
+        })
         .catch((reason: unknown) => {
-          skillReads.delete(key);
+          if (skillReads.get(key)?.read === request) skillReads.delete(key);
           throw reason;
         })
         .finally(() => {

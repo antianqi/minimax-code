@@ -86,6 +86,7 @@ export const initialWebuiModelsWorkflowsState: WebuiModelsWorkflowsState = {
 };
 
 export interface WebuiModelsWorkflows {
+  readonly diagnostics: () => { readonly catalogueKeys: number; readonly retainedCatalogues: number };
   readonly getSnapshot: () => WebuiModelsWorkflowsState;
   readonly subscribe: (listener: () => void) => () => void;
 
@@ -296,6 +297,23 @@ export function createWebuiModelsWorkflows(deps: {
   const bindCatalogueEpochs = (key: WebuiResourceKey): void => {
     catalogueKeys.set(serializeWebuiResourceKey(key), key);
   };
+  /**
+   * Retire one catalogue answer: its key binding, the answer itself and the
+   * last good value kept beside it.
+   *
+   * The last-good map is a second ledger over the same resource, so it has to
+   * retire with the first one. Releasing only `catalogueKeys` left the retained
+   * arrays behind: an epoch advance dropped the key from the map, which made the
+   * value unreachable to `releaseSession` (it walks that map) and to any later
+   * read (the key carries the new generation), but the array stayed in memory
+   * for the life of the application. One function is the release path for both
+   * ledgers, so neither can be retired without the other.
+   */
+  const releaseCatalogue = (serialized: string, key: WebuiResourceKey): void => {
+    catalogueKeys.delete(serialized);
+    catalogue.release(key);
+    retainedCatalogues.delete(serialized);
+  };
 
   // The owner's own snapshot: the projection below writes it, the React binding
   // subscribes to it. It holds no answer of its own — the keyed resources do.
@@ -380,8 +398,7 @@ export function createWebuiModelsWorkflows(deps: {
     // resources composing the advanced epoch retire; presets stay untouched.
     for (const [serialized, key] of catalogueKeys) {
       if (!(advanced.key in key)) continue;
-      catalogueKeys.delete(serialized);
-      catalogue.release(key);
+      releaseCatalogue(serialized, key);
     }
     if (advanced.key === "configuration") {
       for (const key of providerKeys.values()) providerList.release(key);
@@ -831,6 +848,7 @@ export function createWebuiModelsWorkflows(deps: {
 
   return {
     getSnapshot,
+    diagnostics: () => ({ catalogueKeys: catalogueKeys.size, retainedCatalogues: retainedCatalogues.size }),
     subscribe,
     canReadModels: port.listModels !== undefined,
     canSelectModel: port.selectModel !== undefined,
@@ -860,10 +878,7 @@ export function createWebuiModelsWorkflows(deps: {
     releaseSession: (sessionId: string) => {
       for (const [serialized, key] of catalogueKeys) {
         if (key.sessionId !== sessionId) continue;
-        catalogueKeys.delete(serialized); catalogue.release(key);
-        // The retained answer belongs to the released session, so it goes with it:
-        // a released session's models must not be projected for anyone.
-        retainedCatalogues.delete(serialized);
+        releaseCatalogue(serialized, key);
       }
       releasedSessions.add(sessionId);
       project();

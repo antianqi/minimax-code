@@ -112,7 +112,7 @@ export interface WebuiWorkspaceCanvasCommands {
   readonly canApplyCanvas: boolean;
   /** Read the session's canvas document (a session already left is dropped). */
   readonly readCanvas: WebuiWorkspaceCanvasOwner["read"];
-  /** Run one canvas operation; resolves `true` when it landed. */
+  /** Host settlement only; view callbacks retain their own navigation/operation fence. */
   readonly applyCanvas: WebuiWorkspaceCanvasOwner["apply"];
 }
 

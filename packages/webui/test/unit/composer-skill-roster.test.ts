@@ -59,6 +59,36 @@ const ROSTER = {
   ],
 };
 
+describe("B07 request-specific retirement", () => {
+  it.each(["plugins", "skills"])("an old %s rejection cannot evict its replacement", async (kind) => {
+    const pending: Array<{ resolve: (value: unknown) => void; reject: (reason: unknown) => void }> = [];
+    const catalogue = createWebuiComposerPluginCatalogue({ actions: createWebuiPluginActions({
+      pluginManagement: () => new Promise((resolve, reject) => pending.push({ resolve, reject })),
+    }) });
+    const read = () => kind === "plugins" ? catalogue.installedPlugins() : catalogue.runtimeSkills({ sessionId: "A" });
+    const invalidate = () => kind === "plugins" ? catalogue.invalidatePlugins() : catalogue.invalidateSkills();
+    const first = read(); const rejected = expect(first).rejects.toThrow("old");
+    invalidate(); const replacement = read();
+    pending[0]!.reject(new Error("old")); await rejected;
+    const joined = read(); expect(joined).toBe(replacement);
+    expect(pending).toHaveLength(2);
+    pending[1]!.resolve(kind === "plugins" ? { plugins: [{ name: "new" }] } : { skills: [{ name: "new" }] });
+    expect((await replacement)[0]?.name).toBe("new");
+    catalogue.dispose();
+  });
+  it.each(["plugins", "skills"])("an invalidated successful %s answer cannot reach consumers", async (kind) => {
+    let resolve!: (value: unknown) => void;
+    const catalogue = createWebuiComposerPluginCatalogue({ actions: createWebuiPluginActions({
+      pluginManagement: () => new Promise((res) => { resolve = res; }),
+    }) });
+    const first = kind === "plugins" ? catalogue.installedPlugins() : catalogue.runtimeSkills();
+    const rejected = expect(first).rejects.toThrow("已失效");
+    if (kind === "plugins") catalogue.invalidatePlugins(); else catalogue.invalidateSkills();
+    resolve(kind === "plugins" ? { plugins: [{ name: "old" }] } : { skills: [{ name: "old" }] });
+    await rejected; catalogue.dispose();
+  });
+});
+
 describe("the composer's skill pool", () => {
   it("is read from the runtime roster, scoped by the session", async () => {
     const { catalogue, calls } = catalogueWith(ROSTER);

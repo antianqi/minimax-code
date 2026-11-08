@@ -14,6 +14,7 @@ import type {
   WebuiWorkspaceArchiveExtractResult,
   WebuiWorkspaceArchiveListing,
 } from "../../../../shared/contracts/workspace.js";
+import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 
 export interface WebuiWorkspaceArchivePort {
   readonly readWorkspaceArchive?: (request: {
@@ -89,24 +90,20 @@ export function createWebuiWorkspaceArchiveOwner(deps: {
   readonly port: WebuiWorkspaceArchivePort;
 }): WebuiWorkspaceArchiveOwner {
   const { port } = deps;
-  let state = initialWebuiWorkspaceArchiveState;
-  const listeners = new Set<() => void>();
+  const { getSnapshot, subscribe, set, dispose, isDisposed } =
+    createWebuiSnapshotStore(initialWebuiWorkspaceArchiveState);
   let version = 0;
-
-  const set = (update: (current: WebuiWorkspaceArchiveState) => WebuiWorkspaceArchiveState): void => {
-    const next = update(state);
-    if (next === state) return;
-    state = next;
-    for (const listener of [...listeners]) listener();
-  };
+  let extraction = 0;
 
   const read = (request: {
     readonly workspaceDir: string;
     readonly path: string;
     readonly prefix?: string;
   }): void => {
+    if (isDisposed()) return;
     const readArchive = port.readWorkspaceArchive;
     const key = archiveKey(request);
+    if (getSnapshot().key !== key) extraction += 1;
     if (!readArchive) {
       set(() => ({
         key,
@@ -141,6 +138,13 @@ export function createWebuiWorkspaceArchiveOwner(deps: {
     readonly destination: string;
     readonly prefix?: string;
   }): Promise<void> => {
+    if (isDisposed()) return;
+    const key = archiveKey(request);
+    const mine = ++extraction;
+    if (getSnapshot().key !== key) {
+      version += 1;
+      set(() => ({ key, listing: { status: "idle" }, extract: { status: "idle" } }));
+    }
     const extractArchive = port.extractWorkspaceArchive;
     if (!extractArchive) {
       set((current) => ({
@@ -152,26 +156,21 @@ export function createWebuiWorkspaceArchiveOwner(deps: {
     set((current) => ({ ...current, extract: { status: "extracting" } }));
     try {
       const result = await extractArchive(request);
+      if (mine !== extraction || getSnapshot().key !== key) return;
       set((current) => ({ ...current, extract: { status: "done", result } }));
     } catch (reason: unknown) {
+      if (mine !== extraction || getSnapshot().key !== key) return;
       set((current) => ({ ...current, extract: { status: "error", error: message(reason) } }));
     }
   };
 
   return {
-    state: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    state: getSnapshot,
+    subscribe,
     canRead: port.readWorkspaceArchive !== undefined,
     canExtract: port.extractWorkspaceArchive !== undefined,
     read,
     extract,
-    dispose: () => {
-      listeners.clear();
-    },
+    dispose,
   };
 }

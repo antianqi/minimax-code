@@ -38,7 +38,7 @@ import type {
   WebuiUsageSummaryView,
 } from "../../../../shared/contracts/account-usage.js";
 import type { WebuiUsageQuotaResult } from "../../../../shared/contracts/usage-quota.js";
-import { SigninPanelScene, type SigninDayItem } from "@mavis/shared/daily-signin";
+import { validateSigninPanel } from "@mavis/shared/daily-signin";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export type WebuiAccountPortSlice = Pick<
@@ -300,7 +300,7 @@ function message(reason: unknown): string {
 }
 
 /**
- * Coerce a sign-in panel off the wire before it reaches the state.
+ * Validate a panel before publication, using the producer's shared contract.
  *
  * The transport resolves the server body verbatim (`resolve(frame.body as T)`
  * in `client/platform/transport.ts`), and the sign-in view reads `panel.days`
@@ -312,26 +312,10 @@ function message(reason: unknown): string {
  * The server does validate (`validateSigninPanel` throws `Invalid sign-in
  * panel`), so this is defence at the boundary rather than a known live shape.
  * It is here because the blast radius is the whole UI, not one row: a
- * malformed panel must degrade to an empty seven-day strip, never to a blank
- * page.
+ * malformed panel becomes a recoverable read error, never an empty success.
  */
 function normalizeSigninPanel(value: unknown): WebuiSigninPanelView {
-  const raw = value as { scene?: unknown; days?: unknown } | null;
-  const days = Array.isArray(raw?.days)
-    ? raw.days.filter(
-        (day): day is SigninDayItem =>
-          Boolean(day) &&
-          typeof day === "object" &&
-          typeof (day as { day_no?: unknown }).day_no === "number",
-      )
-    : [];
-  return {
-    scene:
-      typeof raw?.scene === "number"
-        ? (raw.scene as SigninPanelScene)
-        : SigninPanelScene.Unknown,
-    days,
-  };
+  return validateSigninPanel(value);
 }
 
 export interface WebuiAccountWorkflows {
@@ -485,6 +469,7 @@ export function createWebuiAccountWorkflows(deps: {
   const set = (
     update: (current: WebuiAccountWorkflowsState) => WebuiAccountWorkflowsState,
   ): void => {
+    if (disposed) return;
     const next = update(state);
     if (next === state) return;
     state = next;
@@ -537,6 +522,8 @@ export function createWebuiAccountWorkflows(deps: {
   };
 
   let loginTimer: ReturnType<typeof setInterval> | undefined;
+  let loginAttempt = 0;
+  let loginRead = 0;
 
   const acquireCodexOAuthPolling = (): (() => void) => {
     if (disposed) return () => undefined;
@@ -571,6 +558,7 @@ export function createWebuiAccountWorkflows(deps: {
   };
 
   const stopLoginPolling = (): void => {
+    loginAttempt += 1;
     if (loginTimer === undefined) return;
     clearInterval(loginTimer);
     loginTimer = undefined;
@@ -614,13 +602,18 @@ export function createWebuiAccountWorkflows(deps: {
 
   const pollLoginStatus = (): void => {
     const read = port.getAccountLoginStatus;
-    if (!read) return;
+    if (!read || disposed) return;
+    const attempt = loginAttempt;
+    const request = ++loginRead;
     void read()
-      .then((view) => applyLoginView(view))
+      .then((view) => {
+        if (!disposed && attempt === loginAttempt && request === loginRead) applyLoginView(view);
+      })
       .catch(() => undefined);
   };
 
   const startLoginPolling = (): void => {
+    if (disposed) return;
     if (loginTimer !== undefined) return;
     if (!port.getAccountLoginStatus) return;
     loginTimer = setInterval(pollLoginStatus, WEBUI_ACCOUNT_LOGIN_POLL_MS);
@@ -631,10 +624,12 @@ export function createWebuiAccountWorkflows(deps: {
 
   const loadLoginStatus = async (): Promise<void> => {
     const read = port.getAccountLoginStatus;
-    if (!read) return;
+    if (!read || disposed) return;
+    const attempt = loginAttempt;
+    const request = ++loginRead;
     try {
       const view = await read();
-      applyLoginView(view);
+      if (!disposed && attempt === loginAttempt && request === loginRead) applyLoginView(view);
     } catch {
       // A status that cannot be read leaves the page where it is. The page
       // offers a sign-in, and the attempt that follows reports its own error.
@@ -642,7 +637,9 @@ export function createWebuiAccountWorkflows(deps: {
   };
 
   const beginLogin = async (): Promise<void> => {
+    if (disposed) return;
     stopLoginPolling();
+    const attempt = loginAttempt;
     const begin = port.beginAccountLogin;
     if (!begin) {
       set((current) => ({
@@ -654,10 +651,12 @@ export function createWebuiAccountWorkflows(deps: {
     set((current) => ({ ...current, login: { ...current.login, view: undefined } }));
     try {
       const view = await begin();
+      if (disposed || attempt !== loginAttempt) return;
       applyLoginView(view);
       if (view.state === "pending") startLoginPolling();
       return;
     } catch (reason) {
+      if (disposed || attempt !== loginAttempt) return;
       set((current) => ({
         ...current,
         login: { ...current.login, view: { state: "error", error: message(reason) } },
@@ -666,29 +665,36 @@ export function createWebuiAccountWorkflows(deps: {
   };
 
   const cancelLogin = async (): Promise<void> => {
+    if (disposed) return;
     stopLoginPolling();
+    const attempt = loginAttempt;
     try {
       await port.cancelAccountLogin?.();
     } catch {
       // Cancelling is best-effort: the surface closes regardless, and the
       // server-side attempt expires on its own.
     }
+    if (disposed || attempt !== loginAttempt) return;
     set((current) => ({ ...current, login: { ...current.login, view: { state: "idle" } } }));
+    await Promise.all([loadAccount(), loadUsage(true)]);
   };
 
   const switchAccount = async (): Promise<void> => {
+    if (disposed) return;
     stopLoginPolling();
+    const attempt = loginAttempt;
     set((current) => ({ ...current, login: { ...current.login, view: undefined } }));
     try {
-      await port.signOut?.();
+      await removeCredentials();
     } catch (reason) {
+      if (disposed || attempt !== loginAttempt) return;
       set((current) => ({
         ...current,
         login: { ...current.login, view: { state: "error", error: message(reason) } },
       }));
       return;
     }
-    await beginLogin();
+    if (!disposed && attempt === loginAttempt) await beginLogin();
   };
 
   const loadAccount = async (sessionId?: string): Promise<void> => {
@@ -1207,27 +1213,27 @@ export function createWebuiAccountWorkflows(deps: {
     }
   };
 
-  const signOutAccount = async (): Promise<void> => {
+  const removeCredentials = async (): Promise<void> => {
+    const attempt = loginAttempt;
     const signOut = port.signOut;
-    if (!signOut) return;
+    if (!signOut) throw new Error("当前服务未提供退出登录");
+    await signOut();
+    if (disposed) return;
+    lastCredentialFingerprint = undefined;
+    afterCredentialChange();
+    set((current) => ({ ...current, account: initialWebuiAccountWorkflowsState.account,
+      usage: initialWebuiAccountWorkflowsState.usage,
+      login: attempt === loginAttempt ? { ...current.login, view: { state: "idle" } } : current.login }));
+    await Promise.all([loadAccount(), loadUsage(true)]);
+  };
+
+  const signOutAccount = async (): Promise<void> => {
+    if (disposed) return;
+    stopLoginPolling();
     set((current) => ({ ...current, signOut: { signingOut: true } }));
     try {
-      await signOut();
+      await removeCredentials();
       set((current) => ({ ...current, signOut: { signingOut: false } }));
-      // The account that just left owned the previous credential generation:
-      // retire it before the re-reads, so an answer still in flight for the old
-      // identity cannot land as current.
-      lastCredentialFingerprint = undefined;
-      afterCredentialChange();
-      // The sign-in state belonged to the account that just left. A page that
-      // still reads as signed in would offer a switch instead of a sign-in.
-      set((current) => ({
-        ...current,
-        login: { ...current.login, view: { state: "idle" } },
-      }));
-      // The account and quota answers belong to the account that just left:
-      // re-read both so no surface keeps showing the previous identity.
-      await Promise.all([loadAccount(), loadUsage(true)]);
     } catch (reason) {
       set((current) => ({ ...current, signOut: { signingOut: false, error: message(reason) } }));
     }
@@ -1244,6 +1250,7 @@ export function createWebuiAccountWorkflows(deps: {
   return {
     getSnapshot: () => state,
     subscribe: (listener) => {
+      if (disposed) return () => undefined;
       listeners.add(listener);
       return () => {
         listeners.delete(listener);

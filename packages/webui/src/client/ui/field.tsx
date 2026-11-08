@@ -81,6 +81,96 @@ export interface WebuiSelectOption {
   readonly label: string;
 }
 
+/**
+ * The active option, brought back into the list.
+ *
+ * The list can change under an open popup — the form behind it reloads its
+ * choices, the field loses its last one — and an index past the end would
+ * leave the trigger naming an option that is not in the document.
+ */
+export function clampWebuiSelectIndex(index: number, optionCount: number): number {
+  if (optionCount <= 0) return 0;
+  return Math.min(Math.max(index, 0), optionCount - 1);
+}
+
+/** What the select's keyboard knows at a moment. */
+export interface WebuiSelectKeyboardState {
+  /** The option the trigger names. */
+  readonly activeIndex: number;
+  /** Whether the option list is open. */
+  readonly open: boolean;
+}
+
+/** What one key does to the select. */
+export interface WebuiSelectKeyboardOutcome {
+  /** The option the trigger names afterwards. */
+  readonly activeIndex: number;
+  /** Whether the list is open afterwards. */
+  readonly open: boolean;
+  /** The option the key chose, when it chose one. */
+  readonly chosenIndex: number | undefined;
+  /** Whether the key belongs to the select at all. */
+  readonly handled: boolean;
+}
+
+/**
+ * The select's keyboard, as a decision.
+ *
+ * The trigger holds the DOM focus and names the active option with
+ * `aria-activedescendant`; the options are not in the tab order and are not
+ * focusable at all. The control used to answer the keyboard two ways at once —
+ * a trigger with an active descendant AND tabbable option buttons — so Tab
+ * walked into the list while the trigger still claimed the focus, and the two
+ * answers disagreed about where the user was.
+ *
+ * So: Arrow, Home and End move the active option; Enter and Space take it;
+ * Escape closes; Tab leaves the control, and the list closes behind it
+ * because nothing in it holds a focus of its own.
+ *
+ * The decision is kept apart from the renderer so it can be exercised
+ * without a document: a key that no option can answer — an empty list — is
+ * answered by nothing at all, and a list that shrank under the open popup
+ * cannot leave the trigger naming an option that is gone.
+ */
+export function reduceWebuiSelectKeyboard(
+  state: WebuiSelectKeyboardState,
+  key: string,
+  optionCount: number,
+  selectedIndex: number,
+): WebuiSelectKeyboardOutcome {
+  const unchanged: WebuiSelectKeyboardOutcome = {
+    ...state,
+    chosenIndex: undefined,
+    handled: false,
+  };
+  if (optionCount <= 0) return unchanged;
+  const activeIndex = clampWebuiSelectIndex(state.activeIndex, optionCount);
+  if (key === "ArrowDown") {
+    return { activeIndex: (activeIndex + 1) % optionCount, open: true, chosenIndex: undefined, handled: true };
+  }
+  if (key === "ArrowUp") {
+    return { activeIndex: (activeIndex - 1 + optionCount) % optionCount, open: true, chosenIndex: undefined, handled: true };
+  }
+  if (key === "Home") {
+    return { activeIndex: 0, open: true, chosenIndex: undefined, handled: true };
+  }
+  if (key === "End") {
+    return { activeIndex: optionCount - 1, open: true, chosenIndex: undefined, handled: true };
+  }
+  if (key === "Enter" || key === " ") {
+    return state.open
+      ? { activeIndex, open: false, chosenIndex: activeIndex, handled: true }
+      : { activeIndex: clampWebuiSelectIndex(selectedIndex, optionCount), open: true, chosenIndex: undefined, handled: true };
+  }
+  if (key === "Escape") {
+    return { activeIndex, open: false, chosenIndex: undefined, handled: true };
+  }
+  if (key === "Tab") {
+    return { activeIndex, open: false, chosenIndex: undefined, handled: true };
+  }
+  return unchanged;
+}
+
 /** A shared select whose option surface is rendered by the WebUI. */
 export interface WebuiSelectMenuProps extends FieldControlProps {
   readonly options: readonly WebuiSelectOption[];
@@ -107,6 +197,12 @@ export function WebuiSelectMenu({
   const optionIdPrefix = useId();
   const optionIds = options.map((_, index) => `${optionIdPrefix}-option-${index}`);
   const close = useCallback(() => setOpen(false), []);
+  /**
+   * The active option is always one that exists: the list can change under an
+   * open popup, and an index past the end would leave the trigger naming an
+   * option that is not in the document.
+   */
+  const activeOptionIndex = clampWebuiSelectIndex(activeIndex, options.length);
   const selectIndex = useCallback((index: number) => {
     const option = options[index];
     if (!option) return;
@@ -114,32 +210,46 @@ export function WebuiSelectMenu({
     setActiveIndex(index);
     close();
   }, [close, onChange, options]);
+  /**
+   * The keyboard, answered by the shared decision.
+   *
+   * The rules themselves live in `reduceWebuiSelectKeyboard`, so they can be
+   * exercised without a document; this is the wiring: a key the decision
+   * answers moves the active option and opens or closes the list, a key it
+   * chooses with takes the option, and a key that is none of its business is
+   * left to the page.
+   */
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (disabled || options.length === 0) return;
-    let nextIndex: number | undefined;
-    if (event.key === "ArrowDown") nextIndex = (activeIndex + 1) % options.length;
-    else if (event.key === "ArrowUp") nextIndex = (activeIndex - 1 + options.length) % options.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = options.length - 1;
-    else if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      if (open) selectIndex(activeIndex);
-      else {
-        setActiveIndex(selectedIndex);
-        setOpen(true);
-      }
+    if (disabled) return;
+    const outcome = reduceWebuiSelectKeyboard(
+      { activeIndex: activeOptionIndex, open },
+      event.key,
+      options.length,
+      selectedIndex,
+    );
+    if (!outcome.handled) return;
+    // Tab and Escape are not the select's to swallow: Tab moves the focus on
+    // and Escape is the dropdown's own dismissal.
+    if (event.key !== "Tab" && event.key !== "Escape") event.preventDefault();
+    if (outcome.chosenIndex !== undefined) {
+      selectIndex(outcome.chosenIndex);
       return;
-    } else return;
-    event.preventDefault();
-    setActiveIndex(nextIndex);
-    if (!open) setOpen(true);
+    }
+    if (outcome.activeIndex !== activeOptionIndex) setActiveIndex(outcome.activeIndex);
+    if (outcome.open !== open) setOpen(outcome.open);
   };
   const selected = options.find((option) => option.value === value);
 
   return (
     <WebuiDropdown
       open={open}
-      onOpen={() => { setActiveIndex(selectedIndex); setOpen(true); }}
+      onOpen={() => {
+        // A list with nothing in it is not a list: the popup stays closed, so
+        // the trigger never claims to have opened one.
+        if (options.length === 0) return;
+        setActiveIndex(selectedIndex);
+        setOpen(true);
+      }}
       onClose={close}
       role="listbox"
       managed
@@ -159,7 +269,7 @@ export function WebuiSelectMenu({
           aria-label={attributes["aria-label"]}
           aria-describedby={attributes["aria-describedby"]}
           aria-invalid={attributes["aria-invalid"]}
-          aria-activedescendant={open ? optionIds[activeIndex] : undefined}
+          aria-activedescendant={open ? optionIds[activeOptionIndex] : undefined}
           aria-expanded={triggerProps["aria-expanded"]}
           aria-controls={triggerProps["aria-controls"]}
           aria-haspopup="listbox"
@@ -180,18 +290,22 @@ export function WebuiSelectMenu({
       )}
     >
       {options.map((option, index) => (
-          <button
+          // An option is not a control: the trigger is the control, and it
+          // names the active option. A focusable option would give the
+          // keyboard a second answer, and a click on one would take the focus
+          // off the trigger — so the press is answered without moving it.
+          <div
             key={option.value}
             id={optionIds[index]}
-            type="button"
             role="option"
             aria-selected={option.value === value}
-            className={`webui-select-menu-option${index === activeIndex ? " is-active" : ""}`}
+            className={`webui-select-menu-option${index === activeOptionIndex ? " is-active" : ""}`}
             onPointerMove={() => setActiveIndex(index)}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => selectIndex(index)}
           >
             {option.label}
-          </button>
+          </div>
         ))}
     </WebuiDropdown>
   );

@@ -292,7 +292,7 @@
     "ui/content-page.tsx": "d55f97925ce48679",
     "ui/dialog.tsx": "979fb6513c18b600",
     "ui/feedback.tsx": "522fd33bb2572bb2",
-    "ui/field.tsx": "22de894dfdc1b706",
+    "ui/field.tsx": "ad2fe1b3722e2045",
     "ui/form-atoms.tsx": "ef7a88d700d63a9e",
     "ui/layout-primitives.tsx": "2f2ddec34be10a04",
     "ui/layout-thresholds.ts": "b3bec466ad8cce38",

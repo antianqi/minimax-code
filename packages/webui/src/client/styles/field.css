@@ -97,12 +97,15 @@
     padding: 4px;
     border-radius: 9px;
   }
+  /* An option is not a control: the trigger is the control, and it names
+   * the active option. The option is therefore not focusable and carries no
+   * button geometry — it is a row of the list, drawn like one. */
   .webui-select-menu-option {
+    box-sizing: border-box;
     display: flex;
     width: 100%;
     min-height: 36px;
     align-items: center;
-    border: 0;
     border-radius: 6px;
     background: transparent;
     padding: 0 9px;
@@ -111,10 +114,21 @@
     text-align: left;
     cursor: pointer;
   }
+  /* The row the keyboard is on.
+   *
+   * The keyboard is the only way into the list — the options are not in the
+   * tab order and are not focusable — so the row it is on has to be visible:
+   * it used to take the grouped secondary fill, which in the light theme is
+   * the popup's own background, and the arrow key moved a cursor nobody
+   * could see. A grouped tertiary wash reads in both themes. */
+  .webui-select-menu-option.is-active {
+    background: var(--bg_grouped_tertiary);
+  }
+  /* The row under the pointer, and the row the field holds, take the fill
+   * every other option list in the client takes. */
   .webui-select-menu-option:hover,
-  .webui-select-menu-option.is-active,
   .webui-select-menu-option[aria-selected="true"] {
-    background: var(--bg_grouped_secondary);
+    background: var(--bg_interaction_tertiary_hover);
   }
   .webui-control::placeholder {
     color: var(--text_default_tertiary);

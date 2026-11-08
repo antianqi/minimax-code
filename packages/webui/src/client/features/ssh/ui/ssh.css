@@ -8,9 +8,15 @@
  * modal in the client draws.
  *
  * What stays here is the terminal's own: the title's mark, the connection
- * state beside it, and the viewport the terminal is drawn in. The viewport is
- * the exception the surface asks for — a dark box for a dark terminal — and it
- * is scoped to the host the SSH view renders, not to the dialog around it.
+ * state beside it, and the viewport the terminal is drawn in.
+ *
+ * The chrome — the mark and the connection state — is drawn with the theme's
+ * tokens, because it sits on the shared frame and has to read in both themes.
+ * The viewport and the surface that stands in for it when the terminal could
+ * not open keep their own dark colours: they are the terminal's own surface,
+ * and a terminal is dark in either theme. The viewport is the exception the
+ * surface asks for, and it is scoped to the host the SSH view renders, not to
+ * the dialog around it.
  *
  * The body's own class carries the one thing the viewport needs from its
  * container: no padding, so the host's own margins are the inset the terminal
@@ -23,22 +29,30 @@
     padding: 0;
   }
   .webui-ssh-terminal-title { display: inline-flex; align-items: center; gap: 10px; }
+  /* The window's own chrome sits on the shared frame, so it is drawn with the
+   * theme's tokens: the mark is a plain tile on the surface, and the icon in
+   * it is the secondary icon colour. The colours this chrome used to carry
+   * were chosen for a dark frame of its own and read at 2.3:1 on the shared
+   * frame in the light theme. */
   .webui-ssh-terminal-title-icon {
     display: inline-flex;
     width: 30px;
     height: 30px;
     align-items: center;
     justify-content: center;
-    border: 1px solid #2b3a52;
+    border: 1px solid var(--border_default);
     border-radius: 9px;
-    background: linear-gradient(145deg, #1c2a3d, #131c29);
-    color: #a8c7ff;
+    background: var(--bg_grouped_tertiary);
+    color: var(--icon_default_secondary);
   }
-  .webui-ssh-terminal-status { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #30394a; border-radius: 999px; padding: 5px 9px; color: #a2adbd; font-size: 11px; line-height: 14px; }
-  .webui-ssh-terminal-status.is-connected { border-color: rgb(56 189 128 / 24%); background: rgb(21 91 64 / 20%); color: #82d5aa; }
-  .webui-ssh-terminal-status.is-connected svg { color: #47c987; }
-  .webui-ssh-terminal-status.is-error { border-color: rgb(248 113 113 / 24%); background: rgb(127 29 29 / 20%); color: #f3a1a1; }
-  .webui-ssh-terminal-status.is-error svg { color: #f87171; }
+  /* The connection state is a wash with the theme's primary text on it: the
+   * words are the meaning, and they have to be readable in both themes. The
+   * dot beside them carries the hue. */
+  .webui-ssh-terminal-status { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border_default); border-radius: 999px; padding: 5px 9px; color: var(--text_default_primary); font-size: 11px; line-height: 14px; }
+  .webui-ssh-terminal-status.is-connected { background: var(--bg_status_positive); }
+  .webui-ssh-terminal-status.is-connected svg { color: var(--text_label_positive_secondary_default); }
+  .webui-ssh-terminal-status.is-error { background: var(--bg_status_error); }
+  .webui-ssh-terminal-status.is-error svg { color: var(--text_label_danger_secondary_default); }
   /* The viewport: the box the terminal is drawn in. Its geometry — the inset
      from the dialog's edge, the padding around the terminal, the radius and
      the ink — is the terminal's own and is unchanged; the frame around it is

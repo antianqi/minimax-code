@@ -129,7 +129,9 @@ export function SshTerminalView(props: SshTerminalViewProps): ReactElement {
       )}
       onClose={props.onClose}
       dismissOnEscape
-      width="wide"
+      // The terminal's own capacity: the shared shell draws the frame, and the
+      // size asked for is the shell's named size, not a rule of this file's.
+      width="expanded"
       portalTarget={dom.portalTarget()}
       bodyClassName="webui-ssh-terminal-body"
       testId="ssh-remote-terminal-dialog"

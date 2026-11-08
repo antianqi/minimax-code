@@ -544,11 +544,13 @@ const tailwindConfig = {
     "webui-inline--gap-large",
     "webui-stack--gap-none",
     // The dialog shell names its width variant from a template
-    // (`webui-dialog-surface--${width}`), so Tailwind cannot see `--compact` or
-    // `--wide` and purged both rules: a compact dialog rendered 640px wide while
-    // its rule sat in `dialog.css`.
+    // (`webui-dialog-surface--${width}`), so Tailwind cannot see `--compact`,
+    // `--wide` or `--expanded` and purged those rules: a compact dialog
+    // rendered 640px wide while its rule sat in `dialog.css`, and the
+    // terminal's own size was dropped the same way.
     "webui-dialog-surface--compact",
     "webui-dialog-surface--wide",
+    "webui-dialog-surface--expanded",
     "webui-stack--gap-hairline",
     "webui-stack--gap-micro",
     "webui-stack--gap-tight",

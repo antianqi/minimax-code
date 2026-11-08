@@ -45,6 +45,14 @@
 
   .webui-dialog-surface--compact { width: min(480px, calc(100vw - 32px)); }
   .webui-dialog-surface--wide { width: min(800px, calc(100vw - 32px)); }
+  /* The room a terminal needs: a shell with a fixed grid fits far fewer
+     columns than an editor, and the window that hosts one is sized for the
+     grid, not for the usual modal. The frame — the surface, the header, the
+     close control — is the shell's whichever size it is drawn at. */
+  .webui-dialog-surface--expanded {
+    width: min(1040px, calc(100vw - 48px));
+    max-height: min(860px, calc(100vh - 48px));
+  }
 
   .webui-dialog-header {
     position: relative;

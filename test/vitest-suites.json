@@ -349,6 +349,7 @@
       "packages/webui/test/unit/composer-seed-dedup.test.ts",
       "packages/webui/test/unit/composer-skill-roster.test.ts",
       "packages/webui/test/unit/composer-submission-gate.test.ts",
+      "packages/webui/test/unit/composer-submit-intent.test.ts",
       "packages/webui/test/unit/connection-health.test.ts",
       "packages/webui/test/unit/connection-status.test.tsx",
       "packages/webui/test/unit/context-breakdown.test.ts",

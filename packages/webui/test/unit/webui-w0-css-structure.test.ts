@@ -503,6 +503,9 @@ describe("W0 · stylesheet composition", () => {
       "../features/transcript/ui/transcript-widgets.css",
       "../features/interactions/ui/plan-mode.css",
       "../features/remote-control/ui/remote-control.css",
+      // The SSH terminal window's own rules: the terminal's title, its
+      // connection state and the dark viewport it is drawn in.
+      "../features/ssh/ui/ssh.css",
       "katex/dist/katex.min.css",
     ]);
   });
@@ -1155,5 +1158,105 @@ describe("W0 · C-2 code gutter outranks the markdown list rules", () => {
     expect(specificity(items.selector)).toEqual([0, 2, 1]);
     expect(declaration(items.body, "margin")).toBeUndefined();
     expect(declaration(items.body, "padding")).toBeDefined();
+  });
+});
+
+describe("the surfaces that own their own appearance", () => {
+  // The SSH terminal window is a shared `WebuiDialog`, and the dialog owns
+  // the frame: the surface, the header, the heading, the close control and the
+  // body's padding. The settings stylesheet used to restate all of them
+  // against the SSH surface's own marker — a window in a business's colours,
+  // wearing another contract's class names. The terminal's own appearance
+  // lives with the SSH business instead, and what is left there is the
+  // terminal.
+  const settingsCss = readFileSync(
+    path.join(clientDir, "features/settings/ui/settings.css"),
+    "utf8",
+  );
+  const sshCss = readFileSync(
+    path.join(clientDir, "features/ssh/ui/ssh.css"),
+    "utf8",
+  );
+
+  it("leaves the dialog's frame to the dialog", () => {
+    // The selectors are what reach into the shell; a comment that explains
+    // the move is not a rule that makes one.
+    const settingsRules = parseRules(settingsCss);
+    const sshRules = parseRules(sshCss);
+    for (const internal of [
+      "webui-dialog-surface",
+      "webui-dialog-header",
+      "webui-dialog-heading",
+      "webui-dialog-close",
+      "webui-dialog-body",
+    ]) {
+      expect(
+        settingsRules.some((rule) => rule.selector.includes(internal)),
+        internal,
+      ).toBe(false);
+      expect(
+        sshRules.some((rule) => rule.selector.includes(internal)),
+        internal,
+      ).toBe(false);
+    }
+    // The marker the SSH view publishes stays — it names the surface for the
+    // tests and for the business — but nothing dresses it any more.
+    expect(
+      settingsRules.some((rule) => rule.selector.includes("data-webui-ssh-terminal-surface")),
+    ).toBe(false);
+    expect(
+      sshRules.some((rule) => rule.selector.includes("data-webui-ssh-terminal-surface")),
+    ).toBe(false);
+  });
+
+  it("keeps the terminal viewport's geometry", () => {
+    // The viewport is the exception the surface asks for: a dark box for a
+    // dark terminal. Its inset from the dialog's edge, its padding, its
+    // radius and its ink are the terminal's own and are unchanged.
+    const viewport = winning(".webui-ssh-terminal-body > .webui-ssh-xterm-host");
+    expect(declaration(viewport.body, "width")).toBe("calc(100% - 40px)");
+    expect(declaration(viewport.body, "margin")).toBe("18px 20px 20px");
+    expect(declaration(viewport.body, "padding")).toBe("18px");
+    expect(declaration(viewport.body, "border-radius")).toBe("12px");
+    expect(declaration(viewport.body, "background")).toBe("#030609");
+    expect(declaration(viewport.body, "flex")).toBe("1 1 0%");
+    // And the body it sits in carries no padding of its own, so the
+    // viewport's margins are the inset the terminal has always had.
+    const body = winning(".webui-ssh-terminal-body");
+    expect(declaration(body.body, "padding")).toBe("0");
+    expect(declaration(body.body, "overflow")).toBe("hidden");
+  });
+
+  it("gives the diff rows the theme's text colour, not a hardcoded ink", () => {
+    // The rows used to carry a hardcoded dark ink, which was readable on the
+    // light theme's pale green and pale red and invisible on the dark
+    // theme's deep green and deep red.
+    for (const selector of [
+      ".webui-review-line--addition",
+      ".webui-review-line--deletion",
+      ".webui-turn-review-line--addition",
+      ".webui-turn-review-line--deletion",
+      ".webui-turn-review-split-side.is-addition",
+      ".webui-turn-review-split-side.is-deletion",
+    ]) {
+      expect(winningDeclaration(selector, "color"), selector).toBe(
+        "var(--text_default_primary)",
+      );
+    }
+    expect(winningDeclaration(".webui-turn-review-line--addition", "background")).toBe(
+      "var(--bg_status_positive)",
+    );
+    expect(winningDeclaration(".webui-turn-review-line--deletion", "background")).toBe(
+      "var(--bg_status_error)",
+    );
+    // One rule per polarity in the workspace: the split view's sides and the
+    // single view's lines are the same recipe.
+    const additionRules = shellRules.filter(
+      (rule) =>
+        isCascading(rule) &&
+        targets(rule, ".webui-turn-review-line--addition"),
+    );
+    expect(additionRules).toHaveLength(1);
+    expect(targets(additionRules[0]!, ".webui-turn-review-split-side.is-addition")).toBe(true);
   });
 });

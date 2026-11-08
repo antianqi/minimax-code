@@ -13,6 +13,7 @@
     "packages/webui/src/client/features/scheduling/ui/scheduling.css": [],
     "packages/webui/src/client/features/sessions/ui/sessions.css": [],
     "packages/webui/src/client/features/settings/ui/settings.css": [],
+    "packages/webui/src/client/features/ssh/ui/ssh.css": [],
     "packages/webui/src/client/features/transcript/ui/transcript-widgets.css": [],
     "packages/webui/src/client/features/transcript/ui/transcript.css": [],
     "packages/webui/src/client/features/workspace/ui/workspace-progress.css": [],

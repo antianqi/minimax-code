@@ -312,12 +312,21 @@
   .webui-turn-review-code--split .webui-turn-review-line--split { width: 100%; min-width: 100%; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .webui-turn-review-split-side { display: grid; min-width: 0; grid-template-columns: 48px minmax(0, 1fr); }
   .webui-turn-review-split-side + .webui-turn-review-split-side { border-left: 1px solid var(--border_default); }
-  .webui-turn-review-split-side.is-deletion { background: var(--bg_status_error); color: #302022; }
-  .webui-turn-review-split-side.is-addition { background: var(--bg_status_positive); color: #17251d; }
+  /* The diff rows, in both shapes the review draws them: the split view's
+   * two sides and the single view's lines are the same recipe, so they are
+   * declared once per polarity.
+   *
+   * The background is the status wash and the foreground is the theme's
+   * primary text. The hardcoded dark ink the rows used to carry was readable
+   * in the light theme and invisible in the dark one, where the wash is a deep
+   * green and a deep red. The gutter's own numbers and markers keep their
+   * status colours. */
+  .webui-turn-review-split-side.is-addition,
+  .webui-turn-review-line--addition { background: var(--bg_status_positive); color: var(--text_default_primary); }
+  .webui-turn-review-split-side.is-deletion,
+  .webui-turn-review-line--deletion { background: var(--bg_status_error); color: var(--text_default_primary); }
   .webui-turn-review-split-side .webui-turn-review-source { min-width: 0; overflow: hidden; }
   .webui-turn-review-code--split .webui-turn-review-line--hunk, .webui-turn-review-code--split .webui-turn-review-line--noNewline { display: block; width: 100%; min-width: 100%; }
-  .webui-turn-review-line--addition { background: var(--bg_status_positive); color: #17251d; }
-  .webui-turn-review-line--deletion { background: var(--bg_status_error); color: #302022; }
   .webui-turn-review-line--hunk { background: var(--bg_grouped_secondary); color: var(--text_default_tertiary); }
   /* The no-newline marker: it renders as its own row with no gutter
      numbers and neutral text, because it records a fact about the line above

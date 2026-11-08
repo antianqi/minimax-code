@@ -2524,6 +2524,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/ssh/ui/ssh.css",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "ssh",
+      "home": "target"
+    },
+    {
       "path": "client/features/ssh/ui/SshPanel.public.tsx",
       "layers": [
         "bindings"

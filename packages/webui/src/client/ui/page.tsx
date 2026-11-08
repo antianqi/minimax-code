@@ -322,7 +322,34 @@ export const WebuiMotion = forwardRef<HTMLElement, WebuiMotionProps>(
 
 export interface WebuiTooltipProps extends Omit<WebuiMotionProps, "kind" | "state"> {
   readonly visible: boolean;
+  /**
+   * The shape the tooltip draws.
+   *
+   * The shared tooltip owns the visibility, the accessibility and the motion;
+   * the appearance is the caller's, and it is named rather than spelled: the
+   * bubble is the one dark shape with an arrow, the card is a plain surface
+   * for a tip that carries more than a line, and `none` leaves the shape to
+   * the caller entirely.
+   */
+  readonly appearance?: "bubble" | "card" | "none";
 }
+
+/**
+ * The class each appearance is drawn with.
+ *
+ * They are written out rather than composed from the name, because the
+ * stylesheet's component layer is pruned against the sources that use it: a
+ * class name that only ever appears inside a template literal is a class the
+ * build drops, and a tooltip without its shape is a tooltip with no shape.
+ */
+const WEBUI_TOOLTIP_APPEARANCE_CLASSES: Record<
+  NonNullable<WebuiTooltipProps["appearance"]>,
+  string
+> = {
+  bubble: "webui-tooltip-bubble",
+  card: "webui-tooltip-card",
+  none: "",
+};
 
 /** A tooltip with shared visibility, accessibility and motion behavior. */
 export const WebuiTooltip = forwardRef<HTMLElement, WebuiTooltipProps>(
@@ -330,6 +357,7 @@ export const WebuiTooltip = forwardRef<HTMLElement, WebuiTooltipProps>(
     {
       as = "span",
       visible,
+      appearance = "bubble",
       className,
       inert,
       "aria-hidden": ariaHidden,
@@ -346,7 +374,7 @@ export const WebuiTooltip = forwardRef<HTMLElement, WebuiTooltipProps>(
         data-webui-tooltip-visible={visible ? "true" : "false"}
         aria-hidden={ariaHidden ?? !visible}
         inert={inert ?? !visible}
-        className={["webui-tooltip-bubble", className]
+        className={[WEBUI_TOOLTIP_APPEARANCE_CLASSES[appearance], className]
           .filter((entry) => Boolean(entry && entry.length > 0))
           .join(" ")}
       />

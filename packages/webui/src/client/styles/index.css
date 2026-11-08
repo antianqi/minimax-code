@@ -80,6 +80,11 @@
 @import "../features/transcript/ui/transcript-widgets.css";
 @import "../features/interactions/ui/plan-mode.css";
 @import "../features/remote-control/ui/remote-control.css";
+/* The SSH terminal window's own rules: the title's mark, the connection
+ * state and the dark viewport the terminal is drawn in. They come with the
+ * other feature rules, so the shared dialog shell above owns the frame and
+ * the business owns what it draws inside it. */
+@import "../features/ssh/ui/ssh.css";
 @import "katex/dist/katex.min.css";
 
 @tailwind base;

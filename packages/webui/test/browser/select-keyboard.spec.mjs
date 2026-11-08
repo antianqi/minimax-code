@@ -187,12 +187,46 @@ test("the row the keyboard is on is visible", async ({ page }) => {
   await expect(page.locator('[role="option"].is-active')).toHaveText("http");
 
   // The keyboard is the only way into the list, so the row it is on has to
-  // be visible: the active row takes a wash the resting rows do not.
-  const fills = await page
-    .locator('[role="option"]')
-    .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
-  expect(fills.length).toBeGreaterThan(1);
-  expect(new Set(fills).size).toBeGreaterThan(1);
+  // be visible AGAINST THE LIST IT SITS IN. Comparing it with the other rows
+  // proves nothing: the selected row takes the same wash the pointer takes,
+  // so a set of row colours can hold two values while the cursor is invisible.
+  const marks = await page.evaluate(() => {
+    const active = document.querySelector('[role="option"].is-active');
+    const popup = document.querySelector('[role="listbox"]');
+    if (!(active instanceof HTMLElement) || !(popup instanceof HTMLElement)) {
+      throw new Error("the list is not open");
+    }
+    const channels = (value) => (value.match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);
+    const luminance = (rgb) => {
+      const [r, g, b] = rgb.map((channel) => {
+        const c = channel / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a, b) => {
+      const first = luminance(a);
+      const second = luminance(b);
+      return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    };
+    const activeStyle = getComputedStyle(active);
+    const popupStyle = getComputedStyle(popup);
+    // The marker is the client's focused-row ring: the cursor is not a hover,
+    // and a wash alone is 1.09:1 on a white popup.
+    const marker = channels((activeStyle.boxShadow.match(/rgba?\([^)]+\)/u) ?? ["rgb(0, 0, 0)"])[0]);
+    return {
+      fill: channels(activeStyle.backgroundColor),
+      popup: channels(popupStyle.backgroundColor),
+      marker,
+      fillRatio: ratio(channels(activeStyle.backgroundColor), channels(popupStyle.backgroundColor)),
+      markerRatio: ratio(marker, channels(popupStyle.backgroundColor)),
+    };
+  });
+  // The cursor's own fill is not the popup's.
+  expect(marks.fill).not.toEqual(marks.popup);
+  // And the marker that makes it visible clears the non-text contrast bar
+  // against the popup it sits on, in either theme.
+  expect(marks.markerRatio).toBeGreaterThanOrEqual(3);
 });
 
 test("the shared dialog draws its own frame", async ({ page }) => {

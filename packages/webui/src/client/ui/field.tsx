@@ -14,6 +14,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   useId,
@@ -204,12 +205,24 @@ export function WebuiSelectMenu({
    */
   const activeOptionIndex = clampWebuiSelectIndex(activeIndex, options.length);
   const selectIndex = useCallback((index: number) => {
+    // A disabled control chooses nothing: the row under the pointer is not an
+    // answer this control may give.
+    if (disabled) return;
     const option = options[index];
     if (!option) return;
     onChange(option.value);
     setActiveIndex(index);
     close();
-  }, [close, onChange, options]);
+  }, [close, disabled, onChange, options]);
+  /**
+   * A list that lost its options, or a control that lost its ability to
+   * answer, does not keep a popup open. The popup would be a list of nothing
+   * over a control that cannot choose from it: the trigger would still claim
+   * to have a list open, and the list would hold nothing to name.
+   */
+  useEffect(() => {
+    if (open && (disabled || options.length === 0)) close();
+  }, [close, disabled, open, options.length]);
   /**
    * The keyboard, answered by the shared decision.
    *
@@ -245,8 +258,9 @@ export function WebuiSelectMenu({
       open={open}
       onOpen={() => {
         // A list with nothing in it is not a list: the popup stays closed, so
-        // the trigger never claims to have opened one.
-        if (options.length === 0) return;
+        // the trigger never claims to have opened one. A control that cannot
+        // answer does not open one either.
+        if (disabled || options.length === 0) return;
         setActiveIndex(selectedIndex);
         setOpen(true);
       }}

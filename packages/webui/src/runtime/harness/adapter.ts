@@ -73,6 +73,7 @@ export function createHarnessPortFromHost(
   };
   /** One host release and outcome, shared by concurrent close callers. */
   let closePromise: Promise<void> | undefined;
+  const resourceDisposers: (() => Promise<void>)[] = [];
   const port: Omit<WebuiHarnessPort, "runCommand" | "importSessionTransferWorkflow"> = {
     version() {
       return version;
@@ -91,12 +92,18 @@ export function createHarnessPortFromHost(
     ...createAccountAdapter(host),
     ...createCronAdapter(host),
     ...createSshAdapter(host),
-    ...createRemoteControlAdapter(host, options.browserPort),
+    ...createRemoteControlAdapter(host, options.browserPort, host.registerShutdownResource ?? ((dispose) => resourceDisposers.push(dispose))),
     ...createChannelAdapter(host),
     close() {
-      closePromise ??= (async () => {
-        await host.apiHost.close();
-      })();
+      closePromise ??= Promise.resolve().then(async () => {
+        const failures: unknown[] = [];
+        for (const dispose of resourceDisposers) {
+          try { await dispose(); } catch (error) { failures.push(error); }
+        }
+        try { await host.apiHost.close(); } catch (error) { failures.push(error); }
+        if (failures.length === 1) throw failures[0];
+        if (failures.length > 1) throw new AggregateError(failures, "WebUI harness shutdown failed");
+      });
       return closePromise;
     },
   };

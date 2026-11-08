@@ -62,6 +62,18 @@ the user paired a second time.
 
 ## The pieces
 
+The owner exposes an idempotent `dispose()` and registers it with the runtime close owner through
+the harness adapter. Shutdown stops the binding timer, aborts pairing and binding HTTP, releases
+status and runtime subscriptions, then disconnects the proxy while preserving the durable binding.
+An HTTP or credential refresh completing after disposal cannot reopen the proxy. A browser's
+connect completion is also fenced before starting fallback pairing or returning credentials as
+accepted, so a late idle/unbound result cannot create a new pairing session after shutdown. A browser's
+status subscription has its own abort signal: detaching a quiet WebSocket wakes the pending read
+and releases that observer without disconnecting the phone link.
+
+Unbind settlement carries the pending `requestId` through to the bridge's synchronous write owner.
+A response for an older request fails without clearing the current pending request or binding.
+
 | Path | What it is |
 | --- | --- |
 | `runtime/remote-control/bridge/` | The vendored `@mavis/remote-control-bridge`: the pairing client, the connection, the frame codec, the data plane, the command router seam. Host-neutral; the only dependency is `ws`. |

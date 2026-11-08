@@ -349,10 +349,10 @@ export function createSshAdapter(
       return { accepted };
     },
 
-    async watchSshTerminal(request) {
+    async watchSshTerminal(request, signal) {
       const runtime = await requireRuntime();
       try {
-        const source = runtime.terminals.watch(request.terminalId);
+        const source = runtime.terminals.watch(request.terminalId, signal);
         return {
           ok: true as const,
           source: source as AsyncIterable<{ readonly data: string }>,

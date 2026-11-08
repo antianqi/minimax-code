@@ -9,7 +9,8 @@
 // spawns a process and never names a path on a remote machine.
 import path from "node:path";
 
-import { createSshAskpassService, type SshAskpassService } from "./askpass.js";
+import type { SshAskpassService, CreateSshAskpassServiceOptions } from "./askpass.js";
+import { createSshAuthentication, type SshAuthentication } from "./authentication.js";
 import { createSshConnectionService, type SshConnectionService } from "./connection-service.js";
 import {
   createSshConnectionRepository,
@@ -36,6 +37,8 @@ export interface SshRuntime {
   readonly connections: SshConnectionService;
   readonly projects: SshProjectService;
   readonly terminals: SshTerminalService;
+  /** Whether this host can deliver a staged password, and why not when it cannot. */
+  readonly authentication: SshAuthentication;
   /** The hosts in `~/.ssh/config`. */
   readonly discovery: () => Promise<SshDiscoveryRecord>;
   /** Release the terminals and the askpass helper. */
@@ -51,23 +54,25 @@ export interface CreateSshRuntimeOptions {
   readonly discovery?: SshDiscoveryDependencies;
   /** The home directory a `~` in a key path is expanded against. */
   readonly homeDirectory?: () => string;
+  /**
+   * The askpass factory. A test overrides it to exercise a host where the helper cannot be
+   * built; the runtime records the failure and keeps serving key authentication.
+   */
+  readonly createAskpass?: (options: CreateSshAskpassServiceOptions) => Promise<SshAskpassService>;
 }
 
 export async function createSshRuntime(options: CreateSshRuntimeOptions): Promise<SshRuntime> {
   const transport = options.transport ?? createSystemSshTransport();
   const credentials: SshCredentialStore = createSshCredentialStore();
 
-  // The askpass helper needs a directory of its own and a socket, so it is created once and
-  // shared. A platform that cannot run it still serves every host that does not need a password.
-  let askpass: SshAskpassService | undefined;
-  try {
-    askpass = await createSshAskpassService({
-      rootDir: path.join(options.dataDir, "ssh"),
-      credentials,
-    });
-  } catch {
-    askpass = undefined;
-  }
+  // The askpass helper needs a directory of its own and a socket. Whether it exists is part of
+  // the runtime's answer, not something each caller re-derives: a host that cannot deliver a
+  // password says so when one is handed to it, and keeps key authentication available.
+  const authentication = await createSshAuthentication({
+    rootDir: path.join(options.dataDir, "ssh"),
+    credentials,
+    ...(options.createAskpass ? { createAskpass: options.createAskpass } : {}),
+  });
 
   const connectionRepository: SshConnectionRepository = createSshConnectionRepository(
     sshConnectionStorePath(options.dataDir),
@@ -86,7 +91,7 @@ export async function createSshRuntime(options: CreateSshRuntimeOptions): Promis
     projects: projectRepository,
     transport,
     credentials,
-    ...(askpass ? { askpass } : {}),
+    authentication,
     ...(options.homeDirectory ? { homeDirectory: options.homeDirectory } : {}),
     discoverHosts: discovery,
   });
@@ -95,28 +100,29 @@ export async function createSshRuntime(options: CreateSshRuntimeOptions): Promis
     connections: connectionRepository,
     transport,
     credentials,
-    ...(askpass ? { askpass } : {}),
+    authentication,
   });
   const terminals = createSshTerminalService({
     connections: connectionRepository,
     projects: projectRepository,
     transport,
-    credentials,
-    ...(askpass ? { askpass } : {}),
+    authentication,
   });
 
   return {
     connections,
     projects,
     terminals,
+    authentication,
     discovery,
     dispose: async () => {
       terminals.dispose();
       credentials.clear();
-      await askpass?.dispose();
+      await authentication.dispose();
     },
   };
 }
 
 export type { SshConnectionService, SshProjectService, SshTerminalService };
+export type { SshAuthentication, SshAuthenticationAvailability } from "./authentication.js";
 export type { SshConnectionRecord, SshDiscoveryRecord, SshEndpointRecord, SshProbeRecord, SshProjectRecord, SshTerminalSessionRecord } from "./types.js";

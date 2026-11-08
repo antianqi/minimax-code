@@ -13,7 +13,8 @@
 import os from "node:os";
 
 import { buildRemoteProbeCommand, buildSshArgs, SSH_PROBE_MARKER } from "./command.js";
-import type { SshAskpassService } from "./askpass.js";
+import { isSshRuntimeError, SshRuntimeError } from "./errors.js";
+import type { SshAuthentication } from "./authentication.js";
 import type { SshCredentialStore } from "./credentials.js";
 import type { SshConnectionRepository } from "./connection-repository.js";
 import type { SshProjectRepository } from "./project-repository.js";
@@ -67,7 +68,13 @@ export interface SshConnectionServiceOptions {
   readonly projects: SshProjectRepository;
   readonly transport: SshTransport;
   readonly credentials: SshCredentialStore;
-  readonly askpass?: SshAskpassService;
+  /**
+   * Which authentication each invocation uses, and whether a password can be delivered at all.
+   *
+   * Required: an optional helper is what let a caller pick the password-only option set with no
+   * way to answer the prompt.
+   */
+  readonly authentication: SshAuthentication;
   /** The home directory a `~` in a key path is expanded against. */
   readonly homeDirectory?: () => string;
   /** The hosts `~/.ssh/config` declares, for the alias check. */
@@ -104,45 +111,70 @@ export function createSshConnectionService(
   };
 
   const probe = async (connection: SshConnectionRecord): Promise<SshProbeRecord> => {
-    const password = options.credentials.get(connection.alias);
-    const hasPassword = password !== undefined;
-    const args = buildSshArgs(connection.endpoint, { password: hasPassword });
-    const env = hasPassword ? options.askpass?.envFor(connection.alias) : undefined;
-    const result = await options.transport.run(
-      [...args, buildRemoteProbeCommand()],
-      env ? { env, timeoutMs: PROBE_TIMEOUT_MS } : { timeoutMs: PROBE_TIMEOUT_MS },
-    );
-    return readProbeResult(connection.alias, result.stdout, result.stderr, result, password);
+    // One decision, three callers: this module says whether the staged password can be
+    // delivered at all. A password that cannot be delivered does not become a password-only
+    // invocation — that reached OpenSSH with key authentication turned off and no answer to the
+    // prompt, and the person read a generic handshake failure.
+    const mode = options.authentication.modeFor(connection.alias);
+    if (mode.kind === "unavailable") {
+      return { alias: connection.alias, status: "probe_failed", detail: `密码登录不可用：${mode.reason}` };
+    }
+    const args = buildSshArgs(connection.endpoint, { password: mode.kind === "password" });
+    const env = mode.kind === "password" ? mode.env : undefined;
+    const redaction = options.credentials.captureRedaction(connection.alias);
+    try {
+      const result = await options.transport.run(
+        [...args, buildRemoteProbeCommand()],
+        env ? { env, timeoutMs: PROBE_TIMEOUT_MS } : { timeoutMs: PROBE_TIMEOUT_MS },
+      );
+      return readProbeResult(connection.alias, result.stdout, result.stderr, result, redaction.redact);
+    } finally { redaction.dispose(); }
   };
 
   const runProbe = async (alias: string): Promise<SshProbeRecord> => {
+    // The slot is claimed before the first await.
+    //
+    // It used to be claimed after reading the host, so two probes that started together both
+    // read it, both passed the guard and both ran — and the slower verdict overwrote the faster
+    // one. Claiming first is what makes "one probe per host" true for the whole read-probe-commit
+    // span rather than only for its middle.
     if (probing.has(alias)) {
       return { alias, status: "failed", detail: "这个主机的探测正在进行中。" };
     }
-    const connection = await options.repository.get(alias);
-    if (!connection) {
-      return { alias, status: "failed", detail: "没有找到这个 SSH 主机。" };
-    }
-    if (!connection.enabled) {
-      return { alias, status: "disabled", detail: "这个主机已停用。" };
-    }
-    if (connection.endpoint.kind === "ssh_config" && (await configAliasState(alias)) === "absent") {
-      return { alias, status: "probe_failed", detail: "这个主机不在 ~/.ssh/config 里。" };
-    }
     probing.add(alias);
     try {
+      const target = await options.repository.getProbeTarget(alias);
+      const connection = target?.record;
+      if (!connection) {
+        return { alias, status: "failed", detail: "没有找到这个 SSH 主机。" };
+      }
+      if (!connection.enabled) {
+        return { alias, status: "disabled", detail: "这个主机已停用。" };
+      }
+      if (connection.endpoint.kind === "ssh_config" && (await configAliasState(alias)) === "absent") {
+        return { alias, status: "probe_failed", detail: "这个主机不在 ~/.ssh/config 里。" };
+      }
       const probed = await probe(connection);
       // The verdict is written back to the record: a probe the host list cannot see is a
-      // probe that never happened.
-      const lastError = probed.status === "connected" ? undefined : probed.detail;
-      await options.repository.save({
+      // probe that never happened. The write is fenced on the endpoint the probe ran against,
+      // so a disable, an endpoint edit or a removal made while it ran keeps its own answer —
+      // the probe cannot re-enable the host, restore the old endpoint, or recreate the record.
+      const committed = await options.repository.commitProbe({
         alias: connection.alias,
-        displayName: connection.displayName,
-        endpoint: connection.endpoint,
-        enabled: connection.enabled,
+        identityRevision: target!.identityRevision,
+        probedEndpoint: connection.endpoint,
         status: probed.status,
-        ...(lastError === undefined ? {} : { lastError }),
+        ...(probed.status === "connected" || probed.detail === undefined
+          ? {}
+          : { detail: probed.detail }),
       });
+      if (committed.outcome !== "committed") {
+        return {
+          alias,
+          status: committed.outcome === "disabled" ? "disabled" : "failed",
+          detail: committed.outcome === "missing" ? "没有找到这个 SSH 主机。" : "主机列表已更改，探测结果已过期。",
+        };
+      }
       return probed;
     } finally {
       probing.delete(alias);
@@ -163,6 +195,11 @@ export function createSshConnectionService(
         return { success: false, error: "host_not_configured" };
       }
       if (input.password !== undefined) {
+        // A password this host cannot deliver is refused where it arrives, not reported as saved
+        // and left to fail later as a handshake nobody can explain.
+        if (!options.authentication.availability.available) {
+          throw new SshRuntimeError("credential_unavailable", options.authentication.availability.reason);
+        }
         try {
           options.credentials.stage(alias, input.password);
         } catch {
@@ -184,13 +221,8 @@ export function createSshConnectionService(
       const probed = await runProbe(alias);
       // The stored record carries the probe's verdict, so the host list and the probe answer
       // agree: a host that could not be reached is listed as `probe_failed`, not as saved-and-fine.
-      const connection = (await options.repository.get(alias)) ?? {
-        alias,
-        displayName,
-        endpoint,
-        enabled,
-        status: enabled ? "idle" : "disabled",
-      };
+      const connection = await options.repository.get(alias);
+      if (!connection) return { success: false, error: "connection_not_found", probe: probed };
       return { success: true, connection, probe: probed };
     },
 
@@ -198,13 +230,25 @@ export function createSshConnectionService(
       if (!isSafeSshAlias(alias)) return { success: false, error: "invalid_input" };
       const connection = await options.repository.get(alias);
       if (!connection) return { success: false, error: "connection_not_found" };
-      const saved = await options.repository.setEnabled(alias, enabled, enabled ? "idle" : "disabled");
+      // The removal may land between the read above and this write; the transaction then has no
+      // record to change, and the caller is told the host is gone rather than shown a saved
+      // record that was never written.
+      const saved = await options.repository
+        .setEnabled(alias, enabled, enabled ? "idle" : "disabled")
+        .catch((error: unknown) => {
+          if (isSshRuntimeError(error) && error.code === "connection_not_found") {
+            return undefined;
+          }
+          throw error;
+        });
+      if (!saved) return { success: false, error: "connection_not_found" };
       if (!enabled) return { success: true, connection: saved };
       // Enabling a host is a request to use it, so the runtime answers whether it can be
       // reached. The probe is that connection, and the list shows what it answered.
       const probed = await runProbe(alias);
       const verified = await options.repository.get(alias);
-      return { success: true, connection: verified ?? saved, probe: probed };
+      if (!verified) return { success: false, error: "connection_not_found", probe: probed };
+      return { success: true, connection: verified, probe: probed };
     },
 
     async remove(alias) {
@@ -288,7 +332,7 @@ function readProbeResult(
   stdout: string,
   stderr: string,
   result: { readonly code: number | null; readonly timedOut: boolean; readonly spawnError?: NodeJS.ErrnoException },
-  password: string | undefined,
+  redact: (value: string) => string,
 ): SshProbeRecord {
   if (result.spawnError) {
     if (result.spawnError.code === "ENOENT") {
@@ -297,7 +341,7 @@ function readProbeResult(
     return {
       alias,
       status: "probe_failed",
-      detail: redact(`无法启动 ssh：${result.spawnError.message}`, password),
+      detail: redact(`无法启动 ssh：${result.spawnError.message}`),
     };
   }
   if (result.timedOut) {
@@ -305,11 +349,11 @@ function readProbeResult(
   }
   const markerIndex = stdout.indexOf(SSH_PROBE_MARKER);
   if (markerIndex < 0) {
-    const reason = firstLine(stderr) || firstLine(stdout);
+    const reason = firstLine(redact(stderr)) || firstLine(redact(stdout));
     return {
       alias,
       status: "probe_failed",
-      detail: redact(reason ? `主机没有完成握手：${reason}` : "主机没有完成握手。", password),
+      detail: redact(reason ? `主机没有完成握手：${reason}` : "主机没有完成握手。"),
     };
   }
   const values = new Map<string, string>();
@@ -336,10 +380,4 @@ function firstLine(value: string): string {
     if (trimmed) return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
   }
   return "";
-}
-
-/** A staged password must never appear in a message the browser reads. */
-function redact(value: string, password: string | undefined): string {
-  if (!password) return value;
-  return value.split(password).join("***");
 }

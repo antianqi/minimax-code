@@ -882,7 +882,7 @@ export interface WebuiHarnessPort {
    * binds to.
    */
   getRemoteControlStatus(): Promise<WebuiRemoteControlStatus>;
-  watchRemoteControlStatus(): Promise<WebuiWatchRemoteControlResult>;
+  watchRemoteControlStatus(signal?: AbortSignal): Promise<WebuiWatchRemoteControlResult>;
   connectRemoteControl(
     request: WebuiRemoteControlConnectRequest,
   ): Promise<WebuiRemoteControlConnectResult>;
@@ -936,7 +936,18 @@ export interface WebuiHarnessPort {
   closeSshTerminal(request: {
     readonly terminalId: string;
   }): Promise<{ readonly accepted: boolean }>;
-  watchSshTerminal(request: { readonly terminalId: string }): Promise<
+  /**
+   * The remote terminal's output stream.
+   *
+   * `signal` is the requesting connection's lifetime, and the stream ends with it: a browser that
+   * disconnected has no reader left, and an `iterator.return()` on a parked `next()` does not
+   * interrupt it. Without the signal the watch stayed subscribed to a quiet session — and its
+   * listener in the session's set — until the remote shell happened to print something.
+   */
+  watchSshTerminal(
+    request: { readonly terminalId: string },
+    signal?: AbortSignal,
+  ): Promise<
     | {
         readonly ok: true;
         readonly source:

@@ -23,6 +23,7 @@ export interface WebuiRuntimeResourceOwners {
 }
 
 export interface WebuiRuntimeLifecycle {
+  readonly registerShutdownResource: (dispose: () => Promise<void>) => void;
   /**
    * Registers the bound harness-host close. Called once, when the factory
    * returns the host; `close` runs it after the auth teardown.
@@ -48,8 +49,12 @@ export function createWebuiRuntimeLifecycle(
   let hostClose: (() => Promise<void>) | undefined;
   /** One completion and failure outcome for all close callers. */
   let closing: Promise<void> | undefined;
+  const resources: (() => Promise<void>)[] = [];
   const closeOwners = async (): Promise<void> => {
     const failures: unknown[] = [];
+    for (const dispose of resources.splice(0)) {
+      try { await dispose(); } catch (error) { failures.push(error); }
+    }
     try {
       owners.disposeAuth();
     } catch (error) {
@@ -75,7 +80,7 @@ export function createWebuiRuntimeLifecycle(
       throw new AggregateError(failures, "WebUI runtime shutdown failed");
   };
   const close = (): Promise<void> => {
-    closing ??= closeOwners();
+    closing ??= Promise.resolve().then(closeOwners);
     return closing;
   };
   const closeAcquiredResources = async (): Promise<void> => {
@@ -99,6 +104,10 @@ export function createWebuiRuntimeLifecycle(
     throw new AggregateError(failures, "WebUI runtime startup failed");
   };
   return {
+    registerShutdownResource(dispose) {
+      if (closing) throw new Error("WebUI runtime is closed");
+      resources.push(dispose);
+    },
     registerHostClose(close_) {
       hostClose = close_;
     },

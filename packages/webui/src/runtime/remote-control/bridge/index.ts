@@ -492,13 +492,10 @@ export class RemoteControlProxy {
    * 超时 / 网络错误 / 5xx **不走这里**：那些保持待确认，等待下一次重放
    * （方案 §4.5.4：不能凭 HTTP 超时判定未解绑）。
    */
-  resolveProducerUnbind(outcome: "confirmed" | "rejected", reason: string): void {
+  resolveProducerUnbind(requestId: string, outcome: "confirmed" | "rejected", reason: string): void {
     const pending = this.opts.identity.getPendingUnbind();
-    if (!pending) {
-      this.opts.logger.warn(
-        `[rc.proxy] producer unbind resolve ignored outcome=${outcome} reason=${reason} cause=no_pending_record`,
-      );
-      return;
+    if (!pending || pending.request_id !== requestId) {
+      throw new Error("The unbind request is no longer pending");
     }
     if (!this.isPendingUnbindOwnedByCurrentUser(pending, "resolve")) {
       throw new Error("Pending unbind belongs to another account");

@@ -13,9 +13,8 @@
 import { randomUUID } from "node:crypto";
 
 import { buildRemoteTerminalCommand, buildSshArgs } from "./command.js";
-import type { SshAskpassService } from "./askpass.js";
+import type { SshAuthentication } from "./authentication.js";
 import type { SshConnectionRepository } from "./connection-repository.js";
-import type { SshCredentialStore } from "./credentials.js";
 import { SshRuntimeError } from "./errors.js";
 import type { SshProjectRepository } from "./project-repository.js";
 import type { SshTerminalProcess, SshTransport } from "./transport.js";
@@ -53,7 +52,7 @@ export interface SshTerminalService {
   resize(terminalId: string, cols: number, rows: number): boolean;
   close(terminalId: string): boolean;
   /** The session's output: the buffered part first, then what arrives. */
-  watch(terminalId: string): AsyncIterable<{ readonly data: string }>;
+  watch(terminalId: string, signal?: AbortSignal): AsyncIterable<{ readonly data: string }>;
   dispose(): void;
 }
 
@@ -61,8 +60,8 @@ export interface SshTerminalServiceOptions {
   readonly connections: SshConnectionRepository;
   readonly projects: SshProjectRepository;
   readonly transport: SshTransport;
-  readonly credentials: SshCredentialStore;
-  readonly askpass?: SshAskpassService;
+  /** Which authentication the session's `ssh` invocation uses. */
+  readonly authentication: SshAuthentication;
 }
 
 export function createSshTerminalService(options: SshTerminalServiceOptions): SshTerminalService {
@@ -90,10 +89,20 @@ export function createSshTerminalService(options: SshTerminalServiceOptions): Ss
       // The folder the session starts in: the one that was asked for, else the project rooted on
       // this host, else the remote home directory the shell opens in anyway.
       const path = request.path?.trim() || (await firstProjectPath(options.projects, alias));
-      const password = options.credentials.get(alias);
-      const args = buildSshArgs(connection.endpoint, { password: password !== undefined, tty: true });
+      const mode = options.authentication.modeFor(alias);
+      if (mode.kind === "unavailable") {
+        return {
+          session: {
+            terminalId: "",
+            alias,
+            status: "failed",
+            error: `密码登录不可用：${mode.reason}`,
+          },
+        };
+      }
+      const args = buildSshArgs(connection.endpoint, { password: mode.kind === "password", tty: true });
       const remoteCommand = buildRemoteTerminalCommand(path);
-      const env = password !== undefined ? options.askpass?.envFor(alias) : undefined;
+      const env = mode.kind === "password" ? mode.env : undefined;
 
       const terminalId = `ssh-terminal-${randomUUID()}`;
       let child: SshTerminalProcess;
@@ -170,12 +179,12 @@ export function createSshTerminalService(options: SshTerminalServiceOptions): Ss
       return true;
     },
 
-    watch(terminalId) {
+    watch(terminalId, signal) {
       const session = sessions.get(terminalId);
       if (!session) {
         throw new SshRuntimeError("terminal_not_found", "没有找到这个远程终端。");
       }
-      return watchSession(session);
+      return watchSession(session, signal);
     },
 
     dispose() {
@@ -186,7 +195,12 @@ export function createSshTerminalService(options: SshTerminalServiceOptions): Ss
           } catch {
             // A session that is already gone needs no killing.
           }
+          session.closed = true;
+          session.status = "closed";
         }
+        // A watcher parked on this session is released here too: the process is gone, so no
+        // close event will come from it.
+        for (const listener of session.closeListeners) listener();
       }
       sessions.clear();
     },
@@ -196,40 +210,57 @@ export function createSshTerminalService(options: SshTerminalServiceOptions): Ss
 /** The output of one session: the buffered part first, then whatever arrives. */
 async function* watchSession(
   session: TerminalSession,
+  signal?: AbortSignal,
 ): AsyncGenerator<{ readonly data: string }> {
-  for (const chunk of [...session.buffer]) {
-    yield { data: chunk };
-  }
-  if (session.closed) return;
-
-  const queue: string[] = [];
+  // One mailbox for the whole life of the watch, and it is filled in the same turn it is opened.
+  //
+  // The replay used to be a snapshot yielded out before the listener existed: a consumer that
+  // paused after the first replayed chunk lost everything the child wrote meanwhile — those bytes
+  // went into the session buffer for whoever attached next, never into this stream. Copying the
+  // buffer into the mailbox and subscribing before the first yield closes that gap, so every byte
+  // is in exactly one place when the reader comes back.
+  const queue: string[] = [...session.buffer];
   let wake: (() => void) | undefined;
+  let cancelled = signal?.aborted ?? false;
+  const resume = (): void => {
+    const pending = wake;
+    wake = undefined;
+    pending?.();
+  };
   const onData = (data: string): void => {
     queue.push(data);
-    wake?.();
+    resume();
   };
   const onClose = (): void => {
-    wake?.();
+    resume();
+  };
+  // A parked iterator has nothing to wake it while the remote side is quiet, so the caller's
+  // signal wakes it itself. `iterator.return()` cannot do this: it does not interrupt an
+  // unresolved `next()`, which is why a disconnected reader used to leave its listener behind
+  // until the next chunk or the shell's exit — possibly never.
+  const onAbort = (): void => {
+    cancelled = true;
+    resume();
   };
   session.listeners.add(onData);
   session.closeListeners.add(onClose);
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    for (;;) {
-      while (queue.length > 0) {
-        const data = queue.shift();
-        if (data !== undefined) yield { data };
+    while (!cancelled) {
+      const data = queue.shift();
+      if (data !== undefined) {
+        yield { data };
+        continue;
       }
       if (session.closed) return;
       await new Promise<void>((resolve) => {
-        wake = () => {
-          wake = undefined;
-          resolve();
-        };
+        wake = resolve;
       });
     }
   } finally {
     session.listeners.delete(onData);
     session.closeListeners.delete(onClose);
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 

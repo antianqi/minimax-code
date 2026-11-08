@@ -15,6 +15,8 @@ import { SshRuntimeError } from "./errors.js";
 import { isValidSshPassword } from "./validators.js";
 
 export interface SshCredentialStore {
+  /** Retain every password the attempt could receive until its output has been redacted. */
+  captureRedaction(alias: string): { redact(value: string): string; dispose(): void };
   /** Stage a password for one host. The previous one, if any, is replaced. */
   stage(alias: string, password: string): void;
   /** The staged password for one host, if there is one. */
@@ -27,7 +29,29 @@ export interface SshCredentialStore {
 
 export function createSshCredentialStore(): SshCredentialStore {
   const staged = new Map<string, string>();
+  const captures = new Map<string, Set<Set<string>>>();
   return {
+    captureRedaction(alias) {
+      const passwords = new Set<string>();
+      const initial = staged.get(alias);
+      if (initial !== undefined) passwords.add(initial);
+      const observers = captures.get(alias) ?? new Set<Set<string>>();
+      captures.set(alias, observers);
+      observers.add(passwords);
+      return {
+        redact(value) {
+          for (const password of [...passwords].sort((left, right) => right.length - left.length)) {
+            value = value.split(password).join("***");
+          }
+          return value;
+        },
+        dispose() {
+          observers.delete(passwords);
+          if (observers.size === 0 && captures.get(alias) === observers) captures.delete(alias);
+          passwords.clear();
+        },
+      };
+    },
     stage(alias, password) {
       if (!isValidSshPassword(password)) {
         throw new SshRuntimeError(
@@ -36,6 +60,7 @@ export function createSshCredentialStore(): SshCredentialStore {
         );
       }
       staged.set(alias, password);
+      for (const capture of captures.get(alias) ?? []) capture.add(password);
     },
     get: (alias) => staged.get(alias),
     remove: (alias) => {

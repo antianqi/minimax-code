@@ -451,6 +451,7 @@ export async function createWebuiRuntimeHost(
   const accountLogin = createWebuiAccountLoginSession(authSession.oauthCore);
   const hostHandle = {
     ...host,
+    registerShutdownResource: lifecycle.registerShutdownResource,
     appVersion: options.appVersion ?? host.appVersion ?? "webui",
     // The scope the resolver settled on, so the handshake can name the
     // account's own legal documents to the browser.

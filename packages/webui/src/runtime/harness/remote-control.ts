@@ -32,8 +32,9 @@ type RemoteControlMembers = Pick<
   | "publishRemoteControlComposerMode"
 >;
 
-export function createRemoteControlAdapter(host: WebuiRuntimeHostHandle, browserPort?: Pick<WebuiBrowserPort, "getAuthorization" | "setAuthorization">): RemoteControlMembers {
+export function createRemoteControlAdapter(host: WebuiRuntimeHostHandle, browserPort?: Pick<WebuiBrowserPort, "getAuthorization" | "setAuthorization">, registerDispose?: (dispose: () => Promise<void>) => void): RemoteControlMembers {
   const controller = createWebuiRemoteControl({ host, ...(browserPort ? { browserPort } : {}) });
+  registerDispose?.(() => controller.dispose());
 
   // The phone link is driven by the runtime: without its CLI service there is no event stream to
   // relay, no command router to answer the phone and no permission path to reply through.
@@ -46,9 +47,9 @@ export function createRemoteControlAdapter(host: WebuiRuntimeHostHandle, browser
       requireRuntime();
       return controller.getStatus();
     },
-    watchRemoteControlStatus: async () => {
+    watchRemoteControlStatus: async (signal) => {
       requireRuntime();
-      return controller.watchStatus();
+      return controller.watchStatus(signal);
     },
     connectRemoteControl: async (request) => {
       requireRuntime();

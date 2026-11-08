@@ -242,6 +242,82 @@ const bot = (connectionId: string): WebuiChannelConnection => ({
 });
 
 describe("IM authorization observation (scripted capability, real owner)", () => {
+  it("keeps the same selection's pending detail read when the pane returns before configuration completes", async () => {
+    vi.useFakeTimers();
+    const configuration = deferred<{ configured: boolean }>();
+    const checkConfig = vi.fn(() => configuration.promise);
+    const filter = { mode: "full" as const, includeToolSummary: true };
+    const readFilter = vi.fn(async () => filter);
+    const start = vi.fn(async () => ({ ok: true, sessionId: "qr" }));
+    const owner = createWebuiChannelOwner({ port: {
+      listChannelConnections: async () => ({ connections: [{ ...bot("a"), binding: { bindingId: "binding", externalId: "wechat:a" } }] }),
+      checkChannelConfig: checkConfig, getChannelMessageFilter: readFilter, startChannelWechatBind: start,
+    } });
+    await owner.load();
+    const release = owner.startRefreshing();
+    const selecting = owner.select("a");
+    expect(checkConfig).toHaveBeenCalledTimes(1);
+    release();
+    const returned = owner.startRefreshing();
+    configuration.resolve({ configured: true });
+    await selecting;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(owner.getSnapshot().selectedId).toBe("a");
+    expect(owner.getSnapshot().config).toEqual({ configured: true });
+    expect(owner.getSnapshot().filter).toBe(filter);
+    expect(owner.getSnapshot().authorization?.sessionId).toBe("qr");
+    expect(checkConfig).toHaveBeenCalledTimes(1);
+    expect(readFilter).toHaveBeenCalledExactlyOnceWith({ agent: "wechat:a" });
+    expect(start).toHaveBeenCalledTimes(1);
+    returned();
+    owner.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("fences a previous selection's late details while authorization refresh leaves current details valid", async () => {
+    vi.useFakeTimers();
+    const previous = deferred<{ configured: boolean }>();
+    const current = deferred<{ configured: boolean }>();
+    const configRead = vi.fn().mockImplementationOnce(() => previous.promise).mockImplementationOnce(() => current.promise);
+    const owner = createWebuiChannelOwner({ port: {
+      listChannelConnections: async () => ({ connections: ["a", "b"].map((id) => ({ ...bot(id), binding: { bindingId: id, externalId: `wechat:${id}` } })) }),
+      checkChannelConfig: configRead,
+      getChannelMessageFilter: async ({ agent }) => ({ mode: agent === "wechat:a" ? "result" : "full", includeToolSummary: true }),
+      startChannelWechatBind: async () => ({ ok: true, sessionId: "explicit" }),
+    } });
+    await owner.load();
+    const selectingA = owner.select("a");
+    const selectingB = owner.select("b");
+    expect(await owner.refreshAuthorization("b")).toEqual({ ok: true });
+    current.resolve({ configured: false });
+    await selectingB;
+    previous.resolve({ configured: true });
+    await selectingA;
+    expect(owner.getSnapshot().selectedId).toBe("b");
+    expect(owner.getSnapshot().config).toEqual({ configured: false });
+    expect(owner.getSnapshot().filter?.mode).toBe("full");
+    expect(owner.getSnapshot().authorization?.sessionId).toBe("explicit");
+    owner.dispose();
+  });
+
+  it("does not revive old details after explicit authorization commands change selection away and back", async () => {
+    const pending = deferred<{ configured: boolean }>();
+    const owner = createWebuiChannelOwner({ port: {
+      listChannelConnections: async () => ({ connections: [bot("a"), bot("b")] }),
+      checkChannelConfig: () => pending.promise,
+      startChannelWechatBind: async () => ({ ok: true, sessionId: "qr" }),
+    } });
+    await owner.load();
+    const selecting = owner.select("a");
+    await owner.refreshAuthorization("b");
+    await owner.refreshAuthorization("a");
+    pending.resolve({ configured: true });
+    await selecting;
+    expect(owner.getSnapshot().selectedId).toBe("a");
+    expect(owner.getSnapshot().config).toBeUndefined();
+    expect(owner.getSnapshot().authorization?.sessionId).toBe("qr");
+    owner.dispose();
+  });
   it("retains a bound bot's configuration and filter across remount and a delayed same-selection refresh", async () => {
     vi.useFakeTimers();
     const configured = { configured: true };

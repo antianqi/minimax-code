@@ -156,6 +156,8 @@ export function createWebuiChannelOwner(
   let inFlight: Promise<void> | undefined;
   let disposed = false;
   let selectionRevision = 0;
+  // Detail reads follow selection/reload freshness, independently of QR operations.
+  let selectionDetailRevision = 0;
   let interestRevision = 0;
   let refreshConsumers = 0;
   let refreshTimer: unknown;
@@ -175,6 +177,7 @@ export function createWebuiChannelOwner(
 
   const publish = (next: WebuiChannelSnapshot): void => {
     if (disposed) return;
+    if (next.selectedId !== snapshot.selectedId) selectionDetailRevision += 1;
     snapshot = next;
     reconcileAuthorizationTimer();
     for (const listener of listeners) listener();
@@ -239,7 +242,8 @@ export function createWebuiChannelOwner(
    * stores one filter per IM client, keyed by the transport identity of its binding.
    */
   const loadSelection = async (connectionId: string | undefined): Promise<void> => {
-    const revision = selectionRevision;
+    if (disposed || snapshot.selectedId !== connectionId) return;
+    const revision = ++selectionDetailRevision;
     const connection =
       connectionId === undefined
         ? undefined
@@ -270,7 +274,7 @@ export function createWebuiChannelOwner(
         filterError = error instanceof Error && error.message ? error.message : WEBUI_CHANNEL_FILTER_FAILED;
       }
     }
-    if (disposed || revision !== selectionRevision || snapshot.selectedId !== connectionId) return;
+    if (disposed || revision !== selectionDetailRevision || snapshot.selectedId !== connectionId) return;
     publish({ ...snapshot, config, filter, filterError });
   };
 

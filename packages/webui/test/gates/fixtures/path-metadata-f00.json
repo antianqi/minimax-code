@@ -22,6 +22,15 @@
       "home": "current"
     },
     {
+      "path": "client/application/miniapp-presenter.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "assembly",
+      "business": null,
+      "home": "current"
+    },
+    {
       "path": "client/application/observation-scheduler.ts",
       "layers": [
         "application"

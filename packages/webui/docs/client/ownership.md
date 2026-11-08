@@ -56,6 +56,9 @@ current. Remount reacquires only an unbound WeChat authorization that is absent;
 selected bot's configuration/filter and performs no selection reload. Same-selection explicit reloads
 retain those fields until their answers arrive. Explicit QR refresh and add-bot commands survive
 observation release, while selection changes, newer commands and disposal still fence their results.
+Selection detail reads have their own freshness revision: authorization reacquisition or refresh
+cannot discard a pending config/filter answer for the same selection. A newer detail reload or
+selection still supersedes it, and disposal prevents publication.
 
 ## Lifetime: one application, explicitly started
 

@@ -303,10 +303,9 @@ export function MiniAppView({
   /**
    * Present the Mini App here, or wait for the standalone tab that holds it.
    *
-   * The first ask starts it — that is what opening a tab means — and every later
-   * ask is one catalogue read, because the only event that says the tab closed is
-   * the record itself. `presentInline` refuses to restart a refused or stopped
-   * Mini App, so this loop cannot turn into a retry the person did not ask for.
+   * The view declares interest; the owner shares one catalogue read per
+   * observation across waiting views and listing readers. It owns retries and
+   * never restarts a refused or stopped Mini App without a person's command.
    *
    * The standalone surface never waits: it *is* the presentation, so the lease the
    * catalogue reports is its own.

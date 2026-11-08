@@ -95,9 +95,9 @@ export interface WebuiChannelOwner {
   readonly getSnapshot: () => WebuiChannelSnapshot;
   /** Reads the bot list once. Concurrent calls share one request. */
   readonly load: () => Promise<void>;
-  /** Re-reads on an interval while the pane is open. Returns the stop function. */
+  /** Shares list/pending-authorization observation while the pane is open; release is idempotent. */
   readonly startRefreshing: () => () => void;
-  /** Selects a bot, reads what belongs to it, and starts its authorization when it has none. */
+  /** Selects/reads a bot. Automatic authorization requires a live pane observation interest. */
   readonly select: (connectionId: string | undefined) => Promise<void>;
   /**
    * Creates the bot a create flow is adding, then authorizes it.
@@ -117,7 +117,7 @@ export interface WebuiChannelOwner {
   ) => Promise<WebuiChannelMutation>;
   /** Reads the authorization the selected bot's card is showing. */
   readonly readAuthorization: () => Promise<WebuiChannelAuthorization | undefined>;
-  /** Starts the authorization over — the 刷新二维码 action. */
+  /** Explicit 刷新二维码 command: observation release does not cancel its result. */
   readonly refreshAuthorization: (connectionId: string) => Promise<WebuiChannelMutation>;
 }
 
@@ -161,6 +161,7 @@ export function createWebuiChannelOwner(
   let refreshTimer: unknown;
   let authorizationTimer: unknown;
   let authorizationRead: { authorization: WebuiChannelAuthorization; promise: Promise<WebuiChannelAuthorization | undefined> } | undefined;
+  let explicitAuthorizationRevision: number | undefined;
 
   const reconcileAuthorizationTimer = (): void => {
     const pending = !disposed && refreshConsumers > 0 && snapshot.authorization?.status === "pending";
@@ -302,11 +303,15 @@ export function createWebuiChannelOwner(
    * The bot already exists — it is prepared before it is authorized — so the authorization is
    * filed under that bot's own connection rather than under the agent's default client. That is
    * what makes 刷新二维码 refresh *this* bot's QR instead of issuing one for another.
+   * An interest token denotes automatic work; absence denotes an explicit command.
    */
   const startAuthorization = async (
     connectionId: string,
+    automaticInterest?: number,
   ): Promise<WebuiChannelMutation> => {
     if (disposed) return { ok: false, message: WEBUI_CHANNEL_FAILED };
+    if (automaticInterest !== undefined && (refreshConsumers === 0 || automaticInterest !== interestRevision))
+      return { ok: false, message: WEBUI_CHANNEL_FAILED };
     const connection = snapshot.connections.find(
       (entry) => entry.connectionId === connectionId,
     );
@@ -324,16 +329,18 @@ export function createWebuiChannelOwner(
       return { ok: false, message: WEBUI_CHANNEL_WECHAT_UNAVAILABLE };
     }
     const base = { connectionId, platform: connection.channel } as const;
+    const revision = ++selectionRevision;
+    explicitAuthorizationRevision = automaticInterest === undefined ? revision : undefined;
+    const isCurrent = (): boolean => !disposed && revision === selectionRevision &&
+      (automaticInterest === undefined || (refreshConsumers > 0 && automaticInterest === interestRevision)) &&
+      snapshot.selectedId === connectionId;
     publish({
       ...snapshot,
       selectedId: connectionId,
       authorization: { ...base, status: "starting" },
     });
-    const revision = ++selectionRevision;
-    const interest = interestRevision;
-    const isCurrent = (): boolean => !disposed && revision === selectionRevision &&
-      interest === interestRevision && snapshot.selectedId === connectionId;
     try {
+      if (!isCurrent()) return { ok: false, message: WEBUI_CHANNEL_FAILED };
       const result = await start({
         name: webuiChannelBotName(connection),
         connectionId,
@@ -366,24 +373,27 @@ export function createWebuiChannelOwner(
         authorization: { ...base, status: "error", error: message },
       });
       return { ok: false, message };
+    } finally {
+      if (explicitAuthorizationRevision === revision) explicitAuthorizationRevision = undefined;
     }
   };
 
-  const select = async (connectionId: string | undefined): Promise<void> => {
+  const select = async (connectionId: string | undefined, explicitAuthorization = false): Promise<void> => {
     if (disposed) return;
+    const sameSelection = snapshot.selectedId === connectionId;
     const revision = ++selectionRevision;
+    const interest = interestRevision;
     const keepsAuthorization =
       connectionId !== undefined && snapshot.authorization?.connectionId === connectionId;
     publish({
       ...snapshot,
       selectedId: connectionId,
-      config: undefined,
-      filter: undefined,
-      filterError: undefined,
+      ...(sameSelection ? {} : { config: undefined, filter: undefined, filterError: undefined }),
       ...(keepsAuthorization ? {} : { authorization: undefined }),
     });
     await loadSelection(connectionId);
-    if (disposed || revision !== selectionRevision || snapshot.selectedId !== connectionId) return;
+    if (disposed || revision !== selectionRevision || snapshot.selectedId !== connectionId ||
+      (!explicitAuthorization && (refreshConsumers === 0 || interest !== interestRevision))) return;
     if (connectionId === undefined) return;
     const connection = snapshot.connections.find(
       (entry) => entry.connectionId === connectionId,
@@ -398,7 +408,7 @@ export function createWebuiChannelOwner(
     ) {
       return;
     }
-    await startAuthorization(connectionId);
+    await startAuthorization(connectionId, explicitAuthorization ? undefined : interest);
   };
 
   /**
@@ -430,7 +440,7 @@ export function createWebuiChannelOwner(
           (entry) => !known.has(entry.connectionId) && entry.channel === platform,
         ) ?? [...snapshot.connections].reverse().find((entry) => entry.channel === platform);
       if (!created) return { ok: true };
-      await select(created.connectionId);
+      await select(created.connectionId, true);
       return { ok: true };
     } catch (error) {
       const message = failureMessage(error);
@@ -531,8 +541,9 @@ export function createWebuiChannelOwner(
       refreshConsumers += 1;
       refreshTimer ??= setIntervalFn(() => void load(), refreshMs);
       reconcileAuthorizationTimer();
-      if (snapshot.selectedId !== undefined && snapshot.authorization === undefined)
-        void select(snapshot.selectedId);
+      const connection = selectedConnection(snapshot);
+      if (connection?.channel === "wechat" && connection.state !== "bound" && snapshot.authorization === undefined)
+        void startAuthorization(connection.connectionId, interestRevision);
       let released = false;
       return () => {
         if (released || disposed) return;
@@ -542,7 +553,7 @@ export function createWebuiChannelOwner(
           authorizationRead = undefined;
           if (refreshTimer !== undefined) clearIntervalFn(refreshTimer);
           refreshTimer = undefined;
-          if (snapshot.authorization?.status === "starting")
+          if (snapshot.authorization?.status === "starting" && explicitAuthorizationRevision !== selectionRevision)
             publish({ ...snapshot, authorization: undefined });
         }
         reconcileAuthorizationTimer();

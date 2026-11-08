@@ -527,7 +527,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     return pending;
   };
 
-  const loadListing = async (fresh = false): Promise<void> => {
+  const loadListing = async (fresh = false): Promise<WebuiMiniAppCatalogue | undefined> => {
     if (disposed || !available) return;
     // A mutation must observe a read started after it settled, never reuse an
     // older poll whose snapshot may still describe the pre-mutation runtime.
@@ -536,7 +536,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     set((current) => ({ ...current, listing: { ...current.listing, loading: true } }));
     const pending = readCatalogue();
     try {
-      await pending;
+      return await pending;
     } catch (error) {
       set((current) => ({
         ...current,
@@ -703,6 +703,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       let first: WebuiMiniAppCatalogueRow | undefined;
       try {
         first = (await listMiniApps()).miniApps.find((candidate) => candidate.pluginId === pluginId);
+        if (!isCurrent() || state.presentations[pluginId] !== current) return;
         if (!first || first.detached || !(first.presentationRevision > current.presentationRevision)) return;
         await new Promise<void>((resolve) => {
           const finish = (): void => {
@@ -762,6 +763,18 @@ export function createWebuiMiniAppWorkflows(deps: {
     await loadListing(true);
   };
 
+  // The single stop verdict for an already-open presentation, shared by explicit
+  // reconciliation and interested-reader observation. A failed read proves no stop.
+  const reconcileOpenPresentation = (pluginId: string, previous: WebuiMiniAppPresentation): boolean => {
+    if (disposed || state.listing.error !== undefined || previous.kind !== "open" ||
+      state.presentations[pluginId] !== previous || state.opening === pluginId) return false;
+    const row = state.listing.rows.find((candidate) => candidate.pluginId === pluginId);
+    const reason = webuiMiniAppStopReason(row);
+    if (!reason) return false;
+    setPresentation(pluginId, { kind: "stopped", reason });
+    return true;
+  };
+
   const syncPresentations = async (): Promise<void> => {
     if (disposed || !available) return;
     const openPlugins = Object.entries(state.presentations)
@@ -773,19 +786,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       // A read that failed says nothing about a view that is up; the next one does.
       return;
     }
-    if (disposed || state.listing.error !== undefined) return;
-    set((current) => {
-      let presentations: Record<string, WebuiMiniAppPresentation> | undefined;
-      for (const [pluginId, previous] of openPlugins) {
-        if (current.presentations[pluginId] !== previous || current.opening === pluginId) continue;
-        const row = current.listing.rows.find((candidate) => candidate.pluginId === pluginId);
-        const reason = webuiMiniAppStopReason(row);
-        if (!reason) continue;
-        presentations = presentations ?? { ...current.presentations };
-        presentations[pluginId] = { kind: "stopped", reason };
-      }
-      return presentations ? { ...current, presentations } : current;
-    });
+    for (const [pluginId, previous] of openPlugins) reconcileOpenPresentation(pluginId, previous);
   };
 
   /**
@@ -865,6 +866,7 @@ export function createWebuiMiniAppWorkflows(deps: {
   const presentInline = async (
     pluginId: string,
     isCurrent: () => boolean = () => !disposed,
+    observed?: { readonly catalogue: WebuiMiniAppCatalogue | undefined },
   ): Promise<"presented" | "waiting" | "blocked"> => {
     if (!available || !isCurrent()) return "blocked";
     const current = state;
@@ -874,7 +876,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     if (existing?.kind === "stopped" || current.refusals[pluginId] !== undefined) return "blocked";
     let catalogue: WebuiMiniAppCatalogue | undefined;
     try {
-      catalogue = await readCatalogue();
+      catalogue = observed ? observed.catalogue : await readCatalogue();
     } catch {
       // A read that failed says nothing about the lease, and starting on a guess
       // could present a Mini App another tab is already showing. Ask again.
@@ -1260,7 +1262,8 @@ export function createWebuiMiniAppWorkflows(deps: {
     if (disposed || suspended || observing) return;
     observing = true;
     try {
-      if (listingInterests.size > 0 || presentationInterests.size > 0) await loadListing();
+      const catalogue = listingInterests.size > 0 || presentationInterests.size > 0
+        ? await loadListing() : undefined;
       for (const [pluginId, interest] of presentationInterests) {
         const isCurrent = (): boolean => !disposed && !suspended && presentationInterests.get(pluginId) === interest;
         if (!isCurrent()) continue;
@@ -1268,13 +1271,10 @@ export function createWebuiMiniAppWorkflows(deps: {
         const presentation = state.presentations[pluginId];
         if (presentation === undefined) {
           if (interest.standalone) await open(pluginId, undefined, isCurrent);
-          else await presentInline(pluginId, isCurrent);
+          else if (state.listing.error === undefined) await presentInline(pluginId, isCurrent, { catalogue });
         } else if (presentation.kind === "open") {
-          const row = state.listing.rows.find((candidate) => candidate.pluginId === pluginId);
-          // Failed reads cannot turn the last good catalogue into a stop verdict.
-          const reason = state.listing.error ? undefined : webuiMiniAppStopReason(row);
-          if (reason) setPresentation(pluginId, { kind: "stopped", reason });
-          else if (!interest.standalone) await refreshInline(pluginId, isCurrent);
+          if (!reconcileOpenPresentation(pluginId, presentation) && !interest.standalone)
+            await refreshInline(pluginId, isCurrent);
         }
       }
     } finally {
@@ -1345,7 +1345,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     available,
     watchPresenter: (onFrame, onFailure) =>
       port.watchMiniAppPresenter?.(onFrame, onFailure) ?? (() => undefined),
-    loadListing,
+    loadListing: async () => { await loadListing(); },
     /** Read one package's declared permissions; per row, on demand. */
     loadPermissions,
     setPermission,

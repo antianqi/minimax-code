@@ -390,11 +390,14 @@ describe("the 接入 IM owner", () => {
     });
 
     await owner.load();
+    const release = owner.startRefreshing();
     await owner.select("connection_pending");
 
     // Desktop shows the QR for an unbound bot without waiting for 刷新二维码.
     expect(started).toEqual(["connection_pending"]);
     expect(owner.getSnapshot().authorization?.sessionId).toBe("sess-2");
+    release();
+    owner.dispose();
   });
 
   it("refuses to start a WeChat authorization for a bot on another platform", async () => {
@@ -462,6 +465,7 @@ describe("the 接入 IM owner", () => {
     });
 
     await owner.load();
+    const release = owner.startRefreshing();
     await owner.select("connection_pending");
     bound = true;
     await owner.readAuthorization();
@@ -469,6 +473,8 @@ describe("the 接入 IM owner", () => {
     expect(owner.getSnapshot().connections[0].state).toBe("bound");
     expect(owner.getSnapshot().authorization).toBeUndefined();
     expect(webuiChannelRows(owner.getSnapshot().connections)[0].stateLabel).toBe("已绑定");
+    release();
+    owner.dispose();
   });
 
   it("reports an expired scan on the card rather than as a bound bot", async () => {
@@ -483,11 +489,14 @@ describe("the 接入 IM owner", () => {
     });
 
     await owner.load();
+    const release = owner.startRefreshing();
     await owner.select("connection_pending");
     await owner.readAuthorization();
 
     expect(owner.getSnapshot().authorization?.status).toBe("expired");
     expect(webuiChannelRows(owner.getSnapshot().connections)[0].bound).toBe(false);
+    release();
+    owner.dispose();
   });
 
   it("unbinds one bot without removing it from the list", async () => {

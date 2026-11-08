@@ -35,17 +35,27 @@ directory it happens to sit in:
 The dependency rules and the role checks that enforce them are in `../architecture/boundaries.md`.
 
 Mini App readers declare catalogue or presentation interest to `miniapp-workflows.ts`.
-The owner shares listing reads and the observation clock; launcher interest requests periodic
+The owner uses one catalogue result per observation across listing readers and waiting views;
+launcher interest requests periodic
 freshness, while catalogue-only interest refreshes on acquisition and browser return. The provider
 binds visibility/focus facts once. Presentation interest waits for detached leases, reconciles open
-views, and ends automatic work on a stopped/refused state. Release and application disposal fence
-pending work. User open/stop commands have per-plugin operation revisions.
+views, and ends automatic work on a stopped/refused state. Reader release fences automatic work;
+application disposal fences all pending work, including a reconnect's first confirmation read before
+any grace timer is created. Explicit user commands survive reader release.
+`reconcileOpenPresentation` is the single open-state stop verdict, used by both interested-reader
+observation and explicit `syncPresentations` reconciliation. User open/stop commands have per-plugin
+operation revisions.
 
 `client/application/miniapp-presenter.ts` coordinates host presenter epochs, revisions, selection
 and asynchronous opening. The composition root constructs it; the shell binds navigation, history
 and workspace commands. A newer intent or released binding prevents an older task from showing a tab.
 The channel owner likewise owns pending authorization polling and shares it among open-pane readers;
-selection, replacement QR, last-reader release and disposal fence delayed authorization results.
+selection, replacement QR, last-reader release and disposal fence delayed automatic authorization
+results. Selection-based authorization starts only while its original pane observation interest is
+current. Remount reacquires only an unbound WeChat authorization that is absent; it preserves the
+selected bot's configuration/filter and performs no selection reload. Same-selection explicit reloads
+retain those fields until their answers arrive. Explicit QR refresh and add-bot commands survive
+observation release, while selection changes, newer commands and disposal still fence their results.
 
 ## Lifetime: one application, explicitly started
 

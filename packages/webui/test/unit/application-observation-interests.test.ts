@@ -29,6 +29,43 @@ function miniapp() {
 afterEach(() => { vi.useRealTimers(); });
 
 describe("Mini App reader interests (scripted capability, real owner)", () => {
+  it("reads one catalogue per observation while multiple inline views wait for leases", async () => {
+    vi.useFakeTimers();
+    const { owner, list, listing, open } = miniapp();
+    listing({ miniApps: [...catalogue(true).miniApps, { ...catalogue(true).miniApps[0]!, pluginId: "other" }] });
+    owner.acquirePresentation("app", false);
+    owner.acquirePresentation("other", false);
+    owner.acquireListing("launcher");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(list).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(list).toHaveBeenCalledTimes(3);
+    expect(open).not.toHaveBeenCalled();
+    owner.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("cannot create a reconnect grace timer when the first confirmation returns after disposal", async () => {
+    vi.useFakeTimers();
+    const { owner, list, listing, open } = miniapp();
+    await owner.open("app");
+    const newer = { miniApps: catalogue().miniApps.map((row) => ({ ...row, presentationRevision: 1 })) };
+    listing(newer);
+    await owner.loadListing();
+    const pending = deferred<WebuiMiniAppCatalogue>();
+    list.mockImplementationOnce(() => pending.promise);
+    const refreshing = owner.refreshInline("app");
+    owner.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+    pending.resolve(newer);
+    // Flush the delayed read without advancing timers: creating a grace timer is itself the defect.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(vi.getTimerCount()).toBe(0);
+    await refreshing;
+    expect(list).toHaveBeenCalledTimes(3);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
   it("shares launcher refreshes, preserves catalogue-only freshness, suspends and disposes", async () => {
     vi.useFakeTimers();
     const { owner, list } = miniapp();
@@ -205,6 +242,80 @@ const bot = (connectionId: string): WebuiChannelConnection => ({
 });
 
 describe("IM authorization observation (scripted capability, real owner)", () => {
+  it("retains a bound bot's configuration and filter across remount and a delayed same-selection refresh", async () => {
+    vi.useFakeTimers();
+    const configured = { configured: true };
+    const filter = { mode: "full" as const, includeToolSummary: true };
+    const configRead = vi.fn(async () => configured);
+    const filterRead = vi.fn(async () => filter);
+    const owner = createWebuiChannelOwner({ port: {
+      listChannelConnections: async () => ({ connections: [{ ...bot("a"), state: "bound", binding: { bindingId: "binding", externalId: "wechat:a" } }] }),
+      checkChannelConfig: configRead, getChannelMessageFilter: filterRead,
+    } });
+    await owner.load();
+    await owner.select("a");
+    const first = owner.startRefreshing();
+    await vi.advanceTimersByTimeAsync(0);
+    first();
+    const stable = owner.getSnapshot();
+    const delayed = deferred<{ configured: boolean }>();
+    configRead.mockImplementationOnce(() => delayed.promise);
+    const returned = owner.startRefreshing();
+    expect(owner.getSnapshot()).toBe(stable);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(configRead).toHaveBeenCalledTimes(1);
+    expect(filterRead).toHaveBeenCalledTimes(1);
+    const refreshing = owner.select("a");
+    expect(owner.getSnapshot().config).toBe(stable.config);
+    expect(owner.getSnapshot().filter).toBe(stable.filter);
+    delayed.resolve(configured);
+    await refreshing;
+    returned();
+    owner.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not start selection-based authorization after the last reader left during configuration loading", async () => {
+    vi.useFakeTimers();
+    const config = deferred<{ configured: boolean }>();
+    const start = vi.fn(async () => ({ ok: true, sessionId: "qr" }));
+    const owner = createWebuiChannelOwner({ port: {
+      listChannelConnections: async () => ({ connections: [bot("a")] }),
+      checkChannelConfig: () => config.promise, startChannelWechatBind: start,
+    } });
+    await owner.load();
+    const release = owner.startRefreshing();
+    const selecting = owner.select("a");
+    release();
+    config.resolve({ configured: true });
+    await selecting;
+    expect(start).not.toHaveBeenCalled();
+    expect(owner.getSnapshot().authorization).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+    const returned = owner.startRefreshing();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(owner.getSnapshot().authorization?.sessionId).toBe("qr");
+    returned();
+    owner.dispose();
+  });
+
+  it("settles an explicitly requested authorization refresh after its last observer leaves", async () => {
+    vi.useFakeTimers();
+    const { owner, start } = channel();
+    await owner.load();
+    const release = owner.startRefreshing();
+    await owner.select("a");
+    const pending = deferred<{ ok: boolean; sessionId: string }>();
+    start.mockImplementationOnce(() => pending.promise);
+    const requested = owner.refreshAuthorization("a");
+    release();
+    pending.resolve({ ok: true, sessionId: "explicit" });
+    expect(await requested).toEqual({ ok: true });
+    expect(owner.getSnapshot().authorization?.sessionId).toBe("explicit");
+    expect(vi.getTimerCount()).toBe(0);
+    owner.dispose();
+  });
   function channel() {
     const status = vi.fn(async () => ({ status: "pending" as "pending" | "confirmed" | "expired" | "error" }));
     const start = vi.fn(async () => ({ ok: true, sessionId: "qr" }));
@@ -271,8 +382,10 @@ describe("IM authorization observation (scripted capability, real owner)", () =>
   });
 
   it("does not let a late QR start select a bot after navigation", async () => {
+    vi.useFakeTimers();
     const { owner, start } = channel();
     await owner.load();
+    owner.startRefreshing();
     const pending = deferred<{ ok: boolean; sessionId: string }>();
     start.mockImplementationOnce(() => pending.promise);
     const old = owner.select("a");

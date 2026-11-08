@@ -250,7 +250,7 @@
     "features/transcript/ui/OutputError.public.tsx": "d06163796859c5cb",
     "features/transcript/ui/PlanDelivery.tsx": "c620e52a916f7af5",
     "features/transcript/ui/QuestionnaireResponse.tsx": "82fa9d9dd51ca51a",
-    "features/transcript/ui/SessionTranscript.tsx": "23e60edb0ed4d9c4",
+    "features/transcript/ui/SessionTranscript.tsx": "003f450b8b25dc40",
     "features/transcript/ui/Transcript.tsx": "410260aa5350a80d",
     "features/transcript/ui/TranscriptPrimitives.tsx": "710f935727950fee",
     "features/transcript/ui/TranscriptSkeletons.tsx": "cd9ed7922014279d",

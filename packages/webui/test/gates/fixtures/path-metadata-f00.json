@@ -607,6 +607,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/composer/application/queue-send-workflow.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "composer",
+      "home": "target"
+    },
+    {
       "path": "client/features/composer/application/turn-retry.ts",
       "layers": [
         "application"
@@ -2579,6 +2588,15 @@
     },
     {
       "path": "client/features/transcript/application/message-feedback.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "transcript",
+      "home": "target"
+    },
+    {
+      "path": "client/features/transcript/application/transcript-settlement.ts",
       "layers": [
         "application"
       ],

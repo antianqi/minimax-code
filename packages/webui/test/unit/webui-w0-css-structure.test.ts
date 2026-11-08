@@ -1227,6 +1227,77 @@ describe("the surfaces that own their own appearance", () => {
     expect(declaration(body.body, "overflow")).toBe("hidden");
   });
 
+  it("asks the shared shell for the room the terminal needs", () => {
+    // The window's capacity is the shell's named size, not a rule of the
+    // business's own. The terminal fits a fixed grid, and the ordinary wide
+    // dialog is a fifth narrower than it needs: the window used to be widened
+    // by rules that reached into the dialog's internals, and when those went
+    // the terminal quietly lost a quarter of its columns.
+    const dialogCss = readFileSync(path.join(stylesDir, "dialog.css"), "utf8");
+    const expanded = winning(".webui-dialog-surface--expanded", parseRules(dialogCss));
+    expect(declaration(expanded.body, "width")).toBe("min(1040px, calc(100vw - 48px))");
+    expect(declaration(expanded.body, "max-height")).toBe("min(860px, calc(100vh - 48px))");
+
+    // The terminal asks for that size by name.
+    const terminalView = readFileSync(
+      path.join(clientDir, "features/ssh/ui/ssh-terminal-view.tsx"),
+      "utf8",
+    );
+    expect(terminalView).toContain('width="expanded"');
+
+    // And the build keeps the rule: the shell composes the class from a
+    // template, so the stylesheet's component layer drops it unless the
+    // safelist names it.
+    const tailwindConfig = readFileSync(
+      path.resolve(clientDir, "../../tailwind.config.cjs"),
+      "utf8",
+    );
+    expect(tailwindConfig).toContain('"webui-dialog-surface--expanded"');
+  });
+
+  it("draws the window's chrome with the theme's tokens", () => {
+    // The chrome in the header sits on the shared frame, so it is drawn with
+    // the theme's tokens. The colours it used to carry were chosen for a
+    // dark frame of its own and read at 2.3:1 on the shared frame in the
+    // light theme.
+    const rules = parseRules(sshCss);
+    const status = winning(".webui-ssh-terminal-status", rules);
+    expect(declaration(status.body, "color")).toBe("var(--text_default_primary)");
+    expect(declaration(status.body, "border")).toBe("1px solid var(--border_default)");
+    expect(
+      declaration(winning(".webui-ssh-terminal-status.is-connected", rules).body, "background"),
+    ).toBe("var(--bg_status_positive)");
+    expect(
+      declaration(winning(".webui-ssh-terminal-status.is-error", rules).body, "background"),
+    ).toBe("var(--bg_status_error)");
+    const mark = winning(".webui-ssh-terminal-title-icon", rules);
+    expect(declaration(mark.body, "background")).toBe("var(--bg_grouped_tertiary)");
+    expect(declaration(mark.body, "color")).toBe("var(--icon_default_secondary)");
+    // No hardcoded ink is left in the chrome. The terminal's own surfaces
+    // keep theirs, and they are the ones that are dark on purpose.
+    for (const selector of [
+      ".webui-ssh-terminal-status",
+      ".webui-ssh-terminal-status.is-connected",
+      ".webui-ssh-terminal-status.is-error",
+      ".webui-ssh-terminal-title-icon",
+    ]) {
+      expect(declarationsForTargeting(selector, rules), selector).not.toMatch(
+        /#[0-9a-f]{3,8}\b/iu,
+      );
+    }
+  });
+
+  it("gives the row the keyboard is on a marker that can be seen", () => {
+    // Four percent of black on a white popup is 1.09:1 — a difference you
+    // can measure and not one you can see, and the keyboard is the only way
+    // into the list. The cursor carries the client's own focused-row marker.
+    const active = winning(".webui-select-menu-option.is-active");
+    expect(declaration(active.body, "background")).toBe("var(--bg_grouped_tertiary)");
+    expect(declaration(active.body, "box-shadow")).toBe(
+      "inset 0 0 0 2px var(--border_accent)",
+    );
+  });
+
   it("gives the diff rows the theme's text colour, not a hardcoded ink", () => {
     // The rows used to carry a hardcoded dark ink, which was readable on the
     // light theme's pale green and pale red and invisible on the dark

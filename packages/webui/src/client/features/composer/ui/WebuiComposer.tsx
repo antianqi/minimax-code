@@ -965,8 +965,8 @@ export function WebuiComposer({
                   />
                   <img
                     src="/assets/img/minimax-octopus-composer-poster.png"
-                    width={180}
-                    height={320}
+                    width={512}
+                    height={384}
                     className="block w-full"
                     alt=""
                     draggable="false"

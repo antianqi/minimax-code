@@ -38,9 +38,9 @@
   .webui-composer-mascot {
     position: absolute;
     z-index: 1;
-    top: -90px;
+    bottom: 100%;
     right: var(--spacing_24);
-    width: 60px;
+    width: var(--webui-composer-mascot-width, 100px);
     height: auto;
     pointer-events: none;
     user-select: none;

@@ -80,7 +80,7 @@ test("composer mascot keeps its corners transparent without video alpha support"
   expect(alpha).toEqual([0, 0, 0, 0]);
 });
 
-test("composer mascot plays the transparent octopus and respects reduced motion", async ({ page }) => {
+test("composer mascot plays the transparent octopus girl and respects reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openApp(page, "#session=A");
 
@@ -89,7 +89,7 @@ test("composer mascot plays the transparent octopus and respects reduced motion"
   await expect.poll(() => mascot.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
   expect(await mascot.evaluate((image) => image.currentSrc)).toMatch(/minimax-octopus-composer\.webp$/u);
   const firstFrame = await mascot.screenshot();
-  await expect.poll(async () => (await mascot.screenshot()).equals(firstFrame), { message: "the mascot animation advances" }).toBe(false);
+  await expect.poll(async () => (await mascot.screenshot()).equals(firstFrame), { message: "the mascot animation advances", intervals: [50] }).toBe(false);
   // The octopus lies on the input: it is anchored to the card's right edge at the
   // shared spacing, and its tentacles reach the input's top edge. That is the
   // placement the design asks for, and neither relation depends on the viewport —
@@ -110,10 +110,11 @@ test("composer mascot plays the transparent octopus and respects reduced motion"
       const mascotBox = image.getBoundingClientRect();
       const inputBox = input.getBoundingClientRect();
       const cardBox = card.getBoundingClientRect();
-      return { rightGap: cardBox.right - mascotBox.right, tentacleGap: inputBox.top - mascotBox.bottom };
+      return { rightGap: cardBox.right - mascotBox.right, tentacleGap: cardBox.top - mascotBox.bottom, inputGap: inputBox.top - mascotBox.bottom };
     });
     rightGaps.push(Math.round(geometry.rightGap));
     tentacleGaps.push(Math.round(geometry.tentacleGap));
+    expect(geometry.inputGap).toBeGreaterThan(0);
   }
   // Anchored to the right edge: the gap is the same at every width, and it is the
   // shared 24px spacing plus the card's own border. A mascot placed relative to the
@@ -121,11 +122,9 @@ test("composer mascot plays the transparent octopus and respects reduced motion"
   expect(Math.max(...rightGaps) - Math.min(...rightGaps), JSON.stringify(rightGaps)).toBeLessThanOrEqual(1);
   expect(rightGaps[0], JSON.stringify(rightGaps)).toBeGreaterThanOrEqual(20);
   expect(rightGaps[0], JSON.stringify(rightGaps)).toBeLessThanOrEqual(32);
-  // The tentacles rest on the input's top edge: a few pixels onto it, not floating
-  // above the card and not sitting over the text.
+  // The character rests on the card's top edge and stays clear of the text field.
   expect(Math.max(...tentacleGaps) - Math.min(...tentacleGaps), JSON.stringify(tentacleGaps)).toBeLessThanOrEqual(1);
-  expect(tentacleGaps[0], JSON.stringify(tentacleGaps)).toBeGreaterThanOrEqual(-12);
-  expect(tentacleGaps[0], JSON.stringify(tentacleGaps)).toBeLessThanOrEqual(0);
+  expect(Math.abs(tentacleGaps[0]), JSON.stringify(tentacleGaps)).toBeLessThanOrEqual(1);
   const alpha = await mascot.evaluate((image) => {
     const canvas = document.createElement("canvas");
     canvas.width = image.naturalWidth;
@@ -138,6 +137,10 @@ test("composer mascot plays the transparent octopus and respects reduced motion"
   expect(alpha).toBe(0);
   if (process.env.WEBUI_COMPOSER_MASCOT_SCREENSHOT) {
     await page.screenshot({ path: process.env.WEBUI_COMPOSER_MASCOT_SCREENSHOT, fullPage: true });
+    await page.evaluate(() => {
+      document.documentElement.classList.replace("light", "dark");
+    });
+    await page.screenshot({ path: `${process.env.WEBUI_COMPOSER_MASCOT_SCREENSHOT}.dark.png`, fullPage: true });
   }
 
   await page.emulateMedia({ reducedMotion: "reduce" });

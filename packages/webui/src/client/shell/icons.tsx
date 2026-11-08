@@ -50,7 +50,7 @@ export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
   return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;
 }
 export function WebuiIconHomeBrand({ className }: WebuiIconProps): ReactElement {
-  return <img src="/assets/img/minimax-octopus-home.png" alt="" aria-hidden="true" className={className} />;
+  return <img src="/assets/img/minimax-octopus-girl-home.png" alt="" aria-hidden="true" className={className} style={{ clipPath: "circle(44% at 50% 50%)", transform: "scale(1.14)" }} />;
 }
 export function WebuiIconAgent({ className }: WebuiIconProps): ReactElement {
   return <img src="/assets/img/minimax-code-agent-icon.png" alt="" aria-hidden="true" className={className} />;

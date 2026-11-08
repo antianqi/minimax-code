@@ -160,5 +160,29 @@ test("goal title stays by the leading status and actions clear the composer masc
     };
   });
   expect(geometry.title.x - geometry.leading.right).toBeLessThanOrEqual(48);
-  expect(geometry.actions.right).toBeLessThanOrEqual(geometry.mascot.x);
+  expect(geometry.actions.bottom <= geometry.mascot.y || geometry.actions.right <= geometry.mascot.x).toBe(true);
+  if (process.env.WEBUI_GOAL_MASCOT_SCREENSHOT) {
+    await page.screenshot({ path: process.env.WEBUI_GOAL_MASCOT_SCREENSHOT });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.getByTestId("thread-goal-banner").evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.width >= 250;
+  })).toBe(true);
+  const narrow = await page.evaluate(() => {
+    const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+    return {
+      banner: rect('[data-testid="thread-goal-banner"]'),
+      usage: rect('[data-testid="thread-goal-usage"]'),
+      actions: rect('[data-testid="thread-goal-banner-actions-slot"]'),
+      mascot: rect('.webui-composer-mascot'),
+    };
+  });
+  expect(narrow.usage.left).toBeGreaterThanOrEqual(narrow.banner.left);
+  expect(narrow.actions.right).toBeLessThanOrEqual(narrow.banner.right);
+  expect(narrow.actions.bottom <= narrow.mascot.top || narrow.actions.right <= narrow.mascot.left).toBe(true);
+  if (process.env.WEBUI_GOAL_MASCOT_SCREENSHOT) {
+    await page.screenshot({ path: `${process.env.WEBUI_GOAL_MASCOT_SCREENSHOT}.narrow.png` });
+  }
 });

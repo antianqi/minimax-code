@@ -2,6 +2,9 @@
 @layer components {
 
   .webui-session-layout .webui-goal-composer-panel {
+    --webui-composer-mascot-width: 100px;
+    container-type: inline-size;
+    container-name: webui-goal-composer;
     width: 100%;
     max-width: 768px;
     border-radius: 24px 24px 20px 20px;
@@ -150,9 +153,30 @@
   .webui-goal-banner-actions-slot {
     flex: none;
     gap: var(--spacing_4);
-    /* Keep the icon actions left of the composer mascot (60px + its 24px inset). */
-    margin-right: calc(60px + var(--spacing_24));
+    /* Reserve the same width and right inset as the composer mascot. */
+    margin-right: calc(var(--webui-composer-mascot-width, 100px) + var(--spacing_24));
     padding: 8px 0 0 8px;
+  }
+
+  @container webui-goal-composer (max-width: 600px) {
+    .webui-session-layout .webui-goal-composer-panel > .webui-goal-banner {
+      padding-bottom: 80px;
+    }
+    .webui-goal-banner-actions-slot {
+      margin-right: 0;
+    }
+  }
+
+  @container webui-goal-composer (max-width: 360px) {
+    .webui-goal-banner-row {
+      flex-wrap: wrap;
+    }
+    .webui-goal-banner-content-row {
+      min-width: 150px;
+    }
+    .webui-goal-banner-actions-slot {
+      margin-left: auto;
+    }
   }
 
   /* The icon-only control is the shared contract (styles/button.css); what is

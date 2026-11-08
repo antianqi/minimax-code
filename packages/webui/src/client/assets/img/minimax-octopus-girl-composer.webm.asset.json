@@ -1,0 +1,6 @@
+{
+  "source": "AI-edited chibi octopus girl keyframes based on the existing composer poster and the user's eye reference image",
+  "destination": "minimax-octopus-girl-composer.webm",
+  "description": "Transparent VP9 version of the composer octopus girl animation. The browser uses the matching animated WebP to avoid video alpha decoding differences.",
+  "conversion": "Interpolate open-eye and closed-eye keyframes with RIFE v4.6; composite only the feathered eye region over the fixed open-eye keyframe, preserving its alpha; schedule 158 frames at 24fps and encode with ffmpeg libvpx-vp9 yuva420p."
+}

@@ -11,7 +11,7 @@ import {
   buildSshArgs,
   SSH_DIRECTORY_MARKER,
 } from "./command.js";
-import type { SshAskpassService } from "./askpass.js";
+import type { SshAuthentication } from "./authentication.js";
 import type { SshConnectionRepository } from "./connection-repository.js";
 import type { SshCredentialStore } from "./credentials.js";
 import type { SshProjectRepository } from "./project-repository.js";
@@ -49,7 +49,8 @@ export interface SshProjectServiceOptions {
   readonly connections: SshConnectionRepository;
   readonly transport: SshTransport;
   readonly credentials: SshCredentialStore;
-  readonly askpass?: SshAskpassService;
+  /** Which authentication each listing uses, and whether a password can be delivered at all. */
+  readonly authentication: SshAuthentication;
 }
 
 const LISTING_TIMEOUT_MS = 30_000;
@@ -126,14 +127,30 @@ export function createSshProjectService(options: SshProjectServiceOptions): SshP
           error: "invalid_input",
         };
       }
-      const password = options.credentials.get(hostAlias);
-      const args = buildSshArgs(connection.endpoint, { password: password !== undefined });
-      const env = password !== undefined ? options.askpass?.envFor(hostAlias) : undefined;
+      const mode = options.authentication.modeFor(hostAlias);
+      if (mode.kind === "unavailable") {
+        return {
+          alias: hostAlias,
+          path: requestedPath,
+          entries: [],
+          status: "probe_failed",
+          error: `密码登录不可用：${mode.reason}`,
+        };
+      }
+      const args = buildSshArgs(connection.endpoint, { password: mode.kind === "password" });
+      const env = mode.kind === "password" ? mode.env : undefined;
       const result = await options.transport.run(
         [...args, buildRemoteDirectoryListCommand(requestedPath)],
         env ? { env, timeoutMs: LISTING_TIMEOUT_MS } : { timeoutMs: LISTING_TIMEOUT_MS },
       );
-      return readDirectoryListing(hostAlias, requestedPath, result.stdout, result.stderr, result, password);
+      return readDirectoryListing(
+        hostAlias,
+        requestedPath,
+        result.stdout,
+        result.stderr,
+        result,
+        options.credentials.get(hostAlias),
+      );
     },
   };
 }

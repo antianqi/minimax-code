@@ -25,13 +25,13 @@ export function createSshHandlerEntries(
   port: WebuiOperationPort,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const watchSshTerminal: DedicatedHandler<typeof watchSshTerminalOperation> = async (
-    _context,
+    context,
     body,
   ) => ({
     // The adapter answers with the envelope itself — a source of frames, or a
     // structured refusal when this host cannot host the terminal. Passing it
     // through unchanged keeps that refusal a refusal instead of an empty stream.
-    stream: await port.watchSshTerminal(body),
+    stream: await port.watchSshTerminal(body, context.signal),
   });
 
   return new Map([

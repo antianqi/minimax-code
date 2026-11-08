@@ -3,11 +3,19 @@
 // A project is a folder on a remote machine: which host it lives on, which path, and the name it
 // is shown under. The store is separate from the host store, so removing a host can name the
 // projects that went with it — the answer the browser shows after a removal.
+//
+// Like the host store, every change is a transaction over the file (see `storage.ts`), and an
+// unreadable document is refused rather than treated as an empty list.
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { SshRuntimeError } from "./errors.js";
-import { SSH_STORE_VERSION, readJsonStore, writeJsonStore } from "./storage.js";
+import {
+  createSshStore,
+  storeUnavailableError,
+  type SshStoreChange,
+  type SshStoreRead,
+} from "./storage.js";
 import type { SshProjectRecord } from "./types.js";
 
 interface StoredProject {
@@ -15,12 +23,6 @@ interface StoredProject {
   readonly alias: string;
   readonly path: string;
   readonly displayName: string;
-}
-
-interface StoredProjects {
-  readonly version: number;
-  readonly revision: number;
-  readonly projects: readonly StoredProject[];
 }
 
 export interface SshProjectRepository {
@@ -38,70 +40,73 @@ export interface SshProjectRepository {
 }
 
 export function createSshProjectRepository(filePath: string): SshProjectRepository {
-  const readStore = async (): Promise<StoredProjects> => {
-    const stored = await readJsonStore<StoredProjects>(filePath);
-    if (!stored || stored.version !== SSH_STORE_VERSION || !Array.isArray(stored.projects)) {
-      return { version: SSH_STORE_VERSION, revision: 0, projects: [] };
-    }
-    return {
-      version: stored.version,
-      revision: typeof stored.revision === "number" ? stored.revision : 0,
-      projects: stored.projects.filter(isStoredProject),
-    };
+  const store = createSshStore<readonly StoredProject[]>(filePath, {
+    member: "projects",
+    read: readStoredProjects,
+  });
+
+  const committed = async (): Promise<readonly StoredProject[]> => {
+    const read = await store.read();
+    if (read.kind === "unusable") throw storeUnavailableError(filePath, read);
+    return read.kind === "usable" ? read.value : [];
   };
 
-  const writeStore = async (projects: readonly StoredProject[]): Promise<void> => {
-    const store = await readStore();
-    await writeJsonStore(filePath, {
-      version: SSH_STORE_VERSION,
-      revision: store.revision + 1,
-      projects,
-    } satisfies StoredProjects);
-  };
+  const current = (read: SshStoreRead<readonly StoredProject[]>): readonly StoredProject[] =>
+    read.kind === "usable" ? read.value : [];
 
   return {
     async list() {
-      const store = await readStore();
-      return store.projects.map(toRecord);
+      return (await committed()).map(toRecord);
     },
 
     async get(id) {
-      const store = await readStore();
-      const found = store.projects.find((project) => project.id === id);
+      const found = (await committed()).find((project) => project.id === id);
       return found ? toRecord(found) : undefined;
     },
 
     async save(record) {
-      const store = await readStore();
-      const id = record.id ?? `ssh-project-${randomUUID()}`;
       const stored: StoredProject = {
-        id,
+        id: record.id ?? `ssh-project-${randomUUID()}`,
         alias: record.alias,
         path: record.path,
         displayName: record.displayName,
       };
-      const projects = [
-        ...store.projects.filter((project) => project.id !== id),
-        stored,
-      ];
-      await writeStore(projects);
-      return toRecord(stored);
+      const { result } = await store.transact(
+        (read): SshStoreChange<readonly StoredProject[], SshProjectRecord> => ({
+          kind: "commit",
+          value: [...current(read).filter((project) => project.id !== stored.id), stored],
+          result: toRecord(stored),
+        }),
+      );
+      return result;
     },
 
     async remove(id) {
-      const store = await readStore();
-      const projects = store.projects.filter((project) => project.id !== id);
-      if (projects.length === store.projects.length) return false;
-      await writeStore(projects);
-      return true;
+      const { result } = await store.transact(
+        (read): SshStoreChange<readonly StoredProject[], boolean> => {
+          const projects = current(read);
+          const remaining = projects.filter((project) => project.id !== id);
+          if (remaining.length === projects.length) return { kind: "keep", result: false };
+          return { kind: "commit", value: remaining, result: true };
+        },
+      );
+      return result;
     },
 
     async removeByHost(alias) {
-      const store = await readStore();
-      const removed = store.projects.filter((project) => project.alias === alias);
-      if (removed.length === 0) return [];
-      await writeStore(store.projects.filter((project) => project.alias !== alias));
-      return removed.map((project) => project.id);
+      const { result } = await store.transact(
+        (read): SshStoreChange<readonly StoredProject[], readonly string[]> => {
+          const projects = current(read);
+          const removed = projects.filter((project) => project.alias === alias);
+          if (removed.length === 0) return { kind: "keep", result: [] };
+          return {
+            kind: "commit",
+            value: projects.filter((project) => project.alias !== alias),
+            result: removed.map((project) => project.id),
+          };
+        },
+      );
+      return result;
     },
   };
 }
@@ -120,15 +125,35 @@ function toRecord(stored: StoredProject): SshProjectRecord {
   };
 }
 
-function isStoredProject(value: unknown): value is StoredProject {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.id === "string" &&
-    typeof record.alias === "string" &&
-    typeof record.path === "string" &&
-    typeof record.displayName === "string"
-  );
+/**
+ * The committed project records, validated field by field.
+ *
+ * Every field is required here: a project without its host, its path or its name cannot be shown
+ * and cannot be removed by the thing that names it, which is why one refusal for the whole
+ * document is better than a filtered list.
+ */
+function readStoredProjects(
+  value: unknown,
+): { readonly ok: true; readonly value: readonly StoredProject[] } | { readonly ok: false; readonly detail: string } {
+  const projects: StoredProject[] = [];
+  for (const [index, entry] of (value as readonly unknown[]).entries()) {
+    if (typeof entry !== "object" || entry === null) {
+      return { ok: false, detail: `第 ${index + 1} 条项目记录不是对象` };
+    }
+    const record = entry as Record<string, unknown>;
+    for (const key of ["id", "alias", "path", "displayName"] as const) {
+      if (typeof record[key] !== "string" || record[key] === "") {
+        return { ok: false, detail: `第 ${index + 1} 条项目记录缺少 ${key}` };
+      }
+    }
+    projects.push({
+      id: record.id as string,
+      alias: record.alias as string,
+      path: record.path as string,
+      displayName: record.displayName as string,
+    });
+  }
+  return { ok: true, value: projects };
 }
 
 /** The project-not-found failure, so the service and the terminal say it the same way. */

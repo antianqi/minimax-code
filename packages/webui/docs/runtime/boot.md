@@ -48,12 +48,28 @@ into one error or an `AggregateError` labelled "WebUI runtime startup failed".
 
 ## Close order
 
-`lifecycle.ts` is the single owner of `close()`, idempotent, and runs:
+`lifecycle.ts` is the single owner of `close()`, idempotent. Process resources registered through
+`registerShutdownResource` (including the lazy remote-control owner) are released before the following
+host/auth sequence. Every registered release is attempted
+even when a peer release fails. Harness adapters used without the assembly retain the same release
+authority in their port's `close()`.
 
 1. auth teardown (stops the watch, clears the refresh timer),
 2. the harness host,
 3. the mcode-tools broker,
 4. the externally supplied browser provider.
+
+The SSH repositories serialize read/transform/commit under a cross-process, heartbeat-renewed
+`proper-lockfile` lease, then atomically rename the committed JSON. Missing files mean an empty
+store; malformed JSON, unsupported versions, invalid records and read failures refuse both reads
+and mutations while preserving the original file. Probe commits compare the endpoint and the
+captured store revision under that same transaction. A changed host list invalidates the verdict,
+including deletion followed by recreation with the same endpoint; the existing JSON format is
+unchanged. A concurrent change to another host can conservatively invalidate a probe too.
+
+SSH password delivery is an explicit authentication capability shared by probes, directory listing
+and terminals. If askpass cannot start, key authentication remains available; password saves fail
+with `credential_unavailable` and the original failure message before staging or spawning.
 
 Every failure is collected and rethrown as one error or an `AggregateError`. The pre-host startup
 path runs the same owners minus the host. A page unsubscribe never reaches this: closing a browser

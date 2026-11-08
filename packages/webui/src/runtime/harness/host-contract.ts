@@ -724,6 +724,8 @@ export interface WebuiRuntimeCliService {
 }
 
 export interface WebuiRuntimeHostHandle {
+  /** Register a process resource with the assembly's close owner. */
+  readonly registerShutdownResource?: (dispose: () => Promise<void>) => void;
   readonly apiHost: { close(): Promise<void> };
   readonly appVersion?: string;
   readonly dataDir?: string;

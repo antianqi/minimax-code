@@ -15,7 +15,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SSH_PROBE_MARKER } from "../../src/runtime/ssh/command.js";
 import { createSshRuntime } from "../../src/runtime/ssh/index.js";
@@ -75,6 +75,84 @@ function syntheticDiscovery(alias: string): SshDiscoveryDependencies {
 }
 
 describe("the saved host's state", () => {
+  it("claims the probe slot before either concurrent call can finish its first read", async () => {
+    const { transport } = switchableTransport();
+    const runtime = await createSshRuntime({ dataDir: temporaryDataDir(), transport });
+    let complete!: (value: Awaited<ReturnType<SshTransport["run"]>>) => void;
+    let started!: () => void;
+    try {
+      await runtime.connections.save({ alias: "build", endpoint: { kind: "manual", host: "example.com" } });
+      const entered = new Promise<void>((resolve) => { started = resolve; });
+      transport.run = vi.fn(() => {
+        started();
+        return new Promise<Awaited<ReturnType<SshTransport["run"]>>>((resolve) => { complete = resolve; });
+      });
+      const first = runtime.connections.probe("build");
+      const second = runtime.connections.probe("build");
+      await entered;
+      expect(await second).toEqual({ alias: "build", status: "failed", detail: "这个主机的探测正在进行中。" });
+      expect(transport.run).toHaveBeenCalledTimes(1);
+      complete({ stdout: SSH_PROBE_MARKER, stderr: "", code: 0, timedOut: false });
+      expect((await first).status).toBe("connected");
+    } finally { await runtime.dispose(); }
+  });
+  it.each(["disable", "remove", "edit", "recreate"] as const)("rejects a probe completion after %s", async (change) => {
+    const { transport } = switchableTransport();
+    const runtime = await createSshRuntime({ dataDir: temporaryDataDir(), transport });
+    try {
+      await runtime.connections.save({ alias: "build", endpoint: { kind: "manual", host: "old.example" } });
+      let complete!: (value: Awaited<ReturnType<SshTransport["run"]>>) => void;
+      let started!: () => void;
+      const entered = new Promise<void>((resolve) => { started = resolve; });
+      transport.run = vi.fn(() => { started(); return new Promise<Awaited<ReturnType<SshTransport["run"]>>>((resolve) => { complete = resolve; }); });
+      const pending = runtime.connections.probe("build");
+      await entered;
+      const duplicate = await runtime.connections.probe("build");
+      expect(duplicate.status).toBe("failed");
+      expect(transport.run).toHaveBeenCalledTimes(1);
+      if (change === "disable") await runtime.connections.setEnabled("build", false);
+      if (change === "remove" || change === "recreate") await runtime.connections.remove("build");
+      if (change === "edit" || change === "recreate") {
+        await runtime.connections.save({ alias: "build", displayName: "New identity", endpoint: { kind: "manual", host: change === "edit" ? "new.example" : "old.example" } });
+      }
+      complete({ stdout: `${SSH_PROBE_MARKER}\nhostname=old\n`, stderr: "", code: 0, timedOut: false });
+      expect((await pending).status).toBe(change === "disable" ? "disabled" : "failed");
+      const records = await runtime.connections.list();
+      if (change === "remove") expect(records).toEqual([]);
+      else {
+        expect(records).toHaveLength(1);
+        expect(records[0]?.status).not.toBe("connected");
+        if (change === "disable") expect(records[0]?.enabled).toBe(false);
+        else {
+          expect(records[0]?.displayName).toBe("New identity");
+          expect(records[0]?.endpoint.host).toBe(change === "edit" ? "new.example" : "old.example");
+        }
+      }
+    } finally { await runtime.dispose(); }
+  });
+
+  it("preserves askpass failure and keeps key auth usable without password-only spawns", async () => {
+    const { transport } = switchableTransport();
+    const run = vi.spyOn(transport, "run");
+    const spawn = vi.spyOn(transport, "spawnTerminal");
+    const runtime = await createSshRuntime({
+      dataDir: temporaryDataDir(), transport,
+      createAskpass: async () => { throw new Error("synthetic askpass permission denied"); },
+    });
+    try {
+      await expect(runtime.connections.save({ alias: "build", endpoint: { kind: "manual", host: "example.com" }, password: "synthetic-password" })).rejects.toMatchObject({ code: "credential_unavailable", message: "synthetic askpass permission denied" });
+      expect(run).not.toHaveBeenCalled();
+      expect(await runtime.connections.list()).toEqual([]);
+      await runtime.connections.save({ alias: "build", endpoint: { kind: "manual", host: "example.com" } });
+      await runtime.projects.listDirectories("build", "/");
+      await runtime.terminals.open({ alias: "build" });
+      expect(spawn).toHaveBeenCalledTimes(1);
+      for (const [args] of [...run.mock.calls, ...spawn.mock.calls]) {
+        expect(args).not.toContain("PubkeyAuthentication=no");
+        expect(args).toContain("BatchMode=yes");
+      }
+    } finally { await runtime.dispose(); }
+  });
   it("writes the verdict of a probe back to the record", async () => {
     const { transport, reachable } = switchableTransport();
     const runtime = await createSshRuntime({ dataDir: temporaryDataDir(), transport });

@@ -127,7 +127,8 @@ export interface WebuiRemoteControlOptions {
 /** The nine operations, as the harness adapter forwards them. */
 export interface WebuiRemoteControlController {
   readonly getStatus: () => Promise<WebuiRemoteControlStatus>;
-  readonly watchStatus: () => Promise<WebuiWatchRemoteControlResult>;
+  readonly watchStatus: (signal?: AbortSignal) => Promise<WebuiWatchRemoteControlResult>;
+  readonly dispose: () => Promise<void>;
   readonly connect: (
     request: WebuiRemoteControlConnectRequest,
   ) => Promise<WebuiRemoteControlConnectResult>;
@@ -169,6 +170,10 @@ export function createWebuiRemoteControl(
     });
   const host = options.host;
   let proxy: RemoteControlProxy | undefined;
+  const lifetime = new AbortController();
+  let unsubscribeStatus: (() => void) | undefined;
+  let disposing: Promise<void> | undefined;
+  const requireOpen = (): void => lifetime.signal.throwIfAborted();
   const subscribers = new Set<(event: WebuiRemoteControlEvent) => void>();
 
   const deviceId = (): string => {
@@ -225,7 +230,9 @@ export function createWebuiRemoteControl(
   const refreshBinding = async (guard?: () => boolean): Promise<boolean> => {
     try {
       await credential.refresh();
-      const info = await pairingClient().getBinding();
+      requireOpen();
+      const info = await pairingClient().getBinding(lifetime.signal);
+      requireOpen();
       if (info.state === "bound" && info.ticket && info.endpoint && info.binding_id !== undefined) {
         if (guard && !guard()) {
           logger.info("[rc.owner] a pairing is in progress; the binding refresh stood down");
@@ -261,7 +268,10 @@ export function createWebuiRemoteControl(
       appVersion: host.appVersion ?? "webui",
       credential,
       logger,
-      ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      fetchImpl: (input, init) => (options.fetchImpl ?? fetch)(input, {
+        ...init,
+        signal: init?.signal ? AbortSignal.any([init.signal, lifetime.signal]) : lifetime.signal,
+      }),
       ...(options.getDeviceName ? { getDeviceName: options.getDeviceName } : {}),
     });
 
@@ -272,6 +282,7 @@ export function createWebuiRemoteControl(
   };
 
   const ensureProxy = (): RemoteControlProxy => {
+    requireOpen();
     if (proxy) return proxy;
     const service = cliService();
     const store = identityStore();
@@ -310,8 +321,7 @@ export function createWebuiRemoteControl(
       ...(options.wsFactory ? { wsFactory: options.wsFactory } : {}),
       ...(options.pollIntervalMs === undefined ? {} : { pollIntervalMs: options.pollIntervalMs }),
     });
-    // The proxy lives for as long as the service does, so the subscription is never released.
-    proxy.onStatusChange((status) => {
+    unsubscribeStatus = proxy.onStatusChange((status) => {
       emit({
         type: "status",
         status: toWebuiStatus(status, deviceId(), deviceName()),
@@ -372,7 +382,7 @@ export function createWebuiRemoteControl(
   let watchTimer: NodeJS.Timeout | undefined;
   let watching = false;
   const watchBinding = async (): Promise<void> => {
-    if (watching) return;
+    if (watching || lifetime.signal.aborted) return;
     watching = true;
     try {
       const current = ensureProxy().getStatus();
@@ -380,7 +390,9 @@ export function createWebuiRemoteControl(
       // The watcher is the first thing this service does with the credential,
       // so it reads it before it asks anything of the server.
       await credential.refresh();
-      const info = await pairingClient().getBinding();
+      requireOpen();
+      const info = await pairingClient().getBinding(lifetime.signal);
+      requireOpen();
       if (info.state !== "bound" || info.binding_id === undefined) return;
       if (!info.ticket || !info.endpoint) return;
       const inUse = identityStore().ensure().binding_id;
@@ -408,6 +420,7 @@ export function createWebuiRemoteControl(
         );
         await ensureProxy().disconnect({ unbind: false });
       }
+      requireOpen();
       await ensureProxy().connect();
     } catch (error) {
       logger.warn(
@@ -434,11 +447,22 @@ export function createWebuiRemoteControl(
     );
 
   return {
+    dispose() {
+      if (disposing) return disposing;
+      lifetime.abort();
+      if (watchTimer) clearInterval(watchTimer);
+      watchTimer = undefined;
+      unsubscribeStatus?.();
+      unsubscribeStatus = undefined;
+      subscribers.clear();
+      disposing = proxy?.disconnect({ unbind: false }) ?? Promise.resolve();
+      return disposing;
+    },
     async getStatus() {
       return status();
     },
 
-    async watchStatus(): Promise<WebuiWatchRemoteControlResult> {
+    async watchStatus(signal?: AbortSignal): Promise<WebuiWatchRemoteControlResult> {
       try {
         ensureProxy();
       } catch (error) {
@@ -454,6 +478,8 @@ export function createWebuiRemoteControl(
         };
       }
       const source = (async function* (): AsyncIterable<WebuiRemoteControlEvent> {
+        const observation = AbortSignal.any([lifetime.signal, ...(signal ? [signal] : [])]);
+        if (observation.aborted) return;
         // The stream has two producers: the bridge's status changes and the
         // runtime's permission questions. The status changes arrive through the
         // owner's fan-out, so they land in a queue; the permission questions
@@ -477,6 +503,12 @@ export function createWebuiRemoteControl(
         // would wait for an iteration that may never finish, and a stream that
         // cannot be closed is a stream that leaks its subscription.
         const permissionController = new AbortController();
+        const stop = (): void => {
+          permissionController.abort();
+          subscribers.delete(push);
+          wake?.();
+        };
+        observation.addEventListener("abort", stop, { once: true });
         const permissions = watchPermissionQuestions(
           cliService(),
           permissionController.signal,
@@ -486,7 +518,7 @@ export function createWebuiRemoteControl(
           // The first frame is the snapshot, so a browser that opens the tab late still learns
           // the current phase without asking for it separately.
           yield { type: "status", status: status() };
-          for (;;) {
+          while (!observation.aborted) {
             if (queue.length > 0) {
               yield queue.shift()!;
               continue;
@@ -507,6 +539,7 @@ export function createWebuiRemoteControl(
             pendingPermission = permissions.next();
           }
         } finally {
+          observation.removeEventListener("abort", stop);
           subscribers.delete(push);
           wake?.();
           permissionController.abort();
@@ -523,6 +556,7 @@ export function createWebuiRemoteControl(
         // account credential. It is read here, not captured: the lease is
         // refreshed in place and a captured token is a token that expires.
         await credential.refresh();
+        requireOpen();
         if (request.requestCode === true) {
           return toWebuiConnectResult(await bridge.requestPairingCode());
         }
@@ -548,6 +582,7 @@ export function createWebuiRemoteControl(
       try {
         // The unbind is an archon_biz request, so it needs the same bearer.
         if (request.unbind === true) await credential.refresh();
+        requireOpen();
         await bridge.disconnect({ unbind: request.unbind === true });
         return { success: true };
       } catch (error) {
@@ -615,6 +650,7 @@ export function createWebuiRemoteControl(
       const bridge = ensureProxy();
       try {
         bridge.resolveProducerUnbind(
+          request.requestId,
           request.confirmed ? "confirmed" : "rejected",
           request.confirmed ? "the browser confirmed the unbind" : "the browser rejected the unbind",
         );
@@ -658,6 +694,7 @@ async function* watchPermissionQuestions(
   // while the runtime's event iterator is still waiting for its next event.
   const stop = (): void => controller.abort();
   signal?.addEventListener("abort", stop, { once: true });
+  if (signal?.aborted) controller.abort();
   try {
     for await (const event of cliService.watchEvents(controller.signal)) {
       if (event.type !== "permission.ask") continue;

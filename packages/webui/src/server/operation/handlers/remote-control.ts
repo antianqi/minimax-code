@@ -26,11 +26,11 @@ export function createRemoteControlHandlerEntries(
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const watchRemoteControlStatus: DedicatedHandler<
     typeof watchRemoteControlStatusOperation
-  > = async (_context, _body) => ({
+  > = async (context, _body) => ({
     // The adapter answers with the envelope itself — a source of frames, or a structured refusal
     // when this host cannot hold the phone link. Passing it through unchanged keeps that refusal a
     // refusal instead of an empty stream.
-    stream: await port.watchRemoteControlStatus(),
+    stream: await port.watchRemoteControlStatus(context.signal),
   });
 
   return new Map([

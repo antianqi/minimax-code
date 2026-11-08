@@ -530,4 +530,79 @@ describe("what an edit puts on the wire", () => {
       schedule: { kind: "recurring", expression: "*/5 * * * *" },
     });
   });
+
+  it("keeps a schedule's time zone and run cap when its time changes", () => {
+    const existing = {
+      ...task(),
+      schedule: {
+        kind: "recurring" as const,
+        expression: "0 9 * * *",
+        timezone: "Asia/Shanghai",
+        maxRuns: 12,
+      },
+    };
+    const initial = webuiCronDraftFromTask(existing);
+    const built = webuiCronUpdateRequest(
+      { ...initial, preset: "daily", time: "18:30" },
+      initial,
+      existing,
+      0,
+    );
+
+    // The form shows neither field, so rebuilding the schedule from it alone
+    // used to drop both: the task silently lost its zone and its run cap.
+    expect(built.ok && built.request.schedule).toEqual({
+      kind: "recurring",
+      expression: "30 18 * * *",
+      timezone: "Asia/Shanghai",
+      maxRuns: 12,
+    });
+  });
+
+  it("does not invent a zone for a task that never had one", () => {
+    const existing = task();
+    const initial = webuiCronDraftFromTask(existing);
+    const built = webuiCronUpdateRequest(
+      { ...initial, preset: "weekly", weekday: "5", time: "07:15" },
+      initial,
+      existing,
+      0,
+    );
+
+    expect(initial.retainedSchedule).toBeUndefined();
+    expect(built.ok && built.request.schedule).toEqual({
+      kind: "recurring",
+      expression: "15 7 * * 5",
+    });
+  });
+
+  it("clears a populated model and project instead of omitting them", () => {
+    const existing = { ...task(), model: "minimax/m3", project: "/work/app" };
+    const initial = webuiCronDraftFromTask(existing);
+    const built = webuiCronUpdateRequest(
+      { ...initial, model: "", project: "  " },
+      initial,
+      existing,
+      0,
+    );
+
+    // An omitted field means "leave it" on this wire, so a blank field that was
+    // dropped left the old model and project in place: clearing did nothing.
+    expect(built.ok && built.request.model).toBeNull();
+    expect(built.ok && built.request.project).toBeNull();
+  });
+
+  it("sends the model and project it still shows", () => {
+    const existing = { ...task(), model: "minimax/m3", project: "/work/app" };
+    const initial = webuiCronDraftFromTask(existing);
+    const built = webuiCronUpdateRequest(
+      { ...initial, model: " minimax/m2 ", project: "/work/other" },
+      initial,
+      existing,
+      0,
+    );
+
+    expect(built.ok && built.request.model).toBe("minimax/m2");
+    expect(built.ok && built.request.project).toBe("/work/other");
+  });
 });

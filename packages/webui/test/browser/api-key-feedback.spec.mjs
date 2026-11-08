@@ -201,4 +201,3 @@ test("the same answer again is given the full time again", async ({ page }) => {
   // countdown started again with the second answer.
   await expect(keyResultToast(page)).toHaveCount(1);
 });
-

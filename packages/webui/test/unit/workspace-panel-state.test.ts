@@ -5,8 +5,9 @@ import {
 } from "../../src/client/features/workspace/application/workspace-panel-owner.js";
 import { parseWebuiMessageFileReference } from "../../src/client/features/transcript/projection/message-file-reference.js";
 import { WebuiMarkdown } from "../../src/client/features/transcript/ui/markdown.public.js";
-import { mergeWorkspaceFileChildren, WebuiFilePreview } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
-import { webuiFileLanguage } from "../../src/client/features/workspace/projection/panel-projection.js";
+import { mergeWorkspaceFileChildren } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { WebuiFilePreview } from "../../src/client/features/workspace/ui/WorkspaceFilePreview.js";
+import { webuiFileLanguage } from "../../src/client/features/workspace/projection/file-highlight.js";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -430,6 +431,14 @@ describe("the panel owner holds the panel state per session", () => {
 });
 
 describe("the terminal roster is read before it is shown", () => {
+  // The roster, its read generation and the create gate are the terminal
+  // binding's (`features/workspace/bindings/use-workspace-terminal.ts`); the
+  // panel renders the loading line and the service's answer. Each claim reads
+  // the module that holds it.
+  const bindingSource = readFileSync(
+    new URL("../../src/client/features/workspace/bindings/use-workspace-terminal.ts", import.meta.url),
+    "utf8",
+  );
   const panelSource = readFileSync(
     new URL("../../src/client/features/workspace/ui/WorkspacePanels.tsx", import.meta.url),
     "utf8",
@@ -438,42 +447,44 @@ describe("the terminal roster is read before it is shown", () => {
   it("does not paint an empty roster before the first answer lands", () => {
     // On a reload whose sessions still hold PTYs, an empty first paint reads as
     // "all my terminals exited" and invites a create that would exceed the
-    // limit. The panel waits for the roster instead.
-    expect(panelSource).toContain("terminalsReady");
-    expect(panelSource).toContain("{!terminalsReady ? DESKTOP_COPY.terminalLoading");
-    // The create waits for the roster too: the panel opens a terminal only once
-    // the first answer has landed, so a reload cannot open a second shell
-    // before the roster has said what is already running.
-    expect(panelSource).toContain("!terminalsReady || terminalTargetId");
+    // limit. The binding waits for the roster instead, and the panel renders
+    // what the binding answers with.
+    expect(bindingSource).toContain("terminalsReady");
+    expect(panelSource).toContain("{!terminal.ready ? DESKTOP_COPY.terminalLoading");
+    // The create waits for the roster too: a terminal is opened only once the
+    // first answer has landed, so a reload cannot open a second shell before
+    // the roster has said what is already running.
+    expect(bindingSource).toContain("!terminalsReady || terminalTargetId");
   });
 
   it("drops a roster read that a later read has superseded", () => {
     // Switching workspaces starts a second read. The first resolving late would
     // otherwise overwrite the newer answer with the previous workspace's
     // terminals — a stale roster that looks live.
-    expect(panelSource).toContain("const read = ++rosterRead.current;");
-    expect(panelSource).toContain("if (rosterRead.current !== read) return;");
+    expect(bindingSource).toContain("const read = ++rosterRead.current;");
+    expect(bindingSource).toContain("if (rosterRead.current !== read) return;");
   });
 
   it("states what the terminal service says rather than discovering a refusal", () => {
-    // The limit is the process half's rule now, so the panel keeps no copy of
-    // it. It asks the owner what it can do and says that answer — an absent
-    // service, a service that is not ready, an interface that does not match —
-    // instead of letting a refused create speak for itself.
-    expect(panelSource).toContain("terminalSupport");
-    expect(panelSource).toContain("terminalAvailability");
-    expect(panelSource).toContain("terminalError");
-    // The panel publishes the service's answer as a marker on the line it
-    // shows. The shared feedback contract carries a surface's own attributes
-    // through `dataAttributes`, so the marker may be written as a JSX
-    // attribute or as an entry of that record — what matters is that it is
-    // bound to the service's answer.
-    expect(panelSource).toMatch(/data-webui-terminal-availability["']?\s*[:=]\s*\{?\s*terminalSupport/);
-    // The create is gated by what the owner can do, so the panel never opens a
-    // terminal the service would refuse.
-    expect(panelSource).toContain("!terminalOwner?.canCreate");
+    // The limit is the process half's rule, so nothing on this side keeps a
+    // copy of it. The binding asks the owner what it can do and says that
+    // answer — an absent service, a service that is not ready, an interface
+    // that does not match — instead of letting a refused create speak for
+    // itself.
+    expect(bindingSource).toContain("terminalSupport");
+    expect(bindingSource).toContain("terminalAvailability");
+    expect(bindingSource).toContain("terminalError");
+    // The service's answer is published as a marker on the line it explains.
+    // The shared feedback contract carries a surface's own attributes through
+    // `dataAttributes`; the binding supplies the entry and the panel binds it
+    // to what the binding answered.
+    expect(bindingSource).toMatch(/data-webui-terminal-availability["']?\s*[:=]\s*\{?\s*terminalSupport/);
+    expect(panelSource).toMatch(/data-webui-terminal-availability["']?\s*[:=]\s*\{?\s*terminal\.support/);
+    // The create is gated by what the owner can do, so a terminal the service
+    // would refuse is never opened.
+    expect(bindingSource).toContain("!owner?.canCreate");
     // One create call, not a copy per button.
-    const createCalls = panelSource.split("terminalOwner.create(").length - 1;
+    const createCalls = bindingSource.split("owner.create(").length - 1;
     expect(createCalls).toBe(1);
   });
 });

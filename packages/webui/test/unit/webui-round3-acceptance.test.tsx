@@ -12,7 +12,8 @@ import {
 import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.js";
 import { WebuiGoalBanner } from "../../src/client/features/goal/ui/GoalBanner.public.js";
 import { WebuiInteractionPanel } from "../../src/client/features/interactions/ui/InteractionPanel.public.js";
-import { chunkWebuiWorkspaceReviewFileIds, WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { chunkWebuiWorkspaceReviewFileIds } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspaceDiffFileSection.js";
 import { WebuiMotionSlot, WebuiTooltip } from "../../src/client/ui/page.js";
 import { projectWebuiDiffFile } from "../../src/client/projection/common/diff-workspace-boundary.js";
 import { projectWebuiUnifiedDiffLines, projectWebuiSplitDiffRows } from "../../src/client/features/workspace/projection/panel-projection.js";

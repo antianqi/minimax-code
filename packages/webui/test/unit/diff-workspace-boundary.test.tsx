@@ -38,7 +38,7 @@ import { WebuiDiffCard } from "../../src/client/features/transcript/ui/DiffCard.
 import { WebuiBrowserCapabilitiesProvider } from "../../src/client/bindings/browser-capabilities.js";
 import { EMPTY_WEBUI_BROWSER_DOM } from "../../src/client/platform/browser-dom.js";
 import { createWebuiBrowserStorage } from "../../src/client/platform/storage.js";
-import { WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspacePanels.js";
+import { WebuiDiffFileSection } from "../../src/client/features/workspace/ui/WorkspaceDiffFileSection.js";
 import type { WebuiFileDiffInfoView } from "../../src/shared/contracts/session.js";
 
 const WORKSPACE = "/work/project";

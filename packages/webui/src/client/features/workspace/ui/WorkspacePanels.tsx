@@ -1,30 +1,11 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import { WebuiSearchField, WebuiTextInput } from "../../../ui/field.js";
-import { WebuiDisclosure, WebuiMotion, WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
-import { Terminal } from "@xterm/xterm";
+import { WebuiDisclosure, WebuiMotion, WebuiPage } from "../../../ui/page.js";
 import { IconAdjustmentsHorizontal, IconEdit, IconLayoutColumns, IconListCheck } from "@tabler/icons-react";
-import { FitAddon } from "@xterm/addon-fit";
 import { basenamePath } from "../../../projection/common/paths.js";
 import { webuiPanelWidthBounds, webuiSurfaceTier, type WebuiSurfaceTier } from "../../../ui/layout-thresholds.js";
-import hljs from "highlight.js/lib/core";
-import bash from "highlight.js/lib/languages/bash";
-import c from "highlight.js/lib/languages/c";
-import cpp from "highlight.js/lib/languages/cpp";
-import css from "highlight.js/lib/languages/css";
-import go from "highlight.js/lib/languages/go";
-import java from "highlight.js/lib/languages/java";
-import javascript from "highlight.js/lib/languages/javascript";
-import json from "highlight.js/lib/languages/json";
-import markdown from "highlight.js/lib/languages/markdown";
-import python from "highlight.js/lib/languages/python";
-import rust from "highlight.js/lib/languages/rust";
-import typescript from "highlight.js/lib/languages/typescript";
-import toml from "highlight.js/lib/languages/ini";
-import xml from "highlight.js/lib/languages/xml";
-import yaml from "highlight.js/lib/languages/yaml";
-import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 // The browser panel is another business's published surface. The workspace
 // may mount it and hand it a surface; it may not construct the browser
 // state itself, which is why the host component exists.
@@ -34,11 +15,16 @@ import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 // is the part that crosses into the browser business through its published
 // port. The strip subscribes to `watchBrowserWebTabs` and, for the active
 // web tab, this file mounts `BrowserPanelHost` with the tab's target.
+//
+// The panel is now layout and tab composition only. A file's diff is
+// `WorkspaceDiffFileSection.tsx`, a file's content is `WorkspaceFilePreview.tsx`,
+// the grammar table and line highlighting are `projection/file-highlight.ts`,
+// and the terminal — roster, xterm, resize reporting — is the
+// `bindings/use-workspace-terminal.ts` binding.
 import { BrowserPanelHost, WebuiBrowserToolbar } from "../../browser/ui/BrowserPanelHost.public.js";
 import { MiniAppPicker } from "../../miniapp/ui/MiniAppPicker.public.js";
 import type {
   WebuiWorkspaceFile,
-  WebuiWorkspaceFileContent,
 } from "../../../../shared/contracts/workspace.js";
 import type {
   WebuiWorkspaceReviewSearchResult,
@@ -55,19 +41,13 @@ import {
   webuiWorkspaceTabContentKey,
 } from "../projection/workspace-panel-state.js";
 import { focusWebuiFileLine, webuiFileLineTargetId } from "../../../bindings/browser-effects.js";
-import {
-  TERMINAL_RESIZE_DEBOUNCE_MS,
-  terminalResizeRequest,
-} from "../../terminal/projection/terminal-size.public.js";
-import type { WebuiTerminalSize } from "../../terminal/contracts/terminal-port.js";
 import type { WebuiTerminalOwner } from "../../terminal/contracts/terminal-owner.js";
-import { WebuiIconChevronRight, WebuiIconClose, WebuiIconDiffFile, WebuiIconFolder, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceExpand } from "../../../shell/icons.js";
+import { WebuiIconChevronRight, WebuiIconClose, WebuiIconFolder, WebuiIconSearch, WebuiIconSidebarToggle, WebuiIconWorkspaceExpand } from "../../../shell/icons.js";
 import { FileTree, filterWorkspaceFiles, findWorkspaceFile, getWorkspaceFileParentPaths, mergeWorkspaceFileChildren } from "./WorkspaceFileTree.js";
-import { WorkspaceMediaPreview } from "./WorkspaceMediaPreview.js";
-import { isMediaContent } from "../projection/media-preview.js";
 import { WorkspaceCanvas } from "./WorkspaceCanvas.js";
-import { WorkspaceArchiveView } from "./WorkspaceArchiveView.js";
-import { WorkspaceHtmlPreview } from "./WorkspaceHtmlPreview.js";
+import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip, webuiWorkspaceLauncherOpenPage, webuiWorkspaceLauncherUrl } from "./WebuiWorkspaceTabStrip.public.js";
+import { WebuiDiffFileSection } from "./WorkspaceDiffFileSection.js";
+import { WebuiFilePreview } from "./WorkspaceFilePreview.js";
 import {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
   chunkWebuiWorkspaceReviewFileIds,
@@ -79,16 +59,13 @@ import {
 } from "../../../bindings/use-query-state.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip, webuiWorkspaceLauncherOpenPage, webuiWorkspaceLauncherUrl } from "./WebuiWorkspaceTabStrip.public.js";
-import { webuiFileLanguage, projectWebuiUnifiedDiffLines, projectWebuiSplitDiffRows, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
+import { useWorkspaceTerminal } from "../bindings/use-workspace-terminal.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 import {
   projectWebuiDiffFile,
   projectWebuiDiffFiles,
-  WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE,
-  type WebuiDiffFileEntry,
 } from "../../../projection/common/diff-workspace-boundary.js";
 // `mergeWorkspaceFileChildren`, `chunkWebuiWorkspaceReviewFileIds` and
 // `WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE` are re-exported below: the panel
@@ -101,27 +78,6 @@ export {
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
 };
 const DESKTOP_COPY = { terminalExited: "已退出", terminalLoading: "正在读取终端…" } as const;
-
-const FILE_CODE_LANGUAGES = {
-  bash,
-  c,
-  cpp,
-  css,
-  go,
-  java,
-  javascript,
-  json,
-  markdown,
-  python,
-  rust,
-  typescript,
-  toml,
-  xml,
-  yaml,
-} as const;
-for (const [name, language] of Object.entries(FILE_CODE_LANGUAGES)) {
-  if (!hljs.getLanguage(name)) hljs.registerLanguage(name, language);
-}
 
 /**
  * The tab, when it is showing the Mini App tool page.
@@ -136,143 +92,6 @@ function isMiniAppPickerTab(
   readonly content: Extract<WorkspacePanelTab["content"], { readonly kind: "miniapp-picker" }>;
 } {
   return tab?.content.kind === "miniapp-picker";
-}
-
-function highlightFileLine(line: string, language: string | undefined): string | undefined {
-  if (!language || !hljs.getLanguage(language)) return undefined;
-  try {
-    return hljs.highlight(line, { language, ignoreIllegals: true }).value;
-  } catch {
-    return undefined;
-  }
-}
-
-function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSelect, onOpenOutsideFile, defaultOpen = true, diffLayout = "unified", showContext = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: (path: string) => void; readonly onOpenOutsideFile?: (path: string) => void; readonly defaultOpen?: boolean; readonly diffLayout?: "unified" | "split"; readonly showContext?: boolean }): ReactElement {
-  const [expanded, setExpanded] = useState(defaultOpen);
-  // The diff could not be loaded: the failure is said once, as a toast, and is
-  // not drawn in the layout.
-  useWebuiToastError(error);
-  const diff = file.withinWorkspace && typeof file.diff === "string" ? file.diff : "";
-  const allLines = useMemo(() => projectWebuiUnifiedDiffLines(diff), [diff]);
-  const lines = useMemo(() => allLines.filter((line) => showContext || line.kind !== "context"), [allLines, showContext]);
-  const splitRows = useMemo(() => projectWebuiSplitDiffRows(allLines).filter((row) => showContext || row.kind !== "context"), [allLines, showContext]);
-  const language = webuiFileLanguage(file.file);
-  const highlightedByContent = useMemo(() => {
-    const highlighted = new Map<string, string | undefined>();
-    for (const line of allLines) {
-      if (line.kind !== "hunk" && line.kind !== "noNewline" && !highlighted.has(line.content))
-        highlighted.set(line.content, highlightFileLine(line.content, language));
-    }
-    return highlighted;
-  }, [allLines, language]);
-  return <section className="webui-turn-review-file" data-expanded={expanded} data-testid="turn-review-diff-file">
-    <WebuiButton variant="plain" size="regular" type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(file.file); setExpanded((value) => !value); }}>
-      <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
-        <WebuiIconChevronRight className="webui-turn-review-chevron" />
-      </WebuiMotionSlot>
-      <span className="webui-diff-file-icon"><WebuiIconDiffFile fileName={file.file} /></span>
-      <span className="webui-turn-review-file-path">{file.file}</span>
-      <span className="webui-diff-add">+{file.additions}</span>
-      {file.deletions > 0 ? <span className="webui-diff-del">-{file.deletions}</span> : null}
-    </WebuiButton>
-    <WebuiDisclosure as="div" open={expanded} className="webui-diff-file-disclosure">
-      <div>
-        {!file.withinWorkspace
-          /* The file is outside the workspace, so its content is not shown. The
-           * entry stays in the list: the file name and the counts are the part a
-           * person can still act on. */
-          ? <div className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace"><p>{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>{onOpenOutsideFile && (file.file.startsWith("/") || /^[a-z]:[\\/]/iu.test(file.file)) ? <WebuiButton variant="quiet-highlight" size="content" type="button" data-testid="turn-review-open-outside-file" onClick={() => onOpenOutsideFile(file.file)}>在文件查看器中打开</WebuiButton> : null}</div>
-          /* 加载中的差异是一条播报；播报通道交给共享契约，类名不变，样式继续命中。 */
-      : loading ? <FeedbackLiveRegion className="webui-turn-review-unavailable">正在加载差异…</FeedbackLiveRegion> : lines.length ? <pre className={`webui-file-code webui-turn-review-code${diffLayout === "split" ? " webui-turn-review-code--split" : ""}`} style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${lines.length * 19.8}px` }}><code className={language ? `hljs language-${language}` : ""}>{diffLayout === "split" ? splitRows.map((row, index) => {
-        if (row.kind === "hunk" || row.kind === "noNewline") {
-          return <span className={`webui-turn-review-line webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}><span className="webui-turn-review-hunk">{row.content}</span></span>;
-        }
-        const oldContent = row.oldLine;
-        const newContent = row.newLine;
-        const oldHighlight = oldContent ? highlightedByContent.get(oldContent.content) : undefined;
-        const newHighlight = newContent ? highlightedByContent.get(newContent.content) : undefined;
-        return <span className={`webui-turn-review-line webui-turn-review-line--split webui-turn-review-line--${row.kind}`} key={`${index}-${row.kind}`}>
-          <span className={`webui-turn-review-split-side${oldContent?.kind === "deletion" ? " is-deletion" : ""}`}>
-            <span className="webui-turn-review-line-number">{oldContent?.oldLine ?? ""}</span>
-            <span className="webui-turn-review-source">{oldContent ? oldHighlight === undefined ? oldContent.content : <span dangerouslySetInnerHTML={{ __html: oldHighlight }} /> : ""}</span>
-          </span>
-          <span className={`webui-turn-review-split-side${newContent?.kind === "addition" ? " is-addition" : ""}`}>
-            <span className="webui-turn-review-line-number">{newContent?.newLine ?? ""}</span>
-            <span className="webui-turn-review-source">{newContent ? newHighlight === undefined ? newContent.content : <span dangerouslySetInnerHTML={{ __html: newHighlight }} /> : ""}</span>
-          </span>
-        </span>;
-      }) : lines.map((line, index) => {
-        const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightedByContent.get(line.content);
-        return <span className={`webui-turn-review-line webui-turn-review-line--${line.kind}`} key={`${index}-${line.kind}`}>
-          {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : line.kind === "noNewline" ? line.content : <>
-            <span className="webui-turn-review-line-number">{line.oldLine ?? ""}</span>
-            <span className="webui-turn-review-line-number">{line.newLine ?? ""}</span>
-            <span className="webui-turn-review-marker">{line.kind === "addition" ? "+" : line.kind === "deletion" ? "−" : " "}</span>
-            <span className="webui-turn-review-source">{highlighted === undefined ? line.content : <span dangerouslySetInnerHTML={{ __html: highlighted }} />}</span>
-          </>}
-        </span>;
-      })}</code></pre> : <p className="webui-turn-review-unavailable">当前运行时没有提供该文件的文本 patch。</p>}
-      </div>
-    </WebuiDisclosure>
-  </section>;
-}
-
-export const WebuiDiffFileSection = memo(WebuiDiffFileSectionView, (previous, next) =>
-  previous.file.file === next.file.file
-  && previous.file.additions === next.file.additions
-  && previous.file.deletions === next.file.deletions
-  && previous.file.status === next.file.status
-  && previous.file.diff === next.file.diff
-  && previous.file.patch === next.file.patch
-  && previous.file.withinWorkspace === next.file.withinWorkspace
-  && previous.selected === next.selected
-  && previous.loading === next.loading
-  && previous.error === next.error
-  && previous.onSelect === next.onSelect
-  && previous.onOpenOutsideFile === next.onOpenOutsideFile
-  && previous.defaultOpen === next.defaultOpen
-  && previous.diffLayout === next.diffLayout
-  && previous.showContext === next.showContext,
-);
-
-export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFileUrl, }: {
-  readonly tabId: string;
-  readonly content: Extract<WebuiWorkspaceTabContent, { readonly kind: "file-preview" }>;
-  readonly result?: { readonly loading: boolean; readonly content?: WebuiWorkspaceFileContent; readonly error?: string };
-  readonly codeMode: boolean;
-  readonly workspaceFileUrl?: (request: { readonly workspaceDir: string; readonly path: string }) => string;
-}): ReactElement {
-  const previewMarkdown = /\.md$/iu.test(content.path) && !codeMode;
-  const text = result?.content?.content ?? "";
-  const language = webuiFileLanguage(content.path);
-  // The read failed, or the content came back carrying an error of its own:
-  // both are said once, as toasts, and neither is drawn in the layout.
-  useWebuiToastError(result?.error);
-  useWebuiToastError(result?.content?.error);
-  // Dispatched ahead of the read result on purpose: an archive never becomes
-  // text, and an HTML preview is a stream the browser fetches rather than a
-  // string the panel holds. Waiting on `readWorkspaceFile` first would either
-  // flash a binary error or buffer a document nobody will read.
-  const archive = isWorkspaceArchivePath(content.path)
-    ? <WorkspaceArchiveView workspaceDir={content.workspaceDir} path={content.path} />
-    : undefined;
-  const html = !archive && isWorkspaceHtmlPath(content.path) && workspaceFileUrl
-    ? <WorkspaceHtmlPreview path={content.path} fileUrl={workspaceFileUrl({ workspaceDir: content.workspaceDir, path: content.path })} content={result?.content} />
-    : undefined;
-  return <div className="webui-workspace-file-document" data-testid="workspace-file-preview" data-file-path={content.path}>
-      {archive ?? html
-        /* 加载文件是一条播报；播报通道交给共享契约。`.webui-workspace-file-document > p`
-           靠元素名命中，契约多了一层 div，等价的间距与颜色留在里面的 p 上。 */
-        ?? (result?.loading ? <FeedbackLiveRegion><p className="m-spacing_16 text-text_default_tertiary">正在加载文件…</p></FeedbackLiveRegion>
-          : result?.content && isMediaContent(result.content, content.path) ? <WorkspaceMediaPreview path={content.path} content={result.content} fileUrl={workspaceFileUrl?.({ workspaceDir: content.workspaceDir, path: content.path })} />
-            : result?.content?.type === "binary" ? <p>无法在文本预览中显示二进制文件。</p>
-              : result?.content ? previewMarkdown ? <WebuiMarkdown source={text} /> : <pre className="webui-file-code"><code className={language ? `hljs language-${language}` : ""}>{text.split("\n").map((line, index) => {
-                const lineNumber = index + 1;
-                const highlighted = highlightFileLine(line, language);
-                return <span key={lineNumber} id={lineNumber === content.lineStart ? webuiFileLineTargetId(tabId, lineNumber) : undefined} tabIndex={lineNumber === content.lineStart ? -1 : undefined} data-line={lineNumber} data-scroll-target-line={lineNumber === content.lineStart ? "true" : undefined} className={`webui-file-code-line ${lineNumber >= (content.lineStart ?? 0) && lineNumber <= (content.lineEnd ?? content.lineStart ?? 0) ? "webui-file-preview-line-active" : ""}`} data-line-number={lineNumber} {...(highlighted !== undefined ? { dangerouslySetInnerHTML: { __html: highlighted || " " } } : {})}>{highlighted === undefined ? line || " " : undefined}</span>;
-              })}</code></pre>
-                : <p>文件读取能力暂不可用。</p>)}
-  </div>;
 }
 
 function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, workspaceFileUrl, terminal: terminalOwner, onClose, onManageMiniApps, onMiniAppMountTarget, onMiniAppToolbarTarget }: {
@@ -413,65 +232,17 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   const [reviewShowContext, setReviewShowContext] = useState(true);
   const setMiniAppToolbarTarget = onMiniAppToolbarTarget ?? (() => undefined);
   const setMiniAppMountTarget = onMiniAppMountTarget ?? (() => undefined);
-  const [terminals, setTerminalsState] = useState<readonly Record<string, unknown>[]>([]);
-  /**
-   * A terminal list answer is rendered directly (`terminals.find`, `terminals.map`),
-   * so a runtime that answers something else must not reach the render: it becomes
-   * an empty list.
-   */
-  const setTerminals = (answer: unknown): void => {
-    setTerminalsState(Array.isArray(answer) ? (answer as readonly Record<string, unknown>[]) : []);
-  };
-  /** Mirror the owner's catalogue into the local render list. */
-  const syncTerminalsFromOwner = (owner: WebuiTerminalOwner | undefined): void => {
-    setTerminals(owner?.getSnapshot().terminals ?? []);
-  };
-  /**
-   * Whether the roster has been read at least once for the current workspace.
-   *
-   * Without it the panel paints an empty terminal list on the first render and
-   * then swaps in the real one a moment later. On a reload whose sessions already
-   * hold PTYs that reads as "all my terminals exited" and offers a create button
-   * that would exceed the limit — a flicker that misreports state, in the one
-   * moment the user is deciding whether their shells survived.
-   */
-  const [terminalsReady, setTerminalsReady] = useState(false);
-  /**
-   * Monotonic read counter. Each roster read takes the next number and only
-   * applies if it is still the newest: switching workspaces quickly starts a
-   * second read, and the first one resolving late would otherwise overwrite the
-   * newer answer with the previous workspace's terminals.
-   */
-  const rosterRead = useRef(0);
-  const autoCreateTerminalFor = useRef<string>();
-  const [terminalInitialSize, setTerminalInitialSize] = useState<{ readonly cols: number; readonly rows: number }>();
-  const [terminalError, setTerminalError] = useState<string>();
-  const terminalSupport = useSyncExternalStore(
-    terminalOwner?.subscribe ?? (() => () => undefined),
-    () => terminalOwner?.support().create ?? "absent",
-    () => terminalOwner?.support().create ?? "absent",
-  );
-  const terminalAvailability = terminalSupport === "absent" ? "当前服务未提供终端。"
-    : terminalSupport === "not-ready" ? "终端服务尚未就绪。"
-      : terminalSupport === "incompatible" ? "终端接口与当前页面不兼容，请检查服务版本。" : undefined;
-  // The terminal failed: the failure is said once, as a toast, and is not drawn
-  // in the terminal's own status line.
-  useWebuiToastError(terminalError, {
-    testId: "workspace-terminal-status",
-    dataAttributes: { "data-webui-terminal-availability": terminalSupport },
-  });
-  const terminalHost = useRef<HTMLDivElement>(null);
-  const terminalInstance = useRef<Terminal>();
-  const terminalStop = useRef<(() => void) | undefined>();
-  /**
-   * The size this pane last told the runtime, so an unchanged measurement is
-   * not sent twice. Deliberately NOT reset when the effect re-mounts the
-   * terminal: the entry carries its terminal id, and a different terminal
-   * cannot match it, so a restored PTY still hears about the grid it was fitted
-   * to while a newly created PTY can start at its measured grid.
-   */
-  const reportedTerminalSize = useRef<WebuiTerminalSize>();
   const activeWorkspace = activeTab && "workspaceDir" in activeTab.content ? activeTab.content.workspaceDir : workspaceDir;
+  // The terminal tab's roster, xterm and resize reporting. The panel says which
+  // tab is on screen and where the PTY belongs; the binding owns what the
+  // browser and the runtime have to agree on — the read generation, the ready
+  // flag, the auto-create latch, the grid measurement and the reported size.
+  const terminal = useWorkspaceTerminal({
+    owner: terminalOwner,
+    tabKind: tab,
+    tabId: activeTab?.id,
+    workspaceDir: activeWorkspace,
+  });
   // The file tree could not be read: the failure is said once, as a toast, and
   // is not drawn in the tree's own scroll area.
   useWebuiToastError(fileTree.workspaceDir === activeWorkspace && !fileTree.loading ? fileTree.error : undefined);
@@ -676,128 +447,6 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
   useWebuiToastError(workspaceReviewSummaryError);
   useWebuiToastError(workspaceReviewSearchError);
   useWebuiToastError(workspaceReviewDiffError);
-  useEffect(() => {
-    if (!terminalOwner) {
-      setTerminals([]);
-      setTerminalsReady(true);
-      return undefined;
-    }
-    const read = ++rosterRead.current;
-    const stop = terminalOwner.subscribe(() => {
-      syncTerminalsFromOwner(terminalOwner);
-      setTerminalError(terminalOwner.getSnapshot().error);
-    });
-    // Not ready until the first answer lands, so a reload holding live PTYs does
-    // not paint an empty list and invite a create that would exceed the limit.
-    setTerminalsReady(false);
-    void terminalOwner.refresh().then(() => {
-      // A superseded read must not apply: its answer describes a workspace the
-      // user has already left.
-      if (rosterRead.current !== read) return;
-      syncTerminalsFromOwner(terminalOwner);
-      setTerminalsReady(true);
-    });
-    return () => {
-      stop();
-      // Unmounting invalidates this read for the same reason switching does.
-      if (rosterRead.current === read) rosterRead.current += 1;
-    };
-  }, [terminalOwner, activeTab?.id, activeWorkspace, tab]);
-  const activeTerminal = activeTab ? terminals.find((entry) => entry.workspaceTabId === activeTab.id) : undefined;
-  const terminalTargetId = activeTerminal?.terminalId;
-  useEffect(() => {
-    if (tab !== "terminal" || !terminalsReady || terminalTargetId || !activeWorkspace || !activeTab?.id || !terminalOwner?.canCreate || !terminalInitialSize) return;
-    const autoCreateKey = `${activeTab?.id ?? ""}\0${activeWorkspace}`;
-    if (autoCreateTerminalFor.current === autoCreateKey) return;
-    autoCreateTerminalFor.current = autoCreateKey;
-    void terminalOwner.create(activeWorkspace, terminalInitialSize, activeTab.id).then((created) => {
-      if (created) reportedTerminalSize.current = { terminalId: created.terminalId, ...terminalInitialSize };
-      syncTerminalsFromOwner(terminalOwner);
-    }).catch((error: unknown) => setTerminalError(error instanceof Error ? error.message : String(error)));
-  }, [tab, terminalsReady, terminalTargetId, activeWorkspace, terminalOwner, terminalInitialSize, activeTab?.id]);
-  // A view going away releases its watch and its xterm; it never kills a PTY.
-  // Process death is the panel's explicit dispose button or the application's
-  // disposal.
-  useEffect(() => () => { terminalStop.current?.(); terminalInstance.current?.dispose(); }, []);
-  // Measure the real xterm grid before creating the PTY. This avoids starting
-  // the shell at 80x24 and immediately resizing it, which leaves wrapped prompt
-  // fragments behind in some interactive shells.
-  useEffect(() => {
-    if (tab !== "terminal" || terminalTargetId || !terminalHost.current) return;
-    const host = terminalHost.current;
-    const styles = getComputedStyle(host);
-    const terminal = new Terminal({ cols: terminalInitialSize?.cols ?? 80, rows: terminalInitialSize?.rows ?? 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_primary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
-    const fit = new FitAddon();
-    terminal.loadAddon(fit);
-    terminal.open(host);
-    let disposed = false;
-    let initialFitFrame: number | undefined;
-    // The grid is measured once the fonts have landed: a measurement taken
-    // against fallback glyphs is a measurement of the wrong grid. The wait
-    // comes from the browser platform, because a panel that reached for
-    // `document` itself would be a panel that could only be placed against a
-    // browser.
-    void dom.whenFontsReady().then(() => {
-      if (disposed) return;
-      initialFitFrame = requestAnimationFrame(() => {
-        if (disposed) return;
-        fit.fit();
-        setTerminalInitialSize({ cols: terminal.cols, rows: terminal.rows });
-      });
-    });
-    return () => {
-      disposed = true;
-      if (initialFitFrame !== undefined) cancelAnimationFrame(initialFitFrame);
-      terminal.dispose();
-    };
-  }, [tab, terminalTargetId]);
-  useEffect(() => {
-    if (!terminalTargetId || !terminalHost.current) return;
-    const terminalId = String(terminalTargetId);
-    const styles = getComputedStyle(terminalHost.current);
-    const terminal = new Terminal({ cols: terminalInitialSize?.cols ?? 80, rows: terminalInitialSize?.rows ?? 24, convertEol: true, theme: { background: styles.getPropertyValue("--bg_default_primary").trim(), foreground: styles.getPropertyValue("--terminal_foreground").trim(), cursor: styles.getPropertyValue("--terminal_cursor").trim() } });
-    const fit = new FitAddon();
-    terminal.loadAddon(fit);
-    terminal.open(terminalHost.current);
-    terminalInstance.current = terminal;
-    terminalStop.current = terminalOwner?.attach(terminalId, (frame) => { terminal.write(frame.data); if (frame.exited) terminal.options.disableStdin = true; });
-    // The fit moves the browser's viewport; this is what tells the runtime. The
-    // size is read at send time, so a drag that ends in one place reports that
-    // place once instead of replaying every frame of the drag.
-    const reportTerminalSize = () => {
-      const request = terminalResizeRequest({ terminalId, cols: terminal.cols, rows: terminal.rows, reported: reportedTerminalSize.current });
-      if (!request) return;
-      reportedTerminalSize.current = request;
-      if (terminalOwner?.canResize) void terminalOwner.resize(request);
-    };
-    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
-    const onResize = () => {
-      fit.fit();
-      if (!terminalOwner?.canResize) return;
-      if (resizeTimer !== undefined) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(reportTerminalSize, TERMINAL_RESIZE_DEBOUNCE_MS);
-    };
-    const observer = new ResizeObserver(onResize);
-    observer.observe(terminalHost.current);
-    const input = terminal.onData((data) => { if (terminalOwner?.canWrite) void terminalOwner.write(terminalId, data); });
-    let disposed = false;
-    let initialFitFrame: number | undefined;
-    void dom.whenFontsReady().then(() => {
-      if (disposed) return;
-      initialFitFrame = requestAnimationFrame(() => {
-        if (disposed) return;
-        fit.fit();
-        terminal.refresh(0, Math.max(0, terminal.rows - 1));
-        reportTerminalSize();
-        terminal.focus();
-      });
-    });
-    return () => { disposed = true; if (initialFitFrame !== undefined) cancelAnimationFrame(initialFitFrame); input.dispose(); observer.disconnect(); if (resizeTimer !== undefined) clearTimeout(resizeTimer); terminalStop.current?.(); terminalStop.current = undefined; terminal.dispose(); terminalInstance.current = undefined; };
-    // `terminalOwner` takes its place beside its neighbours rather than being
-    // read through a ref: the owner is created once per mount by the binding and
-    // its commands are stable, so a panel drag cannot re-run this effect and
-    // rebuild a shell that is running.
-  }, [terminalTargetId, terminalOwner, tab, terminalInitialSize]);
   // The registry carries the kinds, their words and how each opens. Both the tab
   // glyphs the strip needs and the launcher's tiles live in the strip itself:
   // the new tab page took the place of this panel's add menu, which was the same
@@ -1010,20 +659,20 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
       </div>
     ) : null}
     {tab === "terminal" ? <div className="webui-terminal-content">
-        <div ref={terminalHost} className="webui-xterm-host" />
+        <div ref={terminal.hostRef} className="webui-xterm-host" />
         {/* A terminal that failed is said once, as a toast; a terminal still
             coming up is a status and is announced as one. The two are
             different states, so each carries the shared family's own channel.
             The line keeps no paragraph of its own: the family's channel is the
             element, and the terminal's own metrics come from
             `.webui-terminal-content > .webui-terminal-status`. */}
-        {!terminalsReady || !terminalTargetId && terminalAvailability ? (
+        {!terminal.ready || !terminal.hasTerminal && terminal.availability ? (
           <FeedbackLiveRegion
             className="webui-terminal-status"
             testId="workspace-terminal-status"
-            dataAttributes={{ "data-webui-terminal-availability": terminalSupport }}
+            dataAttributes={{ "data-webui-terminal-availability": terminal.support }}
           >
-            {!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability}
+            {!terminal.ready ? DESKTOP_COPY.terminalLoading : terminal.availability}
           </FeedbackLiveRegion>
         ) : null}
     </div> : null}

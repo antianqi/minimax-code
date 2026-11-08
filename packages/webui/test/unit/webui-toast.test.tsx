@@ -102,6 +102,24 @@ describe("the queue", () => {
     expect(repeated.entries[0]?.id).toBe("webui-toast-1");
   });
 
+  it("refreshes a repeated notice in place, and marks it as said again", () => {
+    // ADR 0030: a notice that is said twice is said once — the second saying
+    // refreshes the first, so the stack does not grow and the card does not
+    // animate in again. It is still heard twice, so the refresh carries a new
+    // revision and the card keys its message on it: a live region only
+    // announces what changed inside it.
+    const first = entry({ tone: "success", message: "连接成功" }, "webui-toast-1");
+    const withFirst = reduceWebuiToasts(emptyState, { type: "show", entry: first });
+    const repeated = reduceWebuiToasts(withFirst, {
+      type: "show",
+      entry: entry({ tone: "success", message: "连接成功" }, "webui-toast-2"),
+    });
+    expect(repeated.entries).toHaveLength(1);
+    expect(repeated.entries[0]?.id).toBe("webui-toast-1");
+    expect(repeated.entries[0]?.revision).toBe(1);
+    expect(repeated.entries[0]?.revision).toBe((withFirst.entries[0]?.revision ?? 0) + 1);
+  });
+
   it("keeps two different notices", () => {
     const first = reduceWebuiToasts(emptyState, {
       type: "show",

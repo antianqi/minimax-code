@@ -15,8 +15,8 @@ import { useWebuiProviderEditor } from "../../../features/models/bindings/use-pr
 import type { WebuiProviderEditorCommands } from "../../../features/models/contracts/provider-editor.js";
 import { unavailableWebuiProviderOutcome } from "../../../features/models/contracts/provider-outcome.js";
 import type { WebuiModelProviderView } from "../../../../shared/contracts/models.js";
-import { FeedbackLiveRegion, FeedbackProgress } from "../../../ui/feedback.js";
-import { useWebuiToastError } from "../../../ui/toast.js";
+import { FeedbackProgress } from "../../../ui/feedback.js";
+import { useWebuiToast, useWebuiToastError } from "../../../ui/toast.js";
 import { WebuiButton } from "../../../ui/button.js";
 import { WebuiField, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
@@ -93,7 +93,13 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
   const [savingKey, setSavingKey] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const { errors: keyErrors, validateRequired, clearFieldError } = useWebuiFormValidation();
-  const [keyResult, setKeyResult] = useState<string>();
+  // The result of a key operation is said through the shared toast (ADR 0030):
+  // it has already happened, it is not a field's own validation message, and it
+  // must not take room from the page it is about. The toast controller is used
+  // rather than the notice hooks because a hook says a message when it
+  // changes, and a second test with the same answer is news even though the
+  // words are the same.
+  const toast = useWebuiToast();
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const [providerActionError, setProviderActionError] = useState<string>();
   const [oauthError, setOauthError] = useState<string>();
@@ -146,25 +152,26 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     if (source === activeSource || !settings?.canSetModelSource) return;
     if (source === "minimax_api_key" && apiStatus?.valid !== true) return;
     try { await settings.setModelSource(source); }
-    catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
+    catch (error) { toast.error(error instanceof Error ? error.message : String(error)); }
   };
   const testKey = async () => {
     if (!apiKey.trim() && !apiValid && !validateRequired([{ name: "apiKey", label: "API Key", value: apiKey }])) return;
     if (apiKey.trim() || apiValid) clearFieldError("apiKey");
     if (!models) return;
-    setTestingKey(true); setKeyResult(undefined);
+    setTestingKey(true);
     try {
       const result = recordOf(await models.testProvider({ providerId: "minimax_api", ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }));
-      setKeyResult(result.success === true ? "连接成功" : textOf(recordOf(result.status).lastErrorMessage) || "连接失败");
-    } catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
+      if (result.success === true) toast.success("连接成功");
+      else toast.error(textOf(recordOf(result.status).lastErrorMessage) || "连接失败");
+    } catch (error) { toast.error(error instanceof Error ? error.message : String(error)); }
     finally { setTestingKey(false); }
   };
   const saveKey = async () => {
     if (!validateRequired([{ name: "apiKey", label: "API Key", value: apiKey }])) return;
     if (!models) return;
-    setSavingKey(true); setKeyResult(undefined);
+    setSavingKey(true);
     try { await models.upsertApiKey({ apiKey: apiKey.trim(), saveAndUse: true }); void settings?.loadModelSource(); }
-    catch (error) { setKeyResult(error instanceof Error ? error.message : String(error)); }
+    catch (error) { toast.error(error instanceof Error ? error.message : String(error)); }
     finally { setSavingKey(false); }
   };
   const beginCodexLogin = async () => {
@@ -265,7 +272,7 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
                   className="h-full min-w-[140px] pl-3 pr-1 text-left"
                 >
                   {sourceLabel}
-                  {sourceBadge ? <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${sourceBadge === "使用中" ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{sourceBadge}</span> : null}
+                  {sourceBadge ? <span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${sourceBadge === "使用中" ? "bg-bg_status_positive text-icon_status_success" : "bg-bg_interaction_tertiary_hover text-text_default_secondary"}`}>{sourceBadge}</span> : null}
                 </WebuiButton>
                 <WebuiButton
                   type="button"
@@ -320,11 +327,10 @@ export function UsageModelSettings({ sessionId }: Props): ReactElement {
     </WebuiStack> : null}
 
     {sourceTab === "minimax-api" ? <WebuiStack as="section" gap="small" className="w-full pt-1" data-testid="settings-minimax-api-panel">
-      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span><span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-[rgba(10,10,10,0.04)] text-[#666]"}`}>{apiValid ? "使用中" : "未启用"}</span></WebuiInline>
+      <WebuiInline gap="small"><span className="text-[14px] font-medium leading-5 text-text_default_primary">API Key</span><span className={`rounded-[6px] px-1 py-0.5 text-[12px] leading-4 ${apiValid ? "bg-bg_status_positive text-icon_status_success" : "bg-bg_interaction_tertiary_hover text-text_default_secondary"}`}>{apiValid ? "使用中" : "未启用"}</span></WebuiInline>
       {apiError ? <SettingsErrorNotice message={apiError} action={{ label: "重试", onClick: () => void loadApiStatus() }} /> : null}
       <WebuiInline gap="medium" align="start"><WebuiField className="min-w-0 flex-[1_0_0]" label="API Key" required error={keyErrors.apiKey} control={(props) => <WebuiTextInput {...props} controlSize="compact" type="password" value={apiKey} onChange={(event) => { setApiKey(event.target.value); clearFieldError("apiKey"); }} placeholder={apiValid ? textOf(apiStatus?.maskedApiKey) : "请输入API Key"} />} /><IconButton label="测试连通性" disabled={testingKey} onClick={() => void testKey()}><RefreshIcon /></IconButton></WebuiInline>
-      {/* 保存结果要被听到，播报通道交给共享契约。 */}
-      {keyResult ? <FeedbackLiveRegion>{keyResult}</FeedbackLiveRegion> : null}<WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
+      <WebuiButton variant="secondary" size="regular" className="mt-1 w-[116px]" disabled={savingKey} onClick={() => void saveKey()}>{savingKey ? "保存中…" : "保存并使用"}</WebuiButton>
     </WebuiStack> : null}
 
     {sourceTab === "custom" ? <WebuiStack as="section" gap="medium" className="min-h-0 flex-1" data-testid="settings-custom-models-panel">

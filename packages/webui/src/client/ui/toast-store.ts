@@ -87,6 +87,18 @@ export interface WebuiToastEntry {
    * vanishes in one frame reads as a glitch rather than as a dismissal.
    */
   readonly phase: "visible" | "leaving";
+  /**
+   * How many times this notice has been said.
+   *
+   * A notice that is said twice is said once: the second saying refreshes the
+   * first in place, and the card keeps its id, so it does not animate in
+   * again and the stack does not grow. It is still *heard* twice, which is
+   * what ADR 0030 promises ("a notice said twice is a notice heard twice"),
+   * and a live region only announces what changed inside it. The revision is
+   * what the card keys its message on, so a repeated saying replaces the
+   * message element and the region announces the same words again.
+   */
+  readonly revision: number;
 }
 
 /** What a caller asks the client to say. */
@@ -179,6 +191,7 @@ export function createWebuiToastEntry(request: WebuiToastRequest, id: string): W
     durationMs: webuiToastDurationMs(tone, request.action !== undefined, request.durationMs),
     identity: webuiToastIdentity(tone, request.message, request.description),
     phase: "visible",
+    revision: 0,
   };
 }
 
@@ -217,8 +230,10 @@ function enforceWebuiToastCap(entries: readonly WebuiToastEntry[]): readonly Web
  *
  * A notice that is said twice is said once: the second one refreshes the first
  * in place — same id, so the card does not animate in again — and the queue
- * grows by one only when the notice is a new one. The cap is applied after
- * every arrival, so a burst of failures cannot become a wall.
+ * grows by one only when the notice is a new one. It is still heard twice: the
+ * refresh carries a new revision, and the card keys its message on it, so the
+ * region announces the same words again. The cap is applied after every
+ * arrival, so a burst of failures cannot become a wall.
  */
 export function reduceWebuiToasts(
   state: WebuiToastState,
@@ -237,7 +252,9 @@ export function reduceWebuiToasts(
       const entries =
         repeated >= 0
           ? state.entries.map((candidate, index) =>
-              index === repeated ? { ...entry, id: candidate.id } : candidate,
+              index === repeated
+                ? { ...entry, id: candidate.id, revision: candidate.revision + 1 }
+                : candidate,
             )
           : [...state.entries, entry];
       return { entries: enforceWebuiToastCap(entries) };

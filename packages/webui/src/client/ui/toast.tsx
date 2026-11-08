@@ -476,9 +476,14 @@ export function WebuiToast({
         <Icon size={16} stroke={2} />
       </span>
       <div className="webui-toast-body">
-        <p className="webui-toast-message">{entry.message}</p>
+        {/* The message is keyed on the revision, so a notice that is said
+         * twice is announced twice: the region only announces what changed
+         * inside it, and a refresh that leaves the words in place would be
+         * heard once. The card itself is not re-keyed, so the second saying
+         * does not animate in again. */}
+        <p className="webui-toast-message" key={entry.revision}>{entry.message}</p>
         {entry.description === undefined ? null : (
-          <p className="webui-toast-description">{entry.description}</p>
+          <p className="webui-toast-description" key={`description-${entry.revision}`}>{entry.description}</p>
         )}
         {entry.action === undefined ? null : (
           <div className="webui-toast-action">

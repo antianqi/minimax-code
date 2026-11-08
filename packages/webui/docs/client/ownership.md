@@ -79,7 +79,9 @@ selection still supersedes it, and disposal prevents publication.
 Workspace files, archives, canvases and environments use the terminal snapshot-store lifetime:
 disposal freezes publication, releases subscriptions/timers and refuses new IO. Canvas reads,
 writes and release share a destination revision; accepted writes still settle even when their
-document can no longer be shown. Archive extraction publishes only for its originating listing
+document can no longer be shown. The canvas component separately fences draft/preview callbacks
+by its mounted session and operation lifetime; a settled write alone cannot clear current input.
+Archive extraction publishes only for its originating listing
 and extraction revision. Channel filter writes use the selected bot's detail revision.
 
 Account login uses attempt and status-read revisions across begin, poll, cancel and dialog close.
@@ -93,7 +95,11 @@ Scheduling acquires complete task and run snapshots through the shared cursor wa
 marketplace and manageable skills use the same continuation/progress rule and stop acquiring
 when selection changes. Missing or cyclic continuation is an error, never a complete partial
 snapshot. Session catalogue reads have query revisions and are retired by authoritative patches;
-flat and tree still resolve from one entity map. Explicit query-error clearing writes the cleared
+flat and tree still resolve from one entity map. An invalidated pending flat/tree/page query
+serially acquires an authoritative replacement before settling; all intervening facts, including
+unknown non-created facts, share that one reconciliation. Newer explicit queries and disposal
+retire replacement rights, so fact bursts cannot fan out concurrent automatic refreshes.
+Explicit query-error clearing writes the cleared
 value without requiring a reload. Schedule drafts retain unexposed timezone/run-cap fields and
 map blank model/project values to the wire's explicit null-clear intent.
 

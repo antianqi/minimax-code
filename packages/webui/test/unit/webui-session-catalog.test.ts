@@ -26,6 +26,101 @@ import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../sr
 const purger = () => createWebuiSessionComposerAccess({ purgeSlot: () => undefined });
 
 describe("B21 catalog query ordering", () => {
+  it("coalesces created facts and does not restart dirty initial reads after disposal", async () => {
+    const store = createWebuiSessionStore();
+    const pending = pendingPage(); let calls = 0;
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      loadSessions: () => { calls += 1; return pending.promise; },
+    } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const initial = workflows.loadFlat();
+    for (let i = 0; i < 20; i += 1) workflows.applyFact({ kind: "created", sessionId: "A" });
+    expect(calls).toBe(1);
+    workflows.dispose(); pending.resolve({ sessions: [], hasMore: false }); await initial;
+    expect(calls).toBe(1);
+  });
+  it("does not let an invalidated older initial read restart over a newer explicit read", async () => {
+    const store = createWebuiSessionStore(); const pending = pendingPage(); let calls = 0;
+    const current = session({ sessionId: "A", title: "new" });
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      loadSessions: () => ++calls === 1 ? pending.promise : Promise.resolve({ sessions: [current], hasMore: false }),
+    } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const first = workflows.loadFlat(); workflows.applyFact({ kind: "renamed", sessionId: "A", title: "new" });
+    await workflows.loadFlat(); pending.resolve({ sessions: [], hasMore: false }); await first;
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(["A"]); expect(calls).toBe(2);
+  });
+  it("reconciles failed dirty initial requests and retains the next-page cursor on replacement", async () => {
+    const store = createWebuiSessionStore();
+    const current = session({ sessionId: "A", title: "new" });
+    let reject!: (reason: unknown) => void;
+    const failed = new Promise<never>((_, fail) => { reject = fail; });
+    const cursors: Array<string | undefined> = [];
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      loadSessions: (cursor?: string) => { cursors.push(cursor); return cursors.length === 1 ? failed
+        : Promise.resolve({ sessions: [current], hasMore: false }); },
+    } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const read = workflows.loadMore("next-page");
+    workflows.applyFact({ kind: "renamed", sessionId: "A", title: "new" });
+    reject(new Error("obsolete initial failure")); await read;
+    expect(cursors).toEqual(["next-page", "next-page"]);
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(["A"]);
+    expect(store.getSnapshot().catalog.flat.error).toBeUndefined();
+    expect(store.getSnapshot().catalog.flat.loading).toBe(false);
+  });
+  it.each(["renamed", "pinned", "visibility"] as const)("reconciles initial flat/tree membership after an unknown %s fact without a refresh storm", async (kind) => {
+    const store = createWebuiSessionStore();
+    const flat = pendingPage(); const replacementFlat = pendingPage();
+    const tree = pendingPage(); const replacementTree = pendingPage();
+    let flatCalls = 0; let treeCalls = 0;
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      loadSessions: () => ++flatCalls === 1 ? flat.promise : replacementFlat.promise,
+      loadSessionTree: async () => {
+        const page = await (++treeCalls === 1 ? tree.promise : replacementTree.promise);
+        return { ...page, sessions: page.sessions.map((s) => ({ session: s, childSessions: [] })) };
+      },
+    } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const firstFlat = workflows.loadFlat(); const firstTree = workflows.loadTree();
+    for (let i = 0; i < 20; i += 1) workflows.applyFact(kind === "renamed"
+      ? { kind, sessionId: "A", title: "new" }
+      : kind === "visibility" ? { kind, sessionId: "A", hidden: true }
+      : { kind, sessionId: "A", pinned: true });
+    expect(flatCalls).toBe(1); expect(treeCalls).toBe(1);
+    expect(store.getSnapshot().catalog.entities.size).toBe(0);
+    const old = session({ sessionId: "A", title: "old" });
+    flat.resolve({ sessions: [old], hasMore: false }); tree.resolve({ sessions: [old], hasMore: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(flatCalls).toBe(2); expect(treeCalls).toBe(2);
+    expect(store.getSnapshot().catalog.flat.loading).toBe(true);
+    const current = kind === "visibility" ? [] : [{ ...old, title: "new" }];
+    replacementFlat.resolve({ sessions: current, hasMore: false });
+    replacementTree.resolve({ sessions: current, hasMore: false });
+    await Promise.all([firstFlat, firstTree]);
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(current.map((s) => s.sessionId));
+    expect(store.getSnapshot().catalog.tree.nodes.map((n) => n.sessionId)).toEqual(current.map((s) => s.sessionId));
+    expect(store.getSnapshot().catalog.flat.loading).toBe(false);
+    expect(flatCalls).toBe(2); expect(treeCalls).toBe(2);
+  });
+  it("reconciles known non-created facts during initial tree load and preserves both memberships", async () => {
+    const store = createWebuiSessionStore();
+    const original = session({ sessionId: "A", title: "old" });
+    store.updateCatalog(() => createWebuiSessionCatalogFromPage({ sessions: [original], hasMore: false }));
+    const pending = pendingPage(); let flatCalls = 0; let treeCalls = 0;
+    const current = [ { ...original, title: "new" }, session({ sessionId: "B", title: "second" }) ];
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      loadSessions: () => ++flatCalls === 1 ? pending.promise : Promise.resolve({ sessions: current, hasMore: false }),
+      loadSessionTree: async () => {
+        const page = ++treeCalls === 1 ? await pending.promise : { sessions: current, hasMore: false };
+        return { ...page, sessions: page.sessions.map((s) => ({ session: s, childSessions: [] })) };
+      },
+    } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const reads = workflows.refresh();
+    workflows.applyFact({ kind: "renamed", sessionId: "A", title: "new" });
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(["A"]);
+    pending.resolve({ sessions: [original], hasMore: false }); await reads;
+    expect(store.getSnapshot().catalog.flat.ids).toEqual(["A", "B"]);
+    expect(store.getSnapshot().catalog.tree.nodes.map((n) => n.sessionId)).toEqual(["A", "B"]);
+    expect(store.getSnapshot().catalog.entities.get("A")?.title).toBe("new");
+    expect([flatCalls, treeCalls]).toEqual([2, 2]);
+  });
   it("preserves refresh failure reporting while exposing the flat query error", async () => {
     const store = createWebuiSessionStore();
     const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
@@ -58,9 +153,10 @@ describe("B21 catalog query ordering", () => {
     const original = session({ sessionId: "A", title: "old" });
     store.updateCatalog(() => createWebuiSessionCatalogFromPage({ sessions: [original], hasMore: false }));
     const page = pendingPage();
+    let flatReads = 0; let treeReads = 0;
     const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
-      loadSessions: () => page.promise,
-      loadSessionTree: async () => { const value = await page.promise; return { ...value, sessions: value.sessions.map((s) => ({ session: s, childSessions: [] })) }; },
+      loadSessions: () => ++flatReads === 1 ? page.promise : Promise.resolve({ sessions: path === "more" ? [] : [{ ...original, title: "new" }], hasMore: false }),
+      loadSessionTree: async () => { const value = ++treeReads === 1 ? await page.promise : { sessions: [{ ...original, title: "new" }], hasMore: false }; return { ...value, sessions: value.sessions.map((s) => ({ session: s, childSessions: [] })) }; },
       updateSession: async () => ({ session: { ...original, title: "new" } }),
     } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
     const read = path === "tree" ? workflows.loadTree() : path === "more" ? workflows.loadMore("next") : workflows.refresh();
@@ -75,7 +171,8 @@ describe("B21 catalog query ordering", () => {
     store.updateCatalog(() => createWebuiSessionCatalogFromPage({ sessions: [original], hasMore: false }));
     const first = pendingPage(); const second = pendingPage(); let reads = 0;
     const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
-      loadSessions: () => ++reads === 1 ? first.promise : second.promise,
+      loadSessions: () => ++reads === 1 ? first.promise : action === "new read" ? second.promise
+        : Promise.resolve({ sessions: action === "hide" ? [] : [{ ...original, title: "new" }], hasMore: false }),
       updateSession: async () => ({ session: { ...original, title: "new" } }),
     } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
     const oldRead = workflows.loadFlat();

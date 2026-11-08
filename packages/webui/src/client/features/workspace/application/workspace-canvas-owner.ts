@@ -52,8 +52,9 @@ export interface WebuiWorkspaceCanvasOwner {
   /** Read the session's canvas. A read for a session already left is dropped. */
   readonly read: (sessionId: string) => void;
   /**
-   * Run one canvas operation. Resolves with `true` when it landed, so the surface
-   * can run its own post-success work (clearing a preview, closing a draft field).
+   * Run one canvas operation. Resolves with `true` when the host accepted it.
+   * This settlement survives navigation; the surface must independently fence
+   * post-success edits to its current draft and preview by its own lifetime.
    */
   readonly apply: (
     sessionId: string,

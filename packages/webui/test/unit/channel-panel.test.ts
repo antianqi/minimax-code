@@ -73,6 +73,30 @@ function snapshot(overrides: Partial<WebuiChannelSnapshot> = {}): WebuiChannelSn
 
 const noop = (): void => {};
 
+describe("B16 filter write publication", () => {
+  it.each(["selection", "new write", "failure", "dispose"])("settles the old write without overwriting %s", async (action) => {
+    let resolve!: (value: { mode: "full"; includeToolSummary: boolean }) => void;
+    let reject!: (error: unknown) => void;
+    const old = new Promise<{ mode: "full"; includeToolSummary: boolean }>((res, rej) => { resolve = res; reject = rej; });
+    let calls = 0;
+    const owner = createWebuiChannelOwner({ port: {
+      listChannelConnections: async () => ({ connections: [boundWechat({ connectionId: "A" }), boundWechat({ connectionId: "B" })] }),
+      getChannelMessageFilter: async () => ({ mode: "result", includeToolSummary: false }),
+      updateChannelMessageFilter: () => ++calls === 1 ? old : Promise.resolve({ mode: "result", includeToolSummary: false }),
+    } });
+    await owner.load(); await owner.select("A");
+    const pending = owner.updateMessageFilter({ agent: "wechat:mavis", filter: { mode: "full", includeToolSummary: true } });
+    if (action === "new write") await owner.updateMessageFilter({ agent: "wechat:mavis", filter: { mode: "result", includeToolSummary: false } });
+    else if (action === "dispose") owner.dispose();
+    else await owner.select("B");
+    const before = owner.getSnapshot();
+    if (action === "failure") reject(new Error("A failed")); else resolve({ mode: "full", includeToolSummary: true });
+    expect((await pending).ok).toBe(action !== "failure");
+    expect(owner.getSnapshot()).toBe(before);
+    owner.dispose();
+  });
+});
+
 /** The pane's own source: the toast is raised in an effect, so only the source pins it. */
 const panelSource = readFileSync(
   fileURLToPath(

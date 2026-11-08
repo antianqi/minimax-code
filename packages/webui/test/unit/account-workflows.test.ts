@@ -15,6 +15,97 @@ const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 
 
 const pending: WebuiAccountLoginView = { state: "pending" };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+describe("B01 login attempt publication", () => {
+  it.each(["cancel", "close", "dispose", "new attempt"])("does not restart polling when begin completes after %s", async (action) => {
+    vi.useFakeTimers();
+    const begin = deferred<WebuiAccountLoginView>();
+    let calls = 0;
+    const workflows = createWebuiAccountWorkflows({ port: {
+      beginAccountLogin: () => ++calls === 1 ? begin.promise : Promise.resolve({ state: "error", error: "new" }),
+      getAccountLoginStatus: async () => pending,
+    } });
+    const first = workflows.beginLogin();
+    if (action === "cancel") await workflows.cancelLogin();
+    if (action === "close") workflows.stopLoginPolling();
+    if (action === "dispose") workflows.dispose();
+    if (action === "new attempt") await workflows.beginLogin();
+    const before = workflows.getSnapshot();
+    begin.resolve(pending); await first;
+    expect(workflows.getSnapshot()).toBe(before);
+    expect(vi.getTimerCount()).toBe(0);
+    workflows.dispose();
+  });
+
+  it.each(["cancel", "dispose"])("ignores an old authenticated poll after %s and reconciles cancel through account truth", async (action) => {
+    vi.useFakeTimers();
+    const poll = deferred<WebuiAccountLoginView>();
+    const readAccount = vi.fn(async () => ({ signedIn: true, accountId: "host" }));
+    const workflows = createWebuiAccountWorkflows({ port: {
+      beginAccountLogin: async () => pending,
+      getAccountLoginStatus: () => poll.promise,
+      getAccountStatus: readAccount,
+    } });
+    await workflows.beginLogin(); await vi.advanceTimersByTimeAsync(2000);
+    if (action === "cancel") await workflows.cancelLogin(); else workflows.dispose();
+    const before = workflows.getSnapshot();
+    poll.resolve({ state: "authenticated" }); await Promise.resolve(); await Promise.resolve();
+    expect(workflows.getSnapshot()).toBe(before);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(readAccount).toHaveBeenCalledTimes(action === "cancel" ? 1 : 0);
+    workflows.dispose();
+  });
+});
+
+describe("B02 credential removal settlement", () => {
+  it("switch retires credentials and reconciles the departed account before beginning", async () => {
+    const { createWebuiIdentityEpochs } = await import("../../src/client/application/identity-epochs.js");
+    const epochs = createWebuiIdentityEpochs();
+    const events: string[] = [];
+    epochs.subscribe((event) => events.push(event.key));
+    let signedIn = true;
+    const account = vi.fn(async () => ({ signedIn, accountId: signedIn ? "old" : null }));
+    const workflows = createWebuiAccountWorkflows({ identityEpochs: epochs, port: {
+      getAccountStatus: account,
+      signOut: async () => { signedIn = false; return { success: true }; },
+      beginAccountLogin: async () => {
+        expect(events).toEqual(["credentials"]);
+        expect(workflows.getSnapshot().account.value?.signedIn).toBe(false);
+        return pending;
+      },
+    } });
+    await workflows.loadAccount(); await workflows.switchAccount();
+    expect(account).toHaveBeenCalledTimes(2);
+    expect(workflows.getSnapshot().login.view).toEqual(pending);
+    workflows.dispose();
+  });
+  it("refuses a switch when sign-out is unavailable", async () => {
+    const begin = vi.fn(async () => pending);
+    const workflows = createWebuiAccountWorkflows({ port: { beginAccountLogin: begin } });
+    await workflows.switchAccount();
+    expect(begin).not.toHaveBeenCalled();
+    expect(workflows.getSnapshot().login.view).toEqual({ state: "error", error: "当前服务未提供退出登录" });
+  });
+});
+
+it("B08 exposes a recoverable malformed panel error and permits a valid retry", async () => {
+  let malformed = true;
+  const panel = { scene: 0, days: Array.from({ length: 7 }, (_, i) => ({ day_no: i + 1, points: 0, status: 1, is_today: false })) };
+  const workflows = createWebuiAccountWorkflows({ port: { getSigninPanel: async () => malformed ? {} as never : panel } });
+  await workflows.loadSigninPanel();
+  expect(workflows.getSnapshot().signin.error).toBe("Invalid sign-in panel");
+  expect(workflows.getSnapshot().signin.panel).toBeUndefined();
+  malformed = false; await workflows.loadSigninPanel();
+  expect(workflows.getSnapshot().signin.panel).toEqual(panel);
+  expect(workflows.getSnapshot().signin.error).toBeUndefined();
+});
+
 afterEach(() => {
   vi.useRealTimers();
 });

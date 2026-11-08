@@ -53,6 +53,36 @@ function task(overrides: Partial<WebuiCronTask> = {}): WebuiCronTask {
   };
 }
 
+describe("B15 scheduled task pagination", () => {
+  it("collects task and run pages through the owner's commands", async () => {
+    const taskCursors: Array<string | undefined> = [];
+    const runCursors: Array<string | undefined> = [];
+    const owner = createWebuiSchedulingOwner({ port: {
+      listCronTasks: async ({ cursor } = {}) => {
+        taskCursors.push(cursor);
+        return { items: [task({ cronId: cursor ? "second" : "first" })], hasMore: !cursor, ...(!cursor ? { nextCursor: "next" } : {}) };
+      },
+      listCronTaskRuns: async ({ cursor }) => {
+        runCursors.push(cursor);
+        return { items: [{ runId: cursor ? "run-2" : "run-1" } as never], hasMore: !cursor, ...(!cursor ? { nextCursor: "next" } : {}) };
+      },
+    } });
+    await owner.load();
+    expect(owner.getSnapshot().tasks.map((t) => t.cronId)).toEqual(["first", "second"]);
+    expect(await owner.loadRuns("first")).toEqual({ ok: true, runs: [{ runId: "run-1" }, { runId: "run-2" }] });
+    expect(taskCursors).toEqual([undefined, "next"]); expect(runCursors).toEqual([undefined, "next"]);
+  });
+  it.each(["missing", "repeated"])("refuses %s task/run continuation without presenting a complete partial list", async (kind) => {
+    const owner = createWebuiSchedulingOwner({ port: {
+      listCronTasks: async () => ({ items: [task()], hasMore: true, ...(kind === "repeated" ? { nextCursor: "same" } : {}) }),
+      listCronTaskRuns: async () => ({ items: [], hasMore: true, ...(kind === "repeated" ? { nextCursor: "same" } : {}) }),
+    } });
+    await owner.load();
+    expect(owner.getSnapshot()).toMatchObject({ status: "error", tasks: [], error: "Scheduled tasks returned an invalid cursor" });
+    expect(await owner.loadRuns("first")).toEqual({ ok: false, message: "Scheduled task runs returned an invalid cursor" });
+  });
+});
+
 describe("the schedule in readable form", () => {
   it("translates the shapes a person writes and prints the rest verbatim", () => {
     expect(describeWebuiCronSchedule({ kind: "recurring", expression: "0 9 * * *" })).toBe(

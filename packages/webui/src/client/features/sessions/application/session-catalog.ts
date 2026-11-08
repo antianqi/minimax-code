@@ -147,7 +147,7 @@ export function setWebuiCatalogFlatError(
     ...catalog,
     flat: {
       ...catalog.flat,
-      ...(error !== undefined ? { error } : {}),
+      error,
     },
   };
 }

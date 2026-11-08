@@ -76,6 +76,27 @@ selection still supersedes it, and disposal prevents publication.
 
 ## Temporal ownership
 
+Workspace files, archives, canvases and environments use the terminal snapshot-store lifetime:
+disposal freezes publication, releases subscriptions/timers and refuses new IO. Canvas reads,
+writes and release share a destination revision; accepted writes still settle even when their
+document can no longer be shown. Archive extraction publishes only for its originating listing
+and extraction revision. Channel filter writes use the selected bot's detail revision.
+
+Account login uses attempt and status-read revisions across begin, poll, cancel and dialog close.
+Credential removal is shared by switch and sign-out: retire the credential epoch and reconcile
+account/usage before beginning another login. Malformed check-in and directory responses enter
+recoverable error states. Settings subscribes once per resource slot, independently of repeated
+reads; retained model answers retire with their epoch/session resource. Composer catalogue
+invalidation also retires outstanding promises, preventing stale successful consumption.
+
+Scheduling acquires complete task and run snapshots through the shared cursor walker; plugin
+marketplace and manageable skills use the same continuation/progress rule and stop acquiring
+when selection changes. Missing or cyclic continuation is an error, never a complete partial
+snapshot. Session catalogue reads have query revisions and are retired by authoritative patches;
+flat and tree still resolve from one entity map. Explicit query-error clearing writes the cleared
+value without requiring a reload. Schedule drafts retain unexposed timezone/run-cap fields and
+map blank model/project values to the wire's explicit null-clear intent.
+
 Four rules, each with a mechanism in `client/conversation/`:
 
 - **Interest leases.** A session or resource is held by selected-view, secondary-consumer,

@@ -13,6 +13,7 @@ import type {
   WebuiWorkspaceEnvironment,
   WebuiWorkspaceGitMutationRequest,
 } from "../../../../shared/contracts/workspace.js";
+import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export interface WebuiWorkspaceEnvironmentPort {
@@ -69,10 +70,11 @@ export function createWebuiWorkspaceEnvironmentOwner(deps: {
   readonly invalidateReview: () => void;
 }): WebuiWorkspaceEnvironmentOwner {
   const { port } = deps;
-  let state = initialWebuiWorkspaceEnvironmentState;
-  let revision = 0;
+  const lifetime = createWebuiSnapshotStore({ state: initialWebuiWorkspaceEnvironmentState, revision: 0 });
+  const set = (update: (current: WebuiWorkspaceEnvironmentState) => WebuiWorkspaceEnvironmentState): void => {
+    lifetime.set((current) => { const state = update(current.state); return state === current.state ? current : { ...current, state }; });
+  };
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const listeners = new Set<() => void>();
   const versions = new Map<string, number>();
 
   const bump = (key: string): number => {
@@ -83,14 +85,8 @@ export function createWebuiWorkspaceEnvironmentOwner(deps: {
   const isCurrent = (key: string, version: number): boolean =>
     (versions.get(key) ?? 0) === version;
 
-  const set = (update: (current: WebuiWorkspaceEnvironmentState) => WebuiWorkspaceEnvironmentState): void => {
-    const next = update(state);
-    if (next === state) return;
-    state = next;
-    for (const listener of [...listeners]) listener();
-  };
-
   const load = (workspaceDir: string): void => {
+    if (lifetime.isDisposed()) return;
     const key = `environment:${workspaceDir}`;
     const version = bump(key);
     if (!port.getWorkspaceEnvironment) return;
@@ -120,14 +116,13 @@ export function createWebuiWorkspaceEnvironmentOwner(deps: {
   };
 
   const invalidate = (workspaceDir: string, debounceMs: number): void => {
+    if (lifetime.isDisposed()) return;
     const fire = (): void => {
-      set((current) =>
-        current.workspaceDir === workspaceDir
-          ? { ...current, loading: true }
-          : current,
-      );
-      revision += 1;
-      for (const listener of [...listeners]) listener();
+      timer = undefined;
+      lifetime.set((current) => ({
+        state: current.state.workspaceDir === workspaceDir ? { ...current.state, loading: true } : current.state,
+        revision: current.revision + 1,
+      }));
     };
     if (timer !== undefined) clearTimeout(timer);
     if (debounceMs <= 0) {
@@ -140,8 +135,10 @@ export function createWebuiWorkspaceEnvironmentOwner(deps: {
   const mutateGit = async (
     request: WebuiWorkspaceGitMutationRequest,
   ): Promise<Record<string, unknown>> => {
+    if (lifetime.isDisposed()) throw new Error("Workspace environment owner released");
     if (!port.mutateWorkspaceGit) return {};
     const result = await port.mutateWorkspaceGit(request);
+    if (lifetime.isDisposed()) return result;
     // Exactly the views this mutation affects: the git environment and the review
     // of the workspace it ran in. Nothing else reloads.
     invalidate(request.workspaceDir, 0);
@@ -150,23 +147,19 @@ export function createWebuiWorkspaceEnvironmentOwner(deps: {
   };
 
   return {
-    state: () => state,
-    revision: () => revision,
+    state: () => lifetime.getSnapshot().state,
+    revision: () => lifetime.getSnapshot().revision,
     canReadEnvironment: port.getWorkspaceEnvironment !== undefined,
     canMutateGit: port.mutateWorkspaceGit !== undefined,
     load,
     invalidate,
     mutateGit,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    subscribe: lifetime.subscribe,
     dispose: () => {
       if (timer !== undefined) clearTimeout(timer);
       timer = undefined;
-      listeners.clear();
+      versions.clear();
+      lifetime.dispose();
     },
   };
 }

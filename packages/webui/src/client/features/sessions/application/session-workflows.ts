@@ -585,6 +585,7 @@ export function createWebuiSessionWorkflows(deps: {
     origin: "local" | "external",
   ): void => {
     removedSessionIds.add(sessionId);
+    entityRevisions.delete(sessionId);
     // Read before anything is released: the input belongs to a slot this teardown
     // is about to fence.
     if (origin === "external") retainUnsentInput(sessionId);
@@ -611,14 +612,38 @@ export function createWebuiSessionWorkflows(deps: {
    * at each call site is what makes "a removed session stays removed" a
    * property of the workflow instead of a rule each new load has to remember.
    */
+  let catalogClock = 0;
+  const entityRevisions = new Map<string, number>();
   const commitCatalog = (
     update: (current: WebuiSessionCatalogState) => WebuiSessionCatalogState,
+    readRevision?: number,
   ): void => {
-    store.updateCatalog((current) => dropRemovedEntities(update(current)));
+    if (disposed) return;
+    store.updateCatalog((current) => {
+      const next = dropRemovedEntities(update(current));
+      let entities: Map<string, WebuiClientSession> | undefined;
+      for (const [id, record] of next.entities) {
+        if (record === current.entities.get(id)) continue;
+        // Flat/tree membership is independent; both queries still share one
+        // entity authority. An older query cannot overwrite a newer answer.
+        if (readRevision !== undefined && (entityRevisions.get(id) ?? 0) > readRevision) {
+          entities ??= new Map(next.entities);
+          const retained = current.entities.get(id);
+          if (retained) entities.set(id, retained); else entities.delete(id);
+        } else {
+          entityRevisions.set(id, readRevision ?? ++catalogClock);
+        }
+      }
+      return entities ? { ...next, entities } : next;
+    });
   };
 
-  const applyFlatLoaded = (page: WebuiClientSessionPage): void => {
-    commitCatalog((current) => reduceWebuiCatalogFlatLoaded(current, page));
+  let flatRead = 0;
+  let treeRead = 0;
+  let catalogMutation = 0;
+  const retireCatalogReads = (): void => {
+    catalogMutation += 1;
+    commitCatalog((current) => setWebuiCatalogFlatLoading(current, false));
   };
 
   const acquireSession = (sessionId: string): Promise<void> => {
@@ -641,51 +666,63 @@ export function createWebuiSessionWorkflows(deps: {
     return read;
   };
 
-  const loadFlat = async (): Promise<void> => {
-    if (!port.loadSessions) return;
+  const loadFlat = async (propagateError = false): Promise<void> => {
+    if (disposed || !port.loadSessions) return;
+    const read = ++flatRead;
+    const revision = ++catalogClock;
+    const mutation = catalogMutation;
+    const isCurrent = (): boolean => !disposed && read === flatRead && mutation === catalogMutation;
     commitCatalog((current) => setWebuiCatalogFlatLoading(current, true));
     try {
       const page = await port.loadSessions();
+      if (!isCurrent()) return;
       commitCatalog((current) => {
         const loaded = reduceWebuiCatalogFlatLoaded(current, page);
         return setWebuiCatalogFlatError(loaded, undefined);
-      });
+      }, revision);
     } catch (reason) {
+      if (!isCurrent()) return;
       commitCatalog((current) => setWebuiCatalogFlatError(current, message(reason)));
       commitCatalog((current) => setWebuiCatalogFlatLoading(current, false));
+      if (propagateError) throw reason;
       return;
     }
     commitCatalog((current) => setWebuiCatalogFlatLoading(current, false));
   };
 
-  const loadTree = async (): Promise<void> => {
-    if (!port.loadSessionTree) return;
+  const loadTree = async (propagateError = false): Promise<void> => {
+    if (disposed || !port.loadSessionTree) return;
+    const read = ++treeRead;
+    const revision = ++catalogClock;
+    const mutation = catalogMutation;
     try {
       const page = await port.loadSessionTree();
-      commitCatalog((current) => reduceWebuiCatalogTreeLoaded(current, page));
-    } catch {
+      if (disposed || read !== treeRead || mutation !== catalogMutation) return;
+      commitCatalog((current) => reduceWebuiCatalogTreeLoaded(current, page), revision);
+    } catch (reason) {
+      if (propagateError) throw reason;
       // Tree projection is optional; a runtime without child-session support
       // must not break the flat-list rail.
     }
   };
 
   const refresh = async (): Promise<void> => {
-    const [page, tree] = await Promise.all([
-      port.loadSessions?.(),
-      port.loadSessionTree?.(),
-    ]);
-    if (page) applyFlatLoaded(page);
-    if (tree) commitCatalog((current) => reduceWebuiCatalogTreeLoaded(current, tree));
+    await Promise.all([loadFlat(true), loadTree(true)]);
   };
 
   const loadMore = async (cursor: string | undefined): Promise<void> => {
-    if (!port.loadSessions) return;
+    if (disposed || !port.loadSessions) return;
+    const read = ++flatRead;
+    const revision = ++catalogClock;
+    const mutation = catalogMutation;
+    const isCurrent = (): boolean => !disposed && read === flatRead && mutation === catalogMutation;
     commitCatalog((current) => setWebuiCatalogFlatLoading(current, true));
     try {
       const page = await port.loadSessions(cursor);
-      commitCatalog((current) => reduceWebuiCatalogFlatAppended(current, page));
+      if (!isCurrent()) return;
+      commitCatalog((current) => reduceWebuiCatalogFlatAppended(current, page), revision);
     } finally {
-      commitCatalog((current) => setWebuiCatalogFlatLoading(current, false));
+      if (isCurrent()) commitCatalog((current) => setWebuiCatalogFlatLoading(current, false));
     }
   };
 
@@ -703,6 +740,7 @@ export function createWebuiSessionWorkflows(deps: {
     },
     applyFact: (fact) => {
       if (removedSessionIds.has(fact.sessionId)) return;
+      retireCatalogReads();
       if (fact.kind === "created") {
         // A creation normally names an entity this client has never read.
         // Repair through the authoritative query before applying known-only patches.
@@ -757,6 +795,7 @@ export function createWebuiSessionWorkflows(deps: {
     rename: async (sessionId, title) => {
       if (!port.updateSession) return undefined;
       const result = await port.updateSession({ id: sessionId, title });
+      retireCatalogReads();
       const nextTitle = result.session?.title;
       if (nextTitle) {
         commitCatalog((current) =>
@@ -910,6 +949,7 @@ export function createWebuiSessionWorkflows(deps: {
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      entityRevisions.clear();
       projectRequestVersion += 1;
       if (projects.loading) setProjects({ ...projects, loading: false });
       projectListeners.clear();

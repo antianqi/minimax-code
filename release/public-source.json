@@ -3983,6 +3983,7 @@
     "packages/webui/src/client/contracts/browser-drawing.ts",
     "packages/webui/src/client/contracts/transport.ts",
     "packages/webui/src/client/contracts/value-readers.ts",
+    "packages/webui/src/client/conversation/pagination.ts",
     "packages/webui/src/client/conversation/request-freshness.ts",
     "packages/webui/src/client/conversation/session-scope.ts",
     "packages/webui/src/client/conversation/stream-instrumentation.ts",

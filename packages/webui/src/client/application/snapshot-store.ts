@@ -29,6 +29,8 @@ export interface WebuiSnapshotStore<State extends object> {
    * so an unchanged answer must not cost a render.
    */
   readonly set: (update: (current: State) => State) => void;
+  readonly isDisposed: () => boolean;
+  readonly dispose: () => void;
 }
 
 export function createWebuiSnapshotStore<State extends object>(
@@ -36,14 +38,17 @@ export function createWebuiSnapshotStore<State extends object>(
 ): WebuiSnapshotStore<State> {
   let state = initial;
   const listeners = new Set<() => void>();
+  let disposed = false;
 
   return {
     getSnapshot: () => state,
     subscribe: (listener) => {
+      if (disposed) return () => undefined;
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     set: (update) => {
+      if (disposed) return;
       const next = update(state);
       if (next === state) return;
       state = next;
@@ -51,5 +56,7 @@ export function createWebuiSnapshotStore<State extends object>(
       // while it is being notified must not change what this pass visits.
       for (const listener of [...listeners]) listener();
     },
+    isDisposed: () => disposed,
+    dispose: () => { disposed = true; listeners.clear(); },
   };
 }

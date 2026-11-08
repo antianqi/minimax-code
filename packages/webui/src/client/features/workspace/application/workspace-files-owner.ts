@@ -15,6 +15,7 @@ import type {
   WebuiWorkspaceFileContent,
 } from "../../../../shared/contracts/workspace.js";
 import { mergeWorkspaceFileChildren } from "../projection/workspace-file-tree.js";
+import { createWebuiSnapshotStore } from "../../../application/snapshot-store.js";
 
 /** The transport methods this owner drives. Absent means "not wired". */
 export interface WebuiWorkspaceFilesPort {
@@ -115,20 +116,19 @@ function withoutKey(
  * whole app tree falls into the error boundary. The `?.` stopped one level
  * too early: it guarded `listing` and left `entries` bare.
  *
- * Normalising at the door means the view can read the listing it was given
- * without re-checking the wire's shape at every use, and a malformed answer
- * degrades to an empty directory rather than to a blank page.
+ * Rejecting malformed data here routes it through the browse command's
+ * recoverable error state, without inventing an empty directory.
  */
 function normalizeDirectoryListing(
   value: WebuiWorkspaceDirectoryListing,
 ): WebuiWorkspaceDirectoryListing {
   const raw = value as Partial<WebuiWorkspaceDirectoryListing> | null;
-  return {
-    dir: typeof raw?.dir === "string" ? raw.dir : "",
-    parent: typeof raw?.parent === "string" ? raw.parent : undefined,
-    entries: Array.isArray(raw?.entries) ? raw.entries : [],
-    truncated: raw?.truncated === true,
-  };
+  if (!raw || typeof raw.dir !== "string" || !Array.isArray(raw.entries) ||
+      !raw.entries.every((entry) => entry && typeof entry.name === "string" && typeof entry.path === "string") ||
+      (raw.parent !== undefined && typeof raw.parent !== "string") || typeof raw.truncated !== "boolean") {
+    throw new Error("目录列表响应格式无效，请重试。");
+  }
+  return raw as WebuiWorkspaceDirectoryListing;
 }
 
 /** The children a directory load returned, or `undefined` when it was dropped. */
@@ -165,8 +165,8 @@ export function createWebuiWorkspaceFilesOwner(deps: {
   readonly port: WebuiWorkspaceFilesPort;
 }): WebuiWorkspaceFilesOwner {
   const { port } = deps;
-  let state = initialWebuiWorkspaceFilesState;
-  const listeners = new Set<() => void>();
+  const { getSnapshot, subscribe, set, dispose, isDisposed } =
+    createWebuiSnapshotStore(initialWebuiWorkspaceFilesState);
   const versions = new Map<string, number>();
   const bump = (key: string): number => {
     const next = (versions.get(key) ?? 0) + 1;
@@ -174,16 +174,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     return next;
   };
   const isCurrent = (key: string, version: number): boolean =>
-    (versions.get(key) ?? 0) === version;
-
-  const set = (
-    update: (current: WebuiWorkspaceFilesState) => WebuiWorkspaceFilesState,
-  ): void => {
-    const next = update(state);
-    if (next === state) return;
-    state = next;
-    for (const listener of listeners) listener();
-  };
+    !isDisposed() && (versions.get(key) ?? 0) === version;
 
   const setFile = (
     tabId: string,
@@ -200,6 +191,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
   // workspace collapses to one reload, exactly as the panel's 350 ms timer did.
 
   const selectWorkspace = (workspaceDir: string | undefined): void => {
+    if (isDisposed()) return;
     set((current) =>
       current.fileTree.workspaceDir === workspaceDir
         ? current
@@ -211,6 +203,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
   };
 
   const loadFileTree = (workspaceDir: string): void => {
+    if (isDisposed()) return;
     const key = `tree:${workspaceDir}`;
     const version = bump(key);
     if (!port.listWorkspaceFileTree) {
@@ -276,6 +269,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     workspaceDir: string,
     path: string,
   ): Promise<WebuiWorkspaceDirLoad> => {
+    if (isDisposed()) return undefined;
     if (!port.listWorkspaceFileTree) {
       set((current) => ({
         ...current,
@@ -354,7 +348,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
    * reads the new one instead of keeping the old one's result.
    */
   const readFile = (cacheKey: string, workspaceDir: string, path: string): void => {
-    if (state.files.get(cacheKey)?.content) return;
+    if (isDisposed() || getSnapshot().files.get(cacheKey)?.content) return;
     const key = `file:${cacheKey}`;
     const version = bump(key);
     if (!port.readWorkspaceFile) {
@@ -375,6 +369,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
   };
 
   const setInlineFile = (cacheKey: string, content: string, resolvedPath: string): void => {
+    if (isDisposed()) return;
     // Supersede any in-flight read for this tab so a late read does not
     // overwrite the inline content the tab already carries.
     bump(`file:${cacheKey}`);
@@ -386,6 +381,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
 
   let browseSeq = 0;
   const browse = (dir?: string): void => {
+    if (isDisposed()) return;
     const browseDirs = port.browseWorkspaceDirs;
     const mine = ++browseSeq;
     if (!browseDirs) {
@@ -412,6 +408,7 @@ export function createWebuiWorkspaceFilesOwner(deps: {
   };
 
   const discardTab = (tabId: string): void => {
+    if (isDisposed()) return;
     bump(`file:${tabId}`);
     set((current) => {
       if (!current.files.has(tabId)) return current;
@@ -440,13 +437,8 @@ export function createWebuiWorkspaceFilesOwner(deps: {
   };
 
   return {
-    state: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    state: getSnapshot,
+    subscribe,
     canListFileTree: port.listWorkspaceFileTree !== undefined,
     canReadFile: port.readWorkspaceFile !== undefined,
     selectWorkspace,
@@ -458,8 +450,6 @@ export function createWebuiWorkspaceFilesOwner(deps: {
     canBrowseDirectories: port.browseWorkspaceDirs !== undefined,
     browse,
     reportDirectoryError,
-    dispose: () => {
-      listeners.clear();
-    },
+    dispose: () => { versions.clear(); dispose(); },
   };
 }

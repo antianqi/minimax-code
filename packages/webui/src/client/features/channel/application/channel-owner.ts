@@ -593,15 +593,19 @@ export function createWebuiChannelOwner(
       return result;
     },
     updateMessageFilter: async (request) => {
+      if (disposed) return { ok: false, message: WEBUI_CHANNEL_UNAVAILABLE };
       const write = options.port.updateChannelMessageFilter;
       if (!write) return { ok: false, message: WEBUI_CHANNEL_UNAVAILABLE };
+      const selectedId = snapshot.selectedId;
+      const revision = ++selectionDetailRevision;
+      const isCurrent = (): boolean => !disposed && revision === selectionDetailRevision && snapshot.selectedId === selectedId;
       try {
         const filter = await write(request);
-        publish({ ...snapshot, filter, filterError: undefined, actionError: undefined });
+        if (isCurrent()) publish({ ...snapshot, filter, filterError: undefined, actionError: undefined });
         return { ok: true };
       } catch (error) {
         const message = failureMessage(error);
-        publish({ ...snapshot, actionError: message });
+        if (isCurrent()) publish({ ...snapshot, actionError: message });
         return { ok: false, message };
       }
     },

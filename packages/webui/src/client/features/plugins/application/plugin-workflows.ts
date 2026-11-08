@@ -25,6 +25,7 @@
 import { webuiPluginFailureTextFrom } from "../../../projection/common/plugin-failure-text.js";
 import type { PluginPort } from "../contracts/plugin-port.js";
 import type { WebuiAgentOption } from "../contracts/plugin-rows.js";
+import { collectWebuiPages } from "../../../conversation/pagination.js";
 import {
   createWebuiPluginActions,
   webuiPluginRows,
@@ -400,7 +401,7 @@ export function createWebuiPluginWorkflows(deps: {
       };
     });
     try {
-      const composed = await composeListing(selection);
+      const composed = await composeListing(selection, () => isCurrent("listing", version));
       if (!isCurrent("listing", version) || !sameSelection(state.listing.selection, selection)) return;
       const nextListing: WebuiPluginListingState = {
         selection,
@@ -432,6 +433,7 @@ export function createWebuiPluginWorkflows(deps: {
   /** The area/view composition the component used to perform itself. */
   const composeListing = async (
     selection: WebuiPluginSelection,
+    isCurrent: () => boolean,
   ): Promise<{
     readonly rows: readonly Record<string, unknown>[];
     readonly pluginTotal?: number;
@@ -442,12 +444,9 @@ export function createWebuiPluginWorkflows(deps: {
     if (area === "plugins" && view === "market") {
       const [market, installed] = await Promise.all([
         (async () => {
-          const plugins: Record<string, unknown>[] = [];
-          let cursor: string | undefined;
           let tagDefinitions: unknown;
           let pluginTotal: unknown;
-          const seen = new Set<string>();
-          for (;;) {
+          const plugins = await collectWebuiPages(async (cursor) => {
             const page = await call("listMarketplacePlugins", {
               source: InstalledPluginSource.OFFICIAL,
               limit: 100,
@@ -455,20 +454,11 @@ export function createWebuiPluginWorkflows(deps: {
               category: category ? MARKETPLACE_CATEGORY[category] : undefined,
               cursor,
             }) as Record<string, unknown>;
-            plugins.push(...webuiPluginRows(page, "plugins"));
             tagDefinitions = page.tagDefinitions ?? tagDefinitions;
             pluginTotal = page.pluginTotal ?? pluginTotal;
-            if (page.cursorResetRequired === true) {
-              throw new Error("Plugin marketplace cursor expired; refresh the catalogue");
-            }
-            if (page.hasMore !== true) break;
-            const next = page.nextCursor;
-            if (typeof next !== "string" || !next || seen.has(next)) {
-              throw new Error("Plugin marketplace returned an invalid cursor");
-            }
-            seen.add(next);
-            cursor = next;
-          }
+            return { items: webuiPluginRows(page, "plugins"), hasMore: page.hasMore === true,
+              nextCursor: page.nextCursor, cursorResetRequired: page.cursorResetRequired === true };
+          }, { label: "Plugin marketplace", isCurrent });
           return { plugins, tagDefinitions, pluginTotal };
         })(),
         call("listInstalledPlugins", { limit: 200 }),
@@ -544,30 +534,17 @@ export function createWebuiPluginWorkflows(deps: {
     if (area === "skills") {
       // Runtime skills intentionally exclude disabled entries; the management
       // list must include them so the user can turn one back on.
-      const skills: Record<string, unknown>[] = [];
-      let cursor: string | undefined;
-      for (;;) {
+      const skills = await collectWebuiPages(async (cursor) => {
         const page = await call("listManageableSkills", {
           limit: 200,
           keyword: query || undefined,
           excludeBuiltin: true,
           cursor,
         });
-        skills.push(...webuiPluginRows(page, "skills"));
-        const nextCursor =
-          page && typeof page === "object" && typeof (page as Record<string, unknown>).nextCursor === "string"
-            ? ((page as Record<string, unknown>).nextCursor as string)
-            : undefined;
-        if (
-          !page ||
-          typeof page !== "object" ||
-          (page as Record<string, unknown>).hasMore !== true ||
-          !nextCursor
-        ) {
-          break;
-        }
-        cursor = nextCursor;
-      }
+        const record = page as Record<string, unknown> | undefined;
+        return { items: webuiPluginRows(page, "skills"), hasMore: record?.hasMore === true,
+          nextCursor: record?.nextCursor, cursorResetRequired: record?.cursorResetRequired === true };
+      }, { label: "Manageable skills", isCurrent });
       return { rows: skills, skillTotal: null };
     }
     if (area === "apps") {

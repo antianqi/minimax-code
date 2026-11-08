@@ -1044,6 +1044,53 @@ describe("V36 · this page can act on a session fact another client published", 
     expect(workflows.retainedDeletionDrafts()).toBe(retained);
   });
 
+  it.each(["attachments", "references", "both"])("successful text copy preserves uncopied %s for transfer", async (staging) => {
+    const { workflows, composer } = factFixture();
+    const attachments = staging === "references" ? [] : [{ id: "file", fileName: "draft.txt", mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const }];
+    const urlReferences = staging === "attachments" ? [] : [{ id: "ref", url: "https://example.test/reference" }];
+    composer.setStaging({ attachments, urlReferences });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const copy = vi.fn(async () => undefined);
+    await workflows.copyRetainedDeletionDraft("a", copy);
+    expect(copy).toHaveBeenCalledExactlyOnceWith("half-written");
+    expect(workflows.retainedDeletionDrafts()).toEqual([{ sessionId: "a", draft: "", attachments, urlReferences }]);
+    expect(workflows.transferRetainedDeletionDraft("a", "target")).toEqual({ draft: "", attachments, urlReferences });
+    expect(composer.readStaging()).toMatchObject({ attachments, urlReferences });
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
+  it("does not consume attachment-only retained input or copy an empty string", async () => {
+    const { workflows, composer } = factFixture({ a: "" });
+    const attachments = [{ id: "file", fileName: "draft.txt", mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const }];
+    composer.setStaging({ attachments, urlReferences: [] });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const retained = workflows.retainedDeletionDrafts();
+    expect(retained).toHaveLength(1);
+    const copy = vi.fn(async () => undefined);
+    await workflows.copyRetainedDeletionDraft("a", copy);
+    expect(copy).not.toHaveBeenCalled();
+    expect(workflows.retainedDeletionDrafts()).toBe(retained);
+    expect(workflows.transferRetainedDeletionDraft("a", "target")).toEqual({ draft: "", attachments, urlReferences: [] });
+  });
+
+  it("a late concurrent copy cannot remove the replacement record containing uncopied input", async () => {
+    const { workflows, composer } = factFixture();
+    const urlReferences = [{ id: "ref", url: "https://example.test/reference" }];
+    composer.setStaging({ attachments: [], urlReferences });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    let acknowledgeFirst!: () => void;
+    let acknowledgeSecond!: () => void;
+    const first = workflows.copyRetainedDeletionDraft("a", () => new Promise<void>((resolve) => { acknowledgeFirst = resolve; }));
+    const second = workflows.copyRetainedDeletionDraft("a", () => new Promise<void>((resolve) => { acknowledgeSecond = resolve; }));
+    acknowledgeFirst();
+    await first;
+    const replacement = workflows.retainedDeletionDrafts();
+    expect(replacement).toEqual([{ sessionId: "a", draft: "", attachments: [], urlReferences }]);
+    acknowledgeSecond();
+    await second;
+    expect(workflows.retainedDeletionDrafts()).toBe(replacement);
+  });
+
   it("keeps the retained record until the clipboard promise acknowledges success", async () => {
     const { workflows } = factFixture();
     workflows.applyFact({ kind: "deleted", sessionId: "a" });

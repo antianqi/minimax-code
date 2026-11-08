@@ -257,11 +257,12 @@ export interface WebuiSessionWorkflows {
    * client or the CLI removed it. The text and attachments that were staged for it
    * are the user's, not the catalogue's, so they are retained here rather than
    * dropped with the session: the notice that reports the deletion reads this list
-   * until the user copies the text, transfers it to another task, or discards it.
+   * until the user handles all retained input by copying its text, transferring
+   * the remaining input to another task, or discarding it.
    */
   readonly retainedDeletionDrafts: () => readonly WebuiRetainedDeletionDraft[];
   readonly subscribeRetainedDrafts: (listener: () => void) => () => void;
-  /** Retire this record only after the browser acknowledges copying its text. */
+  /** Acknowledged text copy consumes only text; uncopied attachments/references remain. */
   readonly copyRetainedDeletionDraft: (sessionId: string, copy: (text: string) => Promise<void>) => Promise<void>;
   /**
    * Hand the retained input to a task. With no target it goes to the composer's
@@ -477,8 +478,8 @@ export function createWebuiSessionWorkflows(deps: {
   /**
    * Unsent input retained from sessions somebody else deleted.
    *
-   * A bounded bucket, like the deletion fence beside it: the record is retired by
-   * the user copying, transferring or discarding it, and cleared when the page is
+   * A bounded bucket, like the deletion fence beside it: the record is retired when
+   * all input is copied, transferred or discarded, and cleared when the page is
    * torn down. That is the same boundedness exception an in-memory fact log takes for
    * tombstones — bounded by user action rather than by a quota — and it is stated
    * rather than implied.
@@ -506,9 +507,15 @@ export function createWebuiSessionWorkflows(deps: {
   };
   const copyRetainedDeletionDraft = async (sessionId: string, copy: (text: string) => Promise<void>): Promise<void> => {
     const retained = retainedDrafts.get(sessionId);
-    if (!retained) return;
+    if (!retained || retained.draft === "") return;
     await copy(retained.draft);
-    if (retainedDrafts.get(sessionId) === retained) dropRetained(sessionId);
+    if (retainedDrafts.get(sessionId) !== retained) return;
+    if (retained.attachments.length > 0 || retained.urlReferences.length > 0) {
+      retainedDrafts.set(sessionId, { ...retained, draft: "" });
+      notifyRetained();
+    } else {
+      dropRetained(sessionId);
+    }
   };
   const transferRetainedDeletionDraft = (
     sessionId: string,

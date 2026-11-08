@@ -10,9 +10,9 @@
 // It is disabled-by-default in the sense that matters: the retained input is not
 // inserted into any editor, is not resent, and is not re-created as a task. The
 // three actions are the only ways it leaves — copy the text, transfer it to the
-// task the user is in, or discard it — and each of them retires the record, which
-// is why the notice disappears when the user acts rather than when a later read
-// happens to notice.
+// task the user is in, or discard it. Acknowledged text copy leaves uncopied
+// attachments and references available for transfer; the notice retires only
+// when all retained input has been handled.
 
 import type { ReactElement } from "react";
 
@@ -23,7 +23,7 @@ import { WebuiButton } from "../../../ui/button.js";
 
 export interface WebuiExternalDeletionNoticeProps {
   readonly drafts: readonly WebuiRetainedDeletionDraft[];
-  /** Hands the text back for copying; the record retires in the owner. */
+  /** Requests text copy; the owner preserves input the clipboard cannot copy. */
   readonly onCopy: (sessionId: string) => void;
   /** Puts the input into the composer's current slot. */
   readonly onTransfer: (sessionId: string) => void;

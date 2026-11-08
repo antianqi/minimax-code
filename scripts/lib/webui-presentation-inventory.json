@@ -210,7 +210,7 @@
     "features/review/ui/ReviewSettingsPage.public.tsx": "b22f0b5060308689",
     "features/scheduling/ui/SchedulingPanel.public.tsx": "17141e43679af0bd",
     "features/scheduling/ui/scheduling-editor.tsx": "a952e3163dcd78eb",
-    "features/sessions/ui/ExternalDeletionDraftNotice.public.tsx": "da940d3d024e15ad",
+    "features/sessions/ui/ExternalDeletionDraftNotice.public.tsx": "ffa8c6ab7184f100",
     "features/sessions/ui/LeftRail.tsx": "8e4c7409afe527f9",
     "features/sessions/ui/ProjectList.tsx": "634a9b14600d54ce",
     "features/sessions/ui/RailRow.tsx": "f08f294e403b0bae",

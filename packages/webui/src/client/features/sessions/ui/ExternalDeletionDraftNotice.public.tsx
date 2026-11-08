@@ -14,10 +14,10 @@
 // attachments and references available for transfer; the notice retires only
 // when all retained input has been handled.
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
 import type { WebuiRetainedDeletionDraft } from "../application/session-workflows.js";
-import { FeedbackLiveRegion } from "../../../ui/feedback.js";
+import { FeedbackError, FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { WebuiInline } from "../../../ui/layout-primitives.js";
 import { WebuiButton } from "../../../ui/button.js";
 
@@ -36,6 +36,7 @@ export function WebuiExternalDeletionNotice({
   onTransfer,
   onDiscard,
 }: WebuiExternalDeletionNoticeProps): ReactElement | null {
+  const [transferError, setTransferError] = useState<{ readonly sessionId: string; readonly message: string }>();
   if (drafts.length === 0) return null;
   return (
     <FeedbackLiveRegion
@@ -56,13 +57,23 @@ export function WebuiExternalDeletionNotice({
               <WebuiButton variant="quiet-secondary" size="inline" onClick={() => onCopy(draft.sessionId)}>
                 复制文本
               </WebuiButton>
-              <WebuiButton variant="quiet-secondary" size="inline" onClick={() => onTransfer(draft.sessionId)}>
+              <WebuiButton variant="quiet-secondary" size="inline" onClick={() => {
+                try {
+                  onTransfer(draft.sessionId);
+                  setTransferError(undefined);
+                } catch (error: unknown) {
+                  setTransferError({ sessionId: draft.sessionId, message: error instanceof Error ? error.message : String(error) });
+                }
+              }}>
                 合并到当前任务
               </WebuiButton>
               <WebuiButton variant="danger" size="inline" onClick={() => onDiscard(draft.sessionId)}>
                 丢弃
               </WebuiButton>
             </WebuiInline>
+            {transferError?.sessionId === draft.sessionId ? (
+              <FeedbackError message={`无法合并保留内容：${transferError.message}`} testId="external-deletion-transfer-error" />
+            ) : null}
           </div>
         );
       })}

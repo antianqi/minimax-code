@@ -286,6 +286,35 @@ for (const [destination, sourceState] of [["home", "copied"], ["B", "copied"], [
   });
 }
 
+test("C11 refused merge reports an action error and preserves input for retry", async ({ page }, testInfo) => {
+  await openApp(page, "#session=A");
+  const input = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");
+  await input.fill("source draft");
+  await page.getByLabel("添加文件或图片", { exact: true }).setInputFiles({ name: "source.txt", mimeType: "text/plain", buffer: Buffer.from("source") });
+  await expect(page.getByRole("button", { name: "移除 source.txt", exact: true })).toBeVisible();
+  await page.evaluate(() => window.__fixture.publishSessionFact("A", {}, {
+    type: "session.deleted", payload: { sessionId: "A" }, timestamp: Date.now(), source: "fixture",
+  }));
+  const notice = page.getByTestId("external-deletion-draft-A");
+  await expect(notice).toBeVisible();
+  await notice.getByRole("button", { name: "合并到当前任务", exact: true }).click();
+  await expect(notice.getByRole("alert")).toHaveText("无法合并保留内容：请选择仍存在的任务或新建任务后合并保留内容。");
+  await expect(notice.getByRole("alert")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("transfer-action-error.png") });
+  await expect(page.getByText(/Unable to load projects/u)).toHaveCount(0);
+  await expect(notice.getByTestId("external-deletion-draft-text")).toHaveText("source draft");
+  await expect(notice.getByTestId("external-deletion-draft-attachments")).toHaveText("（1 个附件）");
+  await page.locator('[data-webui-session-link="B"]').first().click({ position: { x: 12, y: 12 } });
+  await expect(page.locator('[data-webui-transcript="B"]')).toBeVisible();
+  await input.fill("target draft");
+  await notice.getByRole("button", { name: "合并到当前任务", exact: true }).click();
+  await expect(notice).toHaveCount(0);
+  await expect(page.getByTestId("external-deletion-transfer-error")).toHaveCount(0);
+  await expect(input).toHaveValue("target draft\nsource draft");
+  await expect(page.getByRole("button", { name: "移除 source.txt", exact: true })).toBeVisible();
+  expect(await requestCount(page, "sendMessage")).toBe(0);
+});
+
 test("V15 cross-page deletion retains reachable unsent input and fences a late read", async ({ page, context }) => {
   await openApp(page);
   const composer = page.getByPlaceholder("输入消息…（输入 / 唤起命令）");

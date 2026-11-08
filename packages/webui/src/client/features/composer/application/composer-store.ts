@@ -32,7 +32,7 @@ import type { WebuiMentionRange } from "../contracts/composer-interactions.js";
 import type { WebuiRecordedTurn } from "../contracts/composer-turn.js";
 import type { WebuiComposerModes, WebuiComposerQueueState, WebuiComposerSnapshot, WebuiComposerStagingState } from "../contracts/composer-state.js";
 export type { WebuiComposerModes, WebuiComposerQueueState, WebuiComposerSnapshot, WebuiComposerStagingState } from "../contracts/composer-state.js";
-import type { WebuiComposerPurgeSlot } from "./composer-store.public.js";
+import type { WebuiComposerMergeInput, WebuiComposerPurgeSlot } from "./composer-store.public.js";
 
 export interface WebuiComposerPersistence {
   readonly loadComposer: <T>(parse: (raw: string | null | undefined) => T) => T;
@@ -96,6 +96,8 @@ export interface WebuiComposerStore {
    * through the prune.
    */
   readonly setDraft: (key: string, draft: string) => void;
+  /** Merge retained text and staging atomically; conflicts publish nothing. */
+  readonly mergeInput: WebuiComposerMergeInput;
   /** Record one committed submission into a slot's history. */
   readonly recordInput: (key: string, text: string) => void;
   /**
@@ -192,6 +194,25 @@ export interface WebuiComposerStore {
   ) => boolean;
 }
 
+function mergeRetainedItems<T extends { readonly id: string }>(
+  current: readonly T[],
+  incoming: readonly T[],
+  sameItem: (left: T, right: T) => boolean,
+): readonly T[] {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  const additions: T[] = [];
+  for (const item of incoming) {
+    const existing = byId.get(item.id);
+    if (existing) {
+      if (!sameItem(existing, item)) throw new Error("保留内容与当前任务的附件或引用标识冲突，请先分别保存内容。");
+    } else {
+      byId.set(item.id, item);
+      additions.push(item);
+    }
+  }
+  return additions.length === 0 ? current : [...current, ...additions];
+}
+
 export function createWebuiComposerStore(options?: {
   /** Seed for SSR / tests; never a second load of storage. */
   readonly initial?: WebuiComposerPersisted;
@@ -267,6 +288,25 @@ export function createWebuiComposerStore(options?: {
     },
     readDraft: (key) => state.drafts[key] ?? "",
     readHistory: (key) => state.history[key] ?? [],
+    mergeInput: (key, input) => {
+      const attachments = mergeRetainedItems(staging.attachments, input.attachments, (left, right) =>
+        left.fileName === right.fileName && left.mimeType === right.mimeType && left.sizeBytes === right.sizeBytes && left.dataUrl === right.dataUrl && left.kind === right.kind);
+      const urlReferences = mergeRetainedItems(staging.urlReferences, input.urlReferences, (left, right) => left.url === right.url);
+      const currentDraft = state.drafts[key] ?? "";
+      const separator = currentDraft === "" || currentDraft.endsWith("\n") ? "" : "\n";
+      const draft = input.draft === "" ? currentDraft : `${currentDraft}${separator}${input.draft}`;
+      const draftChanged = draft !== currentDraft;
+      if (!draftChanged && attachments === staging.attachments && urlReferences === staging.urlReferences) return;
+      const next = draftChanged ? { ...state, drafts: { ...state.drafts, [key]: draft } } : state;
+      // Preflight is complete. Publish the whole input before any subscriber can
+      // reenter; never write a precomputed field after notifying listeners.
+      if (draftChanged) options?.storage?.saveComposer(next, serializeWebuiComposerPersisted, [key]);
+      state = next;
+      staging = { ...staging, attachments, urlReferences };
+      if (draftChanged) bumpSlot(key);
+      snapshot = { ...state, queue, staging, modes, retry, mentionRange };
+      notify();
+    },
     setDraft: (key, draft) => {
       bumpSlot(key);
       apply((current) => {

@@ -13,7 +13,7 @@
 // unit-tested against a scripted port.
 
 import type { SessionPort, WebuiClientSessionCreator } from "../contracts/session-port.js";
-import type { WebuiComposerPurgeSlot } from "../../../features/composer/application/composer-store.public.js";
+import type { WebuiComposerMergeInput, WebuiComposerPurgeSlot } from "../../../features/composer/application/composer-store.public.js";
 import type {
   WebuiComposerAttachment,
   WebuiComposerUrlReference,
@@ -154,32 +154,7 @@ export interface WebuiComposerInputSource {
     readonly attachments: readonly WebuiComposerAttachment[];
     readonly urlReferences: readonly WebuiComposerUrlReference[];
   };
-  readonly setDraft?: (key: string, text: string) => void;
-  readonly setStaging?: (
-    next: Partial<{
-      readonly attachments: readonly WebuiComposerAttachment[];
-      readonly urlReferences: readonly WebuiComposerUrlReference[];
-    }>,
-  ) => void;
-}
-
-function mergeRetainedComposerItems<T extends { readonly id: string }>(
-  current: readonly T[],
-  incoming: readonly T[],
-  sameItem: (left: T, right: T) => boolean,
-): readonly T[] {
-  const byId = new Map(current.map((item) => [item.id, item]));
-  const additions: T[] = [];
-  for (const item of incoming) {
-    const existing = byId.get(item.id);
-    if (existing) {
-      if (!sameItem(existing, item)) throw new Error("保留内容与当前任务的附件或引用标识冲突，请先分别保存内容。");
-    } else {
-      byId.set(item.id, item);
-      additions.push(item);
-    }
-  }
-  return additions.length === 0 ? current : [...current, ...additions];
+  readonly mergeInput?: WebuiComposerMergeInput;
 }
 
 /**
@@ -216,25 +191,8 @@ export function createWebuiSessionComposerAccess(
     },
     writeUnsent: (sessionId, input) => {
       const key = sessionId ?? options.homeKey ?? "";
-      const hasStaging = input.attachments.length > 0 || input.urlReferences.length > 0;
-      if (input.draft !== "" && (!source.readDraft || !source.setDraft))
-        throw new Error("当前任务未提供草稿合并能力，保留内容未转移。");
-      if (hasStaging && (!source.readStaging || !source.setStaging))
-        throw new Error("当前任务未提供附件合并能力，保留内容未转移。");
-      const currentDraft = source.readDraft?.(key) ?? "";
-      const staged = hasStaging ? source.readStaging!() : undefined;
-      // Validate both collections before publishing any change. A conflicting
-      // identity must preserve the destination and the retained source intact.
-      const merged = staged ? {
-        attachments: mergeRetainedComposerItems(staged.attachments, input.attachments, (left, right) =>
-          left.fileName === right.fileName && left.mimeType === right.mimeType && left.sizeBytes === right.sizeBytes && left.dataUrl === right.dataUrl && left.kind === right.kind),
-        urlReferences: mergeRetainedComposerItems(staged.urlReferences, input.urlReferences, (left, right) => left.url === right.url),
-      } : undefined;
-      if (input.draft !== "") {
-        const separator = currentDraft === "" || currentDraft.endsWith("\n") ? "" : "\n";
-        source.setDraft!(key, `${currentDraft}${separator}${input.draft}`);
-      }
-      if (merged) source.setStaging!(merged);
+      if (!source.mergeInput) throw new Error("当前任务未提供内容合并能力，保留内容未转移。");
+      source.mergeInput(key, input);
     },
   };
 }

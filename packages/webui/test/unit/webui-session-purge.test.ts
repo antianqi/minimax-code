@@ -1110,6 +1110,42 @@ describe("V36 · this page can act on a session fact another client published", 
     expect(workflows.retainedDeletionDrafts()).toEqual([]);
   });
 
+  it.each([false, true])("publishes a complete retained merge once and preserves synchronous subscriber edits (reentrant=%s)", (reentrant) => {
+    const { workflows, composer } = factFixture({ a: "source draft" });
+    const file = (id: string) => ({ id, fileName: `${id}.txt`, mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const });
+    const sourceFile = file("source");
+    const targetFile = file("target");
+    const subscriberFile = file("subscriber");
+    const sourceUrl = { id: "source-url", url: "https://example.test/source" };
+    const targetUrl = { id: "target-url", url: "https://example.test/target" };
+    const subscriberUrl = { id: "subscriber-url", url: "https://example.test/subscriber" };
+    composer.setStaging({ attachments: [sourceFile], urlReferences: [sourceUrl] });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    composer.setDraft("target", "target draft");
+    composer.setStaging({ attachments: [targetFile], urlReferences: [targetUrl] });
+    const observed: ReturnType<typeof composer.getSnapshot>[] = [];
+    let edited = false;
+    const detach = composer.subscribe(() => {
+      observed.push(composer.getSnapshot());
+      if (reentrant && !edited && composer.readDraft("target") === "target draft\nsource draft") {
+        edited = true;
+        composer.setStaging((current) => ({
+          attachments: [...current.attachments, subscriberFile],
+          urlReferences: [...current.urlReferences, subscriberUrl],
+        }));
+      }
+    });
+    workflows.transferRetainedDeletionDraft("a", "target");
+    detach();
+    expect(composer.readStaging().attachments).toEqual([targetFile, sourceFile, ...(reentrant ? [subscriberFile] : [])]);
+    expect(composer.readStaging().urlReferences).toEqual([targetUrl, sourceUrl, ...(reentrant ? [subscriberUrl] : [])]);
+    expect(observed).toHaveLength(reentrant ? 2 : 1);
+    expect(observed[0]?.drafts.target).toBe("target draft\nsource draft");
+    expect(observed[0]?.staging.attachments).toEqual([targetFile, sourceFile]);
+    expect(observed[0]?.staging.urlReferences).toEqual([targetUrl, sourceUrl]);
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
   it.each(["attachment", "reference"])("retains both sides and performs no write when %s identities conflict", (kind) => {
     const { workflows, composer } = factFixture();
     const sourceFile = { id: "same-id", fileName: "source.txt", mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const };
@@ -1123,7 +1159,13 @@ describe("V36 · this page can act on a session fact another client published", 
       urlReferences: [{ ...sourceUrl, ...(kind === "reference" ? { url: "https://example.test/target" } : {}) }],
     });
     const target = composer.getSnapshot();
+    const revision = composer.readSlotRevision("target");
+    const changed = vi.fn();
+    const detach = composer.subscribe(changed);
     expect(() => workflows.transferRetainedDeletionDraft("a", "target")).toThrow(/标识/u);
+    detach();
+    expect(changed).not.toHaveBeenCalled();
+    expect(composer.readSlotRevision("target")).toBe(revision);
     expect(composer.getSnapshot()).toBe(target);
     expect(workflows.retainedDeletionDrafts()).toBe(retained);
   });

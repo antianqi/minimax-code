@@ -26,6 +26,13 @@ Runnable slash commands clear the captured draft as soon as execution starts; ne
 in the composer. `/compact` progress and its one-line completion summary appear at the bottom of the
 matching session's transcript. Other command output remains with the composer.
 
+Retained input from an externally deleted session is merged only by the notice's explicit action.
+The composer store's `mergeInput` validates attachment and URL identities before changing any field,
+appends nonempty source text, and publishes the complete draft and staging together. Empty source
+text preserves the target draft. Synchronous subscribers can edit the committed input without a
+later transfer write replacing their changes. Conflicts publish nothing and keep the retained source;
+the notice shows a transfer error beside its action so the user can select another destination and retry.
+
 ## Where the pieces live
 
 - The surface is `client/features/composer/ui/WebuiComposer.tsx`, with the editor staging, menus,

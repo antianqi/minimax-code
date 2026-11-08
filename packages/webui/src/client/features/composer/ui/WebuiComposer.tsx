@@ -17,7 +17,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -38,10 +37,6 @@ import { FeedbackBusy } from "../../../ui/feedback.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { WebuiMotionSlot } from "../../../ui/page.js";
 import { WebuiCard } from "../../../ui/card.js";
-import type {
-  WebuiComposerPluginCatalogue,
-  WebuiComposerPluginSummary,
-} from "../../../features/plugins/application/composer-catalogue.public.js";
 import { readContextUsageFromPage } from "../contracts/context-usage.js";
 import { readWebuiComposerSubmitGate } from "../projection/submission-gate.js";
 import {
@@ -76,17 +71,13 @@ import {
   useWebuiModelsWorkflows,
   useWebuiModelsWorkflowsState,
 } from "../../../bindings/use-query-state.js";
-import {
-  useWebuiSettingsWorkflows,
-  useWebuiSettingsWorkflowsState,
-} from "../../../bindings/use-query-state.js";
-import { type WebuiPermissionMode } from "../../../features/settings/contracts/settings-port.js";
-import {
-  useWebuiGoalOwner,
-  useWebuiGoalReaction,
-} from "../../../features/goal/bindings/goal-owner.public.js";
+import { useWebuiGoalOwner } from "../../../features/goal/bindings/goal-owner.public.js";
 import { useWebuiInteractionOwner } from "../../../features/interactions/bindings/interaction-owner.public.js";
+import { useComposerCatalogue } from "../bindings/use-composer-catalogue.js";
 import { useComposerController } from "../bindings/use-composer-controller.js";
+import { useComposerGoalMode } from "../bindings/use-composer-goal-mode.js";
+import { useComposerPermissionMode } from "../bindings/use-composer-permission-mode.js";
+import { useComposerSubmission } from "../bindings/use-composer-submission.js";
 import { useComposerLayout } from "../bindings/use-composer-layout.js";
 import { useComposerInput } from "../bindings/use-composer-input.js";
 import { useComposerAttachments } from "../bindings/use-composer-attachments.js";
@@ -147,7 +138,6 @@ import {
   slashSkillSummaryToEntry,
   WEBUI_BUILTIN_COMMANDS,
   type SlashCommandEntry,
-  type WebuiSlashSkillSummary,
 } from "./slash-palette.js";
 import {
   isWebuiRunnableCommand,
@@ -333,7 +323,6 @@ export function WebuiComposer({
   // its own fence.
   const goalCoordinator = useWebuiGoalOwner(sessionId);
   const applyGoal = goalCoordinator.applyGoal;
-  const [goalEnabled, setGoalEnabled] = useState(true);
   // The composer's owner, read once for everything this component keeps in it:
   // the input modes, the retry record, the queue and the may-write cell for
   // the staging. One store, one subscription.
@@ -369,6 +358,10 @@ export function WebuiComposer({
     setLocalInteractionError(error);
     if (error === undefined) composerController.clearError();
   }, [composerController]);
+  // The permission mode: read from the settings owner, written back through it,
+  // with the popover's own open/busy/unavailable state. The composer supplies
+  // the error slot every other flow here also writes.
+  const permission = useComposerPermissionMode({ reportError: setInteractionError });
   // The queue mirror is the composer's own state, and its owner is the composer
   // store. It is live state: not persisted, and not per-slot, because unlike
   // the draft it does not survive a session switch.
@@ -425,33 +418,43 @@ export function WebuiComposer({
     [composerController],
   );
   const [composerMenu, setComposerMenu] = useState<"root" | "skills" | "plugins">();
-  const [installedPlugins, setInstalledPlugins] = useState<readonly WebuiComposerPluginSummary[]>([]);
-  const [pluginsLoading, setPluginsLoading] = useState(false);
-  const [pluginsError, setPluginsError] = useState<string>();
-  const [skillsMenuLoading, setSkillsMenuLoading] = useState(false);
-  const [skillsMenuError, setSkillsMenuError] = useState<string>();
   // The mention range is the composer's own state; the slash range is derived
   // (`commandRange` below), so only this half is state.
   const mentionRange = composerSnapshot.mentionRange;
   const setMentionRange = composerController.setMentionRange;
+  // What the composer can offer: the installed plugins and the runtime's skill
+  // roster, each with its own loading and failure state. The menu section and an
+  // `@` mention decide which of them is read; the palette below decides how the
+  // roster is presented.
+  const composerCatalogue = useComposerCatalogue({
+    catalogue: pluginCatalogue,
+    sessionId,
+    workspaceDir,
+    menu: composerMenu,
+    wantsMentionChoices: mentionRange !== undefined,
+  });
   const composerInput = useComposerInput(draft, sessionId);
   const { mentionIndex, setMentionIndex, commandIndex, setCommandIndex, historyBrowse, setHistoryBrowse } = composerInput;
-  // The mode is the settings owner's answer, read through its snapshot;
-  // only the menu's open/busy/unavailable presentation state is local.
-  const settingsWorkflows = useWebuiSettingsWorkflows();
-  const settingsSnapshot = useWebuiSettingsWorkflowsState();
-  const permissionMode = settingsSnapshot.permissionMode.value;
-  const [permissionMenuOpen, setPermissionMenuOpen] = useState(false);
-  const [permissionBusy, setPermissionBusy] = useState(false);
-  const [permissionUnavailable, setPermissionUnavailable] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   // The slash palette follows the caret, so its position is state rather than a
   // ref: a click or an arrow key that only moves the caret still has to
   // re-derive whether a slash token is under it.
   const composerCaret = composerInput.caret;
-  const editingGoalDraftRef = useRef(false);
   const textareaRef = composerInput.textareaRef;
+  // The goal and plan input modes, with the enable probe, the goal re-read and
+  // the one piece of state they need.
+  const goalInput = useComposerGoalMode({
+    sessionId,
+    goal,
+    goalCoordinator,
+    goalMode,
+    planMode,
+    setGoalMode,
+    setPlanMode,
+    onDraftChange,
+    textareaRef,
+  });
   const composerRegionRef = useRef<HTMLDivElement | null>(null);
   // The composer's input box — the frame the textarea and the staging row sit
   // in. The mention list and the command palette hang off it, because it is
@@ -482,131 +485,9 @@ export function WebuiComposer({
   const historyContextUsage = readContextUsageFromPage(transcriptPage);
   const contextUsage = liveContextUsage ?? historyContextUsage;
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!settingsWorkflows) return undefined;
-    if (!settingsWorkflows.canReadPermissionMode) {
-      setPermissionUnavailable(true);
-      return undefined;
-    }
-    // The owner reports what this request produced, so the surface does not
-    // re-read the shared snapshot to find out what it just got — and an
-    // unsupported payload is this request's error rather than a field that may
-    // have been overwritten by a later read.
-    settingsWorkflows
-      .loadPermissionMode()
-      .then((outcome) => {
-        if (cancelled) return;
-        if (outcome.status === "ready") {
-          setPermissionUnavailable(false);
-          return;
-        }
-        setPermissionUnavailable(true);
-        if (outcome.status === "failed") {
-          setInteractionError(
-            outcome.error instanceof Error ? outcome.error.message : "加载授权模式失败",
-          );
-          return;
-        }
-        // Superseded or disposed: this request was refused, so there is nothing
-        // to report — the switch keeps whatever the snapshot already holds.
-        setPermissionUnavailable(false);
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setPermissionUnavailable(true);
-        setInteractionError(error instanceof Error ? error.message : String(error));
-      });
-    return () => { cancelled = true; };
-  }, [settingsWorkflows]);
 
-  useEffect(() => {
-    if (composerMenu !== "plugins" && !mentionRange) return;
-    if (!pluginCatalogue?.available) {
-      setInstalledPlugins([]);
-      return;
-    }
-    let cancelled = false;
-    setPluginsLoading(true);
-    setPluginsError(undefined);
-    // The rows are already the shape this menu renders, so there is no local
-    // copy of the runtime's naming rules here any more.
-    pluginCatalogue.installedPlugins()
-      .then((plugins) => { if (!cancelled) setInstalledPlugins(plugins); })
-      .catch((error: unknown) => {
-        if (!cancelled) setPluginsError(error instanceof Error ? error.message : String(error));
-      })
-      .finally(() => { if (!cancelled) setPluginsLoading(false); });
-    return () => { cancelled = true; };
-  }, [composerMenu, mentionRange !== undefined, pluginCatalogue]);
 
-  // The skills submenu and the slash palette render the same pool, so they read
-  // it through one loader. The request cache is the catalogue's, keyed by the
-  // read's scope, rather than a ref in this component: a second reader joins the
-  // request the first one started instead of replacing the pool underneath it,
-  // and the composer no longer owns that lifetime.
-  const [slashSkills, setSlashSkills] = useState<readonly WebuiSlashSkillSummary[]>(
-    [],
-  );
-  const readSlashSkills = useCallback((): Promise<
-    readonly WebuiSlashSkillSummary[]
-  > => {
-    if (!pluginCatalogue) return Promise.reject(new Error("技能目录暂不可用"));
-    // The roster is read for the session the composer is on. The runtime
-    // resolves that session's agent and working directory from the session
-    // itself, so the read names NO agent: the shell's agent name is a
-    // placeholder until the session list arrives ("main" is not an agent the
-    // runtime knows), and a roster read that names an unknown agent comes
-    // back empty. With no session the runtime answers with its default
-    // agent's roster.
-    return pluginCatalogue.runtimeSkills({
-      ...(sessionId ? { sessionId } : {}),
-      ...(workspaceDir ? { workspaceDir } : {}),
-    });
-  }, [pluginCatalogue, sessionId, workspaceDir]);
 
-  useEffect(() => {
-    if (composerMenu !== "skills") return;
-    if (!pluginCatalogue) {
-      setSkillsMenuError("技能目录暂不可用");
-      return;
-    }
-    let cancelled = false;
-    setSkillsMenuLoading(true);
-    setSkillsMenuError(undefined);
-    readSlashSkills()
-      .then((skills) => { if (!cancelled) setSlashSkills(skills); })
-      .catch((error: unknown) => { if (!cancelled) setSkillsMenuError(error instanceof Error ? error.message : String(error)); })
-      .finally(() => { if (!cancelled) setSkillsMenuLoading(false); });
-    return () => { cancelled = true; };
-  }, [composerMenu, pluginCatalogue, readSlashSkills]);
-
-  /**
-   * The view's half of a steering re-read: after one lands, the composer's goal
-   * mode follows the goal it returned. A subscription rather than a replaceable
-   * effect, so a reaction cannot displace the authoritative route, and it is
-   * keyed by the session whose goal it describes.
-   */
-  useWebuiGoalReaction(sessionId, (next) => {
-    if (next) setGoalMode(next.status !== "complete");
-  });
-
-  const goalEnabledProbe = goalCoordinator.isGoalEnabled;
-  useEffect(() => {
-    if (!goalEnabledProbe) {
-      setGoalEnabled(true);
-      return undefined;
-    }
-    let cancelled = false;
-    void goalEnabledProbe()
-      .then((result) => {
-        if (cancelled) return;
-        setGoalEnabled(result.enabled);
-        if (!result.enabled) setGoalMode(false);
-      })
-      .catch(() => { if (!cancelled) setGoalEnabled(false); });
-    return () => { cancelled = true; };
-  }, [goalEnabledProbe]);
 
   const handlePermission = async (
     permission: WebuiPendingPermission,
@@ -714,36 +595,10 @@ export function WebuiComposer({
   // trims to "/name" and matches again.
   const commandRange = findWebuiSlashRange(draft, composerCaret);
   const commandQuery = commandRange?.query ?? "";
-  // Pull a fresh skill pool from the runtime roster when the catalogue is
-  // wired up. The fallback (fixtures resolved at module init) keeps the popover
-  // functional even if the read is unavailable or rejects; once the live roster
-  // returns, fetched entries replace the fixtures in the sectioning pass.
-  //
-  // The read is scoped, so it follows the scope: another session is another
-  // roster, and the old one goes rather than standing in for it. The pool is
-  // emptied first for the same reason — showing the previous session's skills
-  // under the new session's composer would be a lie.
-  useEffect(() => {
-    if (!pluginCatalogue) return;
-    let cancelled = false;
-    setSlashSkills([]);
-    readSlashSkills()
-      .then((skills) => {
-        if (cancelled) return;
-        setSlashSkills(skills);
-      })
-      .catch(() => {
-        // The popover keeps using the fixtures when the read rejects; the
-        // submenu reports the failure in its own state.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pluginCatalogue, readSlashSkills]);
-  const slashSectioned = slashSkills.length
+  const slashSectioned = composerCatalogue.skills.length
     ? sectionWebuiSlashPalette(
         WEBUI_BUILTIN_COMMANDS,
-        slashSkills.map(slashSkillSummaryToEntry),
+        composerCatalogue.skills.map(slashSkillSummaryToEntry),
       )
     : WEBUI_SLASH_FALLBACK_SECTIONED;
   const commandSuggestions = commandRange
@@ -758,7 +613,7 @@ export function WebuiComposer({
   const mentionQuery = mentionRange?.query.toLocaleLowerCase() ?? "";
   const mentionSuggestions: readonly WebuiComposerMentionChoice[] = mentionRange
     ? [
-        ...installedPlugins
+        ...composerCatalogue.plugins
           .filter((plugin) => `${plugin.displayName} ${plugin.name}`.toLocaleLowerCase().includes(mentionQuery))
           .map((plugin) => ({ kind: "plugin" as const, name: plugin.name, label: plugin.displayName, detail: plugin.description, section: "插件" })),
         { kind: "local-file" as const, label: "添加本地文件", section: "本地资源" },
@@ -842,76 +697,20 @@ export function WebuiComposer({
       return;
     }
   };
-  const changePermissionMode = async (mode: WebuiPermissionMode) => {
-    if (!settingsWorkflows?.canWritePermissionMode) return;
-    // Close the menu at the point of selection. The write may take a moment,
-    // but the selected row should never remain visible in a disabled/greyed
-    // state while the runtime is saving it.
-    setPermissionMenuOpen(false);
-    setPermissionBusy(true);
-    setInteractionError(undefined);
-    try {
-      // The owner writes and answers with the mode the runtime settled on, so a
-      // runtime that accepted something else is caught here, as before.
-      const refreshed = await settingsWorkflows.savePermissionMode(mode);
-      if (refreshed !== mode) throw new Error("授权模式未能保存，请重试");
-      setPermissionUnavailable(false);
-    } catch (error) {
-      setInteractionError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setPermissionBusy(false);
-    }
-  };
-  const activateGoalMode = () => {
-    if (!goalEnabled || !goalCoordinator.createGoal) return;
-    setGoalMode(true);
-    setPlanMode(false);
-    onDraftChange("");
-    textareaRef.current?.focus();
-  };
-  const editGoalInComposer = (objective: string) => {
-    editingGoalDraftRef.current = true;
-    setGoalMode(true);
-    setPlanMode(false);
-    onDraftChange(objective);
-    window.requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(objective.length, objective.length);
-    });
-  };
-  const cancelGoalMode = () => {
-    setGoalMode(false);
-    if (!goal || editingGoalDraftRef.current) onDraftChange("");
-    editingGoalDraftRef.current = false;
-    textareaRef.current?.focus();
-  };
-  const activatePlanMode = () => {
-    setPlanMode(true);
-    setGoalMode(false);
-    onDraftChange("");
-    textareaRef.current?.focus();
-  };
-  const cancelPlanMode = () => {
-    setPlanMode(false);
-    onDraftChange("");
-    textareaRef.current?.focus();
-  };
   const handleDraftChange = (next: string) => {
     if (next.trim().toLowerCase() === "/goal") {
-      activateGoalMode();
+      goalInput.activateGoalMode();
       return;
     }
     onDraftChange(next);
   };
   const chooseCommand = (command: string) => {
     if (command === "goal") {
-      activateGoalMode();
+      goalInput.activateGoalMode();
       return;
     }
     if (command === "plan") {
-      activatePlanMode();
+      goalInput.activatePlanMode();
       return;
     }
     const insertion = `/${command} `;
@@ -990,75 +789,41 @@ export function WebuiComposer({
   // action for a request the user can send again after the review completes.
   const hidePlanReviewInProgressRefusal =
     streamRefusal === "Plan review processing must finish before this request can run";
-  const handleRetryResend = () => {
-    void composerController.retry({
-      refusal: streamRefusal,
-      sessionId,
-      draft: recordedTurn?.message ?? "",
-      attachments: attachmentWire,
-      sending,
-      planMode,
-      goalEnabled,
-      agentName,
-      ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
-      ...(teamModeOff ? { teamModeOff: true } : {}),
-      onSessionCreated: (createdSessionId, selected) => {
-        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId, selected, teamModeOff);
-      },
-    });
-  };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const command = commandInvocation
-      ? slashSectioned.find(
-          (item) => item.name === commandInvocation[1],
-        )
-      : undefined;
-    // Pure intent resolution — five paths: activate-goal-mode, submit-goal,
-    // run-command, submit-turn (which submitWebuiComposerTurn further
-    // splits into send+resume vs queue). All side effects (state updates,
-    // draft clearing, auto-follow lock, error rendering) stay in this
-    // function so the resolver itself can be tested without React.
-    setInteractionError(undefined);
-    const pendingHomeModelSelection = sessionId
-      ? undefined
-      : pendingHomeModelSelectionRef.current;
-    const outcome = await composerController.submit({
-      draft: messageDraft,
-      ...(command ? { commandMatch: command } : {}),
-      ...(commandInvocation?.[2] !== undefined ? { commandInvocationInput: commandInvocation[2] } : {}),
-      attachments: attachmentWire,
-      sending,
-      planMode,
-      goalEnabled,
-      agentName,
-      ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
-      ...(teamModeOff ? { teamModeOff: true } : {}),
-      ...(pendingHomeModelSelection && modelsWorkflows
-        ? {
-            prepareCreatedSession: async (createdSessionId: string) => {
-              try {
-                await modelsWorkflows.selectModel({
-                  ...pendingHomeModelSelection,
-                  sessionId: createdSessionId,
-                });
-              } catch (error) {
-                setInteractionError(
-                  error instanceof Error ? error.message : String(error),
-                );
-                throw error;
-              }
-            },
-          }
-        : {}),
-      onSessionCreated: (createdSessionId, selected) => {
-        if (isAttachedTo(sessionId)) onSessionCreated?.(createdSessionId, selected, teamModeOff);
-      },
-    });
-    if (outcome.kind !== "ignored" && outcome.kind !== "mode-activated") setHistoryBrowse(undefined);
-    if (outcome.kind === "needs-session" && isAttachedTo(sessionId)) onNeedsSession?.(outcome.draft);
-    if (outcome.kind === "goal-updated") editingGoalDraftRef.current = false;
-  };
+  // The two outbound requests: the ordinary submit and the retry of a refused
+  // turn. The composer supplies its current input; the binding assembles the
+  // intent and acts on the owner's outcome.
+  const commandMatch = commandInvocation
+    ? slashSectioned.find((item) => item.name === commandInvocation[1])
+    : undefined;
+  const submission = useComposerSubmission({
+    controller: composerController,
+    sessionId,
+    messageDraft,
+    ...(commandMatch ? { commandMatch } : {}),
+    ...(commandInvocation?.[2] !== undefined ? { commandInvocationInput: commandInvocation[2] } : {}),
+    attachments: attachmentWire,
+    sending,
+    planMode,
+    goalEnabled: goalInput.goalEnabled,
+    agentName,
+    ...(createSessionWorkspaceDir ? { createSessionWorkspaceDir } : {}),
+    teamModeOff,
+    pendingHomeModelSelection: pendingHomeModelSelectionRef,
+    ...(modelsWorkflows
+      ? {
+          prepareModelSelection: (request: WebuiModelSelectionRequest, createdSessionId: string) =>
+            modelsWorkflows.selectModel({ ...request, sessionId: createdSessionId }),
+        }
+      : {}),
+    refusal: streamRefusal,
+    recordedTurn,
+    isAttachedTo,
+    ...(onSessionCreated ? { onSessionCreated } : {}),
+    ...(onNeedsSession ? { onNeedsSession } : {}),
+    onHistoryReset: () => setHistoryBrowse(undefined),
+    onGoalSettled: goalInput.settleGoalEdit,
+    reportError: setInteractionError,
+  });
   const clearLocalGoal = () => {
     applyGoal(undefined);
     setGoalMode(false);
@@ -1102,7 +867,7 @@ export function WebuiComposer({
           variant="output_error"
           text={streamRefusal}
           errorAt={Date.now()}
-          {...(retryPlan.kind === "resend" ? { onRetry: handleRetryResend } : {})}
+          {...(retryPlan.kind === "resend" ? { onRetry: submission.retryRefusedTurn } : {})}
         />
       ) : null}
       {commandOutput && !compactCommand ? (
@@ -1160,7 +925,7 @@ export function WebuiComposer({
         <WebuiComposerGoalPanel
           enabled={Boolean(
             sessionLayout &&
-              ((sessionId && goalEnabled && goal) || queueItems.length > 0 || queuePaused),
+              ((sessionId && goalInput.goalEnabled && goal) || queueItems.length > 0 || queuePaused),
           )}
         >
           {sessionLayout ? (
@@ -1171,19 +936,19 @@ export function WebuiComposer({
               onSendNow={handleSendQueueItemNow}
             />
           ) : null}
-          {sessionId && goalEnabled && goal ? (
+          {sessionId && goalInput.goalEnabled && goal ? (
             <WebuiGoalBanner
               goal={goal}
               patchGoal={goalCoordinator.patchGoal}
               clearGoal={goalCoordinator.clearGoal}
-              onEditGoal={editGoalInComposer}
+              onEditGoal={goalInput.editGoalInComposer}
               onCleared={clearLocalGoal}
               interactionBlocked={Boolean(questionnaire || permissions.length > 0)}
             />
           ) : null}
         {!composerReplaced ? (
         <form
-          onSubmit={submit}
+          onSubmit={submission.submit}
           onDragOver={(event) => { if (event.dataTransfer.files.length) event.preventDefault(); }}
           onDrop={(event) => { if (event.dataTransfer.files.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}
           data-webui-composer="true"
@@ -1226,7 +991,7 @@ export function WebuiComposer({
                       mentionRange,
                       setMentionRange,
                       setComposerMenu,
-                      setPermissionMenuOpen,
+                      setPermissionMenuOpen: permission.setMenuOpen,
                     });
                   }}
                   onPaste={(event) => {
@@ -1248,7 +1013,7 @@ export function WebuiComposer({
                     const nextMentionRange = findWebuiMentionRange(event.currentTarget.value, caret);
                     if (nextMentionRange) {
                       setComposerMenu(undefined);
-                      setPermissionMenuOpen(false);
+                      permission.closeMenu();
                     }
                     setMentionRange(nextMentionRange);
                   }}
@@ -1265,17 +1030,17 @@ export function WebuiComposer({
                     commandCount: commandSuggestions.length,
                     submitCommand: commandCanRun,
                     composerMenu,
-                    permissionMenuOpen,
+                    permissionMenuOpen: permission.menuOpen,
                     goalMode,
                     planMode,
                     submitBlocked,
                     setMentionRange,
                     setComposerMenu,
-                    setPermissionMenuOpen,
+                    setPermissionMenuOpen: permission.setMenuOpen,
                     onDraftChange,
                     onHistoryDraftChange: handleDraftChange,
-                    onCancelGoal: cancelGoalMode,
-                    onCancelPlan: cancelPlanMode,
+                    onCancelGoal: goalInput.cancelGoalMode,
+                    onCancelPlan: goalInput.cancelPlanMode,
                     chooseMention: (index) => { const choice = mentionSuggestions[index]; if (choice) chooseMention(choice); },
                     chooseCommand: (index) => { const command = commandSuggestions[index]; if (command) chooseCommand(command.name); },
                   })}
@@ -1333,7 +1098,7 @@ export function WebuiComposer({
           managedLayerId="composer-tools"
                   open={composerMenu !== undefined}
                   onOpen={() => {
-                    setPermissionMenuOpen(false);
+                    permission.closeMenu();
                     setMentionRange(undefined);
                     setComposerMenu("root");
                   }}
@@ -1360,41 +1125,41 @@ export function WebuiComposer({
         <WebuiComposerMenus
           menu={composerMenu}
           onMenuChange={setComposerMenu}
-          skills={slashSkills}
-          skillsLoading={skillsMenuLoading}
-          skillsError={skillsMenuError}
-          plugins={installedPlugins}
-          pluginsLoading={pluginsLoading}
-          pluginsError={pluginsError}
-          pluginsAvailable={pluginCatalogue?.available === true}
+          skills={composerCatalogue.skills}
+          skillsLoading={composerCatalogue.skillsLoading}
+          skillsError={composerCatalogue.skillsError}
+          plugins={composerCatalogue.plugins}
+          pluginsLoading={composerCatalogue.pluginsLoading}
+          pluginsError={composerCatalogue.pluginsError}
+          pluginsAvailable={composerCatalogue.available}
           onOpenPluginManagement={onOpenPluginManagement}
           onAttach={() => fileInputRef.current?.click()}
-          onGoal={activateGoalMode}
+          onGoal={goalInput.activateGoalMode}
           onPlan={() => chooseCommand("plan")}
           onInsertSkill={(name) => { insertAtCaret(`/${name}`); textareaRef.current?.focus(); }}
           onInsertPlugin={(name) => { insertAtCaret(`@${name}`); textareaRef.current?.focus(); }}
         />
                 </WebuiDropdown>
                 <WebuiComposerPermissionControl
-                  mode={permissionMode}
-                  busy={permissionBusy}
-                  unavailable={permissionUnavailable}
-                  menuOpen={permissionMenuOpen}
+                  mode={permission.mode}
+                  busy={permission.busy}
+                  unavailable={permission.unavailable}
+                  menuOpen={permission.menuOpen}
                   onToggleRequest={() => {
                     setComposerMenu(undefined);
                     setMentionRange(undefined);
-                    setPermissionMenuOpen((open) => !open);
+                    permission.toggleMenu();
                   }}
-                  onClose={() => setPermissionMenuOpen(false)}
-                  onChangeMode={(mode) => void changePermissionMode(mode)}
+                  onClose={permission.closeMenu}
+                  onChangeMode={(mode) => void permission.changeMode(mode)}
                 />
                 <WebuiComposerModePills
-                  goalActive={goalEnabled && goalCoordinator.createGoal !== undefined && goalMode}
+                  goalActive={goalInput.goalActive}
                   goalSubmitting={goalSubmitting}
                   planActive={planMode}
                   interactionBlocked={Boolean(questionnaire || permissions.length > 0)}
-                  onCancelGoal={cancelGoalMode}
-                  onCancelPlan={cancelPlanMode}
+                  onCancelGoal={goalInput.cancelGoalMode}
+                  onCancelPlan={goalInput.cancelPlanMode}
                 />
                 {/* 3.2px, written as an arbitrary value on purpose. The
                  * spacing scale is a fixed enumeration, so `gap-0.8` is not a

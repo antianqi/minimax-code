@@ -8,7 +8,6 @@
 // The text below is the declaration as it stood in the source module — no
 // behaviour change.
 
-import hljs from "highlight.js/lib/core";
 import {
   projectWebuiWorkspaceHistory,
   type WebuiWorkspaceSubagent,
@@ -16,18 +15,6 @@ import {
 } from "./workspace-progress.js";
 
 export type WebuiTodo = WebuiWorkspaceTodo;
-
-const FILE_LANGUAGE_BY_EXTENSION: Readonly<Record<string, string>> = {
-  c: "c", cjs: "javascript", cpp: "cpp", css: "css", go: "go", h: "c", htm: "xml", html: "xml", java: "java",
-  js: "javascript", json: "json", jsx: "javascript", md: "markdown", mjs: "javascript", mts: "typescript",
-  py: "python", rs: "rust", sh: "bash", svg: "xml", toml: "toml", ts: "typescript", tsx: "typescript", xml: "xml", yaml: "yaml", yml: "yaml",
-};
-
-export function webuiFileLanguage(path: string): string | undefined {
-  const extension = path.split(".").at(-1)?.toLowerCase();
-  const language = extension ? FILE_LANGUAGE_BY_EXTENSION[extension] : undefined;
-  return language && hljs.getLanguage(language) ? language : undefined;
-}
 
 export type WebuiUnifiedDiffLine = {
   readonly kind: "addition" | "context" | "deletion" | "hunk" | "noNewline";

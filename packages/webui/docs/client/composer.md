@@ -32,6 +32,19 @@ matching session's transcript. Other command output remains with the composer.
   directory. The model picker it renders lives in the models business
   (`client/features/models/ui/ModelPicker.public.tsx`), and it owns the thinking level: there is no
   thinking control in the composer's own toolbar to disagree with it.
+- The surface keeps the input: the draft and its caret, the menus, the toolbar and the rows it
+  draws. Four flows that are not rendering are bindings beside it, so a change to one does not
+  travel through the others:
+  - `bindings/use-composer-permission-mode.ts` — the permission mode's read, its write and the
+    popover's open/busy/unavailable state. The component supplies the error slot and the trigger.
+  - `bindings/use-composer-catalogue.ts` — the installed plugins and the runtime's skill roster,
+    each with its own loading and failure state, plus the scope-following re-read the slash pool
+    needs. Sectioning the palette stays with the surface that renders it.
+  - `bindings/use-composer-goal-mode.ts` — entering and leaving goal and plan mode, the enable
+    probe, the goal re-read and whether the draft came from the banner's edit affordance.
+  - `bindings/use-composer-submission.ts` — the two outbound requests, submit and retry. The wire
+    intent itself is `projection/submit-intent.ts`, so which fields travel is asserted without
+    rendering anything.
 - The owner, the controller, the queue and the persisted store are in
   `client/features/composer/application/` (`composer-controller.ts`, `composer-queue.ts`,
   `composer-store.ts`, `composer-history.ts`, `command-workflows.ts`, `turn-retry.ts`).

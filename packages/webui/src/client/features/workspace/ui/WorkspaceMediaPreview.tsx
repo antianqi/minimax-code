@@ -1,6 +1,6 @@
 // Owns the workspace media-preview feature: the image, audio and video
 // branches of the file preview, moved out of `WebuiFilePreview`.
-// `WorkspacePanels.tsx` only imports the components from it.
+// `WorkspaceFilePreview.tsx` only imports the component from it.
 
 import { useState, type ReactElement } from "react";
 import type { WebuiWorkspaceFileContent } from "../../../../shared/contracts/workspace.js";

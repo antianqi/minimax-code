@@ -12,10 +12,10 @@ It is not complete because:
 
 | Question | Count |
 | --- | --- |
-| Client UI modules classified | 137 |
+| Client UI modules classified | 153 |
 | Modules with a pending contract decision | 0 |
-| Floating layers inventoried | 25 |
-| Floating layers managed by the coordinator | 23 |
+| Floating layers inventoried | 40 |
+| Floating layers managed by the coordinator | 38 |
 | Business-authored alerts left (all exempt) | 2 |
 | Motion distinct effects with a recorded reason | 5 |
 | Accessibility findings recorded as debt | 0 |
@@ -34,18 +34,22 @@ decision has not been taken yet. They are listed here in full so that nothing is
 
 </details>
 
-## Surfaces whose migration was never verified
+## Browser coverage declarations and execution limits
 
-A surface counts as verified when a browser check drives it. The client's browser suites cover:
+A test definition establishes a scenario, not a passing execution. The client's browser suites define:
 
 - the six enumerated surfaces in `rendering-integrity.spec.mjs` (transcript, session rail, workspace panel, settings usage, model provider form, plugin/MCP form) across four extremes and both themes;
 - the provider form, the field contract, the model picker, the overlay coordination path, the content pages and the feedback family, each in its own spec.
 
-Not verified by any browser check:
+The following reviewable declarations are read from `scripts/lib/webui-browser-coverage-evidence.json` and checked against their spec sources:
 
-- the plugin catalogue and the miniapp surfaces (this fixture exposes neither);
-- the SSH panel, which renders the page frame but is reachable from no route in this client;
-- long-tail settings sections that the enumerated states do not open.
+| Surface | Defined scenario | Platform boundary | Execution evidence |
+| --- | --- | --- | --- |
+| Plugin catalogue | `packages/webui/test/browser/plugin-catalogue-layout.spec.mjs`: plugin loading uses the shared single-layer skeleton | Built Chromium fixture | Not recorded by this declaration |
+| Mini App launcher | `packages/webui/test/browser/miniapp-panel.spec.mjs`: the rail launcher refreshes on return and while open without reloading | Built Chromium fixture | Not recorded by this declaration |
+| SSH connection settings and terminal | `packages/webui/test/browser/ssh-terminal.spec.mjs`: the connection state is readable in the light theme | Built Chromium fixture; native SSH is outside this scenario | Not recorded by this declaration |
+
+Passing runs, skipped platforms and native-runtime acceptance require the corresponding run's external receipt. This generated report does not infer them from source presence. Long-tail settings sections outside the enumerated scenarios remain unassessed.
 
 ## Every reviewed exception
 

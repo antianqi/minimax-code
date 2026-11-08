@@ -261,8 +261,8 @@ export interface WebuiSessionWorkflows {
    */
   readonly retainedDeletionDrafts: () => readonly WebuiRetainedDeletionDraft[];
   readonly subscribeRetainedDrafts: (listener: () => void) => () => void;
-  /** The text to copy, and the record retires because the user acted on it. */
-  readonly copyRetainedDeletionDraft: (sessionId: string) => string | undefined;
+  /** Retire this record only after the browser acknowledges copying its text. */
+  readonly copyRetainedDeletionDraft: (sessionId: string, copy: (text: string) => Promise<void>) => Promise<void>;
   /**
    * Hand the retained input to a task. With no target it goes to the composer's
    * current slot, which is where "continue this elsewhere" starts; the record
@@ -504,13 +504,11 @@ export function createWebuiSessionWorkflows(deps: {
     if (!retainedDrafts.delete(sessionId)) return;
     notifyRetained();
   };
-  const copyRetainedDeletionDraft = (sessionId: string): string | undefined => {
+  const copyRetainedDeletionDraft = async (sessionId: string, copy: (text: string) => Promise<void>): Promise<void> => {
     const retained = retainedDrafts.get(sessionId);
-    if (!retained) return undefined;
-    // Copying is the user acting on it: the notice has done its job, and keeping
-    // the record would mean asking them to dismiss something already handled.
-    dropRetained(sessionId);
-    return retained.draft;
+    if (!retained) return;
+    await copy(retained.draft);
+    if (retainedDrafts.get(sessionId) === retained) dropRetained(sessionId);
   };
   const transferRetainedDeletionDraft = (
     sessionId: string,

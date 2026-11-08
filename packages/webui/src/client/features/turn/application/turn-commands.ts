@@ -508,21 +508,21 @@ export function createWebuiConversationTurnCommands(
    * navigation in between must not release either.
    */
   const holdDelivery = (): {
-    readonly onDelivery: (handle: { readonly close: () => void }) => void;
+    readonly onDelivery: (handle: { readonly close: () => void }, targetSessionId?: string) => void;
     readonly release: () => void;
   } => {
     return holdWebuiDelivery(recordKey, context.deliveries, context.scope);
   };
   const loopDeps = (
-    hold: { readonly onDelivery: (handle: { readonly close: () => void }) => void },
+    hold: { readonly onDelivery: (handle: { readonly close: () => void }, targetSessionId?: string) => void },
   ): WebuiDeliveryTransports => ({
     ...(capabilities?.send
-      ? { sendMessage: (body, onFrame) => capabilities.send!(body, onFrame, hold.onDelivery) }
+      ? { sendMessage: (body, onFrame) => capabilities.send!(body, onFrame, (handle) => hold.onDelivery(handle, body.id)) }
       : {}),
     ...(capabilities?.resume
       ? {
           resumeSession: (body, onFrame) =>
-            capabilities.resume!(body, onFrame, hold.onDelivery),
+            capabilities.resume!(body, onFrame, (handle) => hold.onDelivery(handle, body.id)),
         }
       : {}),
     ...(capabilities?.load ? { loadHistory: capabilities.load } : {}),
@@ -570,10 +570,11 @@ export function createWebuiConversationTurnCommands(
       if (!canReconcile) return Promise.resolve();
     }
     const hold = holdDelivery();
+    const transports = loopDeps(hold);
     return attachWebuiTurn({
       sessionId,
       turnId,
-      ...(capabilities?.resume ? { resumeSession: capabilities.resume } : {}),
+      ...(transports.resumeSession ? { resumeSession: transports.resumeSession } : {}),
       ...(capabilities?.load ? { loadMessages: capabilities.load } : {}),
       readStream,
       setSending: writer.setTurnSending,

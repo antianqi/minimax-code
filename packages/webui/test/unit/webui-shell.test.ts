@@ -2479,7 +2479,7 @@ describe("WebUI composer app-to-helper seam", () => {
       sending: true,
     }));
 
-    store.migrateSession(WEBUI_HOME_SESSION_KEY, "session-1");
+    expect(store.transferSession(WEBUI_HOME_SESSION_KEY, "session-1").outcome).toBe("transferred");
 
     const home = store.readSession(WEBUI_HOME_SESSION_KEY);
     expect(home.stream).toEqual(initialWebuiStreamState);

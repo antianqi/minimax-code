@@ -36,6 +36,28 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => console.log("BROWSER_CONSOLE", message.type(), message.text()));
 });
 
+test("a refused composer send retries the exact recorded input without an abort request", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.refuseOperation("sendMessage", "invalid_request", "Synthetic send refusal");
+  });
+  await openApp(page, "#session=A");
+  const input = "Retry these exact synthetic words";
+  await startTurn(page, "A", input);
+  const retry = page.getByTestId("output-error-retry");
+  await expect(retry).toBeVisible();
+  await expect.poll(() => requestCount(page, "sendMessage")).toBe(1);
+  await page.evaluate(() => window.__fixture.allowOperation("sendMessage"));
+  await retry.click();
+  await expect.poll(() => requestCount(page, "sendMessage")).toBe(2);
+  const requests = await page.evaluate(() => window.__fixture.requests.filter((request) =>
+    request.operation === "sendMessage" || request.operation === "abortSession"));
+  expect(requests.map((request) => ({ operation: request.operation, id: request.body.id, content: request.body.content }))).toEqual([
+    { operation: "sendMessage", id: "A", content: input },
+    { operation: "sendMessage", id: "A", content: input },
+  ]);
+  await expect(retry).toHaveCount(0);
+});
+
 for (const theme of ["light", "dark"]) {
 test(`immediate sending presents the selected queue input before acknowledgement (${theme})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem("webui-theme", value), theme);

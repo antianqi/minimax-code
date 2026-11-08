@@ -24,6 +24,19 @@ describe("session stream recovery status", () => {
 });
 
 describe("WebUI mixed stream reducer", () => {
+  it("projects the latest inner context record from a batch and retains it across context-free batches", () => {
+    const batch = (messages: unknown[]) => frame(JSON.stringify({ type: "agent_message", agent_message: { messages } }));
+    const usage = { usedTokens: 84, total_tokens: 100 };
+    const state = reduceWebuiStreamFrame(initialWebuiStreamState, batch([
+      { msg_id: "a", context_usage: { usedTokens: 42 } },
+      null,
+      { msg_id: "b", context_usage: usage },
+      { msg_id: "c", msg_content: "after context" },
+    ]));
+    expect(state.contextUsage).toEqual(usage);
+    expect(reduceWebuiStreamFrame(state, batch([{ msg_id: "d", msg_content: "no context" }])).contextUsage).toBe(state.contextUsage);
+  });
+
   it("retains an exact queue source identity even when the user text is unchanged", () => {
     const data = { msg_id: "msg-user-source", msg_content: "same text" };
     const first = reduceWebuiStreamFrame(initialWebuiStreamState, frame(JSON.stringify({ type: "agent_message", agent_message: data })));

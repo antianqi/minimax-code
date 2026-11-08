@@ -164,8 +164,7 @@ export interface WebuiSessionStore {
   /**
    * The guarded home→session transfer.
    *
-   * `migrateSession` below is the unconditional move the adoption sites use; this
-   * one is the API the creation use case drives. It never overwrites a
+   * This is the API the creation use case drives. It never overwrites a
    * destination that already holds a record
    * and never resurrects a purged id, and it reports every outcome — including
    * the ones that moved nothing — so a submission cannot be left unsettled by a
@@ -176,16 +175,6 @@ export interface WebuiSessionStore {
     targetKey: string,
     options?: { readonly expectSourceIncarnation?: number },
   ) => WebuiSessionTransferResult;
-  /**
-   * Carry a session's live record (stream + sending + interaction slices) from
-   * one key to another and clear the source. It deliberately does **not**
-   * notify: the only subscriber is the view that is about to switch keys (its
-   * effect re-reads the target key) and the target key has no subscriber yet.
-   * This is the application-store form of the old
-   * `migrateSessionRuntimeState`, and the no-notify semantics are load-bearing
-   * for the home → first-session flow.
-   */
-  migrateSession: (fromKey: string, toKey: string) => void;
   /**
    * Drop every server-derived slice for one session id: the session record
    * (stream + sending + permissions + questionnaire + goal + transcript) and
@@ -416,8 +405,7 @@ export function createWebuiSessionStore(options?: {
           // only when the first home turn creates the session that owns its
           // stream. Carrying the already-written record across the keys is a
           // separate, silent step the caller runs
-          // (`store.migrateSession`), exactly as the module-level store's
-          // `migrateSessionRuntimeState` did; doing it here would notify a
+          // (`store.transferSession`); doing it here would notify a
           // subscriber that must not see the intermediate state.
           sessionKey = sessionId;
           return {
@@ -468,22 +456,6 @@ export function createWebuiSessionStore(options?: {
       sessions.delete(fromKey);
       if (state) sessions.set(toKey, state);
       return { outcome: "transferred", sourceIncarnation };
-    },
-    migrateSession: (fromKey, toKey) => {
-      // A key this instance has purged is dead in the store, exactly as it is
-      // for `updateSession`: carrying a record onto it would resurrect the
-      // deleted session (the home→session adoption runs on its own schedule,
-      // so the session it names can be deleted before the move lands).
-      // The source is deliberately left alone — a refused move must not also
-      // clear the record the caller still owns.
-      if (disposed || fromKey === toKey || purged.has(toKey)) return;
-      const state = sessions.get(fromKey);
-      sessions.delete(fromKey);
-      if (state) sessions.set(toKey, state);
-      // No `notify()` on purpose (the module-level store's
-      // `migrateSessionRuntimeState` had the same semantics). The only
-      // subscriber is the view switching keys, which re-reads the target key in
-      // its own effect; the target key has no subscriber yet.
     },
     purgeSession: (sessionId) => {
       if (disposed || sessionId === WEBUI_HOME_SESSION_KEY) return;

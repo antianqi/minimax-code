@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiTransport } from "../../src/client/platform/transport.js";
 import { createWebuiWire } from "../../src/client/platform/wire.js";
+import { runWebuiMutation } from "../../src/client/conversation/request-freshness.js";
 import {
   WebuiErrorCode,
   WebuiWireError,
@@ -204,6 +205,36 @@ describe("the browser input connection", () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it("reports its own deadline as a timeout outcome, not as an unclassified transport failure", async () => {
+    // The producer and the classifier meet here: the write's own budget is the
+    // only fact that can say "the answer never arrived", and the mutation
+    // interface has to be able to branch on it without matching English text.
+    vi.useFakeTimers();
+    try {
+      const wire = createWebuiWire({
+        websocketUrl: "ws://127.0.0.1:1",
+        token: "synthetic",
+        webSocket: ControllableSocket,
+        requestTimeoutMs: 100,
+      });
+      const outcome = runWebuiMutation(() => wire.request("sendBrowserInput", input.command));
+      await tick();
+      await vi.advanceTimersByTimeAsync(100);
+      const settled = await outcome;
+
+      expect(settled.status).toBe("failed");
+      if (settled.status !== "failed") throw new Error("unreachable");
+      expect(settled.category).toBe("timeout");
+      expect(settled.error).toBeInstanceOf(Error);
+      expect((settled.error as Error).message).toContain("timed out after 100ms");
+      // The safe policy for an unknown write result is preserved: a timeout is
+      // not a refusal, so nothing downstream may treat it as "did not land".
+      expect(settled.category).not.toBe("refused");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("fails all outstanding requests when their shared envelope is invalid", async () => {
     const transport = transportWith(ControllableSocket);
     const first = transport.sendBrowserInput(input);
@@ -219,6 +250,36 @@ describe("the browser input connection", () => {
 });
 
 describe("the browser extension download", () => {
+  it.each(["ws", "wss"])("preserves endpoint base paths and token encoding for %s downloads", (scheme) => {
+    const wire = createWebuiWire({ websocketUrl: `${scheme}://runtime.example:8443/base/`, token: "a+b&c", webSocket: ControllableSocket });
+    const expected = scheme === "wss" ? "https:" : "http:";
+    for (const address of [wire.browserExtensionUrl(), wire.workspaceFileUrl({ workspaceDir: "/w", path: "a" }), wire.miniappStandaloneUrl({ pluginId: "p" })]) {
+      const url = new URL(address);
+      expect(url.protocol).toBe(expected);
+      expect(url.pathname).toMatch(/^\/base\//u);
+      expect(url.searchParams.get("token")).toBe("a+b&c");
+    }
+  });
+  it("spells a wss endpoint as https for every download address", () => {
+    // One projection for all of them: a secure socket means a secure page, and
+    // the three builders used to agree with each other only by coincidence.
+    const wire = createWebuiWire({
+      websocketUrl: "wss://runtime.example:8443",
+      token: "fixture-token",
+      webSocket: ControllableSocket,
+    });
+
+    expect(wire.browserExtensionUrl()).toBe(
+      "https://runtime.example:8443/browser-extension?token=fixture-token",
+    );
+    expect(wire.workspaceFileUrl({ workspaceDir: "/w", path: "a.ts" })).toBe(
+      "https://runtime.example:8443/workspace-file?dir=%2Fw&path=a.ts&token=fixture-token",
+    );
+    expect(wire.miniappStandaloneUrl({ pluginId: "p" })).toBe(
+      "https://runtime.example:8443/miniapp?token=fixture-token&plugin=p",
+    );
+  });
+
   it("is addressed by the socket's own base and token", () => {
     const transport = transportWith(ControllableSocket);
 

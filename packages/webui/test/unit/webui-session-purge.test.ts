@@ -179,10 +179,10 @@ describe("R7 · the session store's purge", () => {
     store.purgeSession("deleted");
     const before = store.readSession(WEBUI_HOME_SESSION_KEY);
 
-    store.migrateSession(WEBUI_HOME_SESSION_KEY, "deleted");
+    expect(store.transferSession(WEBUI_HOME_SESSION_KEY, "deleted").outcome).toBe("purged");
 
     // The purged key stays empty: it reads exactly like a key that was never
-    // written. (`migrateSession` does not notify, so the record is read off the
+    // written. (`transferSession` does not notify, so the record is read off the
     // live map rather than the last published snapshot.)
     expect(store.readSession("deleted")).toEqual(store.readSession("never-written"));
     // A refused migration leaves the source record where it was: the caller
@@ -199,7 +199,7 @@ describe("R7 · the session store's purge", () => {
     }));
     const before = store.readSession(WEBUI_HOME_SESSION_KEY);
 
-    store.migrateSession(WEBUI_HOME_SESSION_KEY, "live");
+    expect(store.transferSession(WEBUI_HOME_SESSION_KEY, "live").outcome).toBe("transferred");
 
     expect(store.readSession("live")).toBe(before);
     expect(store.readSession(WEBUI_HOME_SESSION_KEY)).toEqual(
@@ -1010,12 +1010,13 @@ describe("V36 · this page can act on a session fact another client published", 
     expect(closeSession).toHaveBeenCalledTimes(1);
   });
 
-  it("retires a retained draft when the user copies, transfers or discards it", () => {
+  it("retires a retained draft when the user copies, transfers or discards it", async () => {
     const { composer, workflows } = factFixture({ a: "half-written", b: "b-text", c: "c-text" });
     workflows.applyFact({ kind: "deleted", sessionId: "a" });
 
-    // Copying hands back the text and retires the notice: the user acted on it.
-    expect(workflows.copyRetainedDeletionDraft("a")).toBe("half-written");
+    const copy = vi.fn(async () => undefined);
+    await workflows.copyRetainedDeletionDraft("a", copy);
+    expect(copy).toHaveBeenCalledWith("half-written");
     expect(workflows.retainedDeletionDrafts()).toEqual([]);
 
     // Discarding is the third way out, and it drops the record without writing.
@@ -1028,6 +1029,30 @@ describe("V36 · this page can act on a session fact another client published", 
     const moved = workflows.transferRetainedDeletionDraft("c", "target");
     expect(moved?.draft).toBe("c-text");
     expect(composer.readDraft("target")).toBe("c-text");
+    expect(workflows.retainedDeletionDrafts()).toEqual([]);
+  });
+
+  it.each(["absent", "rejected"])("keeps all retained input when clipboard is %s", async (reason) => {
+    const { workflows, composer } = factFixture();
+    const attachments = [{ id: "file", fileName: "draft.txt", mimeType: "text/plain", sizeBytes: 1, dataUrl: "data:text/plain;base64,YQ==", kind: "file" as const }];
+    const urlReferences = [{ id: "ref", url: "https://example.test/reference" }];
+    composer.setStaging({ attachments, urlReferences });
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const retained = workflows.retainedDeletionDrafts();
+    expect(retained[0]).toMatchObject({ draft: "half-written", attachments, urlReferences });
+    await expect(workflows.copyRetainedDeletionDraft("a", async () => { throw new Error(reason); })).rejects.toThrow(reason);
+    expect(workflows.retainedDeletionDrafts()).toBe(retained);
+  });
+
+  it("keeps the retained record until the clipboard promise acknowledges success", async () => {
+    const { workflows } = factFixture();
+    workflows.applyFact({ kind: "deleted", sessionId: "a" });
+    const retained = workflows.retainedDeletionDrafts();
+    let acknowledge!: () => void;
+    const copying = workflows.copyRetainedDeletionDraft("a", () => new Promise<void>((resolve) => { acknowledge = resolve; }));
+    expect(workflows.retainedDeletionDrafts()).toBe(retained);
+    acknowledge();
+    await copying;
     expect(workflows.retainedDeletionDrafts()).toEqual([]);
   });
 

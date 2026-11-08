@@ -204,8 +204,8 @@ surface, the motion and the dismissal, and the wrapper gets no box of its own
 A triggerless popup has no `aria-expanded` to report and no focus to return to
 on Escape. It also has to say what a press *inside* it is: a list that follows
 the caret must not close when the caret moves, and the region it belongs to is
-named with `dismissRegionRef`. The composer's mention list and command palette
-name the composer's whole region; a press in the text, in the attachments or on
+marked with `data-overlay-layer` using the popup's managed layer id. The composer's mention list and command palette
+mark the composer's whole region; a press in the text, in the attachments or on
 the send button is the user still working.
 
 ## A fly-out that opens on hover

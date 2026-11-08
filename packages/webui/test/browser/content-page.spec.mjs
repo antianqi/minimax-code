@@ -11,8 +11,8 @@
 // the suite pins `colorScheme: "light"` and the client's theme is an explicit
 // preference rather than a media query.
 //
-// 远程 is checked only when the runtime exposes it: the rail row is disabled when
-// the runtime has no remote route, and a disabled row is not a page.
+// The fixture exposes both the remote page and SSH connection settings. Missing
+// routes or controls fail these deterministic scenarios rather than skipping them.
 
 import { expect } from "@playwright/test";
 
@@ -26,7 +26,10 @@ const THEMES = ["light", "dark"];
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => console.error("BROWSER_PAGE_ERROR", error.stack ?? error.message));
-  await configureFixture(page, () => undefined);
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("listSshConnections", []);
+    window.__fixture.setResponse("listSshProjects", []);
+  });
   await openApp(page, "#session=A");
 });
 
@@ -127,7 +130,7 @@ for (const theme of THEMES) {
       const railRow = page.getByRole("button", { name: /^远程$/u }).first();
       // The runtime decides whether the client has a remote page; a disabled row is
       // not a page, so there is nothing to measure and nothing to claim.
-      test.skip(await railRow.isDisabled(), "the runtime exposes no remote route in this fixture");
+      await expect(railRow).toBeEnabled();
       await railRow.click();
       await expect(page.getByTestId("remote-page")).toBeVisible();
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -140,18 +143,28 @@ for (const theme of THEMES) {
       expect(measured?.horizontalOverflow ?? 1, "no sideways overflow").toBeLessThanOrEqual(0);
       expect(measured?.bodyHasHeight ?? 0, "the body fills what is left").toBeGreaterThan(0);
 
-      // The SSH tab renders the third page that shares the frame.
-      const sshTab = page.getByTestId("remote-page-tab-ssh");
-      test.skip((await sshTab.count()) === 0, "the runtime exposes no SSH tab in this fixture");
+      // SSH is exposed through connection settings, not a tab of the remote page.
+      await page.getByTestId("remote-control-settings-entry").click();
+      const sshTab = page.getByTestId("connection-section-ssh");
+      await expect(sshTab).toBeVisible();
       await sshTab.click();
       const sshPanel = page.locator('[data-webui-component="ssh-panel"]');
       await expect(sshPanel).toBeVisible();
-      const ssh = await measure(page, '[data-webui-component="ssh-panel"]');
-      expect(ssh?.pageScrolls, "the SSH page does not scroll as a page").toBe(false);
-      expect(ssh?.scrollingNodes, "exactly one scroll boundary").toBe(1);
-      expect(ssh?.titleHeight ?? 0, "the SSH title is not clipped").toBeGreaterThanOrEqual(18);
-      expect(ssh?.horizontalOverflow ?? 1, "no sideways overflow").toBeLessThanOrEqual(0);
-      expect(ssh?.bodyBelowHeader, "the body sits below the header").toBe(true);
+      const ssh = await sshPanel.evaluate((element) => {
+        const dialog = element.closest('[role="dialog"]');
+        const body = dialog.querySelector(".webui-settings-content");
+        return {
+          width: element.getBoundingClientRect().width,
+          overflow: element.scrollWidth - element.clientWidth,
+          bodyOverflow: getComputedStyle(body).overflowY,
+          headerHeight: dialog.querySelector("header").getBoundingClientRect().height,
+        };
+      });
+      expect(ssh.width).toBeGreaterThan(0);
+      expect(ssh.overflow, "SSH content fits its settings viewport").toBeLessThanOrEqual(0);
+      expect(ssh.bodyOverflow, "the settings body owns scrolling").toBe("auto");
+      expect(ssh.headerHeight, "settings retains its header").toBeGreaterThan(0);
+      await page.screenshot({ path: test.info().outputPath(`ssh-settings-${viewport.name}-${theme}.png`), animations: "disabled" });
     });
   }
 }

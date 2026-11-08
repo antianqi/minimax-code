@@ -141,6 +141,18 @@ export function createWebuiObservationScheduler(
   const isCurrent = (state: ClassState, identity: string): boolean =>
     !disposed && state.interested.has(identity);
 
+  /**
+   * When an identity is next due, on the same clock the deadline is armed from.
+   *
+   * An identity with no recorded read is due now: `invalidate` removes the
+   * record, and a stale registration must not wait another freshness window.
+   * Registration records `now()`, so a fresh identity is due one window later.
+   */
+  const dueAt = (state: ClassState, identity: string): number => {
+    const fresh = state.freshAt.get(identity);
+    return fresh === undefined ? now() : fresh + inspectionFreshnessMs;
+  };
+
   const scheduleFreshness = (): void => {
     if (disposed || suspended) return;
     cancelFreshnessTimer?.();
@@ -150,21 +162,30 @@ export function createWebuiObservationScheduler(
     // a detached composer costs no timer.
     let nearest: number | undefined;
     for (const identity of inspection.interested.keys()) {
-      // An identity that has not been read yet is fresh *from registration*, which is
-      // what `register` records. Reading the clock instead of the wall epoch matters:
-      // an unanswered freshness deadline is computed against `0`, which on a real clock
-      // is in the past, so the tick armed immediately and re-armed itself — a spin, not
-      // a schedule. A test whose clock starts at zero cannot see that.
-      const due = (inspection.freshAt.get(identity) ?? now()) + inspectionFreshnessMs;
+      if (inspection.queued.has(identity)) continue;
+      // An identity whose own read is still running has no deadline to wait for:
+      // its next read cannot start before that read settles, and the completion
+      // arms the next deadline. Arming one for it here is what made a slow read
+      // re-arm an already-expired deadline at 0 ms for as long as it ran.
+      if (inspection.inFlightIds.has(identity) && dueAt(inspection, identity) <= now()) continue;
+      // Reading the clock instead of the wall epoch matters: an unanswered
+      // freshness deadline computed against `0` is in the past on a real clock,
+      // so the tick armed immediately and re-armed itself — a spin, not a
+      // schedule. `dueAt` is the one place that decides this.
+      const due = dueAt(inspection, identity);
       nearest = nearest === undefined ? due : Math.min(nearest, due);
     }
     if (nearest === undefined) return;
     const delay = Math.max(0, nearest - now());
     cancelFreshnessTimer = setTimer(() => {
       cancelFreshnessTimer = undefined;
+      const nowMs = now();
       for (const identity of inspection.interested.keys()) {
-        const due = (inspection.freshAt.get(identity) ?? 0) + inspectionFreshnessMs;
-        if (due <= now()) inspection.queued.set(identity, inspection.interested.get(identity)!);
+        // A busy identity is queued — one follow-up, run when its read settles —
+        // and `scheduleFreshness` skips it, so the queue entry is the only
+        // follow-up rather than the first of a run of zero-delay timers.
+        if (dueAt(inspection, identity) > nowMs) continue;
+        inspection.queued.set(identity, inspection.interested.get(identity)!);
       }
       pump(inspection);
       scheduleFreshness();
@@ -202,6 +223,9 @@ export function createWebuiObservationScheduler(
           state.inFlightIds.delete(identity);
           if (isCurrent(state, identity)) state.freshAt.set(identity, now());
           pump(state);
+          // The identity is no longer busy, so its next deadline is a decision
+          // this completion has to make: nothing was armed for it while it ran.
+          scheduleFreshness();
         });
     }
   };

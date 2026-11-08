@@ -26,7 +26,7 @@
 // anywhere else, another session's artifacts directory included, is outside
 // the boundary as before.
 
-import { resolveSegments } from "./paths.js";
+import { resolveAbsolutePath, segmentsWithinRoot } from "./paths.js";
 
 /**
  * What the client needs to name a session's artifacts directory.
@@ -66,11 +66,19 @@ function encodedSessionId(sessionId: string): string {
 /**
  * Whether a path is a file in the session's own artifacts directory.
  *
- * The layout is compared segment by segment against the data directory: the
- * data directory, then `v2/sessions`, then the three date segments, then
- * the session directory, then `artifacts`, and then the file itself. A path
+ * Containment first, layout second, and both against the runtime's data
+ * directory: a path that does not start with the data directory's own segments
+ * is not this session's directory, whatever its tail looks like. Two
+ * directories of the same depth — `/data/one` and `/data/two` — differ in the
+ * segment that has to match, and a path reached through a different root kind
+ * (`/srv/data` against the UNC share `//srv/data`, or another drive) is not
+ * placed by a segment comparison at all.
+ *
+ * The layout is then compared segment by segment: `v2/sessions`, the three date
+ * segments, the session directory, `artifacts`, and then the file itself. A path
  * that climbs out of the artifacts directory with `..` does not resolve to a
- * file under it and is refused.
+ * file under it and is refused, and so is the artifacts directory itself, which
+ * is a directory rather than a file in it.
  */
 export function isWebuiPathWithinSessionArtifacts(
   filePath: string,
@@ -79,19 +87,21 @@ export function isWebuiPathWithinSessionArtifacts(
   const dataDir = roots.dataDir?.trim();
   const sessionId = roots.sessionId?.trim();
   if (!dataDir || !sessionId) return false;
-  const root = resolveSegments(dataDir);
-  const file = resolveSegments(filePath);
+  const root = resolveAbsolutePath(dataDir);
+  const file = resolveAbsolutePath(filePath);
   if (!root || !file) return false;
-  const at = root.length;
+  if (root.kind !== file.kind) return false;
+  if (!segmentsWithinRoot(file.segments, root.segments)) return false;
+  const layout = file.segments.slice(root.segments.length);
   // The file has to be below the artifacts directory, so it needs at least the
-  // seven segments the layout itself takes.
-  if (file.length <= at + 6) return false;
-  if (file[at] !== "v2") return false;
-  if (file[at + 1] !== "sessions") return false;
-  if (!/^\d{4}$/u.test(file[at + 2] ?? "")) return false;
-  if (!/^\d{2}$/u.test(file[at + 3] ?? "")) return false;
-  if (!/^\d{2}$/u.test(file[at + 4] ?? "")) return false;
-  const sessionDirectory = file[at + 5] ?? "";
+  // seven segments the layout itself takes plus one more for the file.
+  if (layout.length < 8) return false;
+  if (layout[0] !== "v2") return false;
+  if (layout[1] !== "sessions") return false;
+  if (!/^\d{4}$/u.test(layout[2] ?? "")) return false;
+  if (!/^\d{2}$/u.test(layout[3] ?? "")) return false;
+  if (!/^\d{2}$/u.test(layout[4] ?? "")) return false;
+  const sessionDirectory = layout[5] ?? "";
   if (!sessionDirectory.endsWith(`-session_${encodedSessionId(sessionId)}`)) return false;
-  return file[at + 6] === "artifacts";
+  return layout[6] === "artifacts";
 }

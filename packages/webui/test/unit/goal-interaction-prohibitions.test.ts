@@ -15,7 +15,6 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import type { WebuiInteractionSink } from "../../src/client/features/interactions/application/interaction-coordinator.js";
 import type { WebuiGoalSink } from "../../src/client/features/goal/application/goal-coordinator.js";
-import { createWebuiVersionCells } from "../../src/client/application/version-cell.js";
 
 const CLIENT_ROOT = new URL("../../src/client/", import.meta.url);
 
@@ -116,14 +115,7 @@ describe("prohibition 2 — a rule may not be filed under a module that does not
     expect(flat(read("features/interactions/application/interaction-session-owners.ts"))).toContain(
       "const pendingVersionRef: WebuiVersionCell = { current: 0 };",
     );
-    expect(flat(read("application/create-application.ts"))).toContain(
-      "const versionCells = createWebuiVersionCells();",
-    );
-    // One type, two objects: independence is structural, not conventional.
-    const cells = createWebuiVersionCells();
-    expect(cells.goal).not.toBe(cells.pending);
-    cells.goal.current += 1;
-    expect(cells.pending.current).toBe(0);
+    expect(flat(read("application/create-application.ts"))).not.toContain("versionCells");
   });
 
   it("goal: no component holds a goal fence or a goal read of its own", () => {

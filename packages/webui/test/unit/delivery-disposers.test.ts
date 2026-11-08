@@ -12,6 +12,7 @@ import { createWebuiDeliveryDisposers, holdWebuiDelivery } from "../../src/clien
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { createWebuiConversationTurnCommands } from "../../src/client/features/turn/application/turn-commands.js";
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { createWebuiSessionCatalogFromPage } from "../../src/client/features/sessions/application/session-catalog.js";
 import type { WebuiClientSessionResumer } from "../../src/client/features/turn/contracts/execution-port.js";
 
 function handle() {
@@ -20,6 +21,59 @@ function handle() {
 }
 
 describe("the delivery disposers", () => {
+  it("application disposal closes an attached recovery delivery without settling host execution", async () => {
+    const closed = vi.fn();
+    const abort = vi.fn(async () => ({ success: true }));
+    const resume: WebuiClientSessionResumer = async (_request, _frame, onDelivery) => {
+      onDelivery?.({ close: closed });
+      return new Promise<never>(() => undefined);
+    };
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined }),
+      turns: { resumeSession: resume },
+      turnCapabilities: { resumeSession: resume, abortSession: abort },
+    });
+    app.start({ initialSessionId: "s1" });
+    app.turnCommandsFor("s1").attach("turn-recovered");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(app.deliveries.count("s1")).toBe(1);
+    app.select("s2");
+    expect(app.store.readSession("s1").sending).toBe(true);
+    app.dispose();
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(app.deliveries.count()).toBe(0);
+    expect(app.store.readSession("s1").sending).toBe(true);
+    expect(abort).not.toHaveBeenCalled();
+  });
+
+  it("an application's Home send is closed by deleting its created session", async () => {
+    const closed = vi.fn();
+    const abort = vi.fn(async () => ({ success: true }));
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined }),
+      turns: { resumeSession: async () => undefined },
+      turnCapabilities: {
+        createSession: async () => ({ sessionId: "created" }),
+        sendMessage: async (_body, _frame, delivery) => {
+          delivery?.({ close: closed });
+          return new Promise<never>(() => undefined);
+        },
+        abortSession: abort,
+      },
+    });
+    app.start();
+    void app.turnCommandsFor(undefined).send({ message: "first" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(app.deliveries.count("created")).toBe(1);
+    app.store.updateCatalog(() => createWebuiSessionCatalogFromPage({ sessions: [{ sessionId: "created", agentName: "main", createdAt: 1, updatedAt: 1 }], hasMore: false }));
+    app.sessionWorkflows.applyFact({ kind: "deleted", sessionId: "created" });
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(app.deliveries.count()).toBe(0);
+    app.dispose();
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(abort).not.toHaveBeenCalled();
+  });
+
   it("V15 refuses a delivery handle that arrives after authoritative session purge", () => {
     const disposers = createWebuiDeliveryDisposers();
     const scope = createWebuiSessionScopeManager();

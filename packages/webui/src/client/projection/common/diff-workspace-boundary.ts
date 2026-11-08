@@ -40,7 +40,12 @@
 //    hide ordinary content as well, which is the worse failure.
 
 import type { WebuiFileDiffInfoView } from "../../../shared/contracts/session.js";
-import { isAbsolutePath, resolveSegments } from "./paths.js";
+import {
+  isAbsolutePath,
+  resolveAbsolutePath,
+  resolveSegments,
+  segmentsWithinRoot,
+} from "./paths.js";
 import {
   isWebuiPathWithinSessionArtifacts,
   type WebuiSessionArtifactsRoots,
@@ -96,17 +101,26 @@ export function isWebuiDiffPathWithinWorkspace(
   if (!workspaceDir?.trim()) return true;
   // A path that names no file cannot be placed inside the workspace.
   if (!filePath.trim()) return false;
-  const root = resolveSegments(workspaceDir);
-  if (!root) return true;
-  const file = resolveSegments(filePath);
-  if (!file) return false;
   if (!isAbsolutePath(filePath)) {
     // A relative path is under the root by construction: `resolveSegments`
     // already refused the ones that climb out of it.
-    return true;
+    return resolveSegments(filePath) !== undefined;
   }
-  if (file.length < root.length) return false;
-  return root.every((segment, index) => segment === file[index]);
+  // The same containment rule the session's artifacts root uses: an absolute
+  // root and an absolute file are compared by root kind first, then segment by
+  // segment, so neither a sibling drive nor a UNC share can stand in for the
+  // root while the segments happen to agree.
+  const root = resolveAbsolutePath(workspaceDir);
+  const file = resolveAbsolutePath(filePath);
+  if (root && file) {
+    if (root.kind !== file.kind) return false;
+    return segmentsWithinRoot(file.segments, root.segments);
+  }
+  const rootSegments = resolveSegments(workspaceDir);
+  if (!rootSegments) return true;
+  const fileSegments = resolveSegments(filePath);
+  if (!fileSegments) return false;
+  return segmentsWithinRoot(fileSegments, rootSegments);
 }
 
 /**

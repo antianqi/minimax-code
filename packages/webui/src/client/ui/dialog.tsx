@@ -156,7 +156,8 @@ export function WebuiDialog({
     id,
     parentId: parentLayerId,
     active: open,
-    dismissible: dismissOnEscape || dismissOnBackdrop,
+    dismissOnEscape,
+    dismissOnBackdrop,
     onClose,
   });
 

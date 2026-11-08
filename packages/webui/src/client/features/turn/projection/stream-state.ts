@@ -408,7 +408,10 @@ export function applyFrameData(
         )
       : upsertMessage(next.messages, message, false);
     const contextUsage = nestedMessages
-      ? [...nestedMessages].reverse().map(recordValue).find((item) => item ? contextUsageRecord(item) : undefined)
+      ? [...nestedMessages].reverse().map((item) => {
+          const message = recordValue(item);
+          return message ? contextUsageRecord(message) : undefined;
+        }).find((usage) => usage !== undefined)
       : contextUsageRecord(message);
     // Todo progress and subagent bookkeeping ride inside the message itself
     // rather than on the global bus, so the frame has to be unwrapped here or

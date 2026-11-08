@@ -122,6 +122,70 @@ describe("the liveness probe on an open socket", () => {
   const livenessFrames = (socket: FakeSocket): Array<Record<string, unknown>> =>
     sentFrames(socket).filter((frame) => frame.operation === "version");
 
+  it("refuses a replaced socket's late open, frames and acceptance", () => {
+    // A reconnect replaces the socket, but the browser still has the old one's
+    // callbacks queued. The old request id proves only that a frame answers the
+    // old subscription, so nothing about the live connection may change when it
+    // arrives: no old event reaches a business route, the channel is not marked
+    // healthy again, and the stale `open` does not re-register the subscription.
+    const { channel: created, onEvent, onReconnect } = subscribe();
+    const first = lastSocket();
+    accept(first);
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+
+    first.emit("close");
+    vi.advanceTimersByTime(1_000);
+    const replacement = lastSocket();
+    expect(replacement).not.toBe(first);
+    expect(created.health.state().kind).toBe("connecting");
+
+    first.emit("open");
+    first.emit(
+      "message",
+      JSON.stringify({
+        protocolVersion: WEBUI_PROTOCOL_VERSION,
+        kind: "event",
+        requestId: first.requestId,
+        body: { type: "session.start", sessionId: "s1" },
+      }),
+    );
+    first.emit(
+      "message",
+      JSON.stringify({
+        protocolVersion: WEBUI_PROTOCOL_VERSION,
+        kind: "response",
+        requestId: first.requestId,
+        body: { ok: true, source: [] },
+      }),
+    );
+
+    // No stale event, no stale acceptance, and nothing written to a socket the
+    // channel had already replaced (its only frame is its own first request).
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(created.health.state().kind).toBe("connecting");
+    expect(sentFrames(first)).toHaveLength(1);
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores an already queued probe from the socket replaced by reconnect", () => {
+    const timers = vi.spyOn(globalThis, "setTimeout");
+    try {
+      const { channel: created } = subscribe();
+      accept(lastSocket());
+      const probe = timers.mock.calls.find(([, delay]) => delay === 10_000)?.[0];
+      expect(probe).toBeTypeOf("function");
+      created.health.reconnect();
+      const replacement = lastSocket();
+      const send = vi.spyOn(replacement, "send");
+      vi.setSystemTime(Date.now() + 11_000);
+      (probe as () => void)();
+      expect(send).not.toHaveBeenCalled();
+      expect(created.health.state().kind).toBe("connecting");
+    } finally {
+      timers.mockRestore();
+    }
+  });
+
   it("N1 · forces a reconnect when an accepted socket goes silent, and recovers on the next acceptance", () => {
     subscribe();
     const socket = lastSocket();

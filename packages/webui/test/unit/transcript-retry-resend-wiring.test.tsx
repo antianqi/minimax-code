@@ -131,7 +131,6 @@ function renderComposer(props: {
   readonly draft?: string;
   readonly refusal?: string;
   readonly sendMessage?: (request: any, onFrame: any) => Promise<void>;
-  readonly abortSession?: (request: { id: string }) => Promise<{ success?: boolean }>;
   readonly loadMessages?: (request: any) => Promise<any>;
 }): {
   html: string;
@@ -252,7 +251,6 @@ describe("a composer submit records the exact text it sent", () => {
 describe("retry re-sends the recorded input and never aborts", () => {
   it("hands the recorded text back to the production send path", async () => {
     const sent: { id: string; content: string }[] = [];
-    const abortSession = vi.fn(async () => ({ success: true }));
     // The real turn sender, assembled the way the composer assembles it.
     let inFlight: Promise<unknown> | undefined;
     const sendTurn = (turn: { message: string }) => {
@@ -295,8 +293,6 @@ describe("retry re-sends the recorded input and never aborts", () => {
     // A resend, carrying the user's own words, to the same session…
     expect(sent.map((request) => request.content)).toEqual([USER_INPUT]);
     expect(sent[0]?.id).toBe(SESSION_ID);
-    // …and no abort was even in reach of this path.
-    expect(abortSession).not.toHaveBeenCalled();
   });
 
   it("sends nothing at all when there is no recorded input", () => {
@@ -342,23 +338,8 @@ describe("retry re-sends the recorded input and never aborts", () => {
 });
 
 describe("the composer withholds a retry it cannot honour", () => {
-  it("pressing the retry affordance does not abort the session", () => {
-    // This is the defect's signature, kept as a standing guard: the affordance
-    // was wired to `abortSession`, which carries only a session id and so can
-    // only ever kill a turn, never re-send one. In a node render no record can
-    // pre-exist, so this pins the wiring (the composer offers nothing here);
-    // the runtime effect of a real retry is pinned by `resendRecordedWebuiTurn`
-    // above, which reaches the production send path.
-    const abortSession = vi.fn(async () => ({ success: true }));
-    const rendered = renderComposer({ draft: USER_INPUT, abortSession });
-
-    rendered.onRetry?.();
-    expect(abortSession).not.toHaveBeenCalled();
-  });
-
   it("renders no retry button when this composer has submitted nothing", () => {
-    const abortSession = vi.fn(async () => ({ success: true }));
-    const rendered = renderComposer({ draft: "", abortSession });
+    const rendered = renderComposer({ draft: "" });
 
     // The failure itself is still surfaced…
     expect(rendered.html).toContain(REFUSAL);
@@ -367,7 +348,6 @@ describe("the composer withholds a retry it cannot honour", () => {
     // is what removes the affordance.
     expect(rendered.html).not.toContain('data-testid="output-error-retry"');
     expect(rendered.onRetry).toBeUndefined();
-    expect(abortSession).not.toHaveBeenCalled();
   });
 
   it("still shows the failure, and no button, when the composer only has a draft", () => {

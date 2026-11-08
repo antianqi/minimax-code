@@ -5,6 +5,20 @@
 // Both symbols are re-exported by `client/shell/WebuiClientFoundationApp.tsx` for
 // back-compat: `main.tsx` re-exports `subscribeToSessionHash`, and the SSR
 // snapshot reads `readSessionIdFromHash` through the shell.
+import { sessionHash } from "../projection/common/router.js";
+
+/** Commit a user navigation to the view, application and current URL together. */
+export function commitWebuiSessionNavigation(
+  sessionId: string | undefined,
+  selectView: (sessionId: string | undefined) => void,
+  selectApplication: (sessionId: string | undefined) => void,
+): void {
+  selectApplication(sessionId);
+  selectView(sessionId);
+  if (typeof window !== "undefined") {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${sessionId ? sessionHash(sessionId) : ""}`);
+  }
+}
 
 
 /**

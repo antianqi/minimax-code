@@ -25,7 +25,6 @@ import type {
   WebuiClientSessionPage,
 } from "../features/sessions/contracts/session-view.js";
 import type { selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.public.js";
-import { sessionHash } from "../projection/common/router.js";
 import {
   useSessionRailPins,
   type WebuiRailPinStorage,
@@ -203,12 +202,6 @@ export function useSessionRailActions({
         const id = forked?.sessionId;
         if (id) {
           selectSession(id);
-          if (typeof window !== "undefined")
-            window.history.replaceState(
-              null,
-              "",
-              `${window.location.pathname}${window.location.search}${sessionHash(id)}`,
-            );
         }
       })
       .catch(fail);
@@ -248,13 +241,6 @@ export function useSessionRailActions({
         });
         await refreshRail();
         selectSession(result.sessionId);
-        if (typeof window !== "undefined") {
-          window.history.replaceState(
-            null,
-            "",
-            `${window.location.pathname}${window.location.search}${sessionHash(result.sessionId)}`,
-          );
-        }
       } catch (reason: unknown) {
         fail(reason);
       } finally {
@@ -268,8 +254,6 @@ export function useSessionRailActions({
       .then(() => {
         if (selectedSessionId === session.sessionId) {
           selectSession(undefined);
-          if (typeof window !== "undefined")
-            window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
         }
       })
       .catch(fail);

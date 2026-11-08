@@ -11,7 +11,7 @@
  * the coordinator only decides who answers an event.
  */
 
-import { createContext, useContext, useEffect, useRef, type ReactElement, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactElement, type ReactNode, type RefObject } from "react";
 import { useOverlayLayer } from "./overlay-coordinator.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useOverlayCoordinator } from "./overlay-coordinator.js";
@@ -143,6 +143,8 @@ export function useDialogLayer(options: {
   readonly parentId?: string | null;
   readonly onClose?: () => void;
   readonly dismissible?: boolean;
+  readonly dismissOnEscape?: boolean;
+  readonly dismissOnBackdrop?: boolean;
   readonly order?: number;
   /**
    * Whether the layer is open.
@@ -153,16 +155,20 @@ export function useDialogLayer(options: {
    */
   readonly active?: boolean;
 }): string {
-  const { id, onClose, dismissible = true, order = 0, active = true } = options;
+  const { id, onClose, dismissible = true, dismissOnEscape = dismissible, dismissOnBackdrop = dismissible, order = 0, active = true } = options;
   const inheritedParentId = useParentLayerId();
   const parentId = options.parentId === undefined ? inheritedParentId : options.parentId;
+  const dismissal = useMemo(() => ({
+    escape: dismissOnEscape ? "dismissible" as const : "deferred" as const,
+    pointerdown: dismissOnBackdrop ? "dismissible" as const : "blocked" as const,
+  }), [dismissOnEscape, dismissOnBackdrop]);
   useOverlayLayer(
     {
       id,
       parentId,
       order,
       active,
-      dismissal: dismissible ? "dismissible" : "deferred",
+      dismissal,
       onRoute: (route) => {
         if (route === "request-close") onClose?.();
       },

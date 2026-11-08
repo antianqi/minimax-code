@@ -4,13 +4,13 @@
 // application store (`application/session-store.ts`). Two documented contracts
 // hold there:
 //
-//   1. `store.migrateSession` deliberately does NOT notify listeners: the only
+//   1. `store.transferSession` deliberately does NOT notify listeners: the only
 //      subscriber is the view that is about to switch keys, and the target key
 //      has no subscriber yet.
 //   2. A turn writer remains pinned to its owning session. It moves only when
 //      the first home-screen turn creates the session that owns its stream, and
 //      `migrateToSession` re-points the writer without carrying the record —
-//      the caller runs the silent `migrateSession` for that.
+//      the creation owner runs the guarded `transferSession` for that.
 //
 // What this file pins is the observable half: read/update/migrate semantics,
 // object identity across a migration, isolation between keys, and the two
@@ -71,7 +71,7 @@ describe("W0 · session store transition sequence", () => {
       sending: true,
     }));
 
-    store.migrateSession(HOME_KEY, SESSION_KEY);
+    expect(store.transferSession(HOME_KEY, SESSION_KEY).outcome).toBe("transferred");
 
     expect(slice(HOME_KEY)).toEqual(initialState());
     expect(slice(SESSION_KEY)).toEqual({
@@ -89,13 +89,13 @@ describe("W0 · session store transition sequence", () => {
     }));
     const before = store.readSession(HOME_KEY);
 
-    store.migrateSession(HOME_KEY, SESSION_KEY);
+    expect(store.transferSession(HOME_KEY, SESSION_KEY).outcome).toBe("transferred");
 
     expect(store.readSession(SESSION_KEY)).toBe(before);
   });
 
   it("does not create the target key when the source was never written", () => {
-    store.migrateSession("w0-missing", SESSION_KEY);
+    expect(store.transferSession("w0-missing", SESSION_KEY).outcome).toBe("no-source");
 
     expect(slice(SESSION_KEY)).toEqual(initialState());
   });
@@ -107,7 +107,7 @@ describe("W0 · session store transition sequence", () => {
     }));
     const before = store.readSession(SESSION_KEY);
 
-    store.migrateSession(SESSION_KEY, SESSION_KEY);
+    expect(store.transferSession(SESSION_KEY, SESSION_KEY).outcome).toBe("no-source");
 
     expect(store.readSession(SESSION_KEY)).toBe(before);
   });
@@ -154,7 +154,7 @@ describe("W0 · session store transition sequence", () => {
     const homeWriter = store.createSessionWriter({ kind: "home" });
     expect(homeWriter.kind).toBe("home");
     homeWriter.setStream((current) => ({ ...current, phase: "streaming" }));
-    store.migrateSession(HOME_KEY, SESSION_KEY);
+    expect(store.transferSession(HOME_KEY, SESSION_KEY).outcome).toBe("transferred");
     const sessionWriter = homeWriter.migrateToSession(SESSION_KEY);
     expect(sessionWriter.kind).toBe("session");
     expect("migrateToSession" in sessionWriter).toBe(false);

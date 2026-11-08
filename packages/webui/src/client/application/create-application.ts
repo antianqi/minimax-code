@@ -105,7 +105,6 @@ import {
   createWebuiComposerStore,
   type WebuiComposerStore,
 } from "../features/composer/application/composer-store.js";
-import { createWebuiVersionCells, type WebuiVersionCells } from "./version-cell.js";
 import {
   createWebuiIdentityEpochs,
   type WebuiIdentityEpochs,
@@ -411,11 +410,6 @@ export interface WebuiApplication {
    */
   readonly activeTurnProbe: ReturnType<typeof webuiActiveTurnProbeFor>;
   /**
-   * The two version cells, one per fence. The application owns the instance; the
-   * business owns the policy and reads the cell it is given.
-   */
-  readonly versionCells: WebuiVersionCells;
-  /**
    * The opaque credential/config generation context. Owners put a token in a
    * resource key and compare with `isCurrent`; the business that owns a write
    * advances the epoch it invalidates. Tokens are instance-scoped and carry no
@@ -526,12 +520,6 @@ export function createWebuiApplication(
     deps.readActiveSessionId ?? (() => store.getSelectedSessionId());
   const sessionActivity = createWebuiSessionActivityController(store);
   const composer = deps.composer ?? createWebuiComposerStore();
-  // The two fence cells. Created once per application, because the coordinator
-  // that uses one is constructed on every render and a counter living in it
-  // would reset; published, because the goal's fence is `goal`'s state and
-  // interactions' late-read protection is `interactions'`, so the component must
-  // not be the thing that declares them.
-  const versionCells = createWebuiVersionCells();
   // The opaque identity/freshness context. Created once per instance so a remount
   // gets fresh tokens, and published because every owner that keys a resource by
   // credential/config generation reads it.
@@ -1123,7 +1111,6 @@ export function createWebuiApplication(
     activeTurnProbe,
     planReviewWorkflow,
     observations,
-    versionCells,
     identityEpochs,
     reconcile: (sessionId) => {
       // A disposed instance reconciles nothing: its store is fenced, so a read

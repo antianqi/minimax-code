@@ -19,7 +19,7 @@ export function holdWebuiDelivery(
   sessionId: () => string,
   deliveries?: WebuiDeliveryDisposers,
   scope?: WebuiSessionScopeManager,
-): { readonly onDelivery: (handle: WebuiDeliveryHandle) => void; readonly release: () => void } {
+): { readonly onDelivery: (handle: WebuiDeliveryHandle, targetSessionId?: string) => void; readonly release: () => void } {
   let releaseHandle: (() => void) | undefined;
   let releaseInterest: (() => void) | undefined;
   let ended = false;
@@ -29,13 +29,13 @@ export function holdWebuiDelivery(
     releaseHandle = undefined; releaseInterest = undefined;
   };
   return {
-    onDelivery: (handle) => {
+    onDelivery: (handle, targetSessionId) => {
       release();
       if (ended || deliveries?.isDisposed() || scope?.isDisposed()) {
         handle.close();
         return;
       }
-      const key = sessionId();
+      const key = targetSessionId ?? sessionId();
       releaseInterest = scope?.acquire(key, "delivery", holder);
       if (scope && !scope.isInterested(key)) {
         releaseInterest?.(); releaseInterest = undefined;

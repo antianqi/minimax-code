@@ -26,6 +26,20 @@ import { extensionIdFromPublicKey, parseExtensionIdList, readStoreExtensionIds }
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
+test('coverage review distinguishes declared browser scenarios from executed evidence', () => {
+  const output = execFileSync(process.execPath, ['scripts/coverage-review.mjs', '--check'], { encoding: 'utf8' });
+  const evidence = JSON.parse(readFileSync(new URL('../scripts/lib/webui-browser-coverage-evidence.json', import.meta.url), 'utf8'));
+  for (const entry of evidence.surfaces) {
+    assert.ok(output.includes(entry.scenario));
+    assert.ok(output.includes(entry.spec));
+    assert.ok(output.includes(entry.platform));
+    assert.ok(output.includes(entry.execution));
+  }
+  assert.ok(output.includes('not a passing execution'));
+  assert.ok(!output.includes('this fixture exposes neither'));
+  assert.ok(!output.includes('reachable from no route'));
+});
+
 test('WebUI help and version do not import or start the runtime', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'webui-launcher-help-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));

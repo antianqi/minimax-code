@@ -16,27 +16,3 @@
 export interface WebuiVersionCell {
   current: number;
 }
-
-/**
- * Both cells, created together and owned by the application.
- *
- * They are made here rather than in the component that currently hands them to
- * the two coordinators: the cell must outlive a render (a counter inside a
- * per-render coordinator resets and silently disables the guard), and the goal's
- * fence belongs to `goal` while interactions' late-read protection belongs to
- * `interactions` — so neither is the composer's state to declare.
- *
- * Still two independent objects. The pair is a construction convenience, not a
- * shared cell: `a goal write does not bump the pending cell` and its converse
- * assert that in `goal-coordinator.test.ts`.
- */
-export interface WebuiVersionCells {
-  /** `goal`'s: orders goal reads against goal writes. */
-  readonly goal: WebuiVersionCell;
-  /** `interactions`': orders pending-permission and questionnaire reads against replies. */
-  readonly pending: WebuiVersionCell;
-}
-
-export function createWebuiVersionCells(): WebuiVersionCells {
-  return { goal: { current: 0 }, pending: { current: 0 } };
-}

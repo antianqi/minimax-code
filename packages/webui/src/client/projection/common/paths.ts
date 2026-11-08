@@ -103,3 +103,51 @@ export function isAbsolutePath(value: string): boolean {
   const posix = toPosixPath(value);
   return posix.startsWith("/") || /^[a-z]:\//iu.test(posix);
 }
+
+/**
+ * What an absolute path's root is spelled as.
+ *
+ * Two paths can only contain one another when their roots are the same kind:
+ * `/srv/data` and `//srv/data` resolve to the same segments, but one is a
+ * directory below `/` and the other is a share on a host, and a drive path
+ * names a different root again. Comparing segments without the kind would let
+ * one spelling of a root vouch for a path reached through another.
+ */
+export type WebuiPathRootKind = "posix" | "drive" | "unc";
+
+/** An absolute path, as the root it names and the segments below it. */
+export interface WebuiResolvedAbsolutePath {
+  readonly kind: WebuiPathRootKind;
+  readonly segments: readonly string[];
+}
+
+/**
+ * Resolve an absolute path, or `undefined` when it is not one.
+ *
+ * A relative path has no root of its own to compare, so it is refused here
+ * rather than resolved against something the caller did not name.
+ */
+export function resolveAbsolutePath(
+  value: string,
+): WebuiResolvedAbsolutePath | undefined {
+  const trimmed = value.trim();
+  if (!trimmed || !isAbsolutePath(trimmed)) return undefined;
+  const posix = toPosixPath(trimmed);
+  const kind: WebuiPathRootKind = posix.startsWith("//")
+    ? "unc"
+    : /^[a-z]:\//iu.test(posix)
+      ? "drive"
+      : "posix";
+  const segments = resolveSegments(trimmed);
+  if (!segments) return undefined;
+  return { kind, segments };
+}
+
+/** Whether `file`'s segments begin with `root`'s, segment by segment. */
+export function segmentsWithinRoot(
+  file: readonly string[],
+  root: readonly string[],
+): boolean {
+  if (file.length < root.length) return false;
+  return root.every((segment, index) => segment === file[index]);
+}

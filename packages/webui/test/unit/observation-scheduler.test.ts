@@ -42,7 +42,9 @@ function harness(startAt = 0) {
       entry.run();
     }
   };
-  return { scheduler, advance, now: () => clock };
+  /** The delays of the freshness timers currently armed, on the harness clock. */
+  const pending = (): number[] => timers.map((entry) => entry.at - clock);
+  return { scheduler, advance, now: () => clock, pending };
 }
 
 /** Let every queued microtask and timer callback settle. */
@@ -272,6 +274,59 @@ describe("V31 · one scheduler, independent budgets, suspended when hidden", () 
     advance(1_500);
     await flush();
     expect(reads).toBe(3);
+  });
+
+  it("does not re-arm an expired deadline while its own read is still running", async () => {
+    // The failure: a read slower than the freshness window left an expired
+    // deadline armed, so the tick fired, queued the follow-up, and armed another
+    // 0 ms tick — a timer spin for as long as the read ran. The follow-up belongs
+    // to the read's completion, not to a timer.
+    const { scheduler, advance, pending } = harness(Date.now());
+    const gate = deferred();
+    let reads = 0;
+    scheduler.setInspectionInterest([
+      {
+        identity: "inspection:s1",
+        run: async () => {
+          reads += 1;
+          await gate.promise;
+        },
+      },
+    ]);
+    await flush();
+    expect(reads).toBe(1);
+
+    advance(2_000);
+    // One queued follow-up and nothing armed: a busy identity has no deadline to
+    // wait for, and its completion decides the next one.
+    expect(scheduler.stats().inspectionQueued).toBe(1);
+    expect(pending()).toEqual([]);
+    expect(scheduler.stats().inspectionIssued).toBe(1);
+
+    gate.resolve();
+    await flush();
+    // The follow-up ran at completion, and exactly one deadline is armed — one
+    // freshness window out, not immediately.
+    expect(reads).toBe(2);
+    expect(pending()).toEqual([2_000]);
+    scheduler.dispose();
+  });
+
+  it("does not arm expired deadlines for work queued behind a saturated budget", async () => {
+    const { scheduler, advance, pending } = harness(Date.now());
+    const gate = deferred();
+    scheduler.setInspectionInterest(["one", "two", "three"].map((identity) => ({
+      identity, run: () => gate.promise,
+    })));
+    await flush();
+    advance(2_000);
+    expect(scheduler.stats().inspectionIssued).toBe(2);
+    expect(pending()).toEqual([]);
+    gate.resolve();
+    await flush();
+    expect(scheduler.stats().inspectionQueued).toBe(0);
+    expect(pending()).toEqual([2_000]);
+    scheduler.dispose();
   });
 
   it("tells a runner that its result is no longer wanted", async () => {

@@ -24,6 +24,15 @@ const layer = (overrides: Partial<OverlayLayer> & Pick<OverlayLayer, "id">): Ove
 const ids = (layers: readonly OverlayLayer[]) => layers.map((entry) => entry.id);
 
 describe("overlay order", () => {
+  it.each([[false, false], [false, true], [true, false], [true, true]])("keeps dialog Escape=%s and backdrop=%s independent", (escape, backdrop) => {
+    const layers = [layer({ id: "dialog", dismissal: {
+      escape: escape ? "dismissible" : "deferred",
+      pointerdown: backdrop ? "dismissible" : "blocked",
+    } })];
+    expect(decideOverlayAction(layers, { kind: "escape", insideLayerIds: [] }).route).toBe(escape ? "request-close" : "handle");
+    expect(decideOverlayAction(layers, { kind: "pointerdown", insideLayerIds: [] }).route).toBe(backdrop ? "request-close" : "block");
+    expect(decideOverlayAction(layers, { kind: "pointerdown", insideLayerIds: ["dialog"] }).route).toBe("handle");
+  });
   it("puts a nested layer in front of its parent whatever the sibling order says", () => {
     const ordered = orderOverlayLayers([
       layer({ id: "dialog", order: 100 }),

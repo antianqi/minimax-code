@@ -6,10 +6,6 @@
 // beyond what `useSyncExternalStore` needs to schedule a
 // render when the application notifies.
 //
-// The interaction commands are built here too, bound to the store's interaction
-// writer for the owner key, so the composer submits `applyGoal` /
-// `replacePendingPermissions` and holds no writer for that state.
-//
 // The turn commands are not built here. `useWebuiSessionCommands` reads the
 // application's one conversation command set — the same construction the event
 // coordinator's attach/recheck routes and the composer's submissions use — and
@@ -32,10 +28,6 @@ import type {
 import type { WebuiApplicationSessionState, WebuiApplicationState } from "../application/state.js";
 import { initialWebuiApplicationSessionState } from "../application/state.js";
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
-import {
-  createWebuiInteractionCommands,
-  type WebuiInteractionCommands,
-} from "../features/sessions/application/session-commands.js";
 import type { WebuiConversationTurnCommands } from "../features/turn/contracts/turn-commands.js";
 import {
   useWebuiApplicationOptional,
@@ -136,30 +128,6 @@ export function useWebuiSessionTranscriptIncomplete(sessionId: string | undefine
 
 export function useWebuiSessionContextUsage(sessionId: string | undefined) {
   return useSessionSlice(sessionId, contextUsageSlice);
-}
-
-/**
- * The interaction command surface for one session (or the home slot). The
- * component calls `replacePendingPermissions` / `removePendingPermission` /
- * `applyQuestionnaire` / `applyGoal` through this, never a store setter; the
- * interaction writer stays inside the binding and is rebuilt only when the
- * owner key changes.
- */
-export function useWebuiInteractionCommands(
-  sessionId: string | undefined,
-): WebuiInteractionCommands {
-  const store = useWebuiSessionStoreContext();
-  return useMemo(
-    () =>
-      createWebuiInteractionCommands(
-        store.createInteractionWriter(
-          sessionId
-            ? { kind: "session", sessionId }
-            : { kind: "home" },
-        ),
-      ),
-    [store, sessionId],
-  );
 }
 
 /**

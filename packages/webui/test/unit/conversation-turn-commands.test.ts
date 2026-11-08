@@ -509,6 +509,74 @@ describe("a response stream that ends is not the end of the turn", () => {
 });
 
 describe("an accepted attempt leases its session", () => {
+  it.each(["attach", "recover", "recheck"] as const)("registers %s delivery and closes it on purge without host abort", async (entry) => {
+    const store = createWebuiSessionStore();
+    const scope = createWebuiSessionScopeManager();
+    const deliveries = createWebuiDeliveryDisposers();
+    const close = vi.fn();
+    const stop = vi.fn(async () => ({ success: true }));
+    const commands = createWebuiConversationTurnCommands({
+      store, scope, deliveries, sessionId: "s1",
+      capabilities: {
+        resume: async (_body, _frame, delivery) => {
+          delivery?.({ close });
+          return openStream();
+        },
+        activeTurn: async () => ({ turnId: "t1", busyReason: "turn", locallyOwned: false }),
+        stop,
+      },
+    });
+    if (entry === "recover") commands.recover();
+    else void commands[entry]("t1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(deliveries.count("s1")).toBe(1);
+    expect(scope.kinds("s1")).toContain("delivery");
+    scope.select("s2");
+    expect(scope.isInterested("s1")).toBe(true);
+    deliveries.closeSession("s1");
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(deliveries.count()).toBe(0);
+    expect(scope.isInterested("s1")).toBe(false);
+    deliveries.closeAll();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it("registers a Home send under its created transport session and releases it on application disposal", async () => {
+    const store = createWebuiSessionStore();
+    const scope = createWebuiSessionScopeManager();
+    const deliveries = createWebuiDeliveryDisposers();
+    const close = vi.fn();
+    const stop = vi.fn(async () => ({ success: true }));
+    const commands = createWebuiConversationTurnCommands({
+      store, scope, deliveries, sessionId: undefined,
+      taskSessions: {
+        creationPending: () => false,
+        submit: async () => ({ kind: "created", sessionId: "created", selected: true }),
+      },
+      capabilities: {
+        send: async (body, _frame, delivery) => {
+          expect(body.id).toBe("created");
+          delivery?.({ close });
+          return openStream();
+        },
+        stop,
+      },
+    });
+    void commands.send({ message: "first" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(deliveries.count("created")).toBe(1);
+    expect(deliveries.count(WEBUI_HOME_SESSION_KEY)).toBe(0);
+    expect(scope.kinds("created")).toContain("delivery");
+    expect(scope.kinds(WEBUI_HOME_SESSION_KEY)).not.toContain("delivery");
+    deliveries.closeSession("created");
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(scope.isInterested("created")).toBe(false);
+    deliveries.closeAll();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(stop).not.toHaveBeenCalled();
+  });
+
   it("keeps the session interesting across a navigation and releases it when the attempt settles", async () => {
     const store = createWebuiSessionStore();
     const scope = createWebuiSessionScopeManager();

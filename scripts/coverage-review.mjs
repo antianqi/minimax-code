@@ -33,6 +33,11 @@ const motion = read("packages/webui/docs/design/motion-inventory.json");
 const accessibilityBaseline = read("packages/webui/test/browser/support/accessibility-baseline.json");
 const accessibilityExceptions = read("packages/webui/test/browser/support/accessibility-exceptions.json");
 const accessibilityReview = read("packages/webui/test/browser/support/accessibility-review.json");
+const browserEvidence = read("scripts/lib/webui-browser-coverage-evidence.json");
+for (const entry of browserEvidence.surfaces) {
+  const source = readFileSync(path.join(repoRoot, entry.spec), "utf8");
+  if (!source.includes(entry.scenario)) throw new Error(`Missing browser scenario: ${entry.surface}: ${entry.scenario}`);
+}
 
 const pending = presentation.entries.filter((entry) => entry.disposition === "pending-contract-decision");
 const byFamily = (entries) => {
@@ -107,18 +112,22 @@ lines.push("");
 lines.push("</details>");
 lines.push("");
 
-lines.push("## Surfaces whose migration was never verified");
+lines.push("## Browser coverage declarations and execution limits");
 lines.push("");
-lines.push("A surface counts as verified when a browser check drives it. The client's browser suites cover:");
+lines.push("A test definition establishes a scenario, not a passing execution. The client's browser suites define:");
 lines.push("");
 lines.push("- the six enumerated surfaces in `rendering-integrity.spec.mjs` (transcript, session rail, workspace panel, settings usage, model provider form, plugin/MCP form) across four extremes and both themes;");
 lines.push("- the provider form, the field contract, the model picker, the overlay coordination path, the content pages and the feedback family, each in its own spec.");
 lines.push("");
-lines.push("Not verified by any browser check:");
+lines.push("The following reviewable declarations are read from `scripts/lib/webui-browser-coverage-evidence.json` and checked against their spec sources:");
 lines.push("");
-lines.push("- the plugin catalogue and the miniapp surfaces (this fixture exposes neither);");
-lines.push("- the SSH panel, which renders the page frame but is reachable from no route in this client;");
-lines.push("- long-tail settings sections that the enumerated states do not open.");
+lines.push("| Surface | Defined scenario | Platform boundary | Execution evidence |");
+lines.push("| --- | --- | --- | --- |");
+for (const entry of browserEvidence.surfaces) {
+  lines.push(`| ${entry.surface} | \`${entry.spec}\`: ${entry.scenario} | ${entry.platform} | ${entry.execution} |`);
+}
+lines.push("");
+lines.push("Passing runs, skipped platforms and native-runtime acceptance require the corresponding run's external receipt. This generated report does not infer them from source presence. Long-tail settings sections outside the enumerated scenarios remain unassessed.");
 lines.push("");
 
 lines.push("## Every reviewed exception");

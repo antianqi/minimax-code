@@ -123,7 +123,7 @@ test.describe("the scheduled-task panel", () => {
 
   test("runs a task now and shows the run, with a way into its session", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await openApp(page);
+    await openApp(page, "#session=B");
     await page.locator('[data-webui-nav-item="定时任务"]').click();
     const panel = page.locator('[data-webui-component="scheduling-panel"]');
     await expect(panel).toBeVisible();
@@ -163,8 +163,19 @@ test.describe("the scheduled-task panel", () => {
     await expect(panel).toHaveScreenshot("scheduling-panel-runs.png", screenshotOptions);
 
     // Opening the session a run produced leaves the panel and lands on that session.
+    await page.evaluate(() => window.__fixture.delayEvery("getMessages", { id: "A" }));
     await runs.locator('[data-webui-scheduling-run-session="A"]').first().click();
     await expect(panel).toHaveCount(0);
     await expect(page).toHaveURL(/#session=A/u);
+    await expect(page.locator('[data-webui-transcript="A"]')).toBeVisible();
+    await expect(page.locator('[data-webui-transcript="B"]')).toHaveCount(0);
+    await expect(page.locator('[data-webui-session-link="A"]').first()).toHaveAttribute("data-webui-session-active", "true");
+    await expect.poll(() => page.evaluate(() => window.__fixture.pending.some((request) => request.operation === "getMessages" && request.body.id === "A"))).toBe(true);
+    await page.locator('[data-webui-session-link="B"]').first().click({ position: { x: 12, y: 12 } });
+    await expect(page.locator('[data-webui-transcript="B"]')).toBeVisible();
+    await page.evaluate(() => window.__fixture.resolve("getMessages", { id: "A" }, { messages: [{ msgId: "late-A", role: "assistant", msgContent: "Late A history" }], hasMore: false }));
+    await expect(page).toHaveURL(/#session=B/u);
+    await expect(page.locator('[data-webui-transcript="B"]')).toBeVisible();
+    await expect(page.locator('[data-webui-session-link="B"]').first()).toHaveAttribute("data-webui-session-active", "true");
   });
 });

@@ -217,6 +217,22 @@ describe("readWebuiSessionTransferTarget", () => {
     }
   });
 
+  it("maps a wss endpoint to the https origin the routes are served on", () => {
+    // The secure socket and the secure page are the same projection as `ws:` to
+    // `http:`: one substitution of the shared prefix, not a special case. The
+    // transfer routes refused to follow it and answered a `wss:` origin, which
+    // neither `fetch` nor a navigation can use.
+    vi.stubGlobal("__WEBUI_CONFIG__", { websocketUrl: "wss://runtime.example:8443/ws", token: "abc" });
+    try {
+      expect(readWebuiSessionTransferTarget()).toEqual({
+        origin: "https://runtime.example:8443",
+        token: "abc",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("treats a blank token as a real dev token, not as no runtime", () => {
     vi.stubGlobal("__WEBUI_CONFIG__", { websocketUrl: "ws://127.0.0.1:5199/ws", token: "" });
     try {

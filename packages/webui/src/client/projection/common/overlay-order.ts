@@ -31,8 +31,10 @@ export interface OverlayLayer {
    * reach an ancestor, `deferred` leaves the attempt unanswered — which is how
    * a layer says its own content owns the key rather than another overlay.
    */
-  readonly dismissal: "dismissible" | "blocked" | "deferred";
+  readonly dismissal: OverlayDismissal | Readonly<Record<OverlayEvent["kind"], OverlayDismissal>>;
 }
+
+export type OverlayDismissal = "dismissible" | "blocked" | "deferred";
 
 /** The facts of one event, never a DOM node. */
 export interface OverlayEvent {
@@ -141,9 +143,10 @@ export function decideOverlayAction(
   const topmost =
     event.kind === "escape" ? (insideActive ?? orderOverlayLayers(active)[0]) : orderOverlayLayers(active)[0];
   if (!topmost) return NOTHING_CLAIMED;
+  const dismissal = typeof topmost.dismissal === "string" ? topmost.dismissal : topmost.dismissal[event.kind];
 
   if (event.kind === "escape") {
-    switch (topmost.dismissal) {
+    switch (dismissal) {
       case "dismissible":
         return { layerId: topmost.id, route: "request-close" };
       case "blocked":
@@ -159,7 +162,7 @@ export function decideOverlayAction(
     isWithin(id, topmost.id, byId),
   );
   if (landedInsideTopmost) return { layerId: topmost.id, route: "handle" };
-  switch (topmost.dismissal) {
+  switch (dismissal) {
     case "dismissible":
       return { layerId: topmost.id, route: "request-close" };
     case "blocked":

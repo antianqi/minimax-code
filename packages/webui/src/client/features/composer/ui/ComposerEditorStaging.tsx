@@ -83,7 +83,6 @@ export interface WebuiComposerEditorStagingProps {
    * composer: a press anywhere in it — the text, the attachments, the send
    * button — is the user still working, not the user leaving.
    */
-  readonly dismissRegionRef: RefObject<HTMLElement | null>;
   /** Closes the mention range. */
   readonly onDismissMention: () => void;
   /** Cancels the slash invocation, exactly as Escape does. */
@@ -157,7 +156,6 @@ export function WebuiComposerEditorStaging({
   onCommandIndexChange,
   onChooseCommand,
   anchorRef,
-  dismissRegionRef,
   onDismissMention,
   onDismissCommand,
 }: WebuiComposerEditorStagingProps) {
@@ -209,7 +207,6 @@ export function WebuiComposerEditorStaging({
           offset={8}
           collision="clamp"
           anchorElementRef={anchorRef}
-          dismissRegionRef={dismissRegionRef}
         >
           {mention.choices.map((choice, index) => (
             <Fragment key={`${choice.section}:${choice.kind}:${choice.label}`}>
@@ -238,7 +235,6 @@ export function WebuiComposerEditorStaging({
           popupDataAttributes={{ "data-webui-command-menu": "true" }}
           placement={placeCommandPalette}
           anchorElementRef={anchorRef}
-          dismissRegionRef={dismissRegionRef}
         >
           {commands.map((command, index) => {
             const Icon = command.icon;

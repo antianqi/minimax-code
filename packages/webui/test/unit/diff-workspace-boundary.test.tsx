@@ -162,6 +162,8 @@ describe("the projection removes the body of a file outside the workspace", () =
 
 describe("the session's own artifacts directory is a second trusted root", () => {
   const roots = sessionRoots;
+  /** The layout below the data directory, as the runtime writes it. */
+  const LAYOUT = `v2/sessions/${SESSION_DIR}/artifacts/plan.md`;
 
   it("keeps the body of a file in the session's own artifacts directory", () => {
     const entry = projectWebuiDiffFile(
@@ -206,7 +208,52 @@ describe("the session's own artifacts directory is a second trusted root", () =>
     expect(entry.diff).toBeUndefined();
   });
 
-  it("does not trust a path that walks out of the artifacts directory", () => {
+  it("does not trust a same-depth directory whose prefix is not the data directory", () => {
+    // The forged path below has exactly the artifacts layout under a root of the
+    // same depth, which a length-only comparison accepts: only comparing the
+    // root's own segments says the directory is not the runtime's.
+    const sameDepth = `/home/user/data/${LAYOUT}`;
+    const sibling = `/home/user/.minimax-backup/${LAYOUT}`;
+
+    expect(isWebuiPathWithinSessionArtifacts(sameDepth, roots)).toBe(false);
+    expect(isWebuiPathWithinSessionArtifacts(sibling, roots)).toBe(false);
+    // The real one, spelled through the root it names, is still trusted.
+    expect(isWebuiPathWithinSessionArtifacts(planFile, roots)).toBe(true);
+  });
+
+  it("does not trust a path reached through another root kind", () => {
+    // The same segments reached as a share, a drive and a posix directory are
+    // three different roots. A comparison that only looked at segments would let
+    // one spelling vouch for another.
+    const layout = LAYOUT;
+    expect(isWebuiPathWithinSessionArtifacts(`//home/user/.minimax/${layout}`, roots)).toBe(false);
+
+    const windowsRoots = { dataDir: "C:\\Users\\u\\AppData\\mcode", sessionId: SESSION_ID };
+    expect(
+      isWebuiPathWithinSessionArtifacts(`D:\\Users\\u\\AppData\\mcode\\${layout}`, windowsRoots),
+    ).toBe(false);
+    // The same drive in another case is one drive, and the layout still holds.
+    expect(
+      isWebuiPathWithinSessionArtifacts(`c:/Users/u/AppData/mcode/${layout}`, windowsRoots),
+    ).toBe(true);
+  });
+
+  it("does not trust the artifacts directory itself", () => {
+    // The boundary is about a file *in* the directory: the directory names no
+    // file, and a diff entry cannot name one either.
+    expect(isWebuiPathWithinSessionArtifacts(artifactsDir, roots)).toBe(false);
+    expect(isWebuiPathWithinSessionArtifacts(`${artifactsDir}/`, roots)).toBe(false);
+  });
+
+  it("compares UNC host and share and requires an absolute data root", () => {
+    const unc = { dataDir: "//server/share/data", sessionId: SESSION_ID };
+    expect(isWebuiPathWithinSessionArtifacts(`//server/share/data/${LAYOUT}`, unc)).toBe(true);
+    expect(isWebuiPathWithinSessionArtifacts(`//other/share/data/${LAYOUT}`, unc)).toBe(false);
+    expect(isWebuiPathWithinSessionArtifacts(`//server/other/data/${LAYOUT}`, unc)).toBe(false);
+    expect(isWebuiPathWithinSessionArtifacts(`relative/data/${LAYOUT}`, { dataDir: "relative/data", sessionId: SESSION_ID })).toBe(false);
+  });
+
+  it("does not trust a file that walks out of the artifacts directory", () => {
     expect(isWebuiPathWithinSessionArtifacts(`${artifactsDir}/../../../../etc/hostname`, roots)).toBe(false);
   });
 

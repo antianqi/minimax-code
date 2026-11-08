@@ -299,7 +299,11 @@ export function createWebuiEventChannel(
       // Terminal shapes do not schedule: the probe's next start is the next
       // `open` event, not a timer that outlives the socket it watches.
       if (stopped || fatal || socket === undefined) return;
-      probeTimer = setTimeout(probeTick, WEBUI_CHANNEL_LIVENESS_PING_INTERVAL_MS);
+      const watchedSocket = socket;
+      probeTimer = setTimeout(() => {
+        if (stopped || socket !== watchedSocket) return;
+        probeTick();
+      }, WEBUI_CHANNEL_LIVENESS_PING_INTERVAL_MS);
       unrefTimer(probeTimer);
     };
     const probeTick = (): void => {
@@ -352,6 +356,17 @@ export function createWebuiEventChannel(
       setState({ kind: "connecting" });
       const ws = new webSocket(websocketUrl());
       socket = ws;
+      /**
+       * Whether this socket is still the connection the channel uses.
+       *
+       * A reconnect replaces `socket` while the old socket's callbacks are still
+       * queued in the browser: its `open`, its frames and its `close` all arrive
+       * after the replacement exists. None of them is about the live
+       * connection — the old socket's request id proves only that a frame belongs
+       * to the old socket's own subscription — so every callback is fenced on the
+       * incarnation before it can touch health, liveness or the event handlers.
+       */
+      const isCurrentConnection = (): boolean => !stopped && socket === ws;
       const requestId = randomId();
       probedRequestId = requestId;
       // Fires when the server *accepts* the `watchEvents` request, not when
@@ -363,7 +378,7 @@ export function createWebuiEventChannel(
       // as "no event can slip past from here".
       let acknowledged = false;
       ws.addEventListener("open", () => {
-        if (stopped) return;
+        if (!isCurrentConnection()) return;
         // The probe watches exactly this socket, from its first instant of
         // life to the close that ends it.
         lastInboundAt = Date.now();
@@ -380,12 +395,15 @@ export function createWebuiEventChannel(
         );
       });
       ws.addEventListener("message", (event) => {
-        // First, before any judging: a frame arrived, so the link is alive.
-        // This is the liveness evidence the probe runs on — it counts even a
-        // frame the decoder below will refuse, and it counts the probe's own
-        // answer, which the request-id filter further down then drops.
+        // First, before any judging: is this frame even about the connection in
+        // use? A replaced socket's late frames are not evidence about the live
+        // one, and its request id only proves it answers the old subscription.
+        if (!isCurrentConnection()) return;
+        // A frame arrived on the live socket, so the link is alive. This is the
+        // liveness evidence the probe runs on — it counts even a frame the
+        // decoder below will refuse, and it counts the probe's own answer, which
+        // the request-id filter further down then drops.
         lastInboundAt = Date.now();
-        if (stopped) return;
         // Judged by the same decoder the request sockets use. The event channel
         // used to parse and trust whatever arrived, so a frame from a different
         // protocol version counted as a live event and marked the connection
@@ -426,7 +444,7 @@ export function createWebuiEventChannel(
           onEvent(body as WebuiClientRuntimeEvent);
       });
       ws.addEventListener("close", () => {
-        if (stopped || socket !== ws) return;
+        if (!isCurrentConnection()) return;
         socket = undefined;
         // The socket the probe watches is gone; the retry loop's next `open`
         // restarts it.

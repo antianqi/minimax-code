@@ -1079,7 +1079,6 @@ export function WebuiComposer({
                   onCommandIndexChange={setCommandIndex}
                   onChooseCommand={chooseCommand}
                   anchorRef={composerInputContainerRef}
-                  dismissRegionRef={composerRegionRef}
                   onDismissMention={() => setMentionRange(undefined)}
                   onDismissCommand={() => {
                     if (!commandRange) return;

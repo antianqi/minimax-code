@@ -12,7 +12,7 @@
 // submits named changes; it holds no `setState` and no updater for it.
 //
 // `adoptHome` is the composer half of home→session adoption. The session half
-// lives on the session store (`migrateSession`); the composition root runs both
+// lives on the session store (`transferSession`); the composition root runs both
 // in one committed transition (`create-application.ts`).
 
 import {

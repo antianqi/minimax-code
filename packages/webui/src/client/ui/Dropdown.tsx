@@ -173,11 +173,10 @@ export interface WebuiDropdownProps {
    *
    * A managed popup registers as one layer and attaches no listener of its own,
    * so inside a managed subtree one Escape closes exactly the topmost layer
-   * instead of every open surface answering the same key. A legacy instance —
-   * `managed` unset — keeps its own Escape and outside-press handling, which is
-   * what the surfaces that have not migrated still rely on.
+   * instead of every open surface answering the same key. All dropdowns use
+   * this registration; the optional marker only documents migrated callers.
    */
-  readonly managed?: boolean;
+  readonly managed?: true;
   /** The layer id a managed popup registers under. */
   readonly managedLayerId?: string;
   /**
@@ -277,14 +276,6 @@ export interface WebuiDropdownProps {
    * and `flip` opens it on the other side when there is no room.
    */
   readonly collision?: WebuiDropdownCollision;
-  /**
-   * The region a press inside is NOT a dismissal.
-   *
-   * By default it is the trigger's own wrapper. A popup with no trigger names
-   * the region that holds it — a list that follows the caret stays open while
-   * the caret moves inside the composer it belongs to.
-   */
-  readonly dismissRegionRef?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -349,7 +340,6 @@ export function WebuiDropdown({
   anchorElementRef,
   placement,
   collision = "none",
-  dismissRegionRef,
   managed = true,
   managedLayerId,
   managedDismissal = "dismissible",
@@ -392,8 +382,6 @@ export function WebuiDropdown({
   placementRef.current = placement;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const dismissRegionRefRef = useRef(dismissRegionRef);
-  dismissRegionRefRef.current = dismissRegionRef;
 
   useEffect(() => {
     if (open) {

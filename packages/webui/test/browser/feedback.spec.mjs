@@ -16,6 +16,11 @@ import { configureFixture, openApp, test } from "./harness.mjs";
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => console.error("BROWSER_PAGE_ERROR", error.stack ?? error.message));
   await configureFixture(page, () => {
+    window.__fixture.setPage("A", {
+      messages: [{ msgId: "history-A", role: "assistant", msgContent: "History A synthetic" }],
+      hasMore: false,
+      contextSnapshot: { status: "live", usage: { totalTokens: 12000, contextWindow: 200000 } },
+    });
     window.__fixture.setResponse("getMemorySettings", { enabled: true, proactive: false });
     window.__fixture.setUsageQuotaResult({
       signedIn: true,
@@ -63,6 +68,11 @@ test("a dynamic field error is announced once and stays associated with its cont
   expect(alertId, "the error has an id a control can point at").toBeTruthy();
   expect(describedBy.split(" "), "the control is described by the error").toContain(alertId);
   await expect(endpoint).toHaveAttribute("aria-invalid", "true");
+  // This production dialog enables Escape and leaves backdrop dismissal off.
+  await page.mouse.click(6, 6);
+  await expect(form).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(form).toHaveCount(0);
 });
 
 test("a determinate bar carries a value while a busy indicator carries none", async ({ page }) => {
@@ -70,26 +80,20 @@ test("a determinate bar carries a value while a busy indicator carries none", as
   // bar. It reports a share of a known window, so it wears `progressbar` with a
   // value; a busy indicator has no share to report and must not wear the role.
   const usage = page.getByTestId("composer-context-usage");
-  // The indicator only renders when the runtime reports a context window; with no
-  // usage in the fixture there is no bar to measure and the test says so.
-  test.skip((await usage.count()) === 0, "the runtime reports no context usage in this fixture");
   await expect(usage).toBeVisible();
   await usage.click();
 
-  const bar = usage.locator('[role="progressbar"]');
+  const bar = page.getByRole("progressbar", { name: "上下文窗口使用量" });
   await expect(bar).toHaveCount(1);
-  // With a known window the bar reports the share; with none it drops the value
-  // rather than reporting zero, which is the indeterminate form of the same bar.
+  // This scenario supplies a known window, so it must report its exact share.
   const value = await bar.getAttribute("aria-valuenow");
   const label = await bar.getAttribute("aria-label");
   expect(label, "the bar is named").toBeTruthy();
-  if (value !== null) {
-    const numeric = Number(value);
-    expect(Number.isFinite(numeric), "a value is a number").toBe(true);
-    expect(numeric).toBeGreaterThanOrEqual(0);
-    expect(numeric).toBeLessThanOrEqual(100);
-    await expect(bar).toHaveAttribute("aria-valuemax", "100");
-  }
+  expect(value, "the known context window requires a determinate value").not.toBeNull();
+  const numeric = Number(value);
+  expect(Number.isFinite(numeric), "a value is a number").toBe(true);
+  expect(numeric).toBe(6);
+  await expect(bar).toHaveAttribute("aria-valuemax", "100");
 
   // And nothing in the composer claims to be loading a share of anything.
   await expect(page.locator('[role="status"][aria-valuenow]')).toHaveCount(0);
@@ -141,11 +145,12 @@ test("the usage model-source menu uses the shared dropdown entrance and exit", a
 });
 
 test("the plugin panel reports activity as a status, never as a progressbar", async ({ page }) => {
+  await page.evaluate(() => window.__fixture.delayEvery("pluginManagement", { action: "listMarketplacePlugins" }));
   // The plugin area is a rail surface, not a settings page.
   await page.getByRole("button", { name: /^插件$/u }).first().click();
-  const panel = page.locator('[data-webui-component="plugin-catalogue"]');
-  if ((await panel.count()) === 0) test.skip(true, "the runtime exposes no plugin catalogue in this fixture");
-  await expect(panel.first()).toBeVisible();
+  const panel = page.getByTestId("plugin-management");
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute("aria-busy", "true");
 
   // Whatever the panel is doing, it has no determinate amount to report, so it must
   // not wear the progressbar role: a bar with no value tells a reader nothing.
@@ -153,12 +158,22 @@ test("the plugin panel reports activity as a status, never as a progressbar", as
 
   // A loading or empty state, when it is there, is a status or a plain state.
   const statuses = panel.locator('[role="status"]');
+  await expect(statuses).toHaveCount(1);
   for (let index = 0; index < (await statuses.count()); index += 1) {
     await expect(statuses.nth(index)).not.toHaveAttribute("aria-valuenow", /.*/u);
   }
 
   // And when the catalogue reports a failure it is an alert, addressable and not a
   // banner: exactly one live region for it.
-  const alerts = panel.locator('[role="alert"]');
-  if ((await alerts.count()) > 0) await expect(alerts).toHaveCount(1);
+  await page.evaluate(() => {
+    window.__fixture.refuseOperation("pluginManagement", "harness_error", "Synthetic catalogue failure");
+    window.__fixture.resolve("pluginManagement", { action: "listMarketplacePlugins" }, { plugins: [], total: 0 });
+  });
+  await expect(panel).not.toHaveAttribute("aria-busy", "true");
+  await page.getByRole("button", { name: "技能", exact: true }).first().click();
+  const alert = page.getByTestId("plugin-catalogue-error");
+  await expect(alert).toBeVisible();
+  await expect(alert).toHaveAttribute("role", "alert");
+  await expect(alert).toContainText("Synthetic catalogue failure");
+  await expect(alert).toHaveCount(1);
 });

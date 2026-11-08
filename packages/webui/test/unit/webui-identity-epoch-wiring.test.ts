@@ -12,7 +12,7 @@
 // epoch context: the owners are framework-free, so the observation is the
 // generation counter rather than a rendering.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createWebuiAccountWorkflows } from "../../src/client/features/account/application/account-workflows.js";
 import { createWebuiModelsWorkflows } from "../../src/client/features/models/application/models-workflows.js";
@@ -102,15 +102,27 @@ describe("account commands move the credential generation", () => {
   });
 
   it("advances when a sign-in completes", async () => {
+    vi.useFakeTimers();
     const { identityEpochs, workflows } = buildAccount({
       beginAccountLogin: async () => ({ state: "pending" }),
       getAccountLoginStatus: async () => ({ state: "authenticated" }),
     });
-    await workflows.beginLogin();
-    // The poll is timer-driven; the same transition is reachable through the
-    // owner's own status read, which is what the login flow calls.
-    await workflows.loadAccount();
-    expect(identityEpochs.credentials().generation).toBeGreaterThanOrEqual(0);
+    try {
+      const before = identityEpochs.credentials();
+      await workflows.beginLogin();
+      expect(workflows.getSnapshot().login.polling).toBe(true);
+      expect(identityEpochs.isCurrent(before)).toBe(true);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(workflows.getSnapshot().login.view?.state).toBe("authenticated");
+      expect(workflows.getSnapshot().login.polling).toBe(false);
+      expect(identityEpochs.credentials().generation).toBe(before.generation + 1);
+      expect(identityEpochs.isCurrent(before)).toBe(false);
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(identityEpochs.credentials().generation).toBe(before.generation + 1);
+    } finally {
+      workflows.dispose();
+      vi.useRealTimers();
+    }
   });
 });
 

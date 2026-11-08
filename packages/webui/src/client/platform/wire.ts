@@ -53,6 +53,7 @@ import {
   type WebuiSocket,
   type WireFrame,
 } from "./event-channel.js";
+import { httpBaseFromWebsocketUrl } from "./transport-origin.js";
 
 export type { WebuiSocket };
 
@@ -65,6 +66,25 @@ export interface WebuiWireOptions {
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * A request whose own deadline passed before the answer arrived.
+ *
+ * The deadline is the client's fact, not the service's, and the mutation
+ * interface branches on it: `classifyWebuiMutationFailure` reads the platform's
+ * `TimeoutError` name (what `AbortSignal.timeout` rejects with), so a write the
+ * client gave up waiting for is reported as `timeout` — "the answer never
+ * arrived, the write may or may not have taken effect" — instead of as an
+ * unclassified transport failure. The message keeps the budget and the
+ * operation, which is what a person reading the failure needs.
+ */
+export class WebuiRequestTimeoutError extends Error {
+  override readonly name = "TimeoutError";
+
+  constructor(message: string) {
+    super(message);
+  }
+}
 
 /** A socket carrying one request, and the only way to settle it. */
 export interface WebuiWireSession {
@@ -474,7 +494,9 @@ export function createWebuiWire({
         () =>
           fail(
             session,
-            new Error(`WebUI request timed out after ${requestTimeoutMs}ms (${operation})`),
+            new WebuiRequestTimeoutError(
+              `WebUI request timed out after ${requestTimeoutMs}ms (${operation})`,
+            ),
           ),
         requestTimeoutMs,
       );
@@ -918,7 +940,7 @@ export function createWebuiWire({
     // Same base rule as `workspaceFileUrl`: the socket URL carries the token, the
     // page route checks it, and `ws:`/`wss:` share a prefix so one substitution
     // reaches `http:`/`https:`.
-    const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
+    const base = httpBaseFromWebsocketUrl(baseWebsocketUrl);
     const query = new URLSearchParams({ token, plugin: pluginId });
     if (sessionId !== undefined) query.set("session", sessionId);
     return `${base}/miniapp?${query.toString()}`;
@@ -934,7 +956,7 @@ export function createWebuiWire({
     // `ws:`/`wss:` share the `ws` prefix, so one substitution lands on
     // `http:`/`https:` respectively, and it must happen before the token is
     // appended — the server checks the token on this route like any other.
-    const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
+    const base = httpBaseFromWebsocketUrl(baseWebsocketUrl);
     const query = new URLSearchParams({ dir: workspaceDir, path: filePath, token });
     return `${base}/workspace-file?${query.toString()}`;
   }
@@ -943,7 +965,7 @@ export function createWebuiWire({
     // Same base rule as `workspaceFileUrl`: the socket URL carries the token,
     // the route checks it, and `ws:`/`wss:` share a prefix so one
     // substitution reaches `http:`/`https:`.
-    const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
+    const base = httpBaseFromWebsocketUrl(baseWebsocketUrl);
     const query = new URLSearchParams({ token });
     return `${base}/browser-extension?${query.toString()}`;
   }

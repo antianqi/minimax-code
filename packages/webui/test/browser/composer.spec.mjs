@@ -173,6 +173,22 @@ const TINY_PNG = Buffer.from(
   "base64",
 );
 
+for (const [token, marker] of [["@", "data-webui-mention-menu"], ["/", "data-webui-command-menu"]]) {
+  test(`the ${token} menu keeps the composer region inside its managed layer`, async ({ page }) => {
+    await openApp(page, "#session=A");
+    const input = composer(page);
+    await input.fill(token);
+    const menu = page.locator(`[${marker}="true"]`);
+    await expect(menu).toBeVisible();
+    // The blank part of the editor keeps the caret after the token. The outer
+    // region's empty corner overlaps the transcript and is not a user target.
+    await input.click({ position: { x: 120, y: 14 } });
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+  });
+}
+
 test("typing / opens the slash palette; filtering and Escape behave", async ({ page }) => {
   await openApp(page, "#session=A");
 

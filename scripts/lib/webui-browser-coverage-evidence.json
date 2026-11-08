@@ -1,0 +1,25 @@
+{
+  "surfaces": [
+    {
+      "surface": "Plugin catalogue",
+      "spec": "packages/webui/test/browser/plugin-catalogue-layout.spec.mjs",
+      "scenario": "plugin loading uses the shared single-layer skeleton",
+      "platform": "Built Chromium fixture",
+      "execution": "Not recorded by this declaration"
+    },
+    {
+      "surface": "Mini App launcher",
+      "spec": "packages/webui/test/browser/miniapp-panel.spec.mjs",
+      "scenario": "the rail launcher refreshes on return and while open without reloading",
+      "platform": "Built Chromium fixture",
+      "execution": "Not recorded by this declaration"
+    },
+    {
+      "surface": "SSH connection settings and terminal",
+      "spec": "packages/webui/test/browser/ssh-terminal.spec.mjs",
+      "scenario": "the connection state is readable in the light theme",
+      "platform": "Built Chromium fixture; native SSH is outside this scenario",
+      "execution": "Not recorded by this declaration"
+    }
+  ]
+}

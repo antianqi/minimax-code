@@ -13,6 +13,8 @@
 // the import POST are served by the same listener -- so it is resolved once
 // here rather than twice with two subtly different copies.
 
+import { httpOriginFromWebsocketUrl } from "./transport-origin.js";
+
 interface WebuiRuntimeConfig {
   readonly websocketUrl: string;
   readonly token: string;
@@ -32,15 +34,12 @@ export interface WebuiSessionTransferTarget {
 export function readWebuiSessionTransferTarget(): WebuiSessionTransferTarget | undefined {
   const config = (globalThis as { __WEBUI_CONFIG__?: WebuiRuntimeConfig }).__WEBUI_CONFIG__;
   if (!config?.websocketUrl) return undefined;
-  // `new URL("ws://host").origin` stays `ws://host`, which `fetch` cannot use.
-  // The transport's URL is the websocket endpoint; the transfer routes are
-  // served by the same listener over HTTP.
-  let origin: string;
-  try {
-    origin = new URL(config.websocketUrl).origin.replace(/^ws(?=:\/\/)/u, "http");
-  } catch {
-    return undefined;
-  }
+  // The transfer routes are served by the same listener the socket is opened
+  // against, so the origin is the transport's own endpoint projected onto HTTP.
+  // That projection is shared with the download builders (`transport-origin.ts`)
+  // rather than restated: it is what makes `wss:` answer `https:` here too.
+  const origin = httpOriginFromWebsocketUrl(config.websocketUrl);
+  if (!origin) return undefined;
   // An empty token is the dev server's ordinary state -- `vite.config.ts`
   // injects `token:''` and the service skips the credential check when it runs
   // with `dev`. Whether a credential is required is the server's call, not the

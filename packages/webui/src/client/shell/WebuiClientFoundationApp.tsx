@@ -60,7 +60,7 @@ import {
   filterWebuiSessionsByQuery,
   sessionLabel,
 } from "../features/sessions/projection/rail-groups.js";
-import { sessionHash } from "../projection/common/router.js";
+import { commitWebuiSessionNavigation } from "../bindings/navigation.js";
 import {
   WebuiIconSearch,
   WebuiIconSidebarToggle,
@@ -352,8 +352,8 @@ export function WebuiClientFoundationApp(
    * is told; every path that changes the route passes through here.
    */
   const selectSession = useCallback((sessionId: string | undefined) => {
-    setSelectedSessionId(sessionId);
-  }, []);
+    commitWebuiSessionNavigation(sessionId, setSelectedSessionId, application.select);
+  }, [application, setSelectedSessionId]);
   const transcriptCommandsWithForkNavigation = useMemo(() => {
     const commands = application.transcriptCommands;
     if (!commands.forkSession) return commands;
@@ -363,12 +363,6 @@ export function WebuiClientFoundationApp(
         const result = await commands.forkSession!(request);
         if (result.session?.sessionId) {
           selectSession(result.session.sessionId);
-          if (typeof window !== "undefined")
-            window.history.replaceState(
-              null,
-              "",
-              `${window.location.pathname}${window.location.search}${sessionHash(result.session.sessionId)}`,
-            );
         }
         return result;
       },
@@ -624,12 +618,6 @@ export function WebuiClientFoundationApp(
   const handleWorkspaceSubagentClick = useCallback(
     (subagent: WebuiWorkspaceSubagent) => {
       selectSession(subagent.sessionId);
-      if (typeof window !== "undefined")
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${window.location.search}${sessionHash(subagent.sessionId)}`,
-        );
     },
     [selectSession],
   );
@@ -712,7 +700,6 @@ export function WebuiClientFoundationApp(
       select: (sessionId) => {
         dispatchShellSurface({ type: "show-conversation" });
         selectSession(sessionId);
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${sessionHash(sessionId)}`);
       },
       isOpen: (sessionId, pluginId) => workspacePanelOwner.stateFor(sessionId).workspacePanel.tabs.some(
         (tab) => tab.content.kind === "miniapp" && tab.content.pluginId === pluginId,
@@ -1183,7 +1170,7 @@ export function WebuiClientFoundationApp(
                   onOpenSession={(sessionId) => {
                     // Opening the session a run produced is an ordinary rail navigation: it also
                     // leaves the panel, which is what a person expects after asking to see it.
-                    application.select(sessionId);
+                    selectSession(sessionId);
                     dispatchShellSurface({ type: "show-conversation" });
                   }}
                 />
@@ -1200,7 +1187,7 @@ export function WebuiClientFoundationApp(
               if (outcome.kind === "creation-failed") throw new Error(outcome.error);
               // The rail's chat action opens what it created only while the claim
               // that started the creation is still current.
-              if (outcome.selected) application.select(outcome.sessionId);
+              if (outcome.selected) selectSession(outcome.sessionId);
               handleSessionCreatedViewEffect(outcome.sessionId, outcome.selected, teamModeOff);
               }} /></WebuiZoneBoundary> : <WebuiPage as="div" kind="content" className="contents">
             <ConversationSurface
@@ -1265,13 +1252,11 @@ export function WebuiClientFoundationApp(
                 <WebuiExternalDeletionNotice
                   drafts={retainedDeletionDrafts}
                   onCopy={(sessionId) => {
-                    const text = sessionWorkflows.copyRetainedDeletionDraft(sessionId);
-                    if (text === undefined) return;
-                    // Copying is the user's act, so the record retires whether or
-                    // not this browser exposes a clipboard to write to.
-                    if (typeof navigator !== "undefined" && navigator.clipboard) {
-                      void navigator.clipboard.writeText(text).catch(() => undefined);
-                    }
+                    void sessionWorkflows.copyRetainedDeletionDraft(sessionId, async (text) => {
+                      if (typeof navigator === "undefined" || !navigator.clipboard)
+                        throw new Error("当前浏览器无法复制到剪贴板，请转移草稿。");
+                      await navigator.clipboard.writeText(text);
+                    }).catch((error: unknown) => setPageError(error instanceof Error ? error.message : String(error)));
                   }}
                   onTransfer={(sessionId) => {
                     sessionWorkflows.transferRetainedDeletionDraft(sessionId);

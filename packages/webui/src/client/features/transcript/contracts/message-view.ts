@@ -12,6 +12,15 @@ import type { WebuiFileDiffInfoView } from "../../../../shared/contracts/session
 
 export type WebuiMessageAttachmentType = "image" | "file";
 
+/** A queue command's presentation until an exact runtime source identity arrives. */
+export interface WebuiQueueSend {
+  readonly itemId: string;
+  readonly content: string;
+  readonly phase: "pending" | "accepted" | "failed" | "unknown" | "confirmed";
+  readonly messageId?: string;
+  readonly error?: string;
+}
+
 export interface WebuiMessageAttachment {
   id: string;
   type: WebuiMessageAttachmentType;

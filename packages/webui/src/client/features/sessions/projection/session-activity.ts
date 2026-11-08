@@ -32,6 +32,7 @@
 import type { WebuiRuntimeEvent } from "../../../../shared/contracts/stream.js";
 import type { WebuiActiveTurn } from "../../../../shared/contracts/session.js";
 import type { WebuiClientSession } from "../contracts/session-view.js";
+import { matchesWebuiTurnIdentity } from "../../turn/contracts/stream-state.js";
 
 export interface WebuiSessionBusy {
   readonly turnId: string;
@@ -166,6 +167,12 @@ export function reduceWebuiSessionActivity(
   }
 
   if (BUSY_END_EVENT_TYPES.has(event.type)) {
+    const turnId = typeof event.payload.turnId === "string" ? event.payload.turnId : undefined;
+    if (!matchesWebuiTurnIdentity(current?.busy, turnId)) {
+      return current?.lastActivityAt === lastActivityAt
+        ? previous
+        : { ...previous, [sessionId]: { ...current!, lastActivityAt } };
+    }
     if (!current) {
       // An end for a session the rail has not seen start -- a turn that began
       // before this client subscribed. Recording it is what lets the probe tell

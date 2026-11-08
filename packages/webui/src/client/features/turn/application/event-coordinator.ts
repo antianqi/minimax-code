@@ -286,6 +286,8 @@ export interface WebuiDomainEventRoutes {
    * last loaded until the user reloaded the window.
    */
   readonly sessionFact: (fact: WebuiSessionFact) => void;
+  /** A committed history replacement, including edits/rewinds by another client. */
+  readonly transcriptRewound: (sessionId: string) => void | Promise<unknown>;
 }
 
 
@@ -368,6 +370,10 @@ export function createWebuiEventCoordinator(
     }
     const sessionId = eventSessionId(event);
     if (!sessionId) return;
+    if (event.type === "message.rewind" && event.payload.contextReset === true) {
+      Promise.resolve(deps.routes.transcriptRewound(sessionId)).catch(() => undefined);
+      return;
+    }
     // Session lifecycle facts are catalogue facts, not turn effects: this page's
     // rail names sessions that another client or the CLI created, renamed,
     // re-modelled or hid, and it must agree with them without waiting for a

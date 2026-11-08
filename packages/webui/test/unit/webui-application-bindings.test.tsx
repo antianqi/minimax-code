@@ -11,6 +11,9 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { createWebuiApplication } from "../../src/client/application/create-application.js";
+import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { createWebuiStoreSelection, selectWebuiSessionStream } from "../../src/client/application/selectors.js";
+import { reduceWebuiStreamFrame } from "../../src/client/features/turn/projection/stream-state.js";
 import type { WebuiProcessEventChannel } from "../../src/client/features/turn/application/event-channel.js";
 import type { WebuiRuntimeEvent } from "../../src/shared/contracts/stream.js";
 import type {WebuiClientSessionResumer} from "../../src/client/features/turn/contracts/execution-port.js";
@@ -58,6 +61,45 @@ function Consumer({ sessionId }: { readonly sessionId: string }) {
 }
 
 describe("the React bindings", () => {
+  it("delivers text chunks to the transcript without notifying progress or composer context readers", () => {
+    const store = createWebuiSessionStore();
+    let textUpdates = 0;
+    let progressUpdates = 0;
+    let contextUpdates = 0;
+    const text = createWebuiStoreSelection(store, (snapshot) => selectWebuiSessionStream(snapshot, "S"));
+    const progress = createWebuiStoreSelection(store, (snapshot) => selectWebuiSessionStream(snapshot, "S").workspaceProgress);
+    const context = createWebuiStoreSelection(store, (snapshot) => selectWebuiSessionStream(snapshot, "S").contextUsage);
+    const off = [text.subscribe(() => { textUpdates += 1; }), progress.subscribe(() => { progressUpdates += 1; }), context.subscribe(() => { contextUpdates += 1; })];
+    const writer = store.createSessionWriter({ kind: "session", sessionId: "S" });
+    for (let index = 0; index < 50; index += 1) writer.setStream((stream) => reduceWebuiStreamFrame(stream, {
+      dataJson: JSON.stringify({ type: "agent_message_chunk", agent_message_chunk: { msg_id: "reply", msg_content: "a" } }),
+    }));
+    expect(textUpdates).toBe(50);
+    expect(text.getSnapshot().messages[0]?.answer).toBe("a".repeat(50));
+    expect(progressUpdates).toBe(0);
+    expect(contextUpdates).toBe(0);
+    for (const unsubscribe of off) unsubscribe();
+    store.dispose();
+  });
+  it("notifies a stream reader only when its own session stream changes", () => {
+    const store = createWebuiSessionStore();
+    const selection = createWebuiStoreSelection(store, (snapshot) => selectWebuiSessionStream(snapshot, "A"));
+    let notifications = 0;
+    const unsubscribe = selection.subscribe(() => { notifications += 1; });
+    const initial = selection.getSnapshot();
+    store.updateSession("B", (current) => ({ ...current, sending: true }));
+    store.updateSession("A", (current) => ({ ...current, sending: true }));
+    store.select("B");
+    expect(selection.getSnapshot()).toBe(initial);
+    expect(notifications).toBe(0);
+    store.updateSession("A", (current) => ({ ...current, stream: { ...current.stream, phase: "waiting" } }));
+    expect(notifications).toBe(1);
+    expect(selection.getSnapshot().phase).toBe("waiting");
+    unsubscribe();
+    store.updateSession("A", (current) => ({ ...current, stream: { ...current.stream, phase: "done" } }));
+    expect(notifications).toBe(1);
+    store.dispose();
+  });
   it("reads the application snapshot through the hook", () => {
     const { application } = makeApplication();
     application.store.updateSession("s1", (current) => ({

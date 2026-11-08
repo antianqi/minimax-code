@@ -90,6 +90,38 @@ function transportWith(socket: typeof ControllableSocket) {
   });
 }
 
+describe("the transcript recovery connection", () => {
+  it("reuses one handshake while keeping active-turn and cross-session history responses separate", async () => {
+    vi.useFakeTimers();
+    try {
+      const sockets: ControllableSocket[] = [];
+      class RecoverySocket extends ControllableSocket {
+        constructor(url: string) { super(url); sockets.push(this); }
+      }
+      const transport = transportWith(RecoverySocket);
+      const active = transport.getActiveTurn({ id: "one" });
+      const first = transport.loadMessages({ id: "one" });
+      const second = transport.loadMessages({ id: "two", before: "older" });
+      const catalogue = transport.loadSessions();
+      await tick();
+      for (const socket of sockets) {
+        for (const request of socket.sent.map((text) => JSON.parse(text)).reverse()) {
+          socket.deliver({ kind: "response", requestId: request.requestId, body: request.operation === "getActiveTurn"
+            ? { turnId: "running", busyReason: "turn", locallyOwned: false }
+            : request.operation === "listSessions" ? { sessions: [] }
+            : { messages: [{ msgId: request.body.id, role: "user", msgContent: request.body.before ?? "head" }] } });
+        }
+      }
+      await expect(active).resolves.toMatchObject({ turnId: "running" });
+      await expect(first).resolves.toMatchObject({ messages: [{ msgId: "one", msgContent: "head" }] });
+      await expect(second).resolves.toMatchObject({ messages: [{ msgId: "two", msgContent: "older" }] });
+      await expect(catalogue).resolves.toEqual({ sessions: [] });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(sockets).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+});
+
 describe("the browser input connection", () => {
   const input = {
     command: {

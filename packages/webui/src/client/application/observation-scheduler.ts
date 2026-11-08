@@ -13,6 +13,8 @@
 //     clients, and the event chain does not prove complete notification of
 //     external change, so the shown session's model catalogue and account status
 //     are re-read on a freshness budget (2 s) while the surface is interested.
+//     The same foreground budget repairs an active-turn gap when no delivery
+//     lease exists, including a failed cold-start probe without a reconnect.
 //
 // Three properties are what make it one mechanism rather than two timers:
 //

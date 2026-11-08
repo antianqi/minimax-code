@@ -83,12 +83,16 @@ export interface WebuiTranscriptHistoryOwner {
    * held was written before the turn's messages were persisted.
    */
   readonly refreshPage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
+  /** Refresh a keyed session without changing the selected presentation. */
+  readonly synchronizePage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
   /**
    * Discards every cached page for a session, then replaces its head page.
    * History mutations that can remove messages (rewind/edit) must not merge
    * rows from the old projection back into the authoritative result.
    */
   readonly replacePage: (sessionId: string) => Promise<WebuiTranscriptLoadOutcome>;
+  /** Commit an authoritative overflow snapshot and fence all older page requests. */
+  readonly acceptReplacement: (sessionId: string, page: WebuiClientMessagePage) => void;
   readonly loadOlder: (
     sessionId: string,
     cursor: string,
@@ -179,10 +183,11 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     sessionId: string,
     cursor: string | undefined,
     mode: "join" | "fresh",
+    presentationScoped = true,
   ): Promise<WebuiTranscriptLoadOutcome> => {
     if (releasedSessions.has(sessionId)) return { status: "stale" };
     if (!deps.loadMessages) return { status: "failed" };
-    if (presentation.identity() !== sessionId) selectSession(sessionId);
+    if (presentationScoped && presentation.identity() !== sessionId) selectSession(sessionId);
     const key = remember(sessionId, cursor);
     if (mode === "fresh") pages.invalidate(key);
     // Captured before the read: refused if the presentation has moved on.
@@ -217,7 +222,7 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     // The presentation fence: a page that arrived for a session the view has
     // left is not written, so the store never gains a page nothing presented.
     if (
-      !presentation.commit(presentationToken, {
+      presentationScoped && !presentation.commit(presentationToken, {
         status: "ready",
         value: { sessionId },
       })
@@ -284,6 +289,12 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     return outcome.status === "ready" ? outcome.value : undefined;
   };
 
+  const invalidatePages = (sessionId: string): void => {
+    for (const key of asked.get(sessionId)?.values() ?? []) pages.invalidate(key);
+    asked.delete(sessionId);
+    headPages.delete(sessionId);
+  };
+
   return {
     selectSession,
     seed,
@@ -299,13 +310,18 @@ export function createWebuiTranscriptHistoryOwner(deps: {
     },
     loadPage: (sessionId) => load(sessionId, undefined, "join"),
     refreshPage: (sessionId) => load(sessionId, undefined, "fresh"),
+    synchronizePage: (sessionId) => load(sessionId, undefined, "fresh", false),
     replacePage: (sessionId) => {
-      for (const key of asked.get(sessionId)?.values() ?? []) pages.invalidate(key);
-      asked.delete(sessionId);
-      headPages.delete(sessionId);
-      return presentation.identity() === sessionId
-        ? load(sessionId, undefined, "fresh")
-        : Promise.resolve({ status: "stale" });
+      invalidatePages(sessionId);
+      return load(sessionId, undefined, "fresh", false);
+    },
+    acceptReplacement: (sessionId, page) => {
+      if (pages.isDisposed() || releasedSessions.has(sessionId)) return;
+      invalidatePages(sessionId);
+      const key = remember(sessionId, undefined);
+      pages.commit(pages.capture(key), { status: "ready", value: page });
+      headPages.set(sessionId, page);
+      deps.transcript.updateTranscript(sessionId, (current) => ({ ...current, page, loading: false, error: undefined }));
     },
     loadOlder: (sessionId, cursor) => load(sessionId, cursor, "fresh"),
     isCurrentPage: (handle) =>

@@ -6,6 +6,7 @@ import {
   reduceWebuiWorkspaceProgressMessage,
 } from "../../workspace/contracts/progress.js";
 import type { WebuiWorkspaceProgressState } from "../contracts/stream-state.js";
+import { matchesWebuiTurnIdentity } from "../contracts/stream-state.js";
 import type {
   WebuiStreamMessage,
   WebuiStreamSubscription,
@@ -169,22 +170,7 @@ export function matchesWebuiTerminalTurn(
   state: WebuiStreamState,
   turnId: string | undefined,
 ): boolean {
-  // No turn id to attribute the event to; it is the best signal we have.
-  if (turnId === undefined) return true;
-  const owned = state.subscription;
-  // No lease at all: the terminal is the only thing that can settle a turn
-  // we never attached to, and there is nobody newer to protect.
-  if (owned === undefined) return true;
-  // A lease that has not adopted its turn id yet has an owner still in
-  // flight — `runWebuiStreamLoop` claims before the runtime publishes
-  // `session.start`, so this is almost always the user's own send between
-  // those two moments. A terminal naming some *other* turn must leave it
-  // alone, or the answer the user is watching for stops streaming early.
-  // The runtime's lifecycle observer always publishes a turn id
-  // (`turn-lifecycle-event-observer.ts`), so a missing one is a
-  // compatibility gap, not licence to let any terminal through.
-  if (owned.turnId === undefined) return false;
-  return owned.turnId === turnId;
+  return matchesWebuiTurnIdentity(state.subscription, turnId);
 }
 
 /**
@@ -277,12 +263,14 @@ function upsertMessage(
     : undefined;
   const usage = usageRecord(value);
   const contextUsage = contextUsageRecord(value);
+  const sourceMessageId = text(value, ["source_message_id", "sourceMessageId"]) || undefined;
   const index = messages.findIndex((message) => message.id === id);
   if (index < 0)
     return [
       ...messages,
       {
         id,
+        ...(sourceMessageId ? { sourceMessageId } : {}),
         answer,
         thinking,
         ...(calls ? { toolCalls: calls } : {}),
@@ -296,6 +284,9 @@ function upsertMessage(
     !chunk &&
     !calls &&
     !usage &&
+    !parts &&
+    !contextUsage &&
+    (!sourceMessageId || sourceMessageId === messages[index]!.sourceMessageId) &&
     messages[index]!.answer === answer &&
     messages[index]!.thinking === thinking
   )
@@ -303,6 +294,9 @@ function upsertMessage(
   const next = [...messages];
   next[index] = {
     id,
+    ...(sourceMessageId || messages[index]!.sourceMessageId
+      ? { sourceMessageId: sourceMessageId ?? messages[index]!.sourceMessageId }
+      : {}),
     answer: chunk
       ? messages[index]!.answer + answer
       : answer || messages[index]!.answer,
@@ -440,6 +434,7 @@ export function applyFrameData(
       ...next,
       phase: "streaming",
       messages,
+      messageSource: "stream",
       workspaceProgress,
       ...(contextUsage ? { contextUsage } : {}),
     };
@@ -452,6 +447,7 @@ export function applyFrameData(
           ...next,
           phase: "streaming",
           messages: upsertMessage(next.messages, message, true),
+          messageSource: "stream",
         }
       : next;
   }

@@ -33,6 +33,7 @@
   .webui-message-file-media { display: block; margin-block-start: 6px; max-width: min(100%, 420px); }
   .webui-message-file-media img,
   .webui-message-file-media video { display: block; max-width: 100%; height: auto; border-radius: 8px; }
+  .webui-message-file-media audio { display: block; max-width: 100%; }
   .webui-markdown > * {
     min-width: 0;
     margin-block-start: 0;

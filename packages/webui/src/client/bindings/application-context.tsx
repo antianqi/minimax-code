@@ -9,6 +9,7 @@
 import {
   createContext,
   useContext,
+  useMemo,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -16,6 +17,7 @@ import {
 import type { WebuiApplication } from "../application/create-application.js";
 import type { WebuiSessionStore } from "../application/session-store.js";
 import type { WebuiApplicationState } from "../application/state.js";
+import { createWebuiStoreSelection } from "../application/selectors.js";
 
 /**
  * The session store, provided on its own so a subtree can read and submit
@@ -87,4 +89,10 @@ export function WebuiApplicationProvider({
 
 export function useWebuiApplicationOptional(): WebuiApplication | undefined {
   return useContext(WebuiApplicationContext);
+}
+
+export function useWebuiSessionStoreSelection<T>(select: (state: WebuiApplicationState) => T): T {
+  const store = useWebuiSessionStoreContext();
+  const selection = useMemo(() => createWebuiStoreSelection(store, select), [store, select]);
+  return useSyncExternalStore(selection.subscribe, selection.getSnapshot, selection.getSnapshot);
 }

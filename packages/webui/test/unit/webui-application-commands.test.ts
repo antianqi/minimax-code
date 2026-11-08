@@ -39,6 +39,89 @@ import type { WebuiComposerSubmitHandlers } from "../../src/client/features/comp
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
+describe("accepted history mutation ownership", () => {
+  it.each(["editSessionMessage", "rewindSession"] as const)("refuses %s while generation is active", async (method) => {
+    let writes = 0;
+    const slices = createWebuiPortSlices({});
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined }),
+      turns: { resumeSession: async () => undefined },
+      slices: { ...slices, transcript: {
+        [method]: async () => { writes += 1; return { rewound: true }; },
+      } },
+    });
+    app.start({ initialSessionId: "S" });
+    app.store.updateSession("S", (current) => ({ ...current, sending: true, stream: { ...current.stream, phase: "streaming" } }));
+    await expect(app.transcriptCommands[method]!({ id: "S", userMessageId: "user", clientRequestId: "blocked", content: "edited", rewindTurnDiff: false }))
+      .rejects.toThrow("生成结束后才能编辑或回退消息");
+    expect(writes).toBe(0);
+    app.dispose();
+  });
+
+  it("applies another client's committed rewind without a mounted transcript", async () => {
+    let ingress!: (event: WebuiRuntimeEvent) => void;
+    const reads: string[] = [];
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: (listener) => { ingress = listener; return () => undefined; } }),
+      turns: { resumeSession: async () => undefined },
+      loadMessages: async ({ id }) => { reads.push(id); return { messages: [{ msgId: "survivor", role: "user", msgContent: "Kept history" }] }; },
+    });
+    app.start({ initialSessionId: "B" });
+    app.store.updateSession("A", (current) => ({ ...current, stream: {
+      ...current.stream, phase: "done", messages: [{ id: "removed", answer: "Rewound reply", thinking: "" }],
+    } }));
+    ingress({ type: "message.rewind", payload: { sessionId: "A", contextReset: true }, timestamp: 1, source: "synthetic" });
+    await expect.poll(() => app.store.readSession("A").transcript.retainedMessages?.length).toBe(0);
+    expect(app.store.readSession("A").stream.messages).toEqual([]);
+    expect(app.store.readSession("A").transcript.page.messages?.map((message) => message.msgId)).toEqual(["survivor"]);
+    expect(app.store.getSelectedSessionId()).toBe("B");
+    expect(reads).toContain("A");
+    app.dispose();
+  });
+
+  it.each([
+    { rewound: true, newer: false },
+    { rewound: true, newer: true },
+    { rewound: false, newer: false },
+  ])("fences the affected execution only: %j", async ({ rewound, newer }) => {
+    let settle!: (result: { rewound: boolean }) => void;
+    const emptySlices = createWebuiPortSlices({} as never);
+    const app = createWebuiApplication({
+      openEventChannel: () => ({ subscribe: () => () => undefined }),
+      turns: { resumeSession: async () => {} },
+      loadMessages: async () => ({ messages: [] }),
+      slices: { ...emptySlices, transcript: {
+        editSessionMessage: () => new Promise((resolve) => { settle = resolve; }),
+      } },
+    });
+    app.start({ initialSessionId: "S" });
+    const start = (generation: number, answer: string) => app.store.updateSession("S", (current) => ({
+      ...current, sending: true, stream: {
+        ...current.stream, phase: "streaming", lastClaimedGeneration: generation,
+        subscription: { owner: "recovered", generation, turnId: `turn-${generation}` },
+        messages: [{ id: `message-${generation}`, answer, thinking: "" }],
+      },
+    }));
+    start(7, "old answer");
+    app.store.updateSession("S", (current) => ({ ...current, sending: false, stream: { ...current.stream, phase: "done", subscription: undefined } }));
+    const editing = app.transcriptCommands.editSessionMessage!({ id: "S", userMessageId: "user", clientRequestId: "edit-test", content: "edited" });
+    if (newer) start(8, "new answer");
+    settle({ rewound });
+    await editing;
+    const current = app.store.readSession("S");
+    if (rewound && !newer) {
+      expect(current.stream.lastClaimedGeneration).toBeUndefined();
+      expect(current.sending).toBe(false);
+      expect(current.transcript.retainedMessages).toEqual([]);
+    } else {
+      expect(current.stream.lastClaimedGeneration).toBe(newer ? 8 : 7);
+      expect(current.sending).toBe(newer);
+      expect(current.stream.messages[0]?.answer).toBe(newer ? "new answer" : "old answer");
+    }
+    app.dispose();
+  });
+});
+
 /** A sink that accepts every write; the sends under test never open a loop. */
 const noopSink: WebuiDeliverySink = {
   claim: () => undefined,

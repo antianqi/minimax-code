@@ -29,6 +29,7 @@ import { isWebuiLeaseGenerationCurrent } from "../../../conversation/stream-leas
 import type {
   WebuiClientMessage,
   WebuiClientMessageLoader,
+  WebuiClientMessagePage,
 } from "../../transcript/contracts/message-view.js";
 import type {
   WebuiStreamState,
@@ -90,7 +91,10 @@ export function buildWebuiStreamLoopSink(
       scope?: { readonly generation?: number },
     ) => WebuiStreamState;
   } = streamStateBundle,
-  options: { readonly clearRefusalOnAnchor?: boolean } = {},
+  options: {
+    readonly clearRefusalOnAnchor?: boolean;
+    readonly onHistoryReplacement?: (page: WebuiClientMessagePage) => void;
+  } = {},
 ): WebuiDeliverySink {
   const clearRefusalOnAnchor = options.clearRefusalOnAnchor ?? true;
   // Set when this sink claims ownership. Everything a superseded attempt writes —
@@ -180,6 +184,7 @@ export function buildWebuiStreamLoopSink(
           {
             ...current,
             messages: anchored,
+            messageSource: "history",
             phase: "streaming",
           },
           {
@@ -203,9 +208,13 @@ export function buildWebuiStreamLoopSink(
       const messages = ((page as HistoryPage | undefined)?.messages ?? []).map(
         streamRecoveryProjection.projectMessage,
       );
-      setStream((current) =>
-        mine(current) ? { ...current, messages } : current,
-      );
+      let accepted = false;
+      setStream((current) => {
+        if (!mine(current)) return current;
+        accepted = true;
+        return { ...current, messages, messageSource: "history", historyReplacement: (current.historyReplacement ?? 0) + 1 };
+      });
+      if (accepted) options.onHistoryReplacement?.(page as WebuiClientMessagePage);
     },
 
     complete: () =>

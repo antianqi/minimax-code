@@ -7,6 +7,11 @@ import type { WebuiStreamMessage } from "../../turn/contracts/stream-state.js";
 import { readUsageNumber } from "../contracts/message-stream.js";
 import { describeRuntimeWarning } from "./message-parts.js";
 
+const streamMessageCache = new WeakMap<WebuiStreamMessage, {
+  readonly previous: WebuiClientMessage | undefined;
+  readonly merged: WebuiClientMessage;
+}>();
+
 /** A render block: one user bubble, or one assistant turn. The transcript
  * renderer iterates these groups; per-block fields tell it how long the turn
  *  took and how many output tokens it used. */
@@ -39,7 +44,6 @@ export function projectWebuiTranscriptMessages(
   page: WebuiClientMessagePage,
   streamMessages: readonly WebuiStreamMessage[],
   preferStreamUpdates = true,
-  preserveSettledMessageIds?: ReadonlySet<string>,
 ): readonly WebuiClientMessage[] {
   // A malformed persisted row must not make transcript projection escape its
   // presentation boundary and replace the whole application.
@@ -58,7 +62,7 @@ export function projectWebuiTranscriptMessages(
   };
   for (let streamIndex = 0; streamIndex < streamMessages.length; streamIndex += 1) {
     const stream = streamMessages[streamIndex]!;
-    const preferThisStreamUpdate = preferStreamUpdates || preserveSettledMessageIds?.has(stream.id) === true;
+    const preferThisStreamUpdate = preferStreamUpdates;
     // Goal lifecycle events also project a synthetic user bubble. A goal-entry
     // turn may already have its own durable or live user message with a
     // different id, so keep that actionable message and omit only the matching
@@ -80,9 +84,11 @@ export function projectWebuiTranscriptMessages(
     if (index === undefined && !preferThisStreamUpdate) continue;
     const previous = index === undefined ? undefined : messages[index];
     if (previous && !preferThisStreamUpdate) continue;
-    const next: WebuiClientMessage = {
+    const cached = streamMessageCache.get(stream);
+    const next: WebuiClientMessage = cached && cached.previous === previous ? cached.merged : {
       ...(previous ?? { msgId: stream.id }),
       msgId: stream.id,
+      ...(stream.sourceMessageId ? { sourceMessageId: stream.sourceMessageId } : {}),
       ...(stream.role || previous?.role ? { role: stream.role ?? previous?.role } : {}),
       ...(stream.answer || previous?.msgContent !== undefined
         ? { msgContent: stream.answer || previous?.msgContent }
@@ -106,6 +112,7 @@ export function projectWebuiTranscriptMessages(
         ? { kind: "goal" }
         : {}),
     };
+    if (next !== cached?.merged) streamMessageCache.set(stream, { previous, merged: next });
     if (index === undefined) {
       // History can already contain a queued user message that was accepted
       // after an in-flight assistant message. Insert the stream-only record

@@ -743,6 +743,7 @@ export function installFixtureTransport() {
       this.listeners = new Map();
       this.closed = false;
       this.request = undefined;
+      this.requests = [];
       // The gate simulates a dead server for NEW connections: the socket
       // errors and closes without ever opening, which is exactly what a
       // real WebSocket to a downed backend does. Existing sockets are
@@ -770,6 +771,7 @@ export function installFixtureTransport() {
     send(serialized) {
       const frame = JSON.parse(serialized);
       this.request = frame;
+      this.requests.push(frame);
       requests.push({ operation: frame.operation, body: clone(frame.body ?? {}) });
       if (refusals.has(frame.operation)) {
         queueMicrotask(() => this.emit("message", { data: JSON.stringify({ protocolVersion: 1, kind: "error", requestId: frame.requestId, ...refusals.get(frame.operation) }) }));
@@ -1044,6 +1046,11 @@ export function installFixtureTransport() {
     // which is the idle-disconnect shape.
     gateSockets(open) { socketGateOpen = open; },
     dropAll() { for (const socket of [...sockets]) if (!socket.closed) socket.close(); },
+    dropRequest(operation, condition) {
+      for (const socket of [...sockets]) {
+        if (socket.requests.some((request) => request.operation === operation && matches(request.body, condition))) socket.close();
+      }
+    },
     resolve(operation, condition, result) {
       const index = pending.findIndex((entry) => entry.operation === operation && matches(entry.body, condition));
       if (index < 0) throw new Error(`No pending fixture request: ${operation} ${JSON.stringify(condition)}`);

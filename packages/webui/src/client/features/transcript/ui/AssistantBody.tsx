@@ -51,6 +51,7 @@ function renderActivityParts(
     if (!entry) continue;
     const { messageId, part } = entry;
     if (part.type === "text" && !processExpanded && part === collapsedVisiblePart) continue;
+    if (part.type === "asset_list" && !processExpanded) continue;
     if (part.type === "tool" || part.type === "thinking") {
       const activityItems: WebuiActivityGroupItem[] = [];
       let cursor = index;
@@ -259,6 +260,9 @@ export function WebuiAssistantBody({
       ...(segment.tools ?? []).map((tool) => ({ messageId: segment.messageId, part: { type: "tool", tool } satisfies WebuiTranscriptActivityPart })),
     ];
   });
+  const deliveredEntries = orderedProcessEntries.flatMap((entry) => entry.part.type === "asset_list"
+    ? [{ messageId: entry.messageId, assets: entry.part.assets }]
+    : []);
   const processSummaryParts = [
     ...(() => {
       const count = orderedProcessEntries.filter((entry) => entry.part.type === "thinking").length;
@@ -339,8 +343,11 @@ export function WebuiAssistantBody({
           initiallyExpanded={expandProcessByDefault}
           showLiveActivity={streaming && Boolean(thinking?.trim())}
           children={renderProcessContent}
-          collapsedContent={(expanded) => !expanded && primaryAnswerPart
-            ? <div className="mt-2 webui-assistant-answer" data-webui-message-kind="assistant"><WebuiMarkdown source={primaryAnswerPart.text} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /></div>
+          collapsedContent={(expanded) => !expanded && (primaryAnswerPart || deliveredEntries.length > 0)
+            ? <WebuiStack gap="roomy">
+                {primaryAnswerPart ? <div className="mt-2 webui-assistant-answer" data-webui-message-kind="assistant"><WebuiMarkdown source={primaryAnswerPart.text} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /></div> : null}
+                {deliveredEntries.map((entry, index) => <WebuiDeliveredAssets key={`${entry.messageId}-delivered-${index}`} assets={entry.assets} workspaceDir={workspaceDir} onOpenFile={onOpenFile} />)}
+              </WebuiStack>
             : null}
         />
       ) : null}

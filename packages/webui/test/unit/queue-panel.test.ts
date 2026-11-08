@@ -6,6 +6,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { WebuiQueuePanel } from "../../src/client/features/composer/ui/QueuePanel.js";
 import { createWebuiCommandWorkflows } from "../../src/client/features/composer/application/command-workflows.js";
+import { createWebuiQueueSendWorkflow } from "../../src/client/features/composer/application/queue-send-workflow.js";
+import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
+import { WebuiWireError } from "../../src/shared/envelope.js";
 import type { WebuiQueueItem } from "../../src/shared/contracts/queue.js";
 
 function item(over: Partial<WebuiQueueItem> = {}): WebuiQueueItem {
@@ -185,6 +188,113 @@ describe("WebuiQueuePanel", () => {
 });
 
 describe("immediate queue send workflow", () => {
+  it("presents intent synchronously, deduplicates activation and keeps it across navigation", async () => {
+    const store = createWebuiSessionStore();
+    let finish: () => void = () => {};
+    let calls = 0;
+    const workflow = createWebuiQueueSendWorkflow({ store, readQueued: () => item(),
+      submit: () => { calls += 1; return new Promise<void>((resolve) => { finish = resolve; }); }, refreshHistory: async () => undefined });
+    workflow.start();
+    const pending = workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]).toMatchObject({ itemId: "q1", content: "把测试跑一遍", phase: "pending" });
+    await workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    store.select("another-session");
+    finish(); await pending;
+    expect(calls).toBe(1);
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]?.phase).toBe("accepted");
+    workflow.dispose();
+  });
+
+  it("confirms only an exact queue source identity, including appearance before acknowledgement", async () => {
+    const store = createWebuiSessionStore();
+    let finish: () => void = () => {};
+    const workflow = createWebuiQueueSendWorkflow({ store, readQueued: () => item(),
+      submit: () => new Promise<void>((resolve) => { finish = resolve; }), refreshHistory: async () => undefined });
+    workflow.start();
+    const pending = workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    store.updateSession("mvs_a", (current) => ({ ...current, stream: { ...current.stream,
+      messages: [{ id: "different", answer: "把测试跑一遍", thinking: "", role: "user", sourceMessageId: "another-queue" }] } }));
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]?.phase).toBe("pending");
+    store.updateSession("mvs_a", (current) => ({ ...current, stream: { ...current.stream,
+      messages: [{ id: "canonical-user", answer: "把测试跑一遍", thinking: "", role: "user", sourceMessageId: "q1" }] } }));
+    finish(); await pending;
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]).toMatchObject({ phase: "confirmed", messageId: "canonical-user" });
+    workflow.dispose();
+  });
+
+  it("retains unknown input without resending, then reconciles the persisted source identity", async () => {
+    const store = createWebuiSessionStore();
+    let calls = 0;
+    const workflow = createWebuiQueueSendWorkflow({ store, readQueued: () => item(),
+      submit: async () => { calls += 1; throw new Error("connection closed"); }, refreshHistory: async () => {
+        store.updateSession("mvs_a", (current) => ({ ...current, transcript: { ...current.transcript, page: {
+          messages: [{ msgId: "canonical", sourceMessageId: "q1", role: "user", msgContent: "把测试跑一遍" }],
+        } } }));
+      } });
+    workflow.start();
+    await expect(workflow.send({ sessionId: "mvs_a", itemId: "q1" })).rejects.toThrow("connection closed");
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]?.phase).toBe("unknown");
+    await workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    expect(calls).toBe(1);
+    await workflow.recheck("mvs_a");
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]?.phase).toBe("confirmed");
+    workflow.dispose();
+  });
+
+  it("permits retry only after a definitive refusal and ignores disposal during submission", async () => {
+    const store = createWebuiSessionStore();
+    let calls = 0;
+    let finish: () => void = () => {};
+    const workflow = createWebuiQueueSendWorkflow({ store, readQueued: () => item(), submit: async () => {
+      if (++calls === 1) throw new WebuiWireError("invalid_request", "invalid queued input");
+      await new Promise<void>((resolve) => { finish = resolve; });
+    }, refreshHistory: async () => undefined });
+    workflow.start();
+    await expect(workflow.send({ sessionId: "mvs_a", itemId: "q1" })).rejects.toThrow("invalid queued input");
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]?.phase).toBe("failed");
+    const retry = workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    workflow.dispose();
+    const before = store.getSnapshot();
+    finish(); await retry;
+    expect(calls).toBe(2);
+    expect(store.getSnapshot()).toBe(before);
+  });
+
+  it("does not keep promising processing after rewind, including a late admission acknowledgement", async () => {
+    const store = createWebuiSessionStore();
+    let finish: () => void = () => {};
+    let submits = 0;
+    let reads = 0;
+    const workflow = createWebuiQueueSendWorkflow({ store, readQueued: () => item(),
+      submit: () => { submits += 1; return new Promise<void>((resolve) => { finish = resolve; }); },
+      refreshHistory: async () => { reads += 1; } });
+    workflow.start();
+    const pending = workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    workflow.transcriptRewound("mvs_a");
+    finish(); await pending;
+    expect(store.readSession("mvs_a").transcript.queueSends?.[0]?.phase).toBe("unknown");
+    await workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    expect(submits).toBe(1);
+    await workflow.recheck("mvs_a");
+    expect(reads).toBe(1);
+    workflow.dispose();
+    await workflow.recheck("mvs_a");
+    expect(reads).toBe(1);
+  });
+
+  it("does not recreate a purged session when its acknowledgement arrives", async () => {
+    const store = createWebuiSessionStore();
+    let finish: () => void = () => {};
+    const workflow = createWebuiQueueSendWorkflow({ store, readQueued: () => item(),
+      submit: () => new Promise<void>((resolve) => { finish = resolve; }), refreshHistory: async () => undefined });
+    workflow.start();
+    const pending = workflow.send({ sessionId: "mvs_a", itemId: "q1" });
+    store.purgeSession("mvs_a");
+    finish(); await pending;
+    expect(store.hasSession("mvs_a")).toBe(false);
+    workflow.dispose();
+  });
+
   it("steers the chosen queue identity through the runtime operation", async () => {
     const calls: unknown[] = [];
     const workflows = createWebuiCommandWorkflows({

@@ -112,11 +112,13 @@ already happened: the shared toast, which reports a failure, a confirmation or a
 client instead of in the page, while a field's own validation error and a state that stays keep their
 place.
 
-[ADR 0032](adr/0032-responsive-session-observation-and-execution-lifecycle.md) records the accepted,
-not-yet-implemented session observation and execution lifecycle redesign: immediate user feedback,
+[ADR 0032](adr/0032-responsive-session-observation-and-execution-lifecycle.md) records the accepted
+session observation and execution lifecycle redesign: immediate user feedback,
 continuous transcript/media settlement, coordinated queue/history/task operations, recoverable
 pending intent, narrow subscriptions and measured UI performance budgets. Its delivery-target
-table is the authority for the derived tracker specification and tickets. It amends the forward
+table is the authority for the derived tracker specification and tickets. Application-owned transcript
+settlement, final group projection and narrow session readers implement part of that direction;
+the broader delivery targets retain their own implementation and acceptance obligations. It amends the forward
 constraint of ADR 0018's historical observation comparison without claiming new runtime evidence.
 A new decision takes the next free number.
 

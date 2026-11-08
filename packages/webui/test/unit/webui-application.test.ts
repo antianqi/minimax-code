@@ -28,6 +28,32 @@ function event(type: string, payload: Record<string, unknown>): WebuiRuntimeEven
   return { type, payload, timestamp: 1, source: "test" };
 }
 
+describe("turn identity across session surfaces", () => {
+  it("keeps the newer turn busy in both the rail and transcript after an old terminal event", () => {
+    const fake = makeChannel();
+    const application = createWebuiApplication({
+      openEventChannel: () => fake.channel,
+      turns: { resumeSession: async () => {} },
+    });
+    application.start();
+    fake.emit(event("session.start", { sessionId: "S", turnId: "old" }));
+    fake.emit(event("session.start", { sessionId: "S", turnId: "new" }));
+    application.store.updateSession("S", (current) => ({
+      ...current,
+      stream: {
+        ...current.stream,
+        subscription: { owner: "recovered", turnId: "new", generation: 2 },
+        lastClaimedGeneration: 2,
+      },
+    }));
+    fake.emit(event("session.finish", { sessionId: "S", turnId: "old" }));
+    expect(application.store.getSnapshot().activity.S?.busy?.turnId).toBe("new");
+    expect(application.store.readSession("S").sending).toBe(true);
+    expect(application.store.readSession("S").stream.phase).toBe("streaming");
+    application.dispose();
+  });
+});
+
 interface FakeChannel {
   readonly channel: WebuiProcessEventChannel;
   readonly emit: (event: WebuiRuntimeEvent) => void;

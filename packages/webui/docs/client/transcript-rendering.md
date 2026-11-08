@@ -1,7 +1,39 @@
 # Transcript rendering contracts
 
 What the transcript's markdown renderer guarantees. The implementation is
-`client/features/transcript/ui/markdown.tsx`; each contract below names the test that pins it.
+`client/features/transcript/ui/markdown.public.tsx`; each contract below names the test that pins it.
+
+## Message content and settlement
+
+`projection/transcript-view-model.ts` returns the final user/assistant/questionnaire groups and
+activity placement for both stream and historical content. Ordered message parts are projected once
+for each changed message. `SessionTranscript` renders those groups; history handoff and retries belong
+to the application settlement owner described in [`ownership.md`](ownership.md).
+
+Delivered files remain visible when a completed turn's process disclosure folds. An expanded process
+shows them in its ordered activity; a collapsed process keeps the delivered content beside the final
+answer. No duplicate file row is rendered. Content retention and media loading are separate: retaining
+a file reference does not prove its bytes are available.
+
+Pinned by `test/unit/transcript-fences.test.ts`, `test/unit/transcript-settled-turn.test.ts`,
+`test/unit/transcript-shape.test.ts`, and `test/browser/transcript-file-media.spec.mjs`.
+
+## Workspace media
+
+Workspace file references and delivered-file rows share the same inline media reader. Images
+(including SVG and PNG), supported video and audio files render their contents in the transcript;
+video and audio use native controls without autoplay. Markdown image syntax and recognized bare
+media filenames in inline code use the same workspace resource path. Non-media files keep links.
+Remote HTTP(S) media and paths outside the current workspace are not automatically previewed.
+
+The host serves actual workspace bytes with byte-range support. A transient media load failure
+retries a bounded number of times; content synchronization and media-byte availability remain
+independent. A tree root can supply the selected workspace even if the current flat page omits it,
+and a newly created external session triggers an authoritative catalogue reload.
+
+Pinned by `test/unit/transcript-file-anchor-anchors.test.tsx`, `test/unit/webui-session-catalog.test.ts`,
+`test/browser/transcript-file-media.spec.mjs` and the production-runtime client scenarios in
+`test/integration/agent-transcript.test.ts`.
 
 ## Code fences
 

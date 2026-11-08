@@ -34,6 +34,7 @@ const EXPECTED: Record<
 > = {
   sessions: [
     "loadProjects", "listArchivedSessions", "loadSessions", "loadSessionTree",
+    "getSession",
     "createSession", "archiveSession", "deleteSession", "updateSession",
     "getSessionForkOptions", "forkSession", "getSessionUsage",
   ],

@@ -63,7 +63,12 @@ import {
   useWebuiSessionGoal,
   useWebuiSessionPermissions,
   useWebuiSessionQuestionnaire,
-  useWebuiSessionState,
+  useWebuiSessionSending,
+  useWebuiSessionQueueSends,
+  useWebuiSessionRefusal,
+  useWebuiSessionTranscriptIncomplete,
+  useWebuiSessionContextUsage,
+  useWebuiSessionTranscriptPage,
 } from "../../../bindings/use-session-state.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { ContextUsageIndicator } from "./ContextUsageIndicator.js";
@@ -281,7 +286,11 @@ export function WebuiComposer({
   useEffect(() => {
     if (sessionId) pendingHomeModelSelectionRef.current = undefined;
   }, [sessionId]);
-  const { stream, sending, transcript } = useWebuiSessionState(sessionId);
+  const sending = useWebuiSessionSending(sessionId);
+  const streamRefusal = useWebuiSessionRefusal(sessionId);
+  const transcriptIncomplete = useWebuiSessionTranscriptIncomplete(sessionId);
+  const liveContextUsage = useWebuiSessionContextUsage(sessionId);
+  const transcriptPage = useWebuiSessionTranscriptPage(sessionId);
   const turnCommands = useWebuiSessionCommands(sessionId);
   // The per-session effects registry the shell provides. The composer registers
   // this session's event handlers here so the application event coordinator —
@@ -364,7 +373,8 @@ export function WebuiComposer({
   // store. It is live state: not persisted, and not per-slot, because unlike
   // the draft it does not survive a session switch.
   const queueState = composerSnapshot.queue;
-  const queueItems = queueState.items;
+  const queueSends = useWebuiSessionQueueSends(sessionId);
+  const queueItems = queueState.items.filter((item) => !queueSends?.some((entry) => entry.itemId === item.itemId));
   const queuePaused = queueState.paused;
   // The model catalogue is the models owner's cached read:
   // the composer used to hold a second copy fed by its own 2s poll of the raw
@@ -469,8 +479,7 @@ export function WebuiComposer({
   // with the history's plainer one. Reading the owners has no copy to lose —
   // the ring follows the live turn while one runs, and the page whenever the
   // transcript commits it.
-  const liveContextUsage = stream.contextUsage ?? stream.messages.at(-1)?.contextUsage;
-  const historyContextUsage = readContextUsageFromPage(transcript.page);
+  const historyContextUsage = readContextUsageFromPage(transcriptPage);
   const contextUsage = liveContextUsage ?? historyContextUsage;
 
   useEffect(() => {
@@ -971,7 +980,7 @@ export function WebuiComposer({
   });
   const recordedTurn = composerSnapshot.retry;
   const retryPlan = planWebuiRetryResend({
-    refusal: stream.refusal,
+    refusal: streamRefusal,
     recordedSession: recordedTurn?.session,
     session: sessionId,
     lastSubmittedText: recordedTurn?.message,
@@ -980,10 +989,10 @@ export function WebuiComposer({
   // refusal in the stream state, but do not show a transcript error or retry
   // action for a request the user can send again after the review completes.
   const hidePlanReviewInProgressRefusal =
-    stream.refusal === "Plan review processing must finish before this request can run";
+    streamRefusal === "Plan review processing must finish before this request can run";
   const handleRetryResend = () => {
     void composerController.retry({
-      refusal: stream.refusal,
+      refusal: streamRefusal,
       sessionId,
       draft: recordedTurn?.message ?? "",
       attachments: attachmentWire,
@@ -1088,10 +1097,10 @@ export function WebuiComposer({
           onSendNow={handleSendQueueItemNow}
         />
       ) : null}
-      {stream.refusal && !hidePlanReviewInProgressRefusal ? (
+      {streamRefusal && !hidePlanReviewInProgressRefusal ? (
         <OutputError
           variant="output_error"
-          text={stream.refusal}
+          text={streamRefusal}
           errorAt={Date.now()}
           {...(retryPlan.kind === "resend" ? { onRetry: handleRetryResend } : {})}
         />
@@ -1115,7 +1124,7 @@ export function WebuiComposer({
           <FeedbackBusy label={`正在执行 ${commandName ? `/${commandName}` : "斜杠命令"}…`} />
         </div>
       ) : null}
-      {stream.transcriptIncomplete ? (
+      {transcriptIncomplete ? (
         <p
           data-webui-transcript-incomplete="true"
           className="text-text_default_secondary text-size_14 leading-line_height_20"

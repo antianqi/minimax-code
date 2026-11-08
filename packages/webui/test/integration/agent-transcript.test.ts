@@ -153,7 +153,7 @@ afterAll(() => {
   else process.env.MAVIS_REGION = previousRegion;
 });
 
-it("a real agent turn resumes after refresh and drains a queued message in order", async () => {
+it.each(["transcript", "cross-client", "external-active-mutation", "external-active-mutation-gap"] as const)("real agent rendering and recovery: %s", async (scenario) => {
   let releaseAnswer: () => void = () => undefined;
   const answerGate = new Promise<void>((resolve) => { releaseAnswer = resolve; });
   let releaseTodoAnswer: () => void = () => undefined;
@@ -167,6 +167,10 @@ it("a real agent turn resumes after refresh and drains a queued message in order
   const reasoningGate = new Promise<void>((resolve) => { reasoningSent = resolve; });
   let queuedTurnStarted: () => void = () => undefined;
   const queuedTurnGate = new Promise<void>((resolve) => { queuedTurnStarted = resolve; });
+  let releaseCrossClientHold: () => void = () => undefined;
+  const crossClientHoldGate = new Promise<void>((resolve) => { releaseCrossClientHold = resolve; });
+  let releaseImmediateAnswer: () => void = () => undefined;
+  const immediateAnswerGate = new Promise<void>((resolve) => { releaseImmediateAnswer = resolve; });
   let retryModelAttempts = 0;
   let allowModelRetryRecovery = false;
   const modelRequests: { url: string | undefined; authorization: string | undefined; body: string }[] = [];
@@ -198,7 +202,17 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       }
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
       let completedWithToolCall = false;
-      if (latestUserContent.includes("Message actions before refresh.")) {
+      if (latestUserContent.includes("Hold for immediate queue.") || latestUserContent.includes("Hold for active mutation.")) {
+        response.write(frame({ role: "assistant", content: "Cross-client live answer is streaming. This controlled passage exceeds the runtime review window so both independent clients can observe it before completion." }));
+        await crossClientHoldGate;
+        if (!response.destroyed && !response.writableEnded) response.write(frame({ content: " Prior response completed before queue continuation." }));
+      } else if (latestUserContent.includes("Immediate media delivery.")) {
+        response.write(frame({ role: "assistant", content: "Immediate queue answer is streaming. This controlled passage exceeds the runtime review window so the selected queued turn can be observed before completion." }));
+        await immediateAnswerGate;
+        response.write(frame({ content: '\n\n<deliver-assets><media src="audit.svg" name="Audit SVG" /><media src="audit.png" name="Audit PNG" /><media src="audit.webm" name="Audit video" /><media src="audit.wav" name="Audit music" /></deliver-assets>' }));
+      } else if (latestUserContent.includes("Edited external message.")) {
+        response.write(frame({ role: "assistant", content: "Edited cross-client answer." }));
+      } else if (latestUserContent.includes("Message actions before refresh.")) {
         response.write(frame({ role: "assistant", content: "Unrefreshed action probe response." }));
       } else if (latestUserContent.includes("Persisted source action probe.")) {
         response.write(frame({ role: "assistant", content: "Persisted source action response." }));
@@ -454,19 +468,37 @@ it("a real agent turn resumes after refresh and drains a queued message in order
 
     browser = await launchBrowser();
     const page = await browser.newPage({ locale: "zh-CN", timezoneId: "Asia/Shanghai" });
-    await page.addInitScript(() => {
-      const testWindow = window as Window & { __webuiTestEventSocket?: WebSocket };
+    await page.addInitScript((dropQueueConfirmation: boolean) => {
+      const testWindow = window as Window & { __webuiTestEventSocket?: WebSocket; __webuiTestHoldEvents?: boolean };
       const nativeSend = WebSocket.prototype.send;
       WebSocket.prototype.send = function (data: string | ArrayBufferLike | Blob | ArrayBufferView) {
         if (typeof data === "string") {
           try {
-            if ((JSON.parse(data) as { operation?: unknown }).operation === "watchEvents")
+            if ((JSON.parse(data) as { operation?: unknown }).operation === "watchEvents") {
               testWindow.__webuiTestEventSocket = this;
+              if (testWindow.__webuiTestHoldEvents) { this.close(); return; }
+            }
           } catch { /* Ignore non-JSON socket frames. */ }
         }
         return nativeSend.call(this, data);
       };
-    });
+      if (!dropQueueConfirmation) return;
+      const nativeListen = WebSocket.prototype.addEventListener;
+      WebSocket.prototype.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) {
+        if (type !== "message") return nativeListen.call(this, type, listener, options);
+        return nativeListen.call(this, type, (event: Event) => {
+          const data = String((event as MessageEvent).data);
+          const surface = window as Window & { __webuiTestDropQueueConfirmation?: boolean; __webuiTestDroppedConfirmations?: number };
+          if (surface.__webuiTestDropQueueConfirmation &&
+            (data.includes("source_message_id") || data.includes("sourceMessageId")) && data.includes("Immediate media delivery.")) {
+            surface.__webuiTestDroppedConfirmations = (surface.__webuiTestDroppedConfirmations ?? 0) + 1;
+            return;
+          }
+          if (typeof listener === "function") listener.call(this, event);
+          else listener.handleEvent(event);
+        }, options);
+      };
+    }, scenario === "external-active-mutation-gap");
     const requests: {
       requestId?: string;
       operation?: string;
@@ -474,6 +506,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       body?: Record<string, unknown>;
     }[] = [];
     const received: { requestId?: string; kind?: string; body?: unknown }[] = [];
+    const wireTimeline: { at: number; direction: string; frame: unknown }[] = [];
     page.on("websocket", (socket) => {
       socket.on("framesent", ({ payload }) => {
         try {
@@ -483,7 +516,10 @@ it("a real agent turn resumes after refresh and drains a queued message in order
             kind?: string;
             body?: Record<string, unknown>;
           };
-          if (request.kind === "request") requests.push(request);
+          if (request.kind === "request") {
+            requests.push(request);
+            wireTimeline.push({ at: Date.now(), direction: "sent", frame: request });
+          }
         } catch { /* Ignore protocol frames that are not JSON requests. */ }
       });
       socket.on("framereceived", ({ payload }) => {
@@ -494,6 +530,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
             body?: unknown;
           };
           received.push(response);
+          wireTimeline.push({ at: Date.now(), direction: "received", frame: response });
         } catch { /* Ignore protocol frames that are not JSON responses. */ }
       });
     });
@@ -526,6 +563,68 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     // Wait for the product handshake deadline; a visible mount node alone does not prove React booted.
     await browserExpect(composer).toBeVisible({ timeout: FIRST_SCREEN_TIMEOUT_MS });
 
+    if (scenario === "external-active-mutation" || scenario === "external-active-mutation-gap") {
+      const lostConfirmation = scenario === "external-active-mutation-gap";
+      await sendComposerMessage("Hold for active mutation.");
+      await browserExpect(page.getByText("Cross-client live answer is streaming.")).toBeVisible({ timeout: 20_000 });
+      await composer.fill("Immediate media delivery.");
+      await composer.press("Enter");
+      if (lostConfirmation) await page.evaluate(() => {
+        // A missing real frame is a controlled observation gap, not a fake host fact.
+        (window as Window & { __webuiTestDropQueueConfirmation?: boolean }).__webuiTestDropQueueConfirmation = true;
+      });
+      await page.getByRole("button", { name: "立即发送" }).click();
+      await browserExpect(page.locator("[data-webui-queue-send-phase=accepted]")).toBeVisible();
+      const activeUser = page.locator('[data-webui-message-role="user"]').filter({ hasText: "Hold for active mutation." });
+      const activeUserId = await activeUser.getAttribute("data-message-id");
+      if (!activeUserId) throw new Error("active user row has no runtime message identity");
+      // This producer is another runtime client. Whether this browser should
+      // expose mutation controls during generation is a separate product decision.
+      const rewound = await port.rewindSession({ id: sessionId, userMessageId: activeUserId, clientRequestId: "external-active-rewind", rewindTurnDiff: false });
+      expect(rewound.rewound).toBe(true);
+      await browserExpect.poll(() => port.getActiveTurn({ id: sessionId })).toBeUndefined();
+      await browserExpect(page.getByText("Hold for active mutation.", { exact: true })).toHaveCount(0);
+      await browserExpect(page.getByText("Cross-client live answer is streaming.")).toHaveCount(0);
+      const runtimeQueue = await port.listQueueMessages({ id: sessionId });
+      // Characterize the current host boundary, not a client-invented paused
+      // queue. The runtime does not return a paused item after this mutation.
+      expect(runtimeQueue.paused).toBe(false);
+      if (process.env.WEBUI_TRANSCRIPT_RECEIPTS)
+        await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, "runtime-rewind-gap.json"), JSON.stringify(runtimeQueue, null, 2));
+      expect(modelRequests.some((request) => JSON.stringify(JSON.parse(request.body).messages?.filter((message: { role?: string }) => message.role === "user").at(-1)).includes("Immediate media delivery."))).toBe(false);
+      if (!lostConfirmation) {
+        await browserExpect(page.getByText("Immediate media delivery.", { exact: true })).toHaveCount(0);
+        releaseCrossClientHold();
+        return;
+      }
+      await browserExpect.poll(() => page.evaluate(() =>
+        (window as Window & { __webuiTestDroppedConfirmations?: number }).__webuiTestDroppedConfirmations ?? 0)).toBeGreaterThan(0);
+      const uncertain = page.locator('[data-webui-queue-send-phase="unknown"]').filter({ hasText: "Immediate media delivery." });
+      try {
+        await browserExpect(uncertain).toBeVisible();
+      } catch (error) {
+        const diagnostic = {
+          queue: runtimeQueue,
+          messages: await port.getMessages({ id: sessionId }),
+          body: await page.locator("body").textContent(),
+          mutationFrames: received.filter((frame) => String(JSON.stringify(frame.body)).includes("message.rewind")),
+          userFrames: received.filter((frame) => String(JSON.stringify(frame.body)).includes("source_message_id")),
+        };
+        if (process.env.WEBUI_TRANSCRIPT_RECEIPTS)
+          await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, "rewind-client-failure.json"), JSON.stringify(diagnostic, null, 2));
+        throw new Error(`${String(error)}\n${JSON.stringify(diagnostic)}`);
+      }
+      await browserExpect(uncertain).toContainText("会话已回退");
+      await browserExpect(uncertain.getByRole("button", { name: "重试发送" })).toHaveCount(0);
+      const submissions = requests.filter((request) => request.operation === "steerQueueItem").length;
+      await uncertain.getByRole("button", { name: "重新核对" }).click();
+      await browserExpect(uncertain).toBeVisible();
+      expect(requests.filter((request) => request.operation === "steerQueueItem")).toHaveLength(submissions);
+      releaseCrossClientHold();
+      return;
+    }
+
+    if (scenario === "transcript") {
     // Exercise the latest user-message controls on a newly opened session,
     // before this page has ever been refreshed. Both actions are canceled so
     // the probe does not mutate the transcript used by the remaining journey.
@@ -746,6 +845,7 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     const activeUserMessageId = await activeUserMessage.getAttribute("data-message-id");
     expect(activeUserMessageId).toEqual(expect.any(String));
     const resumeCountBeforeReload = requests.filter((request) => request.operation === "resumeSession").length;
+    const reloadStartedAt = Date.now();
     await page.reload();
     // The reload is a second cold start of the same client, so it waits on the
     // same condition and with the same deadline. The transcript's first user
@@ -754,8 +854,17 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await browserExpect(composer).toBeVisible({ timeout: FIRST_SCREEN_TIMEOUT_MS });
     await browserExpect(page.locator("#webui-root")).toBeVisible();
     await browserExpect(page.getByText("Please reason, then answer.")).toBeVisible();
-    await browserExpect.poll(() => requests.filter((request) => request.operation === "resumeSession").length)
-      .toBeGreaterThan(resumeCountBeforeReload);
+    try {
+      await browserExpect.poll(() => requests.filter((request) => request.operation === "resumeSession").length)
+        .toBeGreaterThan(resumeCountBeforeReload);
+    } catch (error) {
+      throw new Error(`${String(error)}\n${JSON.stringify({
+        activeTurn: await port.getActiveTurn({ id: sessionId }),
+        timeline: wireTimeline.filter((entry) => entry.at >= reloadStartedAt),
+        visibleTranscript: await page.locator("[data-webui-transcript]").textContent(),
+        composerControls: await page.locator("[data-webui-composer-submit]").count(),
+      })}`);
+    }
     const resumeRequest = requests.filter((request) => request.operation === "resumeSession").at(-1);
     expect(resumeRequest?.body?.afterMsgId).toBe(activeUserMessageId);
     await browserExpect(page.locator("[data-webui-queue-item]")).toHaveCount(1);
@@ -901,6 +1010,9 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     }
     await expect.poll(async () => (await port.listQueueMessages({ id: sessionId })).items ?? [])
       .toEqual([]);
+    await browserExpect.poll(() => port.getActiveTurn({ id: sessionId }), { timeout: 20_000 }).toBeUndefined();
+    await browserExpect(page.locator(`[data-webui-transcript="${sessionId}"]`))
+      .not.toHaveAttribute("data-webui-transcript-synchronization", /pending|failed/u, { timeout: 15_000 });
     try {
       await browserExpect(page.locator("[data-webui-queue-item]")).toHaveCount(0, { timeout: 5_000 });
     } catch (error) {
@@ -1565,11 +1677,213 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     expect(finalEnvironment).toMatchObject({ isGitRepo: true, changedFiles: 1, insertions: 1, deletions: 0 });
     runtimeEventAbort.abort();
     await runtimeEventReader;
+    return;
+    }
+    await writeFile(path.join(workspaceDir, "audit.svg"), '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="red"/></svg>');
+    await writeFile(path.join(workspaceDir, "audit.png"), Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC", "base64"));
+    await writeFile(path.join(workspaceDir, "audit.webm"), await readFile(new URL("../browser/support/composer-mascot-opaque.webm", import.meta.url)));
+    const wav = Buffer.alloc(44 + 16_000);
+    wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(8_000, 24); wav.writeUInt32LE(16_000, 28);
+    wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write("data", 36); wav.writeUInt32LE(16_000, 40);
+    await writeFile(path.join(workspaceDir, "audit.wav"), wav);
+    // Independent contexts share only the real host. No fixture events or
+    // projected messages are injected into either browser.
+    await page.evaluate(() => {
+      const surface = window as Window & { __webuiTestEventSocket?: WebSocket; __webuiTestHoldEvents?: boolean };
+      surface.__webuiTestHoldEvents = true;
+      surface.__webuiTestEventSocket?.close();
+    });
+    const crossClientSession = await port.createSession({ name: "main", workspaceDir });
+    const crossClientId = crossClientSession.session?.sessionId;
+    if (!crossClientId) throw new Error("runtime did not create the cross-client session");
+    const crossClientUrl = new URL(url);
+    crossClientUrl.hash = `session=${crossClientId}`;
+    const observerContext = await browser.newContext({ locale: "zh-CN", timezoneId: "Asia/Shanghai" });
+    const observer = await observerContext.newPage();
+    const observerOperations: string[] = [];
+    const observerTimeline: { at: number; direction: string; frame: unknown }[] = [];
+    const observerConnections = new Map<string, {
+      createdAt: number;
+      handshakeAt?: number;
+      openedAt?: number;
+      operations: { operation: string; at: number }[];
+    }>();
+    if (process.env.WEBUI_TRANSCRIPT_RECEIPTS) {
+      const network = await observerContext.newCDPSession(observer);
+      await network.send("Network.enable");
+      network.on("Network.webSocketCreated", ({ requestId }) => {
+        observerConnections.set(requestId, { createdAt: Date.now(), operations: [] });
+      });
+      network.on("Network.webSocketWillSendHandshakeRequest", ({ requestId }) => {
+        const connection = observerConnections.get(requestId);
+        if (connection) connection.handshakeAt = Date.now();
+      });
+      network.on("Network.webSocketHandshakeResponseReceived", ({ requestId }) => {
+        const connection = observerConnections.get(requestId);
+        if (connection) connection.openedAt = Date.now();
+      });
+      network.on("Network.webSocketFrameSent", ({ requestId, response }) => {
+        const request = JSON.parse(response.payloadData) as { operation?: string };
+        if (request.operation) observerConnections.get(requestId)?.operations.push({ operation: request.operation, at: Date.now() });
+      });
+    }
+    observer.on("websocket", (socket) => {
+      socket.on("framesent", ({ payload }) => {
+        const request = JSON.parse(String(payload)) as { operation?: string };
+        if (request.operation) observerOperations.push(request.operation);
+        observerTimeline.push({ at: Date.now(), direction: "sent", frame: request });
+      });
+      socket.on("framereceived", ({ payload }) => {
+        observerTimeline.push({ at: Date.now(), direction: "received", frame: JSON.parse(String(payload)) });
+      });
+    });
+    await observer.addInitScript(() => localStorage.setItem("webui-theme", "dark"));
+    await observer.goto(crossClientUrl.href);
+    await browserExpect.poll(() => observerOperations.includes("watchEvents"), { timeout: FIRST_SCREEN_TIMEOUT_MS }).toBe(true);
+    await browserExpect(observer.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeVisible();
+    await page.goto(crossClientUrl.href);
+    await browserExpect(composer).toBeVisible({ timeout: FIRST_SCREEN_TIMEOUT_MS });
+    // A concurrent catalogue refresh may already contain this new session.
+    // The catalogue-miss getSession path is pinned by the dedicated browser case.
+    await page.evaluate(() => { (window as Window & { __webuiTestHoldEvents?: boolean }).__webuiTestHoldEvents = false; });
+    await sendComposerMessage("Hold for immediate queue.");
+    for (const client of [page, observer]) {
+      await browserExpect(client.getByText("Cross-client live answer is streaming.")).toBeVisible({ timeout: 20_000 });
+      await browserExpect(client.locator('[data-webui-message-role="user"]').filter({ hasText: "Hold for immediate queue." })).toHaveCount(1);
+    }
+    const refreshSamples: number[] = [];
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const before = observerOperations.filter((operation) => operation === "resumeSession").length;
+      const started = Date.now();
+      await observer.reload();
+      try {
+        await browserExpect(observer.getByText("Cross-client live answer is streaming.")).toBeVisible();
+      } catch (error) {
+        const receipt = {
+          attempt, refreshSamples, activeTurn: await port.getActiveTurn({ id: crossClientId }),
+          timeline: observerTimeline.filter((entry) => entry.at >= started),
+          dom: await observer.locator("[data-webui-transcript]").innerHTML(),
+          body: await observer.locator("body").textContent(),
+          visibility: await observer.evaluate(() => document.visibilityState),
+          connections: [...observerConnections.values()].filter((entry) => entry.createdAt >= started),
+        };
+        if (process.env.WEBUI_TRANSCRIPT_RECEIPTS)
+          await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, "refresh-failure.json"), JSON.stringify(receipt, null, 2));
+        throw new Error(`${String(error)}\n${JSON.stringify(receipt)}`);
+      }
+      await browserExpect.poll(() => observerOperations.filter((operation) => operation === "resumeSession").length).toBeGreaterThan(before);
+      await browserExpect(observer.locator('[data-webui-message-role="user"]').filter({ hasText: "Hold for immediate queue." })).toHaveCount(1);
+      refreshSamples.push(Date.now() - started);
+      if (process.env.WEBUI_TRANSCRIPT_RECEIPTS)
+        await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, "refresh-samples.json"), JSON.stringify(refreshSamples));
+      if (process.env.WEBUI_TRANSCRIPT_RECEIPTS)
+        await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, `refresh-network-${attempt}.json`), JSON.stringify({
+          started, elapsedMs: refreshSamples.at(-1),
+          connections: [...observerConnections.values()].filter((entry) => entry.createdAt >= started),
+          timeline: observerTimeline.filter((entry) => entry.at >= started),
+        }, null, 2));
+    }
+    if (process.env.WEBUI_TRANSCRIPT_RECEIPTS)
+      await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, "refresh-samples.json"), JSON.stringify(refreshSamples));
+    await composer.fill("Immediate media delivery.");
+    await composer.press("Enter");
+    const immediateRow = page.locator("[data-webui-queue-item]").filter({ hasText: "Immediate media delivery." });
+    await browserExpect(immediateRow).toBeVisible();
+    await immediateRow.getByRole("button", { name: "立即发送" }).click();
+    await browserExpect.poll(() => requests.some((request) => request.operation === "steerQueueItem" && request.body?.id === crossClientId)).toBe(true);
+    const immediateRequest = requests.filter((request) => request.operation === "steerQueueItem" && request.body?.id === crossClientId).at(-1);
+    await browserExpect.poll(() => received.some((frame) => frame.requestId === immediateRequest?.requestId && frame.kind === "response" && (frame.body as { success?: boolean } | undefined)?.success === true)).toBe(true);
+    // Steering accepts into the active turn without aborting its model stream.
+    // The runtime consumes it at its own continuation boundary.
+    releaseCrossClientHold();
+    try {
+      for (const client of [page, observer]) {
+        await browserExpect(client.getByText("Immediate queue answer is streaming."), client === page ? "initiating client" : "observing client").toBeVisible({ timeout: 20_000 });
+        await browserExpect(client.locator('[data-webui-message-role="user"]').filter({ hasText: "Immediate media delivery." })).toHaveCount(1);
+        await browserExpect(client.locator("[data-webui-queue-item]")).toHaveCount(0);
+      }
+    } catch (error) {
+      throw new Error(`${String(error)}\n${JSON.stringify({
+        activeTurn: await port.getActiveTurn({ id: crossClientId }),
+        requests: requests.filter((request) => request.body?.id === crossClientId),
+        received: received.filter((frame) => requests.some((request) => request.body?.id === crossClientId && request.requestId === frame.requestId)),
+        modelInputs: modelRequests.map((request) => JSON.parse(request.body).messages?.filter((message: { role?: string }) => message.role === "user").at(-1)),
+        initiatingDom: await page.locator("[data-webui-transcript]").textContent(),
+        observingDom: await observer.locator("[data-webui-transcript]").textContent(),
+        observerOperations,
+      })}`);
+    }
+    releaseCrossClientHold();
+    releaseImmediateAnswer();
+    await browserExpect.poll(() => port.getActiveTurn({ id: crossClientId }), { timeout: 20_000 }).toBeUndefined();
+    if (process.env.WEBUI_TRANSCRIPT_RECEIPTS) {
+      await writeFile(path.join(process.env.WEBUI_TRANSCRIPT_RECEIPTS, "cross-client-history.json"), JSON.stringify({
+        history: await port.getMessages({ id: crossClientId }),
+        initiatingDom: await page.locator("[data-webui-transcript]").innerHTML(),
+        observingDom: await observer.locator("[data-webui-transcript]").innerHTML(),
+        catalogRequests: requests.filter((request) => ["listSessions", "getSessionTree"].includes(request.operation ?? "")),
+        catalogResponses: received.filter((frame) => requests.some((request) => ["listSessions", "getSessionTree"].includes(request.operation ?? "") && request.requestId === frame.requestId)),
+      }, null, 2));
+    }
+    for (const client of [page, observer]) {
+      await browserExpect(client.locator("[data-webui-composer-submit]")).toBeVisible();
+      await browserExpect(client.locator("[data-webui-transcript-synchronization]")).toHaveCount(0);
+      await browserExpect(client.getByText("Prior response completed before queue continuation.")).toBeVisible();
+      const media = client.getByTestId("delivered-assets-list");
+      await browserExpect(media.locator('img[alt="audit.svg"]')).toHaveJSProperty("naturalWidth", 40);
+      await browserExpect(media.locator('img[alt="audit.png"]')).toHaveJSProperty("naturalWidth", 1);
+      await browserExpect.poll(() => media.locator("video[controls]").evaluate((node) => (node as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
+      await browserExpect.poll(() => media.locator("audio[controls]").evaluate((node) => (node as HTMLAudioElement).duration)).toBe(1);
+      const receiptDirectory = process.env.WEBUI_TRANSCRIPT_RECEIPTS;
+      if (receiptDirectory) {
+        await media.locator("audio[controls]").scrollIntoViewIfNeeded();
+        await client.screenshot({ path: path.join(receiptDirectory, client === page ? "runtime-media-light.png" : "runtime-media-dark.png") });
+      }
+    }
+    await observer.reload();
+    const restoredMedia = observer.getByTestId("delivered-assets-list");
+    await browserExpect(restoredMedia.locator('img[alt="audit.svg"]')).toHaveJSProperty("naturalWidth", 40);
+    await browserExpect(restoredMedia.locator("audio[controls]")).toHaveCount(1);
+    const videoUrl = await restoredMedia.locator("video").getAttribute("src");
+    if (!videoUrl) throw new Error("restored video has no workspace resource URL");
+    const rangedVideo = await observer.request.get(new URL(videoUrl, crossClientUrl).href, { headers: { Range: "bytes=0-31" } });
+    expect(rangedVideo.status()).toBe(206);
+    expect((await rangedVideo.body()).length).toBe(32);
+    const externalUserId = await page.locator('[data-webui-message-role="user"]').filter({ hasText: "Immediate media delivery." }).getAttribute("data-message-id");
+    const externalUser = page.locator(`[data-webui-message-role="user"][data-message-id="${externalUserId}"]`);
+    await externalUser.hover();
+    await externalUser.getByRole("button", { name: "编辑", exact: true }).click();
+    const externalEditor = externalUser.getByTestId("user-message-inline-editor");
+    await externalEditor.getByRole("textbox", { name: "消息内容" }).fill("Edited external message.");
+    await externalEditor.getByRole("button", { name: "发送", exact: true }).click();
+    await browserExpect.poll(() => port.getActiveTurn({ id: crossClientId }), { timeout: 20_000 }).toBeUndefined();
+    for (const client of [page, observer]) {
+      await browserExpect(client.getByText("Edited cross-client answer.", { exact: true })).toBeVisible({ timeout: 20_000 });
+      await browserExpect(client.locator('[data-webui-message-role="user"]').filter({ hasText: "Immediate media delivery." })).toHaveCount(0);
+      await browserExpect(client.getByTestId("delivered-assets-list")).toHaveCount(0);
+    }
+    const editedExternalUser = page.locator('[data-webui-message-role="user"]').filter({ hasText: "Edited external message." });
+    await editedExternalUser.hover();
+    await editedExternalUser.getByRole("button", { name: "回退", exact: true }).click();
+    const externalRewind = page.getByTestId("rewind-preview-dialog");
+    await browserExpect(externalRewind).toBeVisible();
+    await externalRewind.getByRole("button", { name: "仅回退对话" }).click();
+    await browserExpect(externalRewind).toHaveCount(0);
+    for (const client of [page, observer]) {
+      await browserExpect(client.getByText("Edited external message.", { exact: true })).toHaveCount(0);
+      await browserExpect(client.getByText("Edited cross-client answer.", { exact: true })).toHaveCount(0);
+    }
+    await observerContext.close();
   } finally {
     runtimeEventAbort?.abort();
     releaseAnswer();
     releaseTodoAnswer();
     releaseStoppedAnswer();
+    releaseCrossClientHold();
+    releaseImmediateAnswer();
     await browser?.close();
     await service?.close().catch(() => undefined);
     await browserAdapter?.close().catch(() => undefined);

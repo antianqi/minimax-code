@@ -37,6 +37,8 @@ export interface TranscriptPort {
 
 /** Commands the transcript presentation may invoke through the application. */
 export interface WebuiTranscriptCommands {
+  readonly retryQueueSend?: (sessionId: string, itemId: string) => Promise<void>;
+  readonly recheckQueueSend?: (sessionId: string) => Promise<void>;
   readonly getSessionForkOptions?: (
     request: WebuiGetSessionForkOptionsRequest,
   ) => Promise<WebuiGetSessionForkOptionsResult>;

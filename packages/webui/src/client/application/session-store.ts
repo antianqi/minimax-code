@@ -45,6 +45,7 @@ import type {
 
 export interface WebuiSessionWriter {
   readonly kind: "session";
+  readonly sessionId: string;
   readonly setStream: (
     update: (current: WebuiStreamState) => WebuiStreamState,
   ) => void;
@@ -333,6 +334,7 @@ export function createWebuiSessionStore(options?: {
 
   const createSessionWriter = <Id extends string>(sessionId: Id): WebuiSessionWriter => ({
     kind: "session",
+    sessionId,
     setStream: (update) =>
       updateSession(sessionId, (current) => ({
         ...current,
@@ -420,6 +422,7 @@ export function createWebuiSessionStore(options?: {
           sessionKey = sessionId;
           return {
             kind: "session",
+            sessionId,
             setStream: writeStream,
             setSending: writeSending,
           };

@@ -57,6 +57,9 @@ import {
 } from "../features/turn/application/event-coordinator.js";
 import type { WebuiOpenEventChannel, WebuiProcessEventChannel } from "../features/turn/application/event-channel.js";
 import { createWebuiSessionStore, createWebuiTranscriptHistoryWriter } from "./session-store.js";
+import { createWebuiTranscriptSettlementOwner, type WebuiTranscriptSettlementOwner } from "../features/transcript/application/transcript-settlement.js";
+import { createWebuiQueueSendWorkflow } from "../features/composer/application/queue-send-workflow.js";
+import { isTurnLive } from "../features/turn/contracts/stream-state.js";
 import { createWebuiTaskSessionWorkflows } from "./task-session-workflows.js";
 import type { WebuiSessionStore } from "./session-store.js";
 import {
@@ -86,8 +89,6 @@ import {
 } from "../features/interactions/application/interaction-session-owners.js";
 import type { WebuiInteractionPortSlice } from "../features/interactions/application/interaction-coordinator.js";
 import { createWebuiInteractionPhaseIntents } from "../features/turn/contracts/interaction-phase-intents.js";
-import { selectWebuiCatalogFlatPage, selectWebuiCatalogTreePage } from "../features/sessions/application/session-catalog.public.js";
-import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../features/sessions/projection/session-lookups.js";
 import type { WebuiApplicationState } from "./state.js";
 import { WEBUI_HOME_SESSION_KEY } from "./state.js";
 import {
@@ -347,6 +348,7 @@ export interface WebuiApplication {
   /** The one owner of a turn's diff query and revert/reapply. */
   readonly turnReview: WebuiTurnReviewOwner;
   readonly transcriptHistory: WebuiTranscriptHistoryOwner;
+  readonly transcriptSettlement: WebuiTranscriptSettlementOwner;
   /** Message actions exposed to transcript UI as application commands. */
   readonly transcriptCommands: WebuiTranscriptCommands;
   /** The one owner of per-session activity writes. */
@@ -463,10 +465,7 @@ export function createWebuiApplication(
    * the same source the shell uses for the composer's fallback requester name.
    */
   const catalogueAgentName = (sessionId: string): string => {
-    const catalog = store.getSnapshot().catalog;
-    const flat = selectWebuiCatalogFlatPage(catalog);
-    const tree = selectWebuiCatalogTreePage(catalog);
-    return selectWebuiSessionAgentName(selectWebuiSessionLookups(flat, tree), sessionId);
+    return store.getSnapshot().catalog.entities.get(sessionId)?.agentName ?? "main";
   };
   const readAgentName = deps.readAgentName ?? catalogueAgentName;
   let recoverTurnForSession: ((sessionId: string) => void) | undefined;
@@ -496,6 +495,13 @@ export function createWebuiApplication(
   const selectSession = (sessionId: string | undefined): void => {
     sessionScope.select(sessionId);
     store.select(sessionId);
+    // Selection is already an observation interest: do not wait for composer
+    // effects or process-channel readiness before attaching an active reply.
+    if (sessionId) recoverTurnForSession?.(sessionId);
+    if (sessionId) void sessionWorkflows.acquireSession(sessionId).catch((error: unknown) => {
+      if (!store.isDisposed() && store.getSelectedSessionId() === sessionId)
+        sessionWorkflows.setError(error instanceof Error ? error.message : String(error));
+    });
     // The selected session and the model catalogue it exposes share one
     // lifecycle. Selecting the home slot from a session must read its catalogue
     // too; otherwise the new-task composer sees an uninitialised home entry
@@ -557,6 +563,7 @@ export function createWebuiApplication(
   const turnCommandsFor = (sessionId: string | undefined): WebuiConversationTurnCommands => {
     return createWebuiConversationTurnCommands({
       store,
+      replaceHistory: (target, page) => transcriptHistory.acceptReplacement(target, page),
       sessionId,
       ...(deps.turnCapabilities ? { capabilities: turnCapabilities } : {}),
       deliveries,
@@ -654,11 +661,13 @@ export function createWebuiApplication(
       // write into. Installed permanently, like every route here, so the rail
       // cannot go stale whenever no view happens to be mounted.
       sessionFact: (fact) => sessionWorkflows.applyFact(fact),
+      transcriptRewound: (sessionId) => replaceMutatedTranscript(sessionId, store.readSession(sessionId).stream.lastClaimedGeneration),
     },
   });
   const turns = createWebuiTurnCoordinator({
     store,
     ...deps.turns,
+    replaceHistory: (target, page) => transcriptHistory.acceptReplacement(target, page),
     deliveries,
     scope: sessionScope,
   });
@@ -674,13 +683,31 @@ export function createWebuiApplication(
     transcript: createWebuiTranscriptHistoryWriter(store),
     loadMessages: deps.loadMessages,
   });
+  const transcriptSettlement = createWebuiTranscriptSettlementOwner({ store, history: transcriptHistory });
+  const replaceMutatedTranscript = (sessionId: string, generation: number | undefined) => {
+    queueSendWorkflow.transcriptRewound(sessionId);
+    const stillTarget = store.readSession(sessionId).stream.lastClaimedGeneration === generation;
+    transcriptSettlement.invalidate(sessionId, { preserveCurrentStream: !stillTarget });
+    if (stillTarget) {
+      const lifecycle = turnCommandsFor(sessionId).lifecycle;
+      lifecycle.clearStream();
+      lifecycle.setTurnSending(false);
+    }
+    return transcriptHistory.replacePage(sessionId);
+  };
   // The business owners, built by the assembly rather than by the mounted view —
   // the shell's own treatment. A view composes screens and reads these; it
   // neither builds one nor holds the capability to build one, so "which business
   // can reach which port" is decided here rather than by which port a component
   // happened to be handed.
   const slices = deps.slices ?? createWebuiPortSlices(deps.turnCapabilities ?? {});
+  const requireEndedGeneration = (sessionId: string): void => {
+    const session = store.readSession(sessionId);
+    if (session.sending || isTurnLive(session.stream.phase)) throw new Error("生成结束后才能编辑或回退消息");
+  };
   const transcriptCommands: WebuiTranscriptCommands = {
+    retryQueueSend: (sessionId, itemId) => queueSendWorkflow.send({ sessionId, itemId }),
+    recheckQueueSend: (sessionId) => queueSendWorkflow.recheck(sessionId),
     ...(slices.sessions.getSessionForkOptions
       ? { getSessionForkOptions: (request) => slices.sessions.getSessionForkOptions!(request) }
       : {}),
@@ -707,18 +734,22 @@ export function createWebuiApplication(
     ...(slices.transcript.rewindSession
       ? {
           rewindSession: async (request) => {
+            requireEndedGeneration(request.id);
+            const generation = store.readSession(request.id).stream.lastClaimedGeneration;
             const result = await slices.transcript.rewindSession!(request);
-            // The runtime has committed a new transcript revision, but the
-            // mounted view still owns its prior page. Replace the selected
-            // session's cached pages before resolving the row action so
-            // removed messages do not remain rendered until a manual reload.
-            await transcriptHistory.replacePage(request.id);
+            if (result.rewound) await replaceMutatedTranscript(request.id, generation);
             return result;
           },
         }
       : {}),
     ...(slices.transcript.editSessionMessage
-      ? { editSessionMessage: (request) => slices.transcript.editSessionMessage!(request) }
+      ? { editSessionMessage: async (request) => {
+          requireEndedGeneration(request.id);
+          const generation = store.readSession(request.id).stream.lastClaimedGeneration;
+          const result = await slices.transcript.editSessionMessage!(request);
+          if (result.rewound) await replaceMutatedTranscript(request.id, generation);
+          return result;
+        } }
       : {}),
   };
   const sessionWorkflows = createWebuiSessionWorkflows({
@@ -745,6 +776,7 @@ export function createWebuiApplication(
     // its own observable state through its own command — this is the list of
     // owners a session has, which only the assembly knows.
     releaseOwners: (sessionId) => {
+      transcriptSettlement.releaseSession(sessionId);
       transcriptHistory.releaseSession(sessionId);
       modelsWorkflows.releaseSession(sessionId);
       goals.purge(sessionId);
@@ -766,6 +798,12 @@ export function createWebuiApplication(
     },
   });
   const commandWorkflows = createWebuiCommandWorkflows({ port: slices.composer });
+  const queueSendWorkflow = createWebuiQueueSendWorkflow({
+    store,
+    readQueued: (sessionId, itemId) => composer.readQueue().items.find((item) => item.sessionId === sessionId && item.itemId === itemId),
+    submit: commandWorkflows.steerQueued,
+    refreshHistory: (sessionId) => transcriptHistory.synchronizePage(sessionId),
+  });
   /**
    * The goal capability one target session offers, read when the submission asks
    * for it rather than captured up front: a session this submission just created
@@ -792,7 +830,7 @@ export function createWebuiApplication(
     // the selection — gated on the use case's own answer.
     selectCreatedSession: selectSession,
     turnCommandsFor,
-    commandWorkflows,
+    commandWorkflows: { ...commandWorkflows, steerQueued: queueSendWorkflow.send },
     canEnqueue: turnCapabilities.enqueue !== undefined,
     canSend: turnCapabilities.send !== undefined,
     readGoal: (sessionId) => store.readSession(sessionId).goal,
@@ -822,6 +860,9 @@ export function createWebuiApplication(
     // The scheduler owns when this runs; the composer only says it is interested.
     observations,
     refreshInspection: async (sessionId) => {
+      // A failed boot probe must recover even if the process channel never reconnects.
+      // Existing deliveries own their lease; the foreground budget only repairs a gap.
+      if (!store.readSession(sessionId).stream.subscription) turnCommandsFor(sessionId).recover();
       // Acquisition, not selection: this runs on the scheduler's freshness budget
       // while the user may have moved elsewhere, and a background read that selects
       // the catalogue it read is a background read changing what is on screen.
@@ -1008,6 +1049,8 @@ export function createWebuiApplication(
       // life through the same object.
       if (lifecycle === "disposed") return false;
       if (lifecycle === "started") return true;
+      transcriptSettlement.start();
+      queueSendWorkflow.start();
       const initialSessionId = options?.initialSessionId;
       // The boot route is applied before ingress opens. A home boot already is
       // the selected state, so read its catalogue directly without running the
@@ -1046,6 +1089,7 @@ export function createWebuiApplication(
     turnCapabilities,
     turnReview,
     transcriptHistory,
+    transcriptSettlement,
     transcriptCommands,
     sessionActivity,
     composer,
@@ -1111,6 +1155,8 @@ export function createWebuiApplication(
         detach?.();
         detach = undefined;
       });
+      shutDown("transcript settlement owner", () => transcriptSettlement.dispose());
+      shutDown("queue send workflow", () => queueSendWorkflow.dispose());
       // Close what this client is observing before fencing the store: the
       // attempt's frames can no longer reach a snapshot, and the host turn keeps
       // running.

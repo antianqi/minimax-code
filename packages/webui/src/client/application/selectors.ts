@@ -19,6 +19,26 @@ import type {
   WebuiApplicationSessionState,
   WebuiApplicationState,
 } from "./state.js";
+import type { WebuiSessionStore } from "./session-store.js";
+
+/** A stable external-store view of one immutable slice. */
+export function createWebuiStoreSelection<T>(
+  store: Pick<WebuiSessionStore, "getSnapshot" | "subscribe">,
+  select: (state: WebuiApplicationState) => T,
+): { readonly getSnapshot: () => T; readonly subscribe: (listener: () => void) => () => void } {
+  return {
+    getSnapshot: () => select(store.getSnapshot()),
+    subscribe: (listener) => {
+      let current = select(store.getSnapshot());
+      return store.subscribe(() => {
+        const next = select(store.getSnapshot());
+        if (Object.is(current, next)) return;
+        current = next;
+        listener();
+      });
+    },
+  };
+}
 
 export function selectWebuiSession(
   state: WebuiApplicationState,

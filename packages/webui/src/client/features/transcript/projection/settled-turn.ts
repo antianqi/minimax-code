@@ -1,56 +1,54 @@
-// What a turn showed while it was live, and whether the persisted page has
-// caught up with it.
-//
-// A settled turn is rendered from the persisted page, and that page can arrive
-// mid-write: the reply's text is stored first, the files it delivered are added
-// afterwards. Checking that the message *exists* is therefore not enough — the
-// reader watched those files appear, and a page that only has the text takes
-// them away again. These two functions decide "caught up" by what the message
-// projects to, which is the same projection the transcript draws.
-import { projectMessageParts, type WebuiMessageForParts } from "./message-parts.js";
+// Durable content must cover the observed ordered parts and asset identities.
+// Completion of delivery alone is not evidence that persistence has caught up.
+import { projectMessageParts } from "./message-parts.js";
+import type { WebuiStreamMessage } from "../../turn/contracts/stream-state.js";
+import type { WebuiClientMessage } from "../contracts/message-view.js";
+import { toolCallStatus } from "./tool-projection.js";
 
-/** The part of a message a settle comparison cares about. */
-export interface WebuiSettledTurnShape {
-  readonly msgId: string;
-  /** Characters of prose, after the renderer-only markup is lifted out. */
-  readonly textLength: number;
-  /** How many delivered files the message names, pictures and clips included. */
-  readonly assets: number;
-}
-
-function shapeOf(message: WebuiMessageForParts): WebuiSettledTurnShape {
-  const projected = projectMessageParts(message);
-  let textLength = 0;
-  let assets = 0;
-  for (const part of projected) {
-    if (part.type === "text") textLength += part.content.length;
-    else if (part.type === "asset_list") assets += part.assets.length;
+function containsObservedValue(expected: unknown, actual: unknown): boolean {
+  if (Object.is(expected, actual)) return true;
+  if (Array.isArray(expected)) return Array.isArray(actual) && expected.every((item, index) => containsObservedValue(item, actual[index]));
+  if (expected && typeof expected === "object") {
+    if (!actual || typeof actual !== "object") return false;
+    return Object.entries(expected).every(([key, value]) => value === undefined || containsObservedValue(value, (actual as Record<string, unknown>)[key]));
   }
-  return { msgId: message.msgId, textLength, assets };
+  return false;
 }
 
-/** The shape of one message as the live view draws it. */
-export function projectWebuiSettledTurnShape(message: WebuiMessageForParts): WebuiSettledTurnShape {
-  return shapeOf(message);
+function containsObservedTool(expected: Record<string, unknown>, actual: Record<string, unknown>): boolean {
+  const before = toolCallStatus(expected);
+  const after = toolCallStatus(actual);
+  const statusCovered = before === "unknown" || before === after ||
+    (before === "pending" && after !== "unknown") ||
+    (before === "running" && (after === "completed" || after === "error" || after === "cancelled"));
+  return statusCovered && Object.entries(expected).every(([key, value]) =>
+    key === "status" || key === "tool_call_status" || key === "toolCallStatus" || value === undefined || containsObservedValue(value, actual[key]),
+  );
 }
-
-/**
- * Whether every message the live turn showed is on the page, with at least as
- * much prose and as many delivered files as the reader already saw.
- *
- * Only "at least as much" is required: a later read may carry more, and a page
- * that carries less is the mid-write state that takes the files away.
- */
-export function isWebuiSettledTurnCaughtUp(
-  expected: readonly WebuiSettledTurnShape[],
-  pageMessages: readonly WebuiMessageForParts[],
-): boolean {
-  if (expected.length === 0) return true;
-  const byId = new Map(pageMessages.map((message) => [message.msgId, message]));
-  return expected.every((want) => {
-    const found = byId.get(want.msgId);
-    if (!found) return false;
-    const have = shapeOf(found);
-    return have.textLength >= want.textLength && have.assets >= want.assets;
+/** Compare actual ordered content and asset identities, allowing an appended durable tail. */
+export function isWebuiObservedMessagePersisted(observed: WebuiStreamMessage, durable: WebuiClientMessage): boolean {
+  if (observed.id !== durable.msgId) return false;
+  const expected = projectMessageParts({
+    msgId: observed.id, msgContent: observed.answer, thinkingContent: observed.thinking,
+    toolCalls: observed.toolCalls, parts: observed.parts,
+  });
+  const actual = projectMessageParts(durable);
+  let index = 0;
+  return expected.every((part) => {
+    for (; index < actual.length; index += 1) {
+      const candidate = actual[index]!;
+      if (part.type !== candidate.type) continue;
+      const { id: _expectedId, ...want } = part;
+      const { id: _actualId, ...have } = candidate;
+      const matches = "content" in want && "content" in have
+        ? typeof have.content === "string" && have.content.startsWith(want.content)
+        : want.type === "tool_call" && have.type === "tool_call"
+        ? containsObservedTool(want.toolCall, have.toolCall)
+        : containsObservedValue(want, have);
+      if (!matches) continue;
+      index += 1;
+      return true;
+    }
+    return false;
   });
 }

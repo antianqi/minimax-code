@@ -19,21 +19,17 @@
 // member for the operation, and the loop's own absent-capability guard refuses
 // the turn with a stated reason.
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import {
   selectWebuiSession,
-  selectWebuiSessionGoal,
-  selectWebuiSessionPermissions,
-  selectWebuiSessionQuestionnaire,
-  selectWebuiSessionStream,
 } from "../application/selectors.js";
 import type { WebuiGoal } from "../../shared/contracts/goal.js";
 import type {
   WebuiPendingPermission,
   WebuiQuestionnaireRequest,
 } from "../../shared/contracts/interactions.js";
-import type { WebuiApplicationSessionState } from "../application/state.js";
+import type { WebuiApplicationSessionState, WebuiApplicationState } from "../application/state.js";
 import { initialWebuiApplicationSessionState } from "../application/state.js";
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
 import {
@@ -44,52 +40,102 @@ import type { WebuiConversationTurnCommands } from "../features/turn/contracts/t
 import {
   useWebuiApplicationOptional,
   useWebuiSessionStoreContext,
-  useWebuiSessionStoreSnapshot,
+  useWebuiSessionStoreSelection,
 } from "./application-context.js";
 
 export function useWebuiTranscriptHistoryOwner() {
-  return useWebuiApplicationOptional()?.transcriptHistory;
+  const owner = useWebuiApplicationOptional()?.transcriptHistory;
+  return useMemo(() => owner ? {
+    seed: owner.seed, loadPage: owner.loadPage, loadOlder: owner.loadOlder, isCurrentPage: owner.isCurrentPage,
+  } : undefined, [owner]);
 }
+
+export function useWebuiTranscriptSettlementOwner() {
+  const owner = useWebuiApplicationOptional()?.transcriptSettlement;
+  return useMemo(() => owner ? { retry: owner.retry } : undefined, [owner]);
+}
+
+function useSessionSlice<T>(sessionId: string | undefined, select: (session: WebuiApplicationSessionState) => T): T {
+  return useWebuiSessionStoreSelection(useCallback(
+    (snapshot: WebuiApplicationState) => select(
+      (sessionId ? selectWebuiSession(snapshot, sessionId) : undefined) ?? initialWebuiApplicationSessionState,
+    ),
+    [sessionId, select],
+  ));
+}
+
+const sessionSlice = (session: WebuiApplicationSessionState) => session;
+const streamSlice = (session: WebuiApplicationSessionState) => session.stream;
+const permissionsSlice = (session: WebuiApplicationSessionState) => session.permissions;
+const questionnaireSlice = (session: WebuiApplicationSessionState) => session.questionnaire;
+const goalSlice = (session: WebuiApplicationSessionState) => session.goal;
+const transcriptSlice = (session: WebuiApplicationSessionState) => session.transcript;
+const queueSendsSlice = (session: WebuiApplicationSessionState) => session.transcript.queueSends;
+const transcriptPageSlice = (session: WebuiApplicationSessionState) => session.transcript.page;
+const sendingSlice = (session: WebuiApplicationSessionState) => session.sending;
+const refusalSlice = (session: WebuiApplicationSessionState) => session.stream.refusal;
+const incompleteSlice = (session: WebuiApplicationSessionState) => session.stream.transcriptIncomplete;
+const contextUsageSlice = (session: WebuiApplicationSessionState) => session.stream.contextUsage ?? session.stream.messages.at(-1)?.contextUsage;
 
 export function useWebuiSessionState(
   sessionId: string | undefined,
 ): WebuiApplicationSessionState {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  if (!sessionId) return initialWebuiApplicationSessionState;
-  return selectWebuiSession(snapshot, sessionId) ?? initialWebuiApplicationSessionState;
+  return useSessionSlice(sessionId, sessionSlice);
 }
 
 export function useWebuiSessionStream(
   sessionId: string | undefined,
 ): WebuiStreamState {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  if (!sessionId) return initialWebuiApplicationSessionState.stream;
-  return selectWebuiSessionStream(snapshot, sessionId);
+  return useSessionSlice(sessionId, streamSlice);
 }
 
 /** The session's pending permissions, read through the selector. */
 export function useWebuiSessionPermissions(
   sessionId: string | undefined,
 ): readonly WebuiPendingPermission[] {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  if (!sessionId) return initialWebuiApplicationSessionState.permissions;
-  return selectWebuiSessionPermissions(snapshot, sessionId);
+  return useSessionSlice(sessionId, permissionsSlice);
 }
 
 /** The session's pending questionnaire, read through the selector. */
 export function useWebuiSessionQuestionnaire(
   sessionId: string | undefined,
 ): WebuiQuestionnaireRequest | undefined {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  return sessionId ? selectWebuiSessionQuestionnaire(snapshot, sessionId) : undefined;
+  return useSessionSlice(sessionId, questionnaireSlice);
 }
 
 /** The session's goal, read through the selector. */
 export function useWebuiSessionGoal(
   sessionId: string | undefined,
 ): WebuiGoal | undefined {
-  const snapshot = useWebuiSessionStoreSnapshot();
-  return sessionId ? selectWebuiSessionGoal(snapshot, sessionId) : undefined;
+  return useSessionSlice(sessionId, goalSlice);
+}
+
+export function useWebuiSessionTranscript(sessionId: string): WebuiApplicationSessionState["transcript"] {
+  return useSessionSlice(sessionId, transcriptSlice);
+}
+
+export function useWebuiSessionQueueSends(sessionId: string | undefined) {
+  return useSessionSlice(sessionId, queueSendsSlice);
+}
+
+export function useWebuiSessionTranscriptPage(sessionId: string | undefined) {
+  return useSessionSlice(sessionId, transcriptPageSlice);
+}
+
+export function useWebuiSessionSending(sessionId: string | undefined) {
+  return useSessionSlice(sessionId, sendingSlice);
+}
+
+export function useWebuiSessionRefusal(sessionId: string | undefined) {
+  return useSessionSlice(sessionId, refusalSlice);
+}
+
+export function useWebuiSessionTranscriptIncomplete(sessionId: string | undefined) {
+  return useSessionSlice(sessionId, incompleteSlice);
+}
+
+export function useWebuiSessionContextUsage(sessionId: string | undefined) {
+  return useSessionSlice(sessionId, contextUsageSlice);
 }
 
 /**

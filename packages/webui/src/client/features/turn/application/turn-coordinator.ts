@@ -23,6 +23,7 @@ import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
 import type {
   WebuiClientMessage,
   WebuiClientMessageLoader,
+  WebuiClientMessagePage,
 } from "../../transcript/contracts/message-view.js";
 import type { WebuiStreamState } from "../projection/stream-state.js";
 import { runWebuiStreamLoop } from "../../../conversation/stream-loop.js";
@@ -37,6 +38,7 @@ export interface WebuiTurnCoordinatorDeps {
   readonly store: WebuiSessionStore;
   readonly resumeSession: WebuiClientSessionResumer;
   readonly loadMessages?: WebuiClientMessageLoader;
+  readonly replaceHistory?: (sessionId: string, page: WebuiClientMessagePage) => void;
   readonly deliveries?: WebuiDeliveryDisposers;
   readonly scope?: WebuiSessionScopeManager;
   /** Injected for tests; production uses the mechanism's loop. */
@@ -86,7 +88,9 @@ export function createWebuiTurnCoordinator(
         // retry path and the composer's submit path must translate a frame into
         // the record the same way, or a retried turn would seed itself
         // differently from a submitted one.
-        buildWebuiStreamLoopSink(writer.setStream, streamStateBundle),
+        buildWebuiStreamLoopSink(writer.setStream, streamStateBundle, {
+          ...(deps.replaceHistory ? { onHistoryReplacement: (page) => deps.replaceHistory!(sessionId, page) } : {}),
+        }),
       ).finally(hold.release);
     },
   };
@@ -103,6 +107,8 @@ export interface WebuiStopTurnDeps {
    * reducer: the caller has no business composing a write over the slice.
    */
   readonly settleStream: () => void;
+  /** The acknowledgement may settle only the execution captured when stop began. */
+  readonly isCurrent: () => boolean;
 }
 
 /**
@@ -117,6 +123,7 @@ export async function stopWebuiTurn(deps: WebuiStopTurnDeps): Promise<void> {
   const result = await deps.abortSession({ id: deps.sessionId });
   if (result.success === false)
     throw new Error("The running turn could not be stopped");
+  if (!deps.isCurrent()) return;
   deps.setSending(false);
   deps.settleStream();
 }

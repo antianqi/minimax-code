@@ -14,7 +14,7 @@
 //
 // | business | slice | port(s) | the shell props it replaces |
 // | --- | --- | --- | --- |
-// | `sessions` | `WebuiSessionsSlice` | `SessionPort` | `loadProjects`, `listArchivedSessions`, `loadSessions`, `loadSessionTree`, `createSession`, `archiveSession`, `deleteSession`, `updateSession`, `getSessionForkOptions`, `forkSession`, `getSessionUsage` |
+// | `sessions` | `WebuiSessionsSlice` | `SessionPort` | `loadProjects`, `listArchivedSessions`, `loadSessions`, `loadSessionTree`, `getSession`, `createSession`, `archiveSession`, `deleteSession`, `updateSession`, `getSessionForkOptions`, `forkSession`, `getSessionUsage` |
 // | `transcript` | `WebuiTranscriptSlice` | `TranscriptPort` | `loadMessages`, `getSessionDiff`, `getTurnDiff`, `revertTurnDiff`, `reapplyTurnDiff`, `getSessionRewindPreview`, `rewindSession`, `editSessionMessage` |
 // | `workspace` | `WebuiWorkspaceSlice` | `WorkspacePort` + `TerminalPort` | the fourteen workspace members plus the six terminal ones |
 // | `composer` | `WebuiComposerSlice` | `ComposerPort` | `runCommand`, `enqueueMessage`, `listQueueMessages`, `deleteQueueItem`, `steerQueueItem` |
@@ -102,6 +102,7 @@ const SESSIONS_KEYS = [
   "listArchivedSessions",
   "loadSessions",
   "loadSessionTree",
+  "getSession",
   "createSession",
   "archiveSession",
   "deleteSession",

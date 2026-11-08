@@ -36,6 +36,76 @@ test.beforeEach(async ({ page }) => {
   page.on("console", (message) => console.log("BROWSER_CONSOLE", message.type(), message.text()));
 });
 
+for (const theme of ["light", "dark"]) {
+test(`immediate sending presents the selected queue input before acknowledgement (${theme})`, async ({ page }) => {
+  await page.addInitScript((value) => localStorage.setItem("webui-theme", value), theme);
+  await configureFixture(page, () => {
+    window.__fixture.setActiveTurn({ turnId: "queue-active", busyReason: "turn", locallyOwned: false });
+    window.__fixture.setResponse("listQueueMessages", { items: [{ itemId: "selected-queue", sessionId: "A", status: "queued", content: "Act on this queued instruction." }] });
+    window.__fixture.delayEvery("steerQueueItem", { id: "A" });
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "立即发送" }).click();
+  const pending = page.locator('[data-webui-transcript="A"] [data-webui-pending-queue-item="selected-queue"]');
+  await expect(pending).toContainText("Act on this queued instruction.");
+  await expect(pending).toContainText("正在立即发送");
+  await page.screenshot({ path: test.info().outputPath("pending-queue-input.png"), animations: "disabled" });
+  await expect(page.locator('[data-webui-queue-item="selected-queue"]')).toHaveCount(0);
+  await pending.evaluate((node) => { node.dataset.queueIdentityProbe = "same-element"; });
+  await emitAgentMessage(page, "A", { msg_id: "prior-assistant", msg_content: "Late output from the prior execution." });
+  await expect(page.locator('[data-webui-message-role]')).toHaveText([
+    /History A synthetic/, /Late output from the prior execution\./, /Act on this queued instruction\./,
+  ]);
+  await page.evaluate(() => window.__fixture.resolve("steerQueueItem", { id: "A" }, { success: true, queueItemId: "selected-queue", turnId: "queue-active" }));
+  await expect(pending).toContainText("已受理，等待处理");
+  await emitAgentMessage(page, "A", { msg_id: "msg-user-canonical-queue", msg_content: "Act on this queued instruction.", source_message_id: "selected-queue" });
+  const confirmed = page.locator('[data-webui-message-role="user"][data-message-id="msg-user-canonical-queue"]');
+  await expect(confirmed).toHaveAttribute("data-queue-identity-probe", "same-element");
+  await expect(pending).toHaveCount(0);
+  await expect(page.locator('[data-webui-message-role="user"]').filter({ hasText: "Act on this queued instruction." })).toHaveCount(1);
+});
+
+test(`a refused immediate send keeps its input and retries only from its failed state (${theme})`, async ({ page }) => {
+  await page.addInitScript((value) => localStorage.setItem("webui-theme", value), theme);
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("listQueueMessages", { items: [{ itemId: "refused-queue", sessionId: "A", status: "queued", content: "Retain this refused input." }] });
+    window.__fixture.refuseOperation("steerQueueItem", "invalid_request", "Synthetic queued input refusal.");
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "立即发送" }).click();
+  const pending = page.locator('[data-webui-pending-queue-item="refused-queue"]');
+  await expect(pending).toContainText("Retain this refused input.");
+  await expect(pending).toContainText("立即发送失败");
+  await page.screenshot({ path: test.info().outputPath("failed-queue-input.png"), animations: "disabled" });
+  await page.evaluate(() => {
+    window.__fixture.allowOperation("steerQueueItem");
+    window.__fixture.setResponse("steerQueueItem", { success: true, queueItemId: "refused-queue", turnId: "accepted-turn" });
+  });
+  await pending.getByRole("button", { name: "重试发送" }).click();
+  await expect(pending).toContainText("已受理，等待处理");
+  expect(await page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "steerQueueItem").length)).toBe(2);
+});
+
+test(`an unknown immediate-send outcome rechecks history without resending (${theme})`, async ({ page }) => {
+  await page.addInitScript((value) => localStorage.setItem("webui-theme", value), theme);
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("listQueueMessages", { items: [{ itemId: "unknown-queue", sessionId: "A", status: "queued", content: "Check this uncertain input." }] });
+    window.__fixture.refuseOperation("steerQueueItem", "internal_error", "Outcome is uncertain.");
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "立即发送" }).click();
+  const pending = page.locator('[data-webui-pending-queue-item="unknown-queue"]');
+  await expect(pending).toContainText("发送结果待确认");
+  await expect(pending.getByRole("button", { name: "重试发送" })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("unknown-queue-input.png"), animations: "disabled" });
+  await page.evaluate(() => window.__fixture.setPage("A", { messages: [{ msgId: "canonical-unknown", role: "user", msgContent: "Check this uncertain input.", sourceMessageId: "unknown-queue" }], hasMore: false }));
+  await pending.getByRole("button", { name: "重新核对" }).click();
+  await expect(pending).toHaveCount(0);
+  await expect(page.locator('[data-webui-message-role="user"]').filter({ hasText: "Check this uncertain input." })).toHaveCount(1);
+  expect(await page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "steerQueueItem").length)).toBe(1);
+});
+}
+
 test("an agent turn streams thinking and answer, then settles on DONE", async ({ page }) => {
   await openApp(page, "#session=A");
   await startTurn(page, "A", "Run the synthetic turn");
@@ -140,6 +210,97 @@ test("the turn process can be folded away while the turn is still streaming", as
   await expect(livePulse(page)).toHaveCount(1);
   await process.click();
   await expect(process).toHaveAttribute("aria-expanded", "true");
+});
+
+test("a failed initial active-turn probe recovers while the event channel stays connected", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setActiveTurn({ turnId: "probe-recovery", busyReason: "turn", locallyOwned: false });
+    window.__fixture.delayNext("getActiveTurn", { id: "A" });
+  });
+  await openApp(page, "#session=A");
+  await expect(page.getByText("History A synthetic", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "watchEvents"))).toBe(true);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(() => window.__fixture.dropRequest("getActiveTurn", { id: "A" }));
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "resumeSession" && request.body.id === "A"))).toBe(true);
+  await emitAgentMessage(page, "A", { msg_id: "probe-recovered-answer", msg_content: "Recovered without a reconnect or navigation." });
+  await expect(page.getByText("Recovered without a reconnect or navigation.")).toBeVisible();
+  expect(await page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "watchEvents").length)).toBe(1);
+});
+
+test("cached user mutation controls wait until generation has ended", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{ msgId: "editable-user", role: "user", msgContent: "Previously completed input", actions: { rewind: true, edit: true } }],
+  }));
+  await openApp(page, "#session=A");
+  const user = page.locator('[data-webui-message-role="user"]').filter({ hasText: "Previously completed input" });
+  await expect(user.getByRole("button", { name: "编辑", exact: true })).toBeVisible();
+  await startTurn(page, "A", "Continue this conversation");
+  await expect(user.getByRole("button", { name: "编辑", exact: true })).toHaveCount(0);
+  await expect(user.getByRole("button", { name: "回退", exact: true })).toHaveCount(0);
+  await emitStream(page, "A", { dataJson: "[DONE]" });
+  await expect(user.getByRole("button", { name: "编辑", exact: true })).toBeVisible();
+  await expect(user.getByRole("button", { name: "回退", exact: true })).toBeVisible();
+});
+
+test("reload discards unconfirmed local queue intent without resubmitting", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__fixture.setResponse("listQueueMessages", { items: [{ itemId: "discard-on-reload", sessionId: "A", status: "queued", content: "Local input may be discarded" }] });
+    window.__fixture.delayNext("steerQueueItem", { id: "A" });
+  });
+  await openApp(page, "#session=A");
+  await page.getByRole("button", { name: "立即发送" }).click();
+  await expect(page.locator('[data-webui-pending-queue-item="discard-on-reload"]')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("History A synthetic", { exact: true })).toBeVisible();
+  await expect(page.locator("[data-webui-pending-queue-item]")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "steerQueueItem").length)).toBe(0);
+});
+
+test("an open editor retains its draft but cannot submit during generation", async ({ page }) => {
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{ msgId: "editable-user", role: "user", msgContent: "Previously completed input", actions: { rewind: true, edit: true } }],
+  }));
+  await openApp(page, "#session=A");
+  await page.getByTestId("user-message-edit-button").click();
+  const editor = page.getByTestId("user-message-inline-editor");
+  await editor.getByRole("textbox").fill("Keep this edit draft");
+  await page.getByPlaceholder("输入消息…（输入 / 唤起命令）").fill("A concurrent turn");
+  await page.locator("[data-webui-composer-submit]").click();
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "sendMessage"))).toBe(true);
+  await expect(editor.getByRole("button", { name: "发送", exact: true })).toBeDisabled();
+  await expect(editor.getByRole("button", { name: "取消", exact: true })).toBeEnabled();
+  await expect(editor.getByRole("textbox")).toHaveValue("Keep this edit draft");
+  await page.screenshot({ path: test.info().outputPath("editor-during-generation.png"), animations: "disabled" });
+  await emitStream(page, "A", { dataJson: "[DONE]" });
+  await expect(editor.getByRole("button", { name: "发送", exact: true })).toBeEnabled();
+  await expect(editor.getByRole("textbox")).toHaveValue("Keep this edit draft");
+});
+
+test("an open rewind preview cannot confirm a concurrently started turn", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("webui-theme", "dark"));
+  await configureFixture(page, () => {
+    window.__fixture.setPage("A", {
+      messages: [{ msgId: "editable-user", role: "user", msgContent: "Previously completed input", actions: { rewind: true, edit: true } }],
+    });
+    window.__fixture.setResponse("getSessionRewindPreview", { sessionId: "A", userMessageId: "editable-user", turns: [] });
+  });
+  await openApp(page, "#session=A");
+  await page.getByTestId("user-message-rewind-button").click();
+  const dialog = page.getByTestId("rewind-preview-dialog");
+  await expect(dialog.getByTestId("rewind-confirm-only")).toBeEnabled();
+  await page.evaluate(() => {
+    window.__fixture.setActiveTurn({ turnId: "concurrent", busyReason: "turn", locallyOwned: false });
+    window.__fixture.emitEvent({ type: "session.start", payload: { sessionId: "A", turnId: "concurrent" }, timestamp: Date.now(), source: "synthetic" });
+  });
+  await expect(dialog.getByTestId("rewind-confirm-only")).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "取消", exact: true })).toBeEnabled();
+  await page.screenshot({ path: test.info().outputPath("rewind-during-generation.png"), animations: "disabled" });
+  await page.evaluate(() => window.__fixture.setActiveTurn(undefined));
+  await emitStream(page, "A", { dataJson: "[DONE]" });
+  await expect(dialog.getByTestId("rewind-confirm-only")).toBeEnabled();
+  await dialog.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 test("a server-initiated turn attaches a stream instead of hanging on 思考中", async ({ page }) => {

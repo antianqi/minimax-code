@@ -15,6 +15,7 @@ import { createWebuiSessionWorkflows } from "../../src/client/features/sessions/
 import { createWebuiSessionScopeManager } from "../../src/client/conversation/session-scope.js";
 import { selectWebuiWorkspaceProgress } from "../../src/client/features/workspace/projection/workspace-progress.js";
 import type { WebuiClientSession } from "../../src/client/features/sessions/contracts/session-view.js";
+import type { WebuiSessionLookupResult } from "../../src/shared/contracts/session.js";
 import { selectWebuiSessionAgentName, selectWebuiSessionLookups } from "../../src/client/features/sessions/projection/session-lookups.js";
 
 /**
@@ -275,6 +276,73 @@ describe("session workflows", () => {
 });
 
 describe("session lookup projection", () => {
+  it("coalesces a direct session lookup without changing query pages or navigation", async () => {
+    const store = createWebuiSessionStore();
+    let finish!: (value: WebuiSessionLookupResult) => void;
+    let calls = 0;
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      getSession: () => { calls += 1; return new Promise((resolve) => { finish = resolve; }); },
+    } as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const first = workflows.acquireSession("direct");
+    expect(workflows.acquireSession("direct")).toBe(first);
+    store.select("another");
+    finish({ session: { ...session({ sessionId: "direct", workspaceDir: "/direct" }) } });
+    await first;
+    expect(calls).toBe(1);
+    expect(store.getSnapshot().catalog.entities.get("direct")?.workspaceDir).toBe("/direct");
+    expect(store.getSnapshot().catalog.flat.ids).toEqual([]);
+    expect(store.getSelectedSessionId()).toBe("another");
+    workflows.dispose();
+  });
+
+  it.each(["delete", "dispose"])("fences direct metadata after %s", async (mode) => {
+    const store = createWebuiSessionStore();
+    let finish!: (value: WebuiSessionLookupResult) => void;
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      getSession: () => new Promise((resolve) => { finish = resolve; }),
+      deleteSession: async () => ({ success: true }),
+    } as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    const reading = workflows.acquireSession("direct");
+    if (mode === "delete") await workflows.remove("direct");
+    else workflows.dispose();
+    finish({ session: { ...session({ sessionId: "direct" }) } });
+    await reading;
+    expect(store.getSnapshot().catalog.entities.has("direct")).toBe(false);
+    workflows.dispose();
+  });
+
+  it("rejects mismatched direct metadata without fabricating a catalogue entity", async () => {
+    const store = createWebuiSessionStore();
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      getSession: async () => ({ session: { ...session({ sessionId: "wrong" }) } }),
+    } as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    await expect(workflows.acquireSession("direct")).rejects.toThrow("incomplete or mismatched identity metadata");
+    expect(store.getSnapshot().catalog.entities.size).toBe(0);
+    workflows.dispose();
+  });
+
+  it("reloads the catalogue when another client creates an unknown session", async () => {
+    const store = createWebuiSessionStore();
+    let reads = 0;
+    const added = session({ sessionId: "external-new" });
+    const workflows = createWebuiSessionWorkflows({ store, composer: purger(), port: {
+      loadSessions: async () => { reads += 1; return { sessions: [added], hasMore: false }; },
+    } as unknown as Parameters<typeof createWebuiSessionWorkflows>[0]["port"] });
+    workflows.applyFact({ kind: "created", sessionId: added.sessionId });
+    await expect.poll(() => reads).toBe(1);
+    expect(store.getSnapshot().catalog.entities.get(added.sessionId)).toEqual(added);
+    workflows.dispose();
+  });
+
+  it("resolves a tree root absent from the current flat page", () => {
+    const root = session({ sessionId: "tree-only", agentName: "tree-agent", workspaceDir: "/tree-workspace" });
+    const lookups = selectWebuiSessionLookups({ sessions: [], hasMore: true }, {
+      sessions: [{ session: root, childSessions: [] }], hasMore: false,
+    });
+    expect(lookups).toEqual([root]);
+    expect(selectWebuiSessionAgentName(lookups, "tree-only")).toBe("tree-agent");
+  });
+
   it("merges child records once and resolves agent names by target session", () => {
     const flat = { sessions: [session({ sessionId: "root", agentName: "root-agent" })], hasMore: false };
     const tree = { sessions: [{

@@ -22,6 +22,29 @@ import type { WebuiStreamFrame } from "../../src/shared/contracts/stream.js";
 const openStream = () => new Promise<never>(() => undefined);
 
 describe("the conversation turn commands", () => {
+  it("does not settle a newer turn when an earlier stop acknowledgement arrives late", async () => {
+    const store = createWebuiSessionStore();
+    let acknowledge!: (value: { success: boolean }) => void;
+    const commands = createWebuiConversationTurnCommands({
+      store, sessionId: "S", capabilities: {
+        resume: openStream as never,
+        stop: () => new Promise((resolve) => { acknowledge = resolve; }),
+      },
+    });
+    commands.attach("old");
+    const stopping = commands.stop();
+    const old = store.readSession("S").stream.subscription!;
+    store.updateSession("S", (current) => ({ ...current, sending: true, stream: {
+      ...current.stream, phase: "streaming", lastClaimedGeneration: old.generation + 1,
+      subscription: { ...old, generation: old.generation + 1, turnId: "new" },
+    } }));
+    acknowledge({ success: true });
+    await stopping;
+    expect(store.readSession("S").sending).toBe(true);
+    expect(store.readSession("S").stream.phase).toBe("streaming");
+    expect(store.readSession("S").stream.subscription?.turnId).toBe("new");
+    store.dispose();
+  });
   it("claims the session's lease from an attachment without being given a writer or a key", () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
@@ -343,6 +366,23 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
     expect(getActiveTurn).toHaveBeenCalledTimes(1);
   });
 
+  it("recovers the next turn when an event gap leaves the previous recovered lease installed", async () => {
+    const store = createWebuiSessionStore();
+    let active = { ...busy, turnId: "t-old" };
+    const commands = createWebuiConversationTurnCommands({
+      store,
+      sessionId: "s1",
+      capabilities: { resume: openStream as never, activeTurn: (async () => active) as never },
+    });
+    commands.recover();
+    await tick();
+    expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-old");
+    active = { ...busy, turnId: "t-new" };
+    commands.recover();
+    await tick();
+    expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-new");
+  });
+
   it("retargets a lease a session.start no longer matches", async () => {
     const store = createWebuiSessionStore();
     const commands = createWebuiConversationTurnCommands({
@@ -363,6 +403,27 @@ describe("recheck and gap recovery are the command set's, not the view's", () =>
     // The stale lease was released (scoped to its generation) and the live turn
     // attached in its place.
     expect(store.readSession("s1").stream.subscription?.turnId).toBe("t-new");
+  });
+
+  it("does not replace a newer local lease with an older recovery probe answer", async () => {
+    const store = createWebuiSessionStore();
+    let finish!: (value: typeof busy) => void;
+    const commands = createWebuiConversationTurnCommands({
+      store, sessionId: "s1", capabilities: {
+        resume: openStream as never,
+        activeTurn: () => new Promise((resolve) => { finish = resolve; }),
+      },
+    });
+    commands.attach("old");
+    commands.recover();
+    await tick();
+    store.updateSession("s1", (current) => ({ ...current, stream: { ...current.stream,
+      lastClaimedGeneration: 99,
+      subscription: { owner: "local-send", generation: 99, turnId: "new-local" },
+    } }));
+    finish(busy);
+    await tick();
+    expect(store.readSession("s1").stream.subscription).toEqual({ owner: "local-send", generation: 99, turnId: "new-local" });
   });
 });
 

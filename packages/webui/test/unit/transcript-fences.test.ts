@@ -16,10 +16,150 @@ import {
 import { createWebuiTranscriptHistoryOwner } from "../../src/client/conversation/transcript-history.js";
 import { projectWebuiTranscriptMessages } from "../../src/client/features/transcript/projection/transcript-projection.js";
 import type { WebuiClientMessagePage } from "../../src/client/features/transcript/contracts/message-view.js";
+import { createWebuiTranscriptSettlementOwner } from "../../src/client/features/transcript/application/transcript-settlement.js";
+import { projectWebuiTranscriptView } from "../../src/client/features/transcript/projection/transcript-view-model.js";
 
 const page = (...msgIds: string[]): WebuiClientMessagePage => ({
   messages: msgIds.map((msgId) => ({ msgId, role: "user", msgContent: `text-${msgId}` })),
   hasMore: false,
+});
+
+describe("application-owned content synchronization", () => {
+  function fixture() {
+    const store = createWebuiSessionStore();
+    const reads: Array<(page: WebuiClientMessagePage) => void> = [];
+    const timers = new Set<() => void>();
+    const history = createWebuiTranscriptHistoryOwner({
+      transcript: createWebuiTranscriptHistoryWriter(store),
+      loadMessages: () => new Promise((resolve) => reads.push(resolve)),
+    });
+    const owner = createWebuiTranscriptSettlementOwner({
+      store, history,
+      setTimer: (callback) => { timers.add(callback); return () => { timers.delete(callback); }; },
+    });
+    owner.start();
+    const write = (answer: string, phase: "streaming" | "done", id = "reply") => {
+      store.updateSession("S", (current) => ({ ...current, stream: {
+        ...current.stream, phase, messages: [{ id, answer, thinking: "" }],
+      } }));
+    };
+    const view = () => {
+      const { stream, transcript } = store.readSession("S");
+      return projectWebuiTranscriptView({
+        sessionId: "S", visiblePage: transcript.page, streamMessages: stream.messages,
+        retainedMessages: transcript.retainedMessages, streamPhase: stream.phase,
+        messageSource: stream.messageSource,
+        processingStartedAtMs: undefined,
+        loading: transcript.loading, error: transcript.error,
+      });
+    };
+    const flush = async () => { for (let index = 0; index < 12; index += 1) await Promise.resolve(); };
+    const dispose = () => { owner.dispose(); history.dispose(); store.dispose(); };
+    return { store, history, owner, reads, timers, write, view, flush, dispose };
+  }
+
+  it("retains final content without a mounted transcript and across the next turn", async () => {
+    const f = fixture();
+    f.write("AAAA", "done");
+    expect(f.reads).toHaveLength(1);
+    expect(f.view().messages.map((message) => message.msgContent)).toEqual(["AAAA"]);
+    f.reads[0]!({ messages: [{ msgId: "reply", role: "assistant", msgContent: "BBBB" }] });
+    await f.flush();
+    expect(f.view().messages.map((message) => message.msgContent)).toEqual(["AAAA"]);
+    f.write("next reply", "streaming", "next");
+    expect(f.view().messages.map((message) => message.msgContent)).toEqual(["AAAA", "next reply"]);
+    expect(f.store.readSession("S").transcript.synchronization?.phase).toBe("pending");
+    f.dispose();
+    expect(f.timers.size).toBe(0);
+  });
+
+  it("synchronizes a background session without selecting it and hands off confirmed content once", async () => {
+    const f = fixture();
+    f.store.select("other");
+    f.history.selectSession("other");
+    f.write("confirmed", "done");
+    f.reads[0]!({ messages: [{ msgId: "reply", role: "assistant", msgContent: "confirmed" }] });
+    await f.flush();
+    expect(f.store.getSelectedSessionId()).toBe("other");
+    expect(f.store.readSession("S").transcript.retainedMessages).toEqual([]);
+    expect(f.store.readSession("S").transcript.synchronization).toBeUndefined();
+    expect(f.view().messages.map((message) => message.msgId)).toEqual(["reply"]);
+    f.dispose();
+  });
+
+  it("bounds fast retries, preserves content during slow reconciliation, and permits explicit recovery", async () => {
+    const f = fixture();
+    f.write("keep me", "done");
+    for (let index = 0; index < 4; index += 1) {
+      expect(f.reads).toHaveLength(index + 1);
+      f.reads[index]!({ messages: [] });
+      await f.flush();
+      const timer = [...f.timers][0];
+      if (timer && index < 3) { f.timers.delete(timer); timer(); }
+    }
+    expect(f.store.readSession("S").transcript.synchronization?.phase).toBe("failed");
+    expect(f.timers.size).toBe(1);
+    expect(f.view().messages[0]?.msgContent).toBe("keep me");
+    f.owner.retry("S");
+    expect(f.reads).toHaveLength(5);
+    f.reads[4]!({ messages: [{ msgId: "reply", msgContent: "keep me", role: "assistant" }] });
+    await f.flush();
+    expect(f.store.readSession("S").transcript.synchronization).toBeUndefined();
+    f.dispose();
+  });
+
+  it("an accepted history mutation clears retention and rejects the previous synchronization read", async () => {
+    const f = fixture();
+    f.store.select("S");
+    f.history.selectSession("S");
+    f.write("removed", "done");
+    f.owner.invalidate("S");
+    const replacement = f.history.replacePage("S");
+    f.reads[1]!({ messages: [] });
+    await replacement;
+    f.reads[0]!({ messages: [{ msgId: "reply", role: "assistant", msgContent: "removed" }] });
+    await f.flush();
+    expect(f.view().messages).toEqual([]);
+    f.dispose();
+  });
+
+  it("a recovery history seed cannot shorten content already observed on a stream", () => {
+    const f = fixture();
+    f.write("complete observed answer", "streaming");
+    f.store.updateSession("S", (current) => ({ ...current, stream: {
+      ...current.stream, messageSource: "history", messages: [{ id: "reply", answer: "complete", thinking: "" }],
+    } }));
+    expect(f.view().renderGroups[0]?.view?.answers).toEqual(["complete observed answer"]);
+    f.dispose();
+  });
+
+  it("an authoritative overflow replaces history and rejects an older synchronization response", async () => {
+    const f = fixture();
+    f.write("invalidated by overflow", "done");
+    f.store.updateSession("S", (current) => ({ ...current, stream: {
+      ...current.stream, phase: "reconnecting", messageSource: "history", historyReplacement: 1, messages: [],
+    } }));
+    f.history.acceptReplacement("S", { messages: [{ msgId: "authoritative-user", role: "user", msgContent: "Replacement history" }] });
+    f.reads[0]!({ messages: [{ msgId: "reply", role: "assistant", msgContent: "invalidated by overflow" }] });
+    await f.flush();
+    expect(f.view().messages.map((message) => message.msgContent)).toEqual(["Replacement history"]);
+    expect(f.store.readSession("S").transcript.synchronization).toBeUndefined();
+    f.dispose();
+  });
+
+  it("replaces the mutated session after navigation without changing the selected session", async () => {
+    const f = fixture();
+    f.history.seed("S", page("removed"));
+    f.store.select("other");
+    f.history.selectSession("other");
+    const replacement = f.history.replacePage("S");
+    expect(f.reads).toHaveLength(1);
+    f.reads[0]!({ messages: [] });
+    await replacement;
+    expect(f.store.readSession("S").transcript.page.messages).toEqual([]);
+    expect(f.store.getSelectedSessionId()).toBe("other");
+    f.dispose();
+  });
 });
 
 describe("a late page after a session switch is discarded", () => {

@@ -94,6 +94,7 @@ import {
   GET_SESSION_FORK_OPTIONS_OPERATION_NAME,
   GET_SESSION_REWIND_PREVIEW_OPERATION_NAME,
   GET_SESSION_TREE_OPERATION_NAME,
+  GET_SESSION_OPERATION_NAME,
   GET_SESSION_USAGE_OPERATION_NAME,
   GET_SIGNIN_PANEL_OPERATION_NAME,
   GET_TURN_DIFF_OPERATION_NAME,
@@ -207,7 +208,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
    * implementation boundary; the `WebuiTransport` capability contract
    * consumed by components keeps its optional semantics. */
   const {
-    request,
+    request: wireRequest,
     stream,
     watchTerminal,
     watchFrames,
@@ -223,6 +224,10 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     miniappStandaloneUrl,
     watchEvents,
   } = createWebuiWire(options);
+  // Bootstrap queries share the idle-bounded unary connection. Opening each
+  // one separately can delay the reply subscription behind queued handshakes.
+  const request: typeof wireRequest = (operation, body, requestOptions) =>
+    wireRequest(operation, body, requestOptions ?? { reuseConnection: true });
 
   return {
     version: () => request(VERSION_OPERATION_NAME, undefined),
@@ -234,6 +239,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
         limit: 500,
         ...(cursor ? { cursor } : {}),
       }),
+    getSession: (body) => request(GET_SESSION_OPERATION_NAME, body),
     loadSessionTree: (cursor) =>
       request(GET_SESSION_TREE_OPERATION_NAME, {
         name: "main",

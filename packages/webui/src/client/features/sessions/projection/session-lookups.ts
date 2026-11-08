@@ -11,7 +11,7 @@ export function selectWebuiSessionLookups(
   const seen = new Set(flat.sessions.map((session) => session.sessionId));
   const result = [...flat.sessions];
   for (const node of tree.sessions) {
-    for (const child of node.childSessions) {
+    for (const child of [node.session, ...node.childSessions]) {
       if (seen.has(child.sessionId)) continue;
       seen.add(child.sessionId);
       result.push(child);

@@ -91,6 +91,9 @@ observer during teardown even while its delivery promise remains pending; closin
 the host turn. Rail observation uses unfiltered known session identities, including tree children,
 so search/disclosure changes do not manufacture fresh probes. Foreground inspection resumes once;
 the event channel's activity repair does not restart it.
+When the inspected session has no delivery lease, its foreground freshness read also retries
+active-turn recovery. A failed cold-start probe therefore does not require a process-channel
+reconnect or another navigation to discover a running turn. An existing delivery keeps its lease.
 
 **Delivery detach is not execution abort.** Hiding or closing a view, or closing the browser
 connection, ends that client's observation — it does not stop the harness's turn. Only an explicit
@@ -98,11 +101,78 @@ stop calls `abortSession`, and only an unstarted queued item is removable from t
 
 ## Reconciling delivery state
 
-The client currently reconciles its own turn/stream state. The 2026-10-16 comparison in
+The application reconciles turn delivery and transcript content separately:
+
+| Fact | Owner | Consumers |
+| --- | --- | --- |
+| Submission admission and execution activity | Turn commands and runtime lifecycle events | Composer send/queue/stop controls |
+| Immediate queue-send intent and outcome | `features/composer/application/queue-send-workflow.ts` | Transcript pending input and composer queue controls |
+| Delivery attachment and stale-frame rejection | Turn's stream sink and generation lease | The session stream projection |
+| Observed content awaiting persistence | `features/transcript/application/transcript-settlement.ts` | The transcript's retained-message slice |
+| History pages, request freshness and pagination | `conversation/transcript-history.ts` | Transcript, context inspection and settlement |
+| Final message groups and activity placement | `features/transcript/projection/transcript-view-model.ts` | `SessionTranscript` and `MessageItem` |
+
+The settlement owner starts with the application, survives view navigation and ends before
+delivery teardown. It preserves observed content across completed turns while keyed history reads
+catch up. History evidence must cover the actual ordered text and asset identities; matching text
+length or file count is insufficient. Fast retries back off to slow reconciliation with an explicit
+recoverable synchronization state. Retrying synchronization never sends another Agent message.
+Background synchronization does not select that session. Accepted edit/rewind invalidates retained
+content and the previous stream generation; authoritative overflow replacement is distinct from an
+ordinary history seed. History seeds must not overwrite richer observed content.
+Committed `message.rewind` context-reset events enter this same replacement path, so a mutation
+from another client invalidates the observed content and rereads that session without selecting it.
+
+An immediate queue send presents its captured input before awaiting admission. Pending, accepted,
+failed and unknown are distinct; admission alone does not mean the runtime has produced the user
+message or begun another model call. The workflow preserves the host's atomic steering semantics.
+Only the exact `source_message_id` / `sourceMessageId` queue identity in a live or durable user
+message confirms its appearance. Equal text is not identity. Confirmation retains the pending
+bubble's render key and removes its local status. Definitive refusal offers retry; an unknown
+outcome retains input and offers a history recheck without automatically resending it.
+An accepted context rewind changes unconfirmed pending/admitted input to an unknown outcome;
+a late admission acknowledgement cannot restore the promise that it is waiting for processing.
+The browser retains the input and offers a read-only history recheck. It does not manufacture a
+paused runtime queue or automatically resubmit input. The current runtime does not return a
+paused queue after another client rewinds a turn whose admitted steering input has not reached
+the next model request (the runtime can already have emitted its canonical user message);
+restoring that input to a paused queue is a recorded runtime gap outside this WebUI-only repair.
+Local intent records survive session navigation. A full page reload discards unconfirmed local
+input; preserving or recovering that input is intentionally outside the supported behavior.
+Edit/rewind controls remain available only after generation has ended.
+Cached historical action flags are masked while a turn is live. An already-open editor retains
+its draft but cannot submit; an open rewind preview cannot confirm and can still be canceled.
+Application mutation commands enforce the same restriction before issuing a runtime write.
+
+Session selection starts active-turn recovery directly, independently of view effects and process
+event-channel readiness. A recovery read that names a different active turn replaces only the
+captured recovered lease; a newer lease or an outstanding local send remains protected.
+Ordinary unary requests reuse the wire's existing idle-bounded connection, with separate request
+identities and deadlines and no automatic replay. Stream subscriptions remain independent. This
+prevents parallel bootstrap handshakes from delaying the history anchor and reply subscription.
+
+Runtime terminal facts use the same turn-identity predicate for rail activity and transcript
+execution. Stop acknowledgements are fenced by the generation captured at invocation, so a late
+acknowledgement cannot settle a newer turn. Execution activity, delivery completion and persistence
+confirmation remain separate facts.
+
+The selected session's metadata is read from the catalogue entity map, independently of the flat
+and tree pages' membership. Selection acquires missing metadata through the existing `getSession`
+operation; concurrent same-identity reads coalesce, and navigation does not redirect their result.
+Deleted sessions and disposed owners reject late metadata. This keeps workspace media and agent
+identity available for deep links, paginated-out sessions and a missed external-creation event.
+
+React session readers subscribe to immutable session/slice selections. Unrelated session, catalogue
+or selection changes do not notify a stream-only reader. The transcript projection merges content,
+groups it and returns final render views; components do not reconstruct assistant groups or schedule
+settlement reads. Unchanged message/group views retain object identity, allowing constant-time
+identity checks at `MessageItem` instead of recursive comparisons of reply bodies.
+
+The 2026-10-16 comparison in
 [`../adr/observation-architecture.md`](../adr/observation-architecture.md) rejected a
 snapshot-plus-deltas prototype that depended on capabilities absent from the host/wire tested then.
-[ADR 0032](../adr/0032-responsive-session-observation-and-execution-lifecycle.md) accepts a new,
-not-yet-implemented lifecycle design using current harness evidence. Its application-owned
+[ADR 0032](../adr/0032-responsive-session-observation-and-execution-lifecycle.md) accepts a broader
+lifecycle design whose remaining targets require their own implementation and acceptance. Its application-owned
 coordination preserves these ownership and temporal fences; the historical comparison does not
 establish today's capability inventory.
 

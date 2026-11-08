@@ -24,6 +24,24 @@ describe("session stream recovery status", () => {
 });
 
 describe("WebUI mixed stream reducer", () => {
+  it("retains an exact queue source identity even when the user text is unchanged", () => {
+    const data = { msg_id: "msg-user-source", msg_content: "same text" };
+    const first = reduceWebuiStreamFrame(initialWebuiStreamState, frame(JSON.stringify({ type: "agent_message", agent_message: data })));
+    const matched = reduceWebuiStreamFrame(first, frame(JSON.stringify({ type: "agent_message", agent_message: { ...data, source_message_id: "queue-exact" } })));
+    expect(matched.messages[0]).toMatchObject({ role: "user", sourceMessageId: "queue-exact", answer: "same text" });
+  });
+
+  it("accepts final media parts and context even when reply prose has not changed", () => {
+    const first = reduceWebuiStreamFrame(initialWebuiStreamState, frame(JSON.stringify({
+      type: "agent_message", agent_message: { msg_id: "m-final", msg_content: "Done" },
+    })));
+    const parts = [{ type: "asset_list", assets: [{ src: "/synthetic/a.svg", name: "a.svg" }] }];
+    const final = reduceWebuiStreamFrame(first, frame(JSON.stringify({
+      type: "agent_message", agent_message: { msg_id: "m-final", msg_content: "Done", parts, context_usage: { usedTokens: 42 } },
+    })));
+    expect(final.messages[0]?.parts).toEqual(parts);
+    expect(final.messages[0]?.contextUsage).toEqual({ usedTokens: 42 });
+  });
   it("retains Desktop ordered activity parts from the live wire envelope", () => {
     const state = reduceWebuiStreamFrame(initialWebuiStreamState, frame(JSON.stringify({
       type: "agent_message",

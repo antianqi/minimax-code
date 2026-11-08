@@ -437,10 +437,10 @@ export function WebuiClientFoundationApp(
   // into — is the assembly's own mapping, so the shell asks for the selection
   // and holds no sentinel. The subscription is the application's, which is the
   // same store subscription the shell used to take directly.
-  const selectedStream = useSyncExternalStore(
+  const selectedProgress = useSyncExternalStore(
     application.subscribe,
-    () => application.reads.stream(selectedSessionId),
-    () => application.reads.stream(selectedSessionId),
+    () => application.reads.stream(selectedSessionId).workspaceProgress,
+    () => application.reads.stream(selectedSessionId).workspaceProgress,
   );
   // The workspace-progress backfill, derived rather than fetched.
   //
@@ -474,7 +474,7 @@ export function WebuiClientFoundationApp(
     () => selectWebuiSessionLookups(page, treePage),
     [page, treePage],
   );
-  const selectedAgentName = selectWebuiSessionAgentName(flatSessionsWithChildren, selectedSessionId);
+  const selectedAgentName = (selectedSessionId ? catalog.entities.get(selectedSessionId)?.agentName : undefined) ?? selectWebuiSessionAgentName(flatSessionsWithChildren, selectedSessionId);
   useEffect(() => {
     if (!sessionWorkflows.canLoadFlat || sessionPage) return;
     void sessionWorkflows.loadFlat();
@@ -513,9 +513,9 @@ export function WebuiClientFoundationApp(
       selectWebuiWorkspaceProgress({
         history: historyProgress,
         treeSubagents,
-        live: selectedStream.workspaceProgress,
+        live: selectedProgress,
       }),
-    [historyProgress, treeSubagents, selectedStream.workspaceProgress],
+    [historyProgress, treeSubagents, selectedProgress],
   );
   const progressTodos: readonly WebuiTodo[] = progress.todos;
   const progressSubagents: readonly WebuiWorkspaceSubagent[] = progress.subagents;
@@ -553,9 +553,7 @@ export function WebuiClientFoundationApp(
       testId: "conversation-usage-toast",
     });
   }, [fiveHourUsageNoticeKey, showToast]);
-  const selectedSession = flatSessionsWithChildren.find(
-    (session) => session.sessionId === selectedSessionId,
-  );
+  const selectedSession = selectedSessionId ? catalog.entities.get(selectedSessionId) : undefined;
   const {
     newTaskWorkspaceDir,
     workspaceMenuOpen,

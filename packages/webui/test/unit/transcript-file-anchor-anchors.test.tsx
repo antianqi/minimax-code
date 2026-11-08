@@ -208,6 +208,35 @@ describe("media file links", () => {
     expect(html).not.toContain("data-webui-file-media");
   });
 
+  it("renders a workspace Markdown image through the same media reader", () => {
+    const html = renderServed("![A chart](out/chart.png)");
+    expect(html).toContain('data-webui-file-media="image"');
+    expect(html).toContain(`<img src="${build("out/chart.png")}"`);
+  });
+
+  it("recognizes a bare media filename without turning prose identifiers into files", () => {
+    expect(renderServed("`flower.svg`")).toContain('data-webui-file-media="image"');
+    expect(renderServed("`song.mp3`")).toContain('data-webui-file-media="audio"');
+    expect(renderServed("`schema.table_name`")).not.toContain("data-webui-file-media");
+  });
+
+  it("never requests remote or outside-workspace image bytes", () => {
+    expect(renderServed("![Remote](https://example.invalid/picture.png)")).not.toContain("<img");
+    expect(renderServed("![Outside](../picture.png)")).not.toContain("<img");
+    expect(renderServed("![Unsafe](javascript:alert(1))")).not.toContain("<img");
+  });
+
+  it("renders music as an inline player and recognizes supported audio extensions", () => {
+    for (const extension of ["mp3", "wav", "ogg", "m4a", "aac", "flac"]) {
+      expect(webuiInlineMediaKind(`out/song.${extension}`)).toBe("audio");
+    }
+    const html = renderServed("[Music](out/song.wav)");
+    expect(html).toContain('data-webui-file-media="audio"');
+    expect(html).toContain(`<audio src="${build("out/song.wav")}"`);
+    expect(html).toContain("controls");
+    expect(html).not.toContain("autoplay");
+  });
+
   it("keeps the link and draws nothing when the reader cannot serve bytes", () => {
     const html = render("See `out/chart.png`.", () => undefined);
     expect(html).toContain('data-webui-file-reference="out/chart.png"');

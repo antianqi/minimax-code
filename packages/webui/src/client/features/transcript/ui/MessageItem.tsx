@@ -7,8 +7,8 @@
 // are accessed via narrow on `view.source`. The runtime contract is
 // view-only.
 //
-// The shell still decides which source owns the turn (history after done,
-// composer while active), but the DOM for either role is produced here.
+// The application retains content and the transcript projector supplies the
+// final historical/live view; this component renders that view.
 
 import { memo, useCallback, useRef, useState, type ReactElement } from "react";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
@@ -44,6 +44,7 @@ import { WebuiDialog, WebuiDialogActions } from "../../../ui/dialog.js";
 import { WebuiField, WebuiTextarea, WebuiTextInput, useWebuiFormValidation } from "../../../ui/field.js";
 import { WebuiInline, WebuiStack } from "../../../ui/layout-primitives.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
+import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 
 /**
  * The single message renderer shared by persisted history and the live turn.
@@ -52,8 +53,7 @@ import { useWebuiToastError } from "../../../ui/toast.js";
  * The single remaining non-view prop is `wallClockDurationMs` — it is
  * group-level (sum-of-frame span across the assistant group), not a
  * per-message fact. Neither adapter can produce it; `SessionTranscript`
- * computes it on the group and passes it here. Documented in
- * `transcript-shape.ts:170-180`.
+ * reads it from the final group projection and passes it here.
  */
 interface MessageItemProps {
   readonly view: WebuiTurnView;
@@ -64,27 +64,13 @@ interface MessageItemProps {
   readonly transcriptCommands?: WebuiTranscriptCommands;
 }
 
-function sameRenderValue(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true;
-  if (Array.isArray(left) && Array.isArray(right))
-    return left.length === right.length && left.every((value, index) => sameRenderValue(value, right[index]));
-  if (left && right && typeof left === "object" && typeof right === "object") {
-    const leftRecord = left as Record<string, unknown>;
-    const rightRecord = right as Record<string, unknown>;
-    const keys = Object.keys(leftRecord);
-    return keys.length === Object.keys(rightRecord).length &&
-      keys.every((key) => sameRenderValue(leftRecord[key], rightRecord[key]));
-  }
-  return false;
-}
-
 function areMessageItemPropsEqual(previous: MessageItemProps, next: MessageItemProps): boolean {
   return previous.wallClockDurationMs === next.wallClockDurationMs &&
     previous.workspaceDir === next.workspaceDir &&
     previous.onOpenFile === next.onOpenFile &&
     previous.onOpenTurnReview === next.onOpenTurnReview &&
     previous.transcriptCommands === next.transcriptCommands &&
-    sameRenderValue(previous.view, next.view);
+    previous.view === next.view;
 }
 
 function MessageItemView({
@@ -169,7 +155,7 @@ function MessageItemView({
       .finally(() => setRewindLoading(false));
   };
   const confirmRewind = (rewindTurnDiff: boolean) => {
-    if (!sessionId || !transcriptCommands.rewindSession) return;
+    if (!sessionId || !transcriptCommands.rewindSession || !actions?.rewind) return;
     setMutationBusy(true);
     void transcriptCommands.rewindSession(buildWebuiRewindRequest(sessionId, messageId, webuiClientRequestId("rewind"), rewindTurnDiff))
       .then(() => { setRewindOpen(false); })
@@ -177,7 +163,7 @@ function MessageItemView({
       .finally(() => setMutationBusy(false));
   };
   const submitEdit = () => {
-    if (!sessionId || !transcriptCommands.editSessionMessage) return;
+    if (!sessionId || !transcriptCommands.editSessionMessage || !(actions?.edit ?? actions?.rewind)) return;
     if (!validateRequired([{ name: "text", label: "消息内容", value: editText }])) return;
     const request = buildWebuiEditRequest(sessionId, messageId, webuiClientRequestId("edit"), editText);
     if (!request) return;
@@ -253,6 +239,8 @@ function MessageItemView({
         data-webui-stream-message={streamMessageId}
         data-webui-message-root={messageRootId ?? messageId}
         data-webui-message-role="user"
+        data-webui-pending-queue-item={view.queueSend?.itemId}
+        data-webui-queue-send-phase={view.queueSend?.phase}
         data-testid="message-item"
         data-role="user"
         data-message-id={messageId}
@@ -264,7 +252,7 @@ function MessageItemView({
             {editing ? (
               <WebuiStack gap="medium" className="webui-user-inline-editor" data-testid="user-message-inline-editor">
                 <WebuiField label="消息内容" required error={editErrors.text} control={(props) => <WebuiTextarea {...props} className="webui-user-inline-editor-control" value={editText} placeholder="编辑消息内容" onChange={(event) => { setEditText(event.target.value); clearFieldError("text"); }} autoFocus />} />
-                <div className="webui-inline-editor-actions"><WebuiButton variant="secondary" onClick={() => { validateRequired([]); setEditing(false); }} disabled={mutationBusy}>取消</WebuiButton><WebuiButton variant="primary" onClick={submitEdit} disabled={mutationBusy}>发送</WebuiButton></div>
+                <div className="webui-inline-editor-actions"><WebuiButton variant="secondary" onClick={() => { validateRequired([]); setEditing(false); }} disabled={mutationBusy}>取消</WebuiButton><WebuiButton variant="primary" onClick={submitEdit} disabled={mutationBusy || !(actions?.edit ?? actions?.rewind)}>发送</WebuiButton></div>
               </WebuiStack>
             ) : <div
               className="webui-user-bubble rounded-[16px] px-3 py-2 max-w-[80%]"
@@ -286,8 +274,17 @@ function MessageItemView({
                 </p>
               </div>
             </div>}
-            {!editing ? <WebuiMessageActions {...actionProps} /> : null}
-            <WebuiRewindDialog open={rewindOpen} messageId={messageId} preview={rewindPreview} loading={rewindLoading} error={mutationError} busy={mutationBusy} onClose={() => setRewindOpen(false)} onConfirm={confirmRewind} />
+            {view.queueSend ? (
+              <WebuiStack gap="small" align="end">
+                <FeedbackLiveRegion className="text-text_default_secondary text-size_12">
+                  {view.queueSend.phase === "pending" ? "正在立即发送" : view.queueSend.phase === "accepted" ? "已受理，等待处理" : view.queueSend.phase === "failed" ? "立即发送失败" : "发送结果待确认"}
+                  {view.queueSend.error ? `：${view.queueSend.error}` : ""}
+                </FeedbackLiveRegion>
+                {view.queueSend.phase === "failed" && sessionId && transcriptCommands.retryQueueSend ? <WebuiButton variant="secondary" onClick={() => transcriptCommands.retryQueueSend!(sessionId, view.queueSend!.itemId)}>重试发送</WebuiButton> : null}
+                {view.queueSend.phase === "unknown" && sessionId && transcriptCommands.recheckQueueSend ? <WebuiButton variant="secondary" onClick={() => transcriptCommands.recheckQueueSend!(sessionId)}>重新核对</WebuiButton> : null}
+              </WebuiStack>
+            ) : !editing ? <WebuiMessageActions {...actionProps} /> : null}
+            <WebuiRewindDialog open={rewindOpen} messageId={messageId} preview={rewindPreview} loading={rewindLoading} error={mutationError} busy={mutationBusy} mutationBlocked={!actions?.rewind} onClose={() => setRewindOpen(false)} onConfirm={confirmRewind} />
           </WebuiStack>
         </WebuiInline>
       </div>

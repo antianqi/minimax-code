@@ -21,6 +21,7 @@ import type {
 import type { WebuiSessionScopeManager } from "../../../conversation/session-scope.js";
 import type {
   WebuiClientProject,
+  WebuiClientSession,
   WebuiClientSessionPage,
 } from "../contracts/session-view.js";
 import type { WebuiSessionListItem } from "../../../../shared/contracts/session.js";
@@ -80,7 +81,7 @@ export type WebuiSessionExporter = (sessionId: string) => void;
 
 type QueryPort = Pick<
   SessionPort,
-  "loadSessions" | "loadSessionTree" | "loadProjects" | "listArchivedSessions"
+  "loadSessions" | "loadSessionTree" | "loadProjects" | "listArchivedSessions" | "getSession"
 >;
 type MutationPort = Pick<
   SessionPort,
@@ -286,6 +287,8 @@ export interface WebuiSessionWorkflows {
   /** Load the first flat page. Resolves when the commit lands. */
   readonly loadFlat: () => Promise<void>;
   readonly loadTree: () => Promise<void>;
+  /** Acquire a directly opened session without changing either catalogue page. */
+  readonly acquireSession: (sessionId: string) => Promise<void>;
   /** Reload both queries in parallel — the post-mutation refresh. */
   readonly refresh: () => Promise<void>;
   /** Append the next flat page. */
@@ -304,9 +307,9 @@ export interface WebuiSessionWorkflows {
    * The same catalogue patch a local action would make, reached from the wire
    * instead: the rail has to agree with every other window about who exists and
    * what they are named, without the user reloading. A fact about a session this
-   * client does not know is ignored rather than inserted — a `created` event from
-   * another client means the row belongs in the next page of the catalogue, and
-   * synthesizing one here would invent a session record this client never read.
+   * client does not know is ignored rather than inserted, except that a creation
+   * triggers an authoritative reload. A directly opened session can also be
+   * acquired by identity without changing either catalogue query's membership.
    */
   readonly applyFact: (fact: WebuiSessionLifecycleFact) => void;
   readonly archive: (sessionId: string) => Promise<void>;
@@ -469,6 +472,7 @@ export function createWebuiSessionWorkflows(deps: {
   // `loadTree`. Session ids are never reused, so the set only grows with the
   // number of deletions.
   const removedSessionIds = new Set<string>();
+  const sessionReads = new Map<string, Promise<void>>();
 
   /**
    * Unsent input retained from sessions somebody else deleted.
@@ -617,6 +621,26 @@ export function createWebuiSessionWorkflows(deps: {
     commitCatalog((current) => reduceWebuiCatalogFlatLoaded(current, page));
   };
 
+  const acquireSession = (sessionId: string): Promise<void> => {
+    if (disposed || removedSessionIds.has(sessionId) || store.getSnapshot().catalog.entities.has(sessionId) || !port.getSession)
+      return Promise.resolve();
+    const pending = sessionReads.get(sessionId);
+    if (pending) return pending;
+    const read = port.getSession({ id: sessionId }).then(({ session }) => {
+      if (disposed || removedSessionIds.has(sessionId) || !session) return;
+      if (session.sessionId !== sessionId || typeof session.agentName !== "string" ||
+          typeof session.createdAt !== "number" || typeof session.updatedAt !== "number")
+        throw new Error("Session lookup returned incomplete or mismatched identity metadata.");
+      const acquired: WebuiClientSession = { ...session, sessionId, agentName: session.agentName,
+        createdAt: session.createdAt, updatedAt: session.updatedAt };
+      commitCatalog((current) => current.entities.has(sessionId) ? current : {
+        ...current, entities: new Map(current.entities).set(sessionId, acquired),
+      });
+    }).finally(() => { if (sessionReads.get(sessionId) === read) sessionReads.delete(sessionId); });
+    sessionReads.set(sessionId, read);
+    return read;
+  };
+
   const loadFlat = async (): Promise<void> => {
     if (!port.loadSessions) return;
     commitCatalog((current) => setWebuiCatalogFlatLoading(current, true));
@@ -671,6 +695,7 @@ export function createWebuiSessionWorkflows(deps: {
     canMutate: port.updateSession !== undefined,
     loadFlat,
     loadTree,
+    acquireSession,
     refresh,
     loadMore,
     setError: (message) => {
@@ -678,6 +703,12 @@ export function createWebuiSessionWorkflows(deps: {
     },
     applyFact: (fact) => {
       if (removedSessionIds.has(fact.sessionId)) return;
+      if (fact.kind === "created") {
+        // A creation normally names an entity this client has never read.
+        // Repair through the authoritative query before applying known-only patches.
+        void loadFlat();
+        return;
+      }
       // A fact about a session this client has not read is not something to
       // invent: the authoritative copy arrives with the next page of the
       // catalogue, and fabricating an entity here would put a record in the rail
@@ -711,15 +742,6 @@ export function createWebuiSessionWorkflows(deps: {
           return;
         case "pinned":
           deps.sessionFactInvalidated?.(fact.sessionId);
-          return;
-        case "created":
-          // Another client or the CLI created something this page can see. The
-          // flat page is the authoritative list, so the row is not synthesised
-          // here — but the fact still has to *cause* the repair rather than wait
-          // for one: a session that exists everywhere else and not here is
-          // exactly the stale catalogue this route exists to prevent. The reload
-          // runs through the same removal fence and request guards as any other.
-          void loadFlat();
           return;
         case "deleted":
           // Confirmed gone by another client. This is the same confirmation a

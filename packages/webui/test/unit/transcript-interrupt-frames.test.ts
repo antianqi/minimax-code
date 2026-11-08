@@ -134,6 +134,7 @@ const interrupt = (
   stopWebuiTurn({
     abortSession: async () => ({ success: true }),
     sessionId: SESSION_ID,
+    isCurrent: () => true,
     setSending: (next) => sending.push(next),
     settleStream: shell.settleStoppedStream,
   });

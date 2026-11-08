@@ -14,11 +14,42 @@
 // first failure ends up with a link and an invisible image.
 
 import { expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 import { configureFixture, emitAgentMessage, emitStream, liveIndicator, openApp, startTurn, test } from "./harness.mjs";
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#e05252"/></svg>';
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC", "base64");
+
+for (const theme of ["light", "dark"]) {
+test(`a different equal-length history reply keeps observed media and offers synchronization recovery (${theme})`, async ({ page }) => {
+  await page.addInitScript((theme) => window.localStorage.setItem("webui-theme", theme), theme);
+  await page.route("**/workspace-file**", (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: SVG }));
+  await openApp(page, "#session=A");
+  await startTurn(page, "A", "Keep the observed file");
+  const observed = 'AAAA<deliver-assets><media src="/synthetic/workspace/flower.svg" name="observed.svg" /></deliver-assets>';
+  await emitAgentMessage(page, "A", { msg_id: "identity-check", msg_content: observed });
+  await expect(deliveredRow(page).getByText("observed.svg")).toBeVisible();
+  await page.evaluate(() => window.__fixture.setPage("A", { messages: [{
+    msgId: "identity-check", role: "assistant", msgContent: 'BBBB<deliver-assets><media src="/synthetic/workspace/other.svg" name="replaced.svg" /></deliver-assets>',
+  }], hasMore: false }));
+  await emitStream(page, "A", { dataJson: "[DONE]" });
+  const recovery = page.locator('[data-webui-transcript-sync="failed"]');
+  await expect(recovery).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("turn-process-trigger")).toHaveAttribute("aria-expanded", "false");
+  await expect(deliveredRow(page).getByText("observed.svg")).toBeVisible();
+  await expect(deliveredRow(page).getByText("replaced.svg")).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("synchronization-recovery.png"), animations: "disabled" });
+  await expect(deliveredRow(page).locator("img")).toBeVisible();
+  await page.evaluate((msgContent) => window.__fixture.setPage("A", { messages: [{
+    msgId: "identity-check", role: "assistant", msgContent,
+  }], hasMore: false }), observed);
+  await recovery.getByRole("button", { name: "重试同步" }).click();
+  await expect(recovery).toHaveCount(0);
+  await expect(deliveredRow(page).getByText("observed.svg")).toHaveCount(1);
+  await expect(deliveredRow(page).locator("img")).toHaveJSProperty("naturalWidth", 40);
+});
+}
 
 /** The transcript row a `<deliver-assets>` block projects into. */
 function deliveredRow(page) {
@@ -62,9 +93,10 @@ test("a delivered picture appears after one failed load, without a reload", asyn
   await expect.poll(() => attempts).toBeGreaterThan(1);
 });
 
-test("a delivered clip draws as a video element", async ({ page }) => {
+test("a delivered clip decodes and plays inside the transcript", async ({ page }) => {
+  const video = await readFile(new URL("./support/composer-mascot-opaque.webm", import.meta.url));
   await page.route("**/workspace-file**", async (route) =>
-    route.fulfill({ status: 200, contentType: "video/mp4", body: "" }),
+    route.fulfill({ status: 200, contentType: "video/webm", body: video }),
   );
 
   await configureFixture(page, () => {
@@ -73,7 +105,7 @@ test("a delivered clip draws as a video element", async ({ page }) => {
         {
           msgId: "m-clip",
           role: "assistant",
-          msgContent: '录好了。\n\n<deliver-assets><media src="/synthetic/workspace/demo.mp4" name="演示" /></deliver-assets>',
+          msgContent: '录好了。\n\n<deliver-assets><media src="/synthetic/workspace/demo.webm" name="演示" /></deliver-assets>',
           timestamp: 1_700_000_000_301,
         },
       ],
@@ -82,7 +114,83 @@ test("a delivered clip draws as a video element", async ({ page }) => {
   });
 
   await openApp(page, "#session=A");
-  await expect(deliveredRow(page).locator('[data-webui-file-media="video"] video[controls]')).toBeAttached();
+  const player = deliveredRow(page).locator('[data-webui-file-media="video"] video[controls]');
+  await expect(player).toBeVisible();
+  await expect.poll(() => player.evaluate((node) => node.videoWidth)).toBeGreaterThan(0);
+  await player.evaluate(async (node) => { node.muted = true; await node.play(); });
+  await expect.poll(() => player.evaluate((node) => node.currentTime)).toBeGreaterThan(0);
+});
+
+test("delivered music decodes inside the transcript without opening a file", async ({ page }) => {
+  const wav = Buffer.alloc(44 + 16_000);
+  wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(8_000, 24); wav.writeUInt32LE(16_000, 28);
+  wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write("data", 36); wav.writeUInt32LE(16_000, 40);
+  await page.route("**/workspace-file**", (route) => route.fulfill({ status: 200, contentType: "audio/wav", body: wav }));
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{ msgId: "music", role: "assistant", msgContent: '<deliver-assets><media src="/synthetic/workspace/song.wav" name="音乐" /></deliver-assets>' }],
+    hasMore: false,
+  }));
+  await openApp(page, "#session=A");
+  await expect(deliveredRow(page).getByText("音乐", { exact: true })).toBeVisible();
+  const player = deliveredRow(page).locator('[data-webui-file-media="audio"] audio[controls]');
+  await expect(player).toBeVisible();
+  await expect.poll(() => player.evaluate((node) => node.duration)).toBe(1);
+  await player.evaluate(async (node) => { node.muted = true; await node.play(); });
+  await expect.poll(() => player.evaluate((node) => node.currentTime)).toBeGreaterThan(0);
+});
+
+test("a Markdown image displays workspace pixels rather than only its alt text", async ({ page }) => {
+  await page.route("**/workspace-file**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{ msgId: "markdown-image", role: "assistant", msgContent: "![PNG picture](flower.png)" }],
+    hasMore: false,
+  }));
+  await openApp(page, "#session=A");
+  const picture = page.locator('[data-webui-file-media="image"] img');
+  await expect(picture).toBeVisible();
+  await expect(picture).toHaveJSProperty("naturalWidth", 1);
+});
+
+test("a bare media filename in inline code displays its workspace image", async ({ page }) => {
+  await page.route("**/workspace-file**", (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: SVG }));
+  await configureFixture(page, () => window.__fixture.setPage("A", {
+    messages: [{ msgId: "inline-image", role: "assistant", msgContent: "See `flower.svg`." }],
+    hasMore: false,
+  }));
+  await openApp(page, "#session=A");
+  const picture = page.locator('[data-webui-file-media="image"] img');
+  await expect(picture).toBeVisible();
+  await expect(picture).toHaveJSProperty("naturalWidth", 40);
+});
+
+test("a session present only in the tree still resolves its media workspace", async ({ page }) => {
+  await page.route("**/workspace-file**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+  await configureFixture(page, () => {
+    window.__fixture.setSessions([]);
+    window.__fixture.setPage("A", { messages: [{ msgId: "tree-image", role: "assistant", msgContent: "[Picture](flower.png)" }], hasMore: false });
+  });
+  await openApp(page, "#session=A");
+  const picture = page.locator('[data-webui-file-media="image"] img');
+  await expect(picture).toBeVisible();
+  await expect(picture).toHaveJSProperty("naturalWidth", 1);
+});
+
+test("a directly opened session outside both catalogue pages acquires its workspace", async ({ page }) => {
+  await page.route("**/workspace-file**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG }));
+  await configureFixture(page, () => {
+    window.__fixture.setSessions([]);
+    window.__fixture.setTree({ sessions: [], hasMore: false });
+    window.__fixture.setResponse("getSession", { session: { sessionId: "A", agentName: "external-agent", createdAt: 1, updatedAt: 1, workspaceDir: "/synthetic/workspace" } });
+    window.__fixture.setPage("A", { messages: [{ msgId: "direct-image", role: "assistant", msgContent: "[Picture](flower.png)" }], hasMore: false });
+  });
+  await openApp(page, "#session=A");
+  const picture = page.locator('[data-webui-file-media="image"] img');
+  await expect(picture).toBeVisible();
+  await expect(picture).toHaveJSProperty("naturalWidth", 1);
+  expect(await page.evaluate(() => window.__fixture.requests.filter((request) => request.operation === "getSession" && request.body.id === "A").length)).toBe(1);
 });
 
 test("a delivered source file stays a plain link", async ({ page }) => {

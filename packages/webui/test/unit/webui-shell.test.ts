@@ -81,7 +81,7 @@ import type {
 } from "../../src/client/features/composer/contracts/composer-turn.js";
 import { createWebuiTurnLifecycleCommands } from "../../src/client/features/turn/application/turn-lifecycle-commands.js";
 import { projectWebuiMessage } from "../../src/client/features/transcript/projection/message-projection.js";
-import { projectLiveTurnView } from "../../src/client/features/transcript/projection/transcript-shape.js";
+import { projectWebuiTranscriptView } from "../../src/client/features/transcript/projection/transcript-view-model.js";
 import { buildWebuiQuestionnaireAnswers } from "../../src/client/features/interactions/projection/questionnaire-state.js";
 import { groupWebuiTranscriptItems } from "../../src/client/features/transcript/projection/transcript-projection.js";
 import type {
@@ -1782,10 +1782,10 @@ describe("WebUI composer send/resume loop", () => {
       toolCalls: legacyHistoryMessage.toolCalls,
     });
 
-    const liveView = projectLiveTurnView(resyncedMessages, {
-      sessionId: "session-resync",
-      streaming: false,
-    });
+    const liveView = projectWebuiTranscriptView({
+      sessionId: "session-resync", visiblePage: {}, streamMessages: resyncedMessages,
+      streamPhase: "waiting", processingStartedAtMs: undefined, loading: false, error: undefined,
+    }).renderGroups.find((entry) => entry.view?.role === "assistant")?.view;
     expect(liveView?.processSegments?.[0]?.activityParts?.map((part) => part.type)).toEqual([
       "thinking", "tool", "text", "cognitive", "delegation", "text",
     ]);
@@ -3783,7 +3783,7 @@ describe("WebUI stream loop · superseded loop fencing", () => {
     // `session.abort`, so the stop button is the only thing that can
     // release the lease.
     const abortSession = vi.fn(async () => ({ success: true }));
-    await stopWebuiTurn({ abortSession, sessionId: "fence-4", setSending, settleStream: () => setStream(settleAbortedStream) });
+    await stopWebuiTurn({ abortSession, sessionId: "fence-4", isCurrent: () => true, setSending, settleStream: () => setStream(settleAbortedStream) });
     expect(abortSession).toHaveBeenCalledWith({ id: "fence-4" });
     expect(setSending).toHaveBeenCalledWith(false);
     expect(state.subscription).toBeUndefined();
@@ -3798,6 +3798,7 @@ describe("WebUI stream loop · superseded loop fencing", () => {
       stopWebuiTurn({
         abortSession: vi.fn(async () => ({ success: false })),
         sessionId: "fence-5",
+        isCurrent: () => true,
         setSending,
         settleStream: setStream,
       }),

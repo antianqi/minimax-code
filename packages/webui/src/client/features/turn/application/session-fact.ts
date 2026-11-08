@@ -72,7 +72,7 @@ export const WEBUI_SESSION_FACTS_NOT_APPLIED = [
   { type: "session.compaction.completed", why: "the settled transcript arrives through the transcript read the turn already refreshes" },
   { type: "session.compaction.failed", why: "the failure reaches the page as the turn's refusal, which is where a user acts on it" },
   { type: "session.llm_retry", why: "a retry is transient turn progress; it changes no session fact a rail or header renders" },
-  { type: "message.rewind", why: "rewinding changes the transcript, whose read the turn owns; the catalogue row is unaffected" },
+  { type: "message.rewind", why: "the event coordinator routes committed context resets to the transcript history replacement; the catalogue row is unaffected" },
   { type: "agent.created", why: "an agent identity is not a session fact; the rail groups by the session's own agent name" },
   { type: "agent.updated", why: "same: the name a session shows is patched by the session's own fact" },
   { type: "rotation.completed", why: "credential rotation is the account owner's concern and invalidates its own reads" },

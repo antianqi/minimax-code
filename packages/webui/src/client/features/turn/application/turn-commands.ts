@@ -18,7 +18,7 @@
 
 import type {WebuiClientMessageEnqueuer} from "../../composer/contracts/command-port.js";
 import type {WebuiClientSessionResumer} from "../contracts/execution-port.js";
-import type { WebuiClientMessageLoader } from "../../transcript/contracts/message-view.js";
+import type { WebuiClientMessageLoader, WebuiClientMessagePage } from "../../transcript/contracts/message-view.js";
 import type { WebuiClientSessionCreator } from "../../sessions/contracts/session-port.js";
 import type { WebuiAttachmentInput } from "../../../../shared/contracts/messages.js";
 import type {
@@ -208,7 +208,7 @@ export interface WebuiRecoverMissedTurnDeps {
   readonly getActiveTurn?: WebuiActiveTurnProbeFn;
   readonly probe?: WebuiActiveTurnProbe;
   readonly readStream: () => WebuiStreamState;
-  /** Settle only the same lease when an authoritative read finds no active turn. */
+  /** Settle only the same lease when an authoritative read finds it stale. */
   readonly settleStaleSubscription: (generation: number) => void;
   readonly attach: (turnId: string | undefined) => void;
 }
@@ -238,6 +238,9 @@ export function recoverMissedWebuiTurn(deps: WebuiRecoverMissedTurnDeps): void {
         if (!active || active.busyReason !== "turn") {
           settleStaleSubscription(probed.generation);
           return;
+        }
+        if (namesWebuiTurn(active) && active.turnId !== probed.turnId) {
+          settleStaleSubscription(probed.generation);
         }
       }
       if (!active || active.busyReason !== "turn") return;
@@ -408,6 +411,7 @@ export function sendWebuiTurn(
  */
 export interface WebuiTurnCommandContext {
   readonly store: WebuiSessionStore;
+  readonly replaceHistory?: (sessionId: string, page: WebuiClientMessagePage) => void;
   readonly sessionId: string | undefined;
   readonly capabilities?: WebuiTurnCapabilitySlice;
   /**
@@ -470,7 +474,7 @@ export function createWebuiConversationTurnCommands(
     sessionId
       ? store.createSessionWriter({ kind: "session", sessionId })
       : store.createSessionWriter({ kind: "home" });
-  const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor());
+  const writerFor = (): WebuiTurnCommandWriter => createWebuiTurnCommands(storeWriterFor(), context.replaceHistory);
 
   /**
    * The published views, bound to a writer of this owner's own. A
@@ -682,9 +686,11 @@ export function createWebuiConversationTurnCommands(
     },
     stop: async () => {
       if (!sessionId || !capabilities?.stop) return;
+      const generation = readStream().lastClaimedGeneration;
       await stopWebuiTurn({
         abortSession: capabilities.stop,
         sessionId,
+        isCurrent: () => readStream().lastClaimedGeneration === generation,
         setSending: lifecycle.setTurnSending,
         settleStream: phase.settleStoppedStream,
       });

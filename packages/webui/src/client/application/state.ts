@@ -23,13 +23,20 @@ import type { WebuiSessionCatalogState } from "../features/sessions/application/
 import { initialWebuiSessionCatalogState } from "../features/sessions/application/session-catalog.public.js";
 import { initialWebuiStreamState } from "../features/turn/projection/stream-state.js";
 import type { WebuiStreamState } from "../features/turn/projection/stream-state.js";
-import type { WebuiClientMessagePage } from "../features/transcript/contracts/message-view.js";
+import type { WebuiStreamMessage } from "../features/turn/contracts/stream-state.js";
+import type { WebuiClientMessagePage, WebuiQueueSend } from "../features/transcript/contracts/message-view.js";
 
 export interface WebuiApplicationTranscriptState {
   readonly generation: number;
   readonly page: WebuiClientMessagePage;
   readonly loading: boolean;
   readonly error?: string;
+  readonly retainedMessages?: readonly WebuiStreamMessage[];
+  readonly queueSends?: readonly WebuiQueueSend[];
+  readonly synchronization?: {
+    readonly phase: "pending" | "failed";
+    readonly error?: string;
+  };
 }
 
 /**

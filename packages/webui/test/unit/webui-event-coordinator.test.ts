@@ -39,6 +39,7 @@ function coordinator() {
       channelReady: () => undefined,
       workspaceGitChanged: () => undefined,
       sessionFact: (fact) => facts.push(fact),
+      transcriptRewound: () => undefined,
     },
   });
   return { store, events, goals, facts };

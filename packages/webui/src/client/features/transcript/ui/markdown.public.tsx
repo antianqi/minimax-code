@@ -75,7 +75,7 @@ function parseDesktopInlineFileReference(value: string, workspaceDir?: string): 
   const name = reference.path.split("/").at(-1)?.toLowerCase() ?? "";
   const extension = name.split(".").at(-1) ?? "";
   const hasExtension = /\.[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(name);
-  return (hasExtension && (reference.path.includes("/") || DESKTOP_FILE_EXTENSIONS.has(extension))) || DESKTOP_EXTENSIONLESS_FILE_NAMES.has(name)
+  return (hasExtension && (reference.path.includes("/") || DESKTOP_FILE_EXTENSIONS.has(extension) || webuiInlineMediaKind(name) !== undefined)) || DESKTOP_EXTENSIONLESS_FILE_NAMES.has(name)
     ? reference
     : undefined;
 }
@@ -196,12 +196,15 @@ export function WebuiWorkspaceFileUrlProvider({ build, children }: { readonly bu
 }
 
 /** The formats a browser paints on its own, so the transcript can show them. */
-const WEBUI_INLINE_MEDIA_KINDS: Readonly<Record<string, "image" | "video">> = {
+type WebuiInlineMediaKind = "image" | "video" | "audio";
+
+const WEBUI_INLINE_MEDIA_KINDS: Readonly<Record<string, WebuiInlineMediaKind>> = {
   png: "image", jpg: "image", jpeg: "image", gif: "image", webp: "image", avif: "image", bmp: "image", ico: "image",
-  svg: "image", mp4: "video", webm: "video", ogv: "video",
+  svg: "image", mp4: "video", webm: "video", ogv: "video", mov: "video",
+  mp3: "audio", wav: "audio", ogg: "audio", m4a: "audio", aac: "audio", flac: "audio",
 };
 
-export function webuiInlineMediaKind(fileName: string): "image" | "video" | undefined {
+export function webuiInlineMediaKind(fileName: string): WebuiInlineMediaKind | undefined {
   const name = fileName.replace(/\\/gu, "/").split("/").at(-1) ?? fileName;
   if (!name.includes(".")) return undefined;
   return WEBUI_INLINE_MEDIA_KINDS[name.split(".").at(-1)?.toLowerCase() ?? ""];
@@ -213,7 +216,7 @@ const MEDIA_LOAD_RETRY_LIMIT = 4;
 /** The delay before retry number `failures`, so a burst does not hammer the route. */
 const MEDIA_LOAD_RETRY_MS = 800;
 
-function WebuiMessageFileMedia({ kind, path }: { readonly kind: "image" | "video"; readonly path: string }): ReactElement | null {
+function WebuiMessageFileMedia({ kind, path }: { readonly kind: WebuiInlineMediaKind; readonly path: string }): ReactElement | null {
   const build = useContext(WebuiWorkspaceFileUrlContext);
   const url = build?.(path) ?? "";
   // A picture mounts as soon as the turn names the file, which can happen
@@ -247,7 +250,9 @@ function WebuiMessageFileMedia({ kind, path }: { readonly kind: "image" | "video
     <span className="webui-message-file-media" data-webui-file-media={kind} data-webui-file-media-attempt={failures}>
       {kind === "video"
         ? <video key={token} src={url} aria-label={name} controls playsInline preload="metadata" onError={retry} />
-        : <img key={token} src={url} alt={name} decoding="async" onError={retry} />}
+        : kind === "audio"
+          ? <audio key={token} src={url} aria-label={name} controls preload="metadata" onError={retry} />
+          : <img key={token} src={url} alt={name} decoding="async" onError={retry} />}
     </span>
   );
 }
@@ -308,6 +313,12 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
       ) : (
         <Fragment key={key}>{inline(token.tokens, onOpenFile, workspaceDir, lexBareText)}</Fragment>
       );
+    }
+    if (token.type === "image") {
+      const reference = parseWebuiMessageFileReference(token.href, workspaceDir);
+      return reference
+        ? <WebuiFileMedia key={key} path={reference.path} />
+        : <Fragment key={key}>{token.text}</Fragment>;
     }
     if (token.type === "webuiFileReference") {
       const file = token as Token & { readonly text: string; readonly href: string };

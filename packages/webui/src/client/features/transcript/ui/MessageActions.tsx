@@ -199,6 +199,7 @@ export function WebuiRewindDialog({
   loading,
   error,
   busy,
+  mutationBlocked = false,
   onClose,
   onConfirm,
 }: {
@@ -208,6 +209,7 @@ export function WebuiRewindDialog({
   readonly loading: boolean;
   readonly error?: string;
   readonly busy: boolean;
+  readonly mutationBlocked?: boolean;
   readonly onClose: () => void;
   readonly onConfirm: (rewindTurnDiff: boolean) => void;
 }): ReactElement {
@@ -222,8 +224,8 @@ export function WebuiRewindDialog({
   return (
     <WebuiDialog id="rewind-dialog" open={open} title="回退" description={files.length > 0 ? `${turns} 轮对话将会回退 · ${files.length} 个文件将被修改。` : `${turns} 轮对话将会回退，不涉及任何文件改动。`} onClose={onClose} dismissOnEscape portalTarget={dom.portalTarget()} testId="rewind-preview-dialog" dataAttributes={{ "data-message-id": messageId }} width="compact" footer={<WebuiDialogActions>
       <WebuiButton variant="secondary" onClick={onClose} disabled={busy}>取消</WebuiButton>
-      <WebuiButton variant="secondary" onClick={() => onConfirm(false)} disabled={busy} data-testid="rewind-confirm-only">仅回退对话</WebuiButton>
-      {files.length > 0 ? <WebuiButton variant="danger" onClick={() => onConfirm(true)} disabled={busy} data-testid="rewind-confirm-with-files">回退对话和文件</WebuiButton> : null}
+      <WebuiButton variant="secondary" onClick={() => onConfirm(false)} disabled={busy || mutationBlocked} data-testid="rewind-confirm-only">仅回退对话</WebuiButton>
+      {files.length > 0 ? <WebuiButton variant="danger" onClick={() => onConfirm(true)} disabled={busy || mutationBlocked} data-testid="rewind-confirm-with-files">回退对话和文件</WebuiButton> : null}
     </WebuiDialogActions>}>
         <section data-testid="rewind-preview-files">
           <h4>受影响的文件改动</h4>

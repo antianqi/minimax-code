@@ -71,12 +71,15 @@ describe("the session state source is single", () => {
 
   it("reads the context-window consumption from the records that own it, and writes it to neither", () => {
     const composer = flat(read("features/composer/ui/WebuiComposer.tsx"));
+    const bindings = flat(read("bindings/use-session-state.ts"));
     // Read: the live turn's own reading, on the stream slice the application
     // store owns...
-    expect(composer).toContain("stream.contextUsage");
+    expect(composer).toContain("useWebuiSessionContextUsage(sessionId)");
+    expect(bindings).toContain("session.stream.contextUsage");
     // ...and the history's reading, on the transcript page the same store
     // owns.
-    expect(composer).toContain("readContextUsageFromPage(transcript.page)");
+    expect(composer).toContain("readContextUsageFromPage(transcriptPage)");
+    expect(bindings).toContain("session.transcript.page");
     // Write: none. A history reading written onto the live turn's record was
     // the record's second, unowned fact: a turn starting again reset it, and a
     // page read that lost its race with a refresh left the ring blank with

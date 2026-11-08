@@ -37,6 +37,7 @@ export interface WebuiWorkspaceProgressState {
 }
 export interface WebuiStreamMessage {
   readonly id: string;
+  readonly sourceMessageId?: string;
   readonly answer: string;
   readonly thinking: string;
   readonly timestamp?: number;
@@ -79,6 +80,15 @@ export interface WebuiStreamMessage {
  */
 export function isTurnLive(phase: WebuiStreamState["phase"] | undefined): boolean {
   return phase === "streaming" || phase === "waiting" || phase === "reconnecting";
+}
+
+/** Attribute lifecycle facts consistently across execution and its read models. */
+export function matchesWebuiTurnIdentity(
+  current: { readonly turnId?: string } | undefined,
+  incomingTurnId: string | undefined,
+): boolean {
+  if (incomingTurnId === undefined || current === undefined) return true;
+  return current.turnId !== undefined && current.turnId === incomingTurnId;
 }
 
 export interface WebuiStreamSubscription {
@@ -127,6 +137,10 @@ export interface WebuiStreamState {
     | "error"
     | "reconnecting";
   readonly messages: readonly WebuiStreamMessage[];
+  /** Distinguish observed frames from a history seed during attachment/recovery. */
+  readonly messageSource?: "stream" | "history";
+  /** An explicit overflow replacement can remove messages from the observed timeline. */
+  readonly historyReplacement?: number;
   readonly runtimeEvents: readonly Record<string, unknown>[];
   readonly actionDeltas: readonly Record<string, unknown>[];
   /** Latest session context snapshot, restored from history and refreshed by live messages. */

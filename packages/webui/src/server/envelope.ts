@@ -6,16 +6,35 @@
 
 import { WEBUI_PROTOCOL_VERSION, type WebuiFrame } from "../shared/envelope.js";
 
+/**
+ * Whether a value names a frame kind this protocol carries.
+ */
+function isWebuiFrameKind(kind: unknown): boolean {
+  return kind === "request" || kind === "response" || kind === "error" || kind === "event";
+}
+
+/**
+ * Whether a candidate carries the request identity every frame must have.
+ *
+ * One rule, stated once, because this module used to hold two: the fast
+ * acceptance below took any string — including the empty one — while the
+ * refusal in `judgeWebuiFrame` rejected an empty `requestId` and said so. The
+ * fast path won, so a frame the judgement calls invalid reached the dispatcher
+ * and was answered as a request nobody could correlate. A frame with no
+ * identity is not a frame; where the refusal is spoken (version, kind or
+ * identity) does not change that.
+ */
+function carriesFrameIdentity(candidate: Record<string, unknown>): boolean {
+  return typeof candidate.requestId === "string" && candidate.requestId.length > 0;
+}
+
 export function isWebuiFrame(value: unknown): value is WebuiFrame {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   return (
     candidate.protocolVersion === WEBUI_PROTOCOL_VERSION &&
-    (candidate.kind === "request" ||
-      candidate.kind === "response" ||
-      candidate.kind === "error" ||
-      candidate.kind === "event") &&
-    typeof candidate.requestId === "string"
+    isWebuiFrameKind(candidate.kind) &&
+    carriesFrameIdentity(candidate)
   );
 }
 
@@ -52,7 +71,7 @@ export function judgeWebuiFrame(value: unknown): WebuiFrameJudgement {
       message: `frame speaks protocol version ${String(candidate.protocolVersion)}, this service speaks ${String(WEBUI_PROTOCOL_VERSION)}`,
     };
   }
-  if (typeof candidate.requestId !== "string" || !candidate.requestId) {
+  if (!carriesFrameIdentity(candidate)) {
     return {
       ok: false,
       code: "invalid_envelope",

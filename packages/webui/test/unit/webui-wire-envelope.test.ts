@@ -5,9 +5,13 @@
 // at all — so the two disagreed about what a given frame was. These cases pin the
 // one shared judgement both ends now use.
 
+import assert from "node:assert/strict";
 import { describe, expect, it } from "vitest";
+import type { WebSocket } from "ws";
 
-import { judgeWebuiFrame } from "../../src/server/envelope.js";
+import { isWebuiFrame, judgeWebuiFrame } from "../../src/server/envelope.js";
+import { dispatchWebuiFrame } from "../../src/server/operation/operation-dispatch.js";
+import type { WebuiOperationRegistryEntry } from "../../src/server/operation/operations.js";
 import {
   decodeWebuiServerFrame,
   WebuiErrorCode,
@@ -15,6 +19,19 @@ import {
 } from "../../src/shared/envelope.js";
 
 const encode = (value: unknown): string => JSON.stringify(value);
+
+/** A socket that records what the dispatcher wrote to it. */
+function socket(): { readyState: number; OPEN: number; sent: string[]; send(payload: string): void } {
+  const value = {
+    readyState: 1,
+    OPEN: 1,
+    sent: [] as string[],
+    send(payload: string) {
+      value.sent.push(payload);
+    },
+  };
+  return value;
+}
 
 describe("the service judges an inbound frame", () => {
   it("accepts a well-formed frame and narrows it", () => {
@@ -51,6 +68,91 @@ describe("the service judges an inbound frame", () => {
     const judged = judgeWebuiFrame({ protocolVersion: 1, kind: "request" });
     expect(judged.ok).toBe(false);
     if (!judged.ok) expect(judged.code).toBe(WebuiErrorCode.invalidEnvelope);
+  });
+});
+
+describe("one identity rule decides every frame", () => {
+  /**
+   * The frame's identity is decided once.
+   *
+   * The fast acceptance took any string and the judgement refused the empty
+   * one, so a request with `requestId: ""` was accepted by the first and never
+   * reached the second. Both now read the same rule, and the dispatch case
+   * below proves the consequence: the operation is not run.
+   */
+  it("refuses the empty request identity on every legal frame kind", () => {
+    for (const kind of ["request", "response", "error", "event"] as const) {
+      const candidate = { protocolVersion: 1, kind, requestId: "" };
+      expect(isWebuiFrame(candidate), `${kind} accepted an empty identity`).toBe(false);
+      const judged = judgeWebuiFrame(candidate);
+      expect(judged.ok, `${kind} judged an empty identity as a frame`).toBe(false);
+      if (!judged.ok) {
+        expect(judged.code).toBe(WebuiErrorCode.invalidEnvelope);
+        expect(judged.message).toBe("frame carries no request identity");
+      }
+    }
+  });
+
+  it("accepts a whitespace identity, which is a token rather than no token", () => {
+    // The rule is "an identity is present", not "an identity looks tidy": the
+    // service never interprets a request id, and a client that chose " " is
+    // correlatable. Pinned so a later tightening is a deliberate decision.
+    const candidate = {
+      protocolVersion: 1,
+      kind: "request",
+      requestId: " ",
+      operation: "listSessions",
+      body: {},
+    };
+    expect(isWebuiFrame(candidate)).toBe(true);
+    expect(judgeWebuiFrame(candidate).ok).toBe(true);
+  });
+
+  it("keeps the version mismatch ahead of the identity refusal", () => {
+    // A frame from another protocol version cannot be judged against this
+    // one's shape, so its (possibly absent) identity is not the finding.
+    const judged = judgeWebuiFrame({ protocolVersion: 99, kind: "request", requestId: "" });
+    expect(judged.ok).toBe(false);
+    if (!judged.ok) expect(judged.code).toBe(WebuiErrorCode.protocolMismatch);
+  });
+
+  it("agrees with the judgement for every legal kind that carries an identity", () => {
+    for (const kind of ["request", "response", "error", "event"] as const) {
+      const candidate = { protocolVersion: 1, kind, requestId: `r-${kind}` };
+      expect(isWebuiFrame(candidate), `${kind} was not accepted`).toBe(true);
+      expect(judgeWebuiFrame(candidate).ok, `${kind} was not judged a frame`).toBe(true);
+    }
+  });
+
+  it("does not dispatch a request the identity rule refuses", async () => {
+    const calls: unknown[] = [];
+    const registry = new Map<string, WebuiOperationRegistryEntry>([
+      [
+        "listSessions",
+        {
+          operation: {
+            name: "listSessions",
+            validate: (body: unknown) => ({ ok: true, body }),
+          },
+          handle: async () => {
+            calls.push("handled");
+            return { body: { sessions: [] } };
+          },
+        },
+      ],
+    ]);
+    const target = socket();
+    await dispatchWebuiFrame(
+      target as unknown as WebSocket,
+      { protocolVersion: 1, kind: "request", requestId: "", operation: "listSessions", body: {} },
+      registry,
+      true,
+      () => undefined,
+    );
+    assert.deepEqual(calls, [], "an unidentified request must not reach its operation");
+    const refusal = JSON.parse(target.sent[0] ?? "{}") as { kind?: string; code?: string };
+    assert.equal(refusal.kind, "error");
+    assert.equal(refusal.code, WebuiErrorCode.invalidEnvelope);
   });
 });
 

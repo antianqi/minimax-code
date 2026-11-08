@@ -170,13 +170,16 @@ export function WebuiToastProvider({
       const entry = createWebuiToastEntry(request, id);
       // A notice that is said twice is said once, and the countdown of the
       // notice that was already on screen starts again: the second saying is
-      // news.
+      // news, and news gets the full time.
       const timer = timersRef.current.get(id);
       if (timer) {
         clearTimeout(timer.handle);
         timersRef.current.delete(id);
       }
-      heldRef.current.delete(id);
+      // A notice the pointer or the focus is holding stays held: the card must
+      // not leave under the reader. What restarts is the time it will be
+      // given once it is let go.
+      if (heldRef.current.has(id)) heldRef.current.set(id, entry.durationMs);
       apply(reduceWebuiToasts({ entries: entriesRef.current }, { type: "show", entry }).entries);
       return id;
     },

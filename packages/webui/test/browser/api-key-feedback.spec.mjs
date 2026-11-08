@@ -133,3 +133,72 @@ test("the same answer twice is heard twice", async ({ page }) => {
     "the message element is replaced, so the region announces it again",
   ).toBe(true);
 });
+
+test("a successful connection test is said over the client", async ({ page }) => {
+  // The fixture answers the connectivity test with a success this time: the
+  // client's own failure path is not the only one that has to be said.
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("testUserModelProvider", { success: true, status: { ok: true } });
+    });
+  });
+  await openUsagePanel(page);
+  const panel = apiKeyPanel(page);
+
+  await panel.getByPlaceholder("请输入API Key").fill("synthetic-key");
+  await panel.getByRole("button", { name: "测试连通性" }).click();
+
+  const success = page.locator('[data-webui-toast="true"]', { hasText: "连接成功" });
+  await expect(success).toHaveCount(1);
+  await expect(success).toHaveAttribute("data-webui-toast-tone", "success");
+  // And the panel itself says nothing: the result does not take room from
+  // the page it is about.
+  await expect(panel.locator('[role="status"]')).toHaveCount(0);
+  await expect(panel.locator('[aria-live]')).toHaveCount(0);
+});
+
+test("a save the runtime refuses is said over the client", async ({ page }) => {
+  // A refusal is the runtime's answer, and it is an answer about something
+  // that has already happened: it is said over the client, not under the
+  // field.
+  await page.addInitScript(() => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.refuseOperation("upsertMiniMaxApiKey", "permission_denied", "没有权限保存 API Key。");
+    });
+  });
+  await openUsagePanel(page);
+  const panel = apiKeyPanel(page);
+
+  await panel.getByPlaceholder("请输入API Key").fill("synthetic-key");
+  await panel.getByRole("button", { name: "保存并使用" }).click();
+
+  const refused = page.locator('[data-webui-toast="true"]', { hasText: "没有权限保存 API Key。" });
+  await expect(refused).toHaveCount(1);
+  await expect(refused).toHaveAttribute("data-webui-toast-tone", "error");
+  await expect(panel.locator('[role="status"]')).toHaveCount(0);
+});
+
+test("the same answer again is given the full time again", async ({ page }) => {
+  await openUsagePanel(page);
+  const panel = apiKeyPanel(page);
+
+  await panel.getByPlaceholder("请输入API Key").fill("synthetic-key");
+  await panel.getByRole("button", { name: "测试连通性" }).click();
+  await expect(keyResultToast(page)).toHaveCount(1);
+
+  // An error notice lives for six seconds. The answer is repeated near the
+  // end of that, and the second saying is news: the card is refreshed and it
+  // is given the time a new notice gets, so it does not vanish half a second
+  // after the second answer.
+  await page.waitForTimeout(5000);
+  await panel.getByRole("button", { name: "测试连通性" }).click();
+  await expect(keyResultToast(page)).toHaveCount(1);
+
+  await page.waitForTimeout(2000);
+  // Seven seconds after the first answer, and the notice is still there: its
+  // countdown started again with the second answer.
+  await expect(keyResultToast(page)).toHaveCount(1);
+});
+

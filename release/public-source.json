@@ -4646,6 +4646,7 @@
     "packages/webui/test/browser/browser-bridge-real-packaged.spec.ts",
     "packages/webui/test/browser/browser-notice-layer.spec.mjs",
     "packages/webui/test/browser/browser-workspace.spec.mjs",
+    "packages/webui/test/browser/composer-goal-mode.spec.mjs",
     "packages/webui/test/browser/composer.spec.mjs",
     "packages/webui/test/browser/connection-status.spec.mjs",
     "packages/webui/test/browser/content-page.spec.mjs",

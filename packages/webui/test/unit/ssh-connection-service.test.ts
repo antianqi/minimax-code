@@ -21,6 +21,7 @@ import { SSH_PROBE_MARKER } from "../../src/runtime/ssh/command.js";
 import { createSshRuntime } from "../../src/runtime/ssh/index.js";
 import type { SshDiscoveryDependencies } from "../../src/runtime/ssh/host-discovery.js";
 import type { SshTransport } from "../../src/runtime/ssh/transport.js";
+import type { SshCredentialStore } from "../../src/runtime/ssh/credentials.js";
 
 const directories: string[] = [];
 
@@ -75,6 +76,42 @@ function syntheticDiscovery(alias: string): SshDiscoveryDependencies {
 }
 
 describe("the saved host's state", () => {
+  it.each([
+    ["probe", "replace"], ["probe", "remove"], ["listing", "replace"], ["listing", "remove"],
+    ["probe", "replace-long"], ["listing", "replace-long"],
+  ] as const)("redacts attempt credentials from a deferred %s after %s", async (kind, change) => {
+    const { transport } = switchableTransport();
+    let credentials!: SshCredentialStore;
+    const runtime = await createSshRuntime({ dataDir: temporaryDataDir(), transport,
+      createAskpass: async (options) => {
+        credentials = options.credentials;
+        return { env: {}, envFor: () => ({}), dispose: async () => {} };
+      },
+    });
+    const oldSecret = `synthetic-original-secret${change === "replace-long" ? "x".repeat(240) : ""}`;
+    const newSecret = "synthetic-replacement-secret";
+    const replacing = change.startsWith("replace");
+    try {
+      await runtime.connections.save({ alias: "build", endpoint: { kind: "manual", host: "synthetic.invalid" }, password: oldSecret });
+      let entered!: () => void;
+      let finish!: (value: Awaited<ReturnType<SshTransport["run"]>>) => void;
+      const started = new Promise<void>((resolve) => { entered = resolve; });
+      transport.run = vi.fn(() => { entered(); return new Promise<Awaited<ReturnType<SshTransport["run"]>>>((resolve) => { finish = resolve; }); });
+      const pending = kind === "probe" ? runtime.connections.probe("build") : runtime.projects.listDirectories("build", "/");
+      await started;
+      if (replacing) credentials.stage("build", newSecret);
+      else if (kind === "listing") await runtime.connections.remove("build");
+      else credentials.remove("build");
+      finish({ stdout: "", stderr: `denied ${oldSecret}${replacing ? ` ${newSecret}` : ""}`, code: 255, timedOut: false });
+      const result = await pending;
+      const visible = JSON.stringify(result);
+      expect(visible).toContain("***");
+      expect(visible).not.toContain(oldSecret);
+      expect(visible).not.toContain(oldSecret.slice(0, 20));
+      expect(visible).not.toContain(newSecret);
+      expect(visible).toContain("denied");
+    } finally { await runtime.dispose(); }
+  });
   it("claims the probe slot before either concurrent call can finish its first read", async () => {
     const { transport } = switchableTransport();
     const runtime = await createSshRuntime({ dataDir: temporaryDataDir(), transport });

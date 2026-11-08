@@ -133,11 +133,20 @@ export function createSshConnectionRepository(filePath: string): SshConnectionRe
         status: record.status,
         ...(record.lastError === undefined ? {} : { lastError: record.lastError }),
       };
-      const { result } = await store.transact((read) => ({
-        kind: "commit",
-        value: [...current(read).filter((connection) => connection.alias !== record.alias), stored],
-        result: toRecord(stored),
-      }));
+      const { result } = await store.transact((read) => {
+        const existing = current(read).find((connection) => connection.alias === record.alias);
+        const merged = {
+          ...existing,
+          ...stored,
+          lastError: stored.lastError,
+          endpoint: { ...unknownEndpointFields(existing?.endpoint), ...stored.endpoint },
+        };
+        return {
+          kind: "commit",
+          value: [...current(read).filter((connection) => connection.alias !== record.alias), merged],
+          result: toRecord(merged),
+        };
+      });
       return result;
     },
 
@@ -171,12 +180,9 @@ export function createSshConnectionRepository(filePath: string): SshConnectionRe
           const identity = String(read.kind === "usable" ? read.revision : 0);
           if (identity !== input.identityRevision) return { kind: "keep", result: { outcome: "changed" } };
           const stored: StoredConnection = {
-            alias: found.alias,
-            displayName: found.displayName,
-            endpoint: found.endpoint,
-            enabled: found.enabled,
+            ...found,
             status: input.status,
-            ...(input.detail === undefined ? {} : { lastError: input.detail }),
+            lastError: input.detail,
           };
           return {
             kind: "commit",
@@ -211,7 +217,7 @@ function toRecord(stored: StoredConnection): SshConnectionRecord {
   return {
     alias: stored.alias,
     displayName: stored.displayName,
-    endpoint: stored.endpoint,
+    endpoint: knownEndpoint(stored.endpoint),
     enabled: stored.enabled,
     status: stored.status,
     ...(stored.lastError === undefined ? {} : { lastError: stored.lastError }),
@@ -270,6 +276,7 @@ function readStoredConnection(value: unknown): StoredConnection | string {
     return `（${record.alias}）的 lastError 不是字符串`;
   }
   return {
+    ...record,
     alias: record.alias,
     displayName: record.displayName,
     endpoint,
@@ -305,19 +312,36 @@ function readStoredEndpoint(value: unknown): SshEndpointRecord | string {
   if (endpoint.identityFile !== undefined && (typeof endpoint.identityFile !== "string" || !isSafeAbsoluteLocalPath(endpoint.identityFile))) {
     return "的 endpoint.identityFile 不是字符串";
   }
-  // Projected rather than passed through: a field this build does not own must not reappear on
-  // the next write, and must not reach a typed consumer.
+  // 磁盘保留未知字段；返回调用者时由 knownEndpoint 单独投影。
   const host = typeof endpoint.host === "string" ? endpoint.host : undefined;
   const port = typeof endpoint.port === "number" ? endpoint.port : undefined;
   const username = typeof endpoint.username === "string" ? endpoint.username : undefined;
   const identityFile = typeof endpoint.identityFile === "string" ? endpoint.identityFile : undefined;
   const alias = typeof endpoint.alias === "string" ? endpoint.alias : undefined;
   return {
+    ...endpoint,
     kind: endpoint.kind as SshEndpointKind,
     ...(host === undefined ? {} : { host }),
     ...(port === undefined ? {} : { port }),
     ...(username === undefined ? {} : { username }),
     ...(identityFile === undefined ? {} : { identityFile }),
     ...(alias === undefined ? {} : { alias }),
+  };
+}
+
+const ENDPOINT_FIELDS = new Set(["kind", "host", "port", "username", "identityFile", "alias"]);
+
+function unknownEndpointFields(endpoint: SshEndpointRecord | undefined): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(endpoint ?? {}).filter(([key]) => !ENDPOINT_FIELDS.has(key)));
+}
+
+function knownEndpoint(endpoint: SshEndpointRecord): SshEndpointRecord {
+  return {
+    kind: endpoint.kind,
+    ...(endpoint.host === undefined ? {} : { host: endpoint.host }),
+    ...(endpoint.port === undefined ? {} : { port: endpoint.port }),
+    ...(endpoint.username === undefined ? {} : { username: endpoint.username }),
+    ...(endpoint.identityFile === undefined ? {} : { identityFile: endpoint.identityFile }),
+    ...(endpoint.alias === undefined ? {} : { alias: endpoint.alias }),
   };
 }

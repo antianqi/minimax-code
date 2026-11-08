@@ -66,6 +66,8 @@ The owner exposes an idempotent `dispose()` and registers it with the runtime cl
 the harness adapter. Shutdown stops the binding timer, aborts pairing and binding HTTP, releases
 status and runtime subscriptions, then disconnects the proxy while preserving the durable binding.
 An HTTP or credential refresh completing after disposal cannot reopen the proxy. A browser's
+connect completion is also fenced before starting fallback pairing or returning credentials as
+accepted, so a late idle/unbound result cannot create a new pairing session after shutdown. A browser's
 status subscription has its own abort signal: detaching a quiet WebSocket wakes the pending read
 and releases that observer without disconnecting the phone link.
 

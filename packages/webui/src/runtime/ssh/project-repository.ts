@@ -72,11 +72,14 @@ export function createSshProjectRepository(filePath: string): SshProjectReposito
         displayName: record.displayName,
       };
       const { result } = await store.transact(
-        (read): SshStoreChange<readonly StoredProject[], SshProjectRecord> => ({
-          kind: "commit",
-          value: [...current(read).filter((project) => project.id !== stored.id), stored],
-          result: toRecord(stored),
-        }),
+        (read): SshStoreChange<readonly StoredProject[], SshProjectRecord> => {
+          const merged = { ...current(read).find((project) => project.id === stored.id), ...stored };
+          return {
+            kind: "commit",
+            value: [...current(read).filter((project) => project.id !== stored.id), merged],
+            result: toRecord(merged),
+          };
+        },
       );
       return result;
     },
@@ -147,6 +150,7 @@ function readStoredProjects(
       }
     }
     projects.push({
+      ...record,
       id: record.id as string,
       alias: record.alias as string,
       path: record.path as string,

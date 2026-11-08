@@ -59,10 +59,16 @@ authority in their port's `close()`.
 3. the mcode-tools broker,
 4. the externally supplied browser provider.
 
-The SSH repositories serialize read/transform/commit under a cross-process, heartbeat-renewed
-`proper-lockfile` lease, then atomically rename the committed JSON. Missing files mean an empty
+The SSH repositories serialize read/transform/commit under a cross-process SQLite OS write lock,
+then atomically rename the committed JSON before releasing that lock. The sibling
+`*.transaction.sqlite` lock file has no application tables and must retain its inode; it is never
+deleted or reclaimed by age. Process exit releases the kernel lock, while a paused live writer
+retains it through awaited write/rename. Missing JSON files mean an empty
 store; malformed JSON, unsupported versions, invalid records and read failures refuse both reads
-and mutations while preserving the original file. Probe commits compare the endpoint and the
+and mutations while preserving the original file. Legacy version-1 documents without a numeric
+revision read as revision 0, matching the earlier reader, and normalize on a successful write.
+Unknown document, record and endpoint fields survive mutations in both stores; public projections
+still expose only known fields. Probe commits compare the endpoint and the
 captured store revision under that same transaction. A changed host list invalidates the verdict,
 including deletion followed by recreation with the same endpoint; the existing JSON format is
 unchanged. A concurrent change to another host can conservatively invalidate a probe too.
@@ -70,6 +76,9 @@ unchanged. A concurrent change to another host can conservatively invalidate a p
 SSH password delivery is an explicit authentication capability shared by probes, directory listing
 and terminals. If askpass cannot start, key authentication remains available; password saves fail
 with `credential_unavailable` and the original failure message before staging or spawning.
+Probe and directory-list attempts retain a redaction scope over all credentials staged for their
+alias during execution. Credential replacement or removal cannot expose an older attempt's secret;
+redaction runs before error truncation and the scope is released when the attempt settles.
 
 Every failure is collected and rethrown as one error or an `AggregateError`. The pre-host startup
 path runs the same owners minus the host. A page unsubscribe never reaches this: closing a browser

@@ -139,18 +139,14 @@ export function createSshProjectService(options: SshProjectServiceOptions): SshP
       }
       const args = buildSshArgs(connection.endpoint, { password: mode.kind === "password" });
       const env = mode.kind === "password" ? mode.env : undefined;
-      const result = await options.transport.run(
-        [...args, buildRemoteDirectoryListCommand(requestedPath)],
-        env ? { env, timeoutMs: LISTING_TIMEOUT_MS } : { timeoutMs: LISTING_TIMEOUT_MS },
-      );
-      return readDirectoryListing(
-        hostAlias,
-        requestedPath,
-        result.stdout,
-        result.stderr,
-        result,
-        options.credentials.get(hostAlias),
-      );
+      const redaction = options.credentials.captureRedaction(hostAlias);
+      try {
+        const result = await options.transport.run(
+          [...args, buildRemoteDirectoryListCommand(requestedPath)],
+          env ? { env, timeoutMs: LISTING_TIMEOUT_MS } : { timeoutMs: LISTING_TIMEOUT_MS },
+        );
+        return readDirectoryListing(hostAlias, requestedPath, result.stdout, result.stderr, result, redaction.redact);
+      } finally { redaction.dispose(); }
     },
   };
 }
@@ -167,7 +163,7 @@ function readDirectoryListing(
   stdout: string,
   stderr: string,
   result: { readonly code: number | null; readonly timedOut: boolean; readonly spawnError?: NodeJS.ErrnoException },
-  password: string | undefined,
+  redact: (value: string) => string,
 ): SshDirectoryListingRecord {
   if (result.spawnError) {
     return {
@@ -194,7 +190,7 @@ function readDirectoryListing(
       path: requestedPath,
       entries: [],
       status: "probe_failed",
-      error: redact(`远端没有返回目录列表：${firstLine(stderr)}`, password),
+      error: `远端没有返回目录列表：${firstLine(redact(stderr))}`,
     };
   }
   const fields = stdout
@@ -257,9 +253,4 @@ function firstLine(value: string): string {
     if (trimmed) return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
   }
   return "";
-}
-
-function redact(value: string, password: string | undefined): string {
-  if (!password) return value;
-  return value.split(password).join("***");
 }

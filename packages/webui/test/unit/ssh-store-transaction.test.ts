@@ -17,11 +17,17 @@
  */
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { rename } from "node:fs/promises";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, rename: vi.fn(actual.rename) };
+});
 
 import {
   createSshConnectionRepository,
@@ -64,6 +70,119 @@ afterEach(() => {
 });
 
 describe("the SSH connection store", () => {
+  it("excludes a stale final rename when a legacy lease is lost during commit", async () => {
+    const file = sshConnectionStorePath(temporaryDataDir());
+    write(file, { version: 1, revision: 0, connections: [] });
+    const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    let resume!: () => void;
+    let paused!: () => void;
+    const entered = new Promise<void>((resolve) => { paused = resolve; });
+    const release = new Promise<void>((resolve) => { resume = resolve; });
+    vi.mocked(rename).mockImplementationOnce(async (...args) => {
+      paused();
+      await release;
+      return actual.rename(...args);
+    });
+    const first = createSshConnectionRepository(file).save(host("first")).then(
+      () => undefined, (error: unknown) => error,
+    );
+    await entered;
+    // 旧租约被抢走时，最终 rename 仍然挂起；新锁必须覆盖这个窗口。
+    rmSync(`${file}.lock`, { recursive: true, force: true });
+    const loader = createRequire(import.meta.url).resolve("tsx");
+    const child = spawn(process.execPath, ["--import", loader, "--input-type=module", "-e", `
+      const { createRequire } = await import('node:module');
+      const require = createRequire(process.cwd() + '/package.json');
+      const Database = require('better-sqlite3');
+      const db = new Database(process.argv[1] + '.transaction.sqlite', { timeout: 0 });
+      let blocked = false;
+      try { db.exec('BEGIN IMMEDIATE'); db.exec('ROLLBACK'); }
+      catch (error) { if (error.code !== 'SQLITE_BUSY') throw error; blocked = true; }
+      db.close();
+      process.send({ blocked });
+      const { createSshConnectionRepository } = await import(${JSON.stringify(new URL("../../src/runtime/ssh/connection-repository.ts", import.meta.url).href)});
+      await createSshConnectionRepository(process.argv[1]).save({ alias: 'second', displayName: 'Second', endpoint: { kind: 'manual', host: 'second.example' }, enabled: true, status: 'idle' });
+      process.disconnect();
+    `, file], { stdio: ["ignore", "ignore", "pipe", "ipc"], env: { ...process.env, TSX_TSCONFIG_PATH: path.resolve("tsconfig.standalone.json") } });
+    let stderr = "";
+    child.stderr!.on("data", (value) => { stderr += String(value); });
+    const probe = new Promise<boolean>((resolve, reject) => {
+      child.once("message", (value) => resolve((value as { blocked: boolean }).blocked));
+      child.once("error", reject);
+    });
+    const done = new Promise<void>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(stderr)));
+    });
+    try {
+      const blocked = await probe;
+      // 旧实现允许第二个 writer 先提交，随后第一份旧快照覆盖它。
+      if (!blocked) await done;
+      resume();
+      const firstError = await first;
+      await done;
+      expect((await createSshConnectionRepository(file).list()).map((record) => record.alias).sort()).toEqual(["first", "second"]);
+      expect(firstError).toBeUndefined();
+      expect(blocked).toBe(true);
+    } finally {
+      resume();
+      if (child.exitCode === null) child.kill();
+    }
+  }, 15_000);
+
+  it.each([undefined, "old-writer"])("accepts legacy v1 revision %s in both stores", async (revision) => {
+    const dir = temporaryDataDir();
+    const hostFile = sshConnectionStorePath(dir);
+    const projectFile = sshProjectStorePath(dir);
+    write(hostFile, { version: 1, ...(revision === undefined ? {} : { revision }), connections: [host("legacy")] });
+    write(projectFile, { version: 1, ...(revision === undefined ? {} : { revision }), projects: [{ id: "old", alias: "legacy", path: "/old", displayName: "Old" }] });
+    const hosts = createSshConnectionRepository(hostFile);
+    const projects = createSshProjectRepository(projectFile);
+    expect((await hosts.list())[0]?.alias).toBe("legacy");
+    expect((await projects.list())[0]?.id).toBe("old");
+    await hosts.save(host("new"));
+    await projects.save({ id: "new", alias: "legacy", path: "/new", displayName: "New" });
+    expect((await hosts.list()).map((record) => record.alias).sort()).toEqual(["legacy", "new"]);
+    expect((await projects.list()).map((record) => record.id).sort()).toEqual(["new", "old"]);
+    expect(JSON.parse(readFileSync(hostFile, "utf8")).revision).toBe(1);
+    expect(JSON.parse(readFileSync(projectFile, "utf8")).revision).toBe(1);
+  });
+
+  it("preserves unknown document, host, project and nested endpoint fields across mutations", async () => {
+    const dir = temporaryDataDir();
+    const hostFile = sshConnectionStorePath(dir);
+    const projectFile = sshProjectStorePath(dir);
+    const extra = { future: ["value", { nested: true }] };
+    write(hostFile, { version: 1, revision: 0, extension: extra, connections: [{ ...host("kept"), extension: extra, endpoint: { ...host("kept").endpoint, extension: extra } }] });
+    write(projectFile, { version: 1, revision: 0, extension: extra, projects: [{ id: "kept", alias: "kept", path: "/kept", displayName: "Kept", extension: extra }] });
+    const hosts = createSshConnectionRepository(hostFile);
+    const projects = createSshProjectRepository(projectFile);
+    const verify = () => {
+      const rawHost = JSON.parse(readFileSync(hostFile, "utf8"));
+      const rawProject = JSON.parse(readFileSync(projectFile, "utf8"));
+      expect(rawHost.extension).toEqual(extra);
+      expect(rawHost.connections.find((record: { alias: string }) => record.alias === "kept")).toMatchObject({ extension: extra, endpoint: { extension: extra } });
+      expect(rawProject.extension).toEqual(extra);
+      expect(rawProject.projects.find((record: { id: string }) => record.id === "kept").extension).toEqual(extra);
+    };
+    await hosts.save(host("other"));
+    await projects.save({ id: "other", alias: "other", path: "/other", displayName: "Other" });
+    verify();
+    await hosts.setEnabled("kept", true, "idle");
+    verify();
+    const target = (await hosts.getProbeTarget("kept"))!;
+    await hosts.commitProbe({ alias: "kept", probedEndpoint: target.record.endpoint, identityRevision: target.identityRevision, status: "connected" });
+    verify();
+    await hosts.save({ ...host("kept"), displayName: "Renamed" });
+    await projects.save({ id: "kept", alias: "kept", path: "/renamed", displayName: "Renamed" });
+    verify();
+    await hosts.remove("other");
+    await projects.removeByHost("other");
+    verify();
+    expect(await hosts.get("kept")).not.toHaveProperty("extension");
+    expect((await hosts.get("kept"))?.endpoint).not.toHaveProperty("extension");
+    expect(await projects.get("kept")).not.toHaveProperty("extension");
+  });
   it("serializes complete host and project mutations from independent processes", async () => {
     const dataDir = temporaryDataDir();
     const hostPath = sshConnectionStorePath(dataDir);
@@ -91,7 +210,7 @@ describe("the SSH connection store", () => {
       process.disconnect();
     `;
     const children = Array.from({ length: 4 }, (_, index) => {
-      const child = spawn(process.execPath, ["--import", loader, "--input-type=module", "-e", script, hostPath, projectPath, `child-${index}`], { stdio: ["ignore", "pipe", "pipe", "ipc"] });
+      const child = spawn(process.execPath, ["--import", loader, "--input-type=module", "-e", script, hostPath, projectPath, `child-${index}`], { stdio: ["ignore", "pipe", "pipe", "ipc"], env: { ...process.env, TSX_TSCONFIG_PATH: path.resolve("tsconfig.standalone.json") } });
       let stderr = "";
       child.stderr!.on("data", (data) => { stderr += String(data); });
       const ready = new Promise<void>((resolve, reject) => {
@@ -199,7 +318,7 @@ describe("the SSH connection store", () => {
     const dataDir = temporaryDataDir();
     const storePath = sshConnectionStorePath(dataDir);
     mkdirSync(path.dirname(storePath), { recursive: true });
-    const lockPath = `${storePath}.lock`;
+    const lockPath = `${storePath}.transaction.sqlite`;
 
     // A real second process takes the same lock this store writes, and holds it.
     const holder = spawn(
@@ -207,15 +326,15 @@ describe("the SSH connection store", () => {
       [
         "-e",
         [
-          "const lockfile = require('proper-lockfile');",
+          "const Database = require('better-sqlite3');",
           "(async () => {",
-          "  const release = await lockfile.lock(process.argv[1], { realpath: false });",
+          "  const database = new Database(process.argv[1]); database.exec('BEGIN IMMEDIATE');",
           "  process.stdout.write('held\\n');",
           "  await new Promise((resolve) => setTimeout(resolve, 400));",
-          "  await release();",
+          "  database.exec('ROLLBACK'); database.close();",
           "})();",
         ].join("\n"),
-        storePath,
+        lockPath,
       ],
       { stdio: ["ignore", "pipe", "inherit"] },
     );
@@ -240,8 +359,11 @@ describe("the SSH connection store", () => {
     expect(elapsed).toBeGreaterThanOrEqual(300);
     await exited;
     expect((await repository.list()).map((record) => record.alias)).toEqual(["contended"]);
-    // The lock is released, not left behind for the next writer.
-    expect(existsSync(lockPath)).toBe(false);
+    // SQLite 锁文件保留稳定 inode；释放的是 OS 写锁。
+    const Database = createRequire(import.meta.url)("better-sqlite3");
+    const probe = new Database(lockPath, { timeout: 0 });
+    try { expect(() => probe.exec("BEGIN IMMEDIATE")).not.toThrow(); }
+    finally { probe.close(); }
   }, 15_000);
 
   it("reports a corrupt document instead of returning an empty list", async () => {

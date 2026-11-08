@@ -17,12 +17,14 @@ import type { SshTransport, SshTerminalProcess } from "../../src/runtime/ssh/tra
 import { createWebuiRemoteControl } from "../../src/runtime/remote-control/owner.js";
 import { DeviceIdentityStore } from "../../src/runtime/remote-control/bridge/device-identity.js";
 import { createWebuiRuntimeLifecycle } from "../../src/runtime/lifecycle.js";
+import { RemoteControlProxy } from "../../src/runtime/remote-control/bridge/index.js";
 
 const cleanup: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 function dataDir() {
   const dir = mkdtempSync(path.join(tmpdir(), "rc-"));
@@ -55,6 +57,25 @@ function host(dir: string, onSubscribe = () => {}, onRelease = () => {}): WebuiR
 }
 
 describe("remote resource lifetime through the production seams", () => {
+  it.each(["idle", "unbound"] as const)("cannot start fallback pairing after deferred connect returns %s beyond dispose", async (phase) => {
+    vi.useFakeTimers();
+    const entered = deferred<void>();
+    const reply = deferred<{ phase: typeof phase }>();
+    vi.spyOn(RemoteControlProxy.prototype, "connect").mockImplementationOnce(() => { entered.resolve(); return reply.promise; });
+    const pairing = vi.spyOn(RemoteControlProxy.prototype, "requestPairingCode");
+    const fetcher = vi.fn(async () => json({ pairing_code: "1234", expires_in_s: 300 }));
+    const owner = createWebuiRemoteControl({ host: host(dataDir()), logger, fetchImpl: fetcher });
+    cleanup.push(() => owner.dispose());
+    const pending = owner.connect({});
+    await entered.promise;
+    await owner.dispose();
+    reply.resolve({ phase });
+    expect((await pending).phase).toBe("error");
+    expect(pairing).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it("captures replay and live SSH output once, in order, before the next pull", async () => {
     let emit!: (value: string) => void;
     const process: SshTerminalProcess = {

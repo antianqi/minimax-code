@@ -21,8 +21,9 @@
 //   * **The lock is cross-process.** `node_modules/.bin/webui` may be started twice against one
 //     data directory (a second tab, a restarted service, a checkout run beside the packaged
 //     app), and a promise map inside one process says nothing about the other. The lock is a
-//     sibling `<file>.lock` directory managed by proper-lockfile, with heartbeat renewal and
-//     stale-holder recovery. A live writer renews its lease while it writes.
+//     sibling SQLite transaction holds an OS write lock through the final rename. It has no
+//     expiring lease: a paused writer cannot lose exclusivity while an awaited commit resumes.
+//     The kernel releases the lock on process exit. The lock database has no application tables.
 //
 // Writes are atomic: the new content goes to a sibling file first and is renamed over the old
 // one, so a crash mid-write cannot leave a half-written store behind. Nothing here is a secret —
@@ -30,7 +31,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import lockfile from "proper-lockfile";
+import { loadBetterSqlite3 } from "@mavis/shared";
 
 import { SshRuntimeError } from "./errors.js";
 
@@ -48,7 +49,7 @@ export type SshStoreRead<T> =
       readonly reason: SshStoreUnusableReason;
       readonly detail: string;
     }
-  | { readonly kind: "usable"; readonly value: T; readonly revision: number };
+  | { readonly kind: "usable"; readonly value: T; readonly revision: number; readonly document: Readonly<Record<string, unknown>> };
 
 /**
  * The change a caller supplies to a transaction.
@@ -92,8 +93,6 @@ export interface SshStore<T> {
 
 /** How long a transaction waits for the lock before giving up. */
 const LOCK_TIMEOUT_MS = 10_000;
-/** How long a lock file may stay behind before it is presumed abandoned. */
-const LOCK_STALE_MS = 300_000;
 
 /**
  * The failure an unusable store produces, in the words the browser may read.
@@ -122,7 +121,7 @@ export function storeUnavailableError(
 
 /** One store file over one path. */
 export function createSshStore<T>(filePath: string, codec: SshStoreCodec<T>): SshStore<T> {
-  const lockPath = `${filePath}.lock`;
+  const lockPath = `${filePath}.transaction.sqlite`;
 
   const decode = async (): Promise<SshStoreRead<T>> => {
     let raw: string;
@@ -161,8 +160,9 @@ export function createSshStore<T>(filePath: string, codec: SshStoreCodec<T>): Ss
         detail: `文件版本 ${version}，本版本只接受 ${SSH_STORE_VERSION}`,
       };
     }
-    const revision = document.revision;
-    if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) {
+    // v1 的旧 writer 将缺失或非数字 revision 当作 0；首次成功写入才规范化它。
+    const revision = typeof document.revision === "number" ? document.revision : 0;
+    if (!Number.isSafeInteger(revision) || revision < 0) {
       return { kind: "unusable", reason: "malformed", detail: "缺少可用的 revision" };
     }
     const member = document[codec.member];
@@ -173,12 +173,13 @@ export function createSshStore<T>(filePath: string, codec: SshStoreCodec<T>): Ss
     if (!decoded.ok) {
       return { kind: "unusable", reason: "malformed", detail: decoded.detail };
     }
-    return { kind: "usable", value: decoded.value, revision };
+    return { kind: "usable", value: decoded.value, revision, document };
   };
 
-  const commit = async (value: T, revision: number): Promise<void> => {
+  const commit = async (value: T, revision: number, previous: Readonly<Record<string, unknown>>): Promise<void> => {
     await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
     const document = {
+      ...previous,
       version: SSH_STORE_VERSION,
       revision,
       [codec.member]: value,
@@ -200,15 +201,7 @@ export function createSshStore<T>(filePath: string, codec: SshStoreCodec<T>): Ss
     async transact<R>(change: (current: SshStoreRead<T>) => SshStoreChange<T, R>) {
       return serialize(filePath, async () => {
         await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
-        let compromised: Error | undefined;
-        const release = await lockfile.lock(filePath, {
-          realpath: false,
-          lockfilePath: lockPath,
-          stale: LOCK_STALE_MS,
-          update: 10_000,
-          retries: { retries: LOCK_TIMEOUT_MS / 100, minTimeout: 100, maxTimeout: 100, factor: 1 },
-          onCompromised: (error) => { compromised = error; },
-        });
+        const release = await acquireTransactionLock(lockPath);
         try {
           const current = await decode();
           if (current.kind === "unusable") throw storeUnavailableError(filePath, current);
@@ -219,8 +212,7 @@ export function createSshStore<T>(filePath: string, codec: SshStoreCodec<T>): Ss
           const validated = codec.read(decision.value);
           if (!validated.ok) throw storeUnavailableError(filePath, { reason: "malformed", detail: validated.detail });
           const revision = (current.kind === "usable" ? current.revision : 0) + 1;
-          if (compromised) throw compromised;
-          await commit(decision.value, revision);
+          await commit(decision.value, revision, current.kind === "usable" ? current.document : {});
           return { revision, result: decision.result };
         } finally {
           await release();
@@ -228,6 +220,31 @@ export function createSshStore<T>(filePath: string, codec: SshStoreCodec<T>): Ss
       });
     },
   };
+}
+
+async function acquireTransactionLock(filePath: string): Promise<() => void> {
+  const Database = loadBetterSqlite3();
+  const database = new Database(filePath, { timeout: 0 });
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  try {
+    for (;;) {
+      try {
+        database.exec("BEGIN IMMEDIATE");
+        return () => {
+          try { database.exec("ROLLBACK"); } finally { database.close(); }
+        };
+      } catch (error) {
+        if ((error as { code?: string }).code !== "SQLITE_BUSY") throw error;
+        if (Date.now() >= deadline) {
+          throw new SshRuntimeError("operation_in_progress", "SSH 数据文件正在由另一个进程更新，请稍后重试。");
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, 25));
+      }
+    }
+  } catch (error) {
+    database.close();
+    throw error;
+  }
 }
 
 /**

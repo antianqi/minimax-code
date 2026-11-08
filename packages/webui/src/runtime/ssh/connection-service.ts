@@ -121,11 +121,14 @@ export function createSshConnectionService(
     }
     const args = buildSshArgs(connection.endpoint, { password: mode.kind === "password" });
     const env = mode.kind === "password" ? mode.env : undefined;
-    const result = await options.transport.run(
-      [...args, buildRemoteProbeCommand()],
-      env ? { env, timeoutMs: PROBE_TIMEOUT_MS } : { timeoutMs: PROBE_TIMEOUT_MS },
-    );
-    return readProbeResult(connection.alias, result.stdout, result.stderr, result, options.credentials.get(connection.alias));
+    const redaction = options.credentials.captureRedaction(connection.alias);
+    try {
+      const result = await options.transport.run(
+        [...args, buildRemoteProbeCommand()],
+        env ? { env, timeoutMs: PROBE_TIMEOUT_MS } : { timeoutMs: PROBE_TIMEOUT_MS },
+      );
+      return readProbeResult(connection.alias, result.stdout, result.stderr, result, redaction.redact);
+    } finally { redaction.dispose(); }
   };
 
   const runProbe = async (alias: string): Promise<SshProbeRecord> => {
@@ -329,7 +332,7 @@ function readProbeResult(
   stdout: string,
   stderr: string,
   result: { readonly code: number | null; readonly timedOut: boolean; readonly spawnError?: NodeJS.ErrnoException },
-  password: string | undefined,
+  redact: (value: string) => string,
 ): SshProbeRecord {
   if (result.spawnError) {
     if (result.spawnError.code === "ENOENT") {
@@ -338,7 +341,7 @@ function readProbeResult(
     return {
       alias,
       status: "probe_failed",
-      detail: redact(`无法启动 ssh：${result.spawnError.message}`, password),
+      detail: redact(`无法启动 ssh：${result.spawnError.message}`),
     };
   }
   if (result.timedOut) {
@@ -346,11 +349,11 @@ function readProbeResult(
   }
   const markerIndex = stdout.indexOf(SSH_PROBE_MARKER);
   if (markerIndex < 0) {
-    const reason = firstLine(stderr) || firstLine(stdout);
+    const reason = firstLine(redact(stderr)) || firstLine(redact(stdout));
     return {
       alias,
       status: "probe_failed",
-      detail: redact(reason ? `主机没有完成握手：${reason}` : "主机没有完成握手。", password),
+      detail: redact(reason ? `主机没有完成握手：${reason}` : "主机没有完成握手。"),
     };
   }
   const values = new Map<string, string>();
@@ -377,10 +380,4 @@ function firstLine(value: string): string {
     if (trimmed) return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
   }
   return "";
-}
-
-/** A staged password must never appear in a message the browser reads. */
-function redact(value: string, password: string | undefined): string {
-  if (!password) return value;
-  return value.split(password).join("***");
 }

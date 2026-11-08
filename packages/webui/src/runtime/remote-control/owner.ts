@@ -558,12 +558,17 @@ export function createWebuiRemoteControl(
         await credential.refresh();
         requireOpen();
         if (request.requestCode === true) {
-          return toWebuiConnectResult(await bridge.requestPairingCode());
+          const paired = await bridge.requestPairingCode();
+          requireOpen();
+          return toWebuiConnectResult(paired);
         }
         const result = await bridge.connect();
+        requireOpen();
         // Nothing to connect to and nothing bound: the only way forward is a pairing code.
         if (result.phase === "idle" || result.phase === "unbound") {
-          return toWebuiConnectResult(await bridge.requestPairingCode());
+          const paired = await bridge.requestPairingCode();
+          requireOpen();
+          return toWebuiConnectResult(paired);
         }
         return toWebuiConnectResult(result);
       } catch (error) {
@@ -608,6 +613,7 @@ export function createWebuiRemoteControl(
           return { success: false, error: "the credential belongs to an earlier connection" };
         }
         const result = await bridge.connect();
+        requireOpen();
         if (result.phase === "error") {
           return {
             success: false,

@@ -228,6 +228,11 @@ function refusalOf(error: unknown): WebuiMiniAppRefusal {
 }
 
 export interface WebuiMiniAppWorkflows {
+  readonly acquireListing: (kind: "launcher" | "catalogue") => () => void;
+  readonly acquirePresentation: (pluginId: string, standalone: boolean) => () => void;
+  readonly setSuspended: (suspended: boolean) => void;
+  readonly refreshInterested: () => void;
+  readonly dispose: () => void;
   readonly getSnapshot: () => WebuiMiniAppWorkflowsState;
   readonly subscribe: (listener: () => void) => () => void;
   /** Whether the host exposes the capability at all. */
@@ -446,6 +451,23 @@ export function createWebuiMiniAppWorkflows(deps: {
         unavailable: "当前运行时没有提供 Mini App 能力。",
       };
   const listeners = new Set<() => void>();
+  let disposed = false;
+  let suspended = false;
+  const listingInterests = new Map<symbol, "launcher" | "catalogue">();
+  const presentationInterests = new Map<string, { count: number; standalone: boolean }>();
+  let observationTimer: ReturnType<typeof setTimeout> | undefined;
+  let observing = false;
+  const selectionWaiters = new Set<() => void>();
+  const reconnectWaiters = new Set<() => void>();
+  const standaloneReleases = new Set<() => void>();
+  const operationRevisions = new Map<string, number>();
+  const revise = (pluginId: string): number => {
+    const revision = (operationRevisions.get(pluginId) ?? 0) + 1;
+    operationRevisions.set(pluginId, revision);
+    return revision;
+  };
+  const currentOperation = (pluginId: string, revision: number): boolean =>
+    !disposed && operationRevisions.get(pluginId) === revision;
   const refreshingInline = new Set<string>();
   /** One catalogue read at a time: a second read while one is open is that read. */
   let inFlight: Promise<WebuiMiniAppCatalogue | undefined> | undefined;
@@ -453,6 +475,7 @@ export function createWebuiMiniAppWorkflows(deps: {
   const set = (
     update: (current: WebuiMiniAppWorkflowsState) => WebuiMiniAppWorkflowsState,
   ): void => {
+    if (disposed) return;
     const next = update(state);
     if (next === state) return;
     state = next;
@@ -469,6 +492,8 @@ export function createWebuiMiniAppWorkflows(deps: {
       else delete presentations[pluginId];
       return { ...current, presentations };
     });
+    if (!needsClock()) stopClock();
+    else scheduleObservation();
   };
 
   const setRefusal = (pluginId: string, refusal: WebuiMiniAppRefusal | undefined): void => {
@@ -478,9 +503,10 @@ export function createWebuiMiniAppWorkflows(deps: {
       else delete refusals[pluginId];
       return { ...current, refusals };
     });
+    if (!needsClock()) stopClock();
   };
 
-  const readCatalogue = async (): Promise<WebuiMiniAppCatalogue | undefined> => {
+  const fetchCatalogue = async (): Promise<WebuiMiniAppCatalogue | undefined> => {
     if (!port.listMiniApps) return undefined;
     const list = await port.listMiniApps();
     // A host that answers nothing, or something else, is an empty catalogue rather
@@ -491,14 +517,24 @@ export function createWebuiMiniAppWorkflows(deps: {
     return list;
   };
 
+  const readCatalogue = (): Promise<WebuiMiniAppCatalogue | undefined> => {
+    if (disposed) return Promise.resolve(undefined);
+    if (inFlight) return inFlight;
+    const pending = fetchCatalogue();
+    inFlight = pending;
+    const clear = (): void => { if (inFlight === pending) inFlight = undefined; };
+    void pending.then(clear, clear);
+    return pending;
+  };
+
   const loadListing = async (fresh = false): Promise<void> => {
-    if (!available) return;
+    if (disposed || !available) return;
     // A mutation must observe a read started after it settled, never reuse an
     // older poll whose snapshot may still describe the pre-mutation runtime.
     if (fresh && inFlight) await inFlight.catch(() => undefined);
+    if (disposed) return;
     set((current) => ({ ...current, listing: { ...current.listing, loading: true } }));
-    const pending = inFlight ?? readCatalogue();
-    inFlight = pending;
+    const pending = readCatalogue();
     try {
       await pending;
     } catch (error) {
@@ -580,8 +616,14 @@ export function createWebuiMiniAppWorkflows(deps: {
     }
   };
 
-  const open = async (pluginId: string, path?: string): Promise<boolean> => {
-    if (!available || !port.openMiniApp) return false;
+  const open = async (
+    pluginId: string,
+    path?: string,
+    isInterested: () => boolean = () => !disposed,
+  ): Promise<boolean> => {
+    if (disposed || !available || !port.openMiniApp) return false;
+    const revision = revise(pluginId);
+    const isCurrent = (): boolean => currentOperation(pluginId, revision) && isInterested();
     set((current) => ({ ...current, opening: pluginId }));
     setPresentation(pluginId, { kind: "opening" });
     setRefusal(pluginId, undefined);
@@ -598,6 +640,7 @@ export function createWebuiMiniAppWorkflows(deps: {
         }),
         loadPermissions(pluginId),
       ]);
+      if (!isCurrent()) return false;
       setPresentation(pluginId, {
         kind: "open",
         viewUrl: view.viewUrl,
@@ -608,26 +651,31 @@ export function createWebuiMiniAppWorkflows(deps: {
       // The catalogue can open a Mini App without mounting its panel view, so
       // nothing else would refresh the runtime status after a successful start.
       await loadListing(true);
-      const revision = state.listing.rows.find((row) => row.pluginId === pluginId)?.presentationRevision;
-      if (revision !== undefined) {
+      if (!isCurrent()) return false;
+      const presentationRevision = state.listing.rows.find((row) => row.pluginId === pluginId)?.presentationRevision;
+      if (presentationRevision !== undefined) {
         const current = state.presentations[pluginId];
         if (current?.kind === "open" && current.connection === (view.connection ?? 0)) {
-          setPresentation(pluginId, { ...current, presentationRevision: revision });
+          setPresentation(pluginId, { ...current, presentationRevision });
         }
       }
       return true;
     } catch (error) {
+      if (!isCurrent()) return false;
       const refusal = refusalOf(error);
       setPresentation(pluginId, undefined);
       setRefusal(pluginId, refusal);
       // The runtime refused to start, so the row it refused about is stale: a
       // capacity refusal names the running apps, and those names come from here.
       await loadListing(true);
+      if (!isCurrent()) return false;
       setRefusal(pluginId, refusal);
       return false;
     } finally {
+      if (currentOperation(pluginId, revision) && !isInterested() && state.presentations[pluginId]?.kind === "opening")
+        setPresentation(pluginId, undefined);
       set((current) => {
-        if (current.opening !== pluginId) return current;
+        if (!currentOperation(pluginId, revision) || current.opening !== pluginId) return current;
         const next = { ...current };
         delete next.opening;
         return next;
@@ -635,16 +683,16 @@ export function createWebuiMiniAppWorkflows(deps: {
     }
   };
 
-  const refreshInline: WebuiMiniAppWorkflows["refreshInline"] = async (pluginId) => {
+  const refreshInline = async (pluginId: string, isCurrent: () => boolean = () => !disposed): Promise<void> => {
     const current = state.presentations[pluginId];
     const row = state.listing.rows.find((candidate) => candidate.pluginId === pluginId);
     if (
-      current?.kind !== "open" ||
+      !isCurrent() || current?.kind !== "open" ||
       row?.detached ||
       state.opening === pluginId ||
       refreshingInline.has(pluginId) ||
       row === undefined ||
-      row.presentationRevision <= current.presentationRevision
+      !(row.presentationRevision > current.presentationRevision)
     ) {
       return;
     }
@@ -655,8 +703,17 @@ export function createWebuiMiniAppWorkflows(deps: {
       let first: WebuiMiniAppCatalogueRow | undefined;
       try {
         first = (await listMiniApps()).miniApps.find((candidate) => candidate.pluginId === pluginId);
-        if (!first || first.detached || first.presentationRevision <= current.presentationRevision) return;
-        await new Promise<void>((resolve) => setTimeout(resolve, MINIAPP_PRESENTATION_RECONNECT_GRACE_MS));
+        if (!first || first.detached || !(first.presentationRevision > current.presentationRevision)) return;
+        await new Promise<void>((resolve) => {
+          const finish = (): void => {
+            clearTimeout(timer);
+            reconnectWaiters.delete(finish);
+            resolve();
+          };
+          const timer = setTimeout(finish, MINIAPP_PRESENTATION_RECONNECT_GRACE_MS);
+          reconnectWaiters.add(finish);
+        });
+        if (!isCurrent() || state.presentations[pluginId] !== current) return;
         const confirmed = (await listMiniApps()).miniApps.find((candidate) => candidate.pluginId === pluginId);
         // A just-disconnected standalone tab gets a short reconnect window. Only
         // reacquire when two fresh reads agree that its lease is still gone.
@@ -664,23 +721,25 @@ export function createWebuiMiniAppWorkflows(deps: {
           !confirmed ||
           confirmed.detached ||
           confirmed.presentationRevision !== first.presentationRevision ||
-          confirmed.presentationRevision <= current.presentationRevision
+          !(confirmed.presentationRevision > current.presentationRevision)
         ) return;
       } catch {
         // A failed confirmation says nothing about lease ownership. Leave the
         // current presentation in place; the next catalogue refresh can retry.
         return;
       }
-      await open(pluginId);
+      if (isCurrent() && state.presentations[pluginId] === current) await open(pluginId, undefined, isCurrent);
     } finally {
       refreshingInline.delete(pluginId);
     }
   };
 
   const stop = async (pluginId: string): Promise<void> => {
-    if (!available || !port.stopMiniApp) return;
+    if (disposed || !available || !port.stopMiniApp) return;
+    const revision = revise(pluginId);
     try {
       await port.stopMiniApp({ pluginId });
+      if (!currentOperation(pluginId, revision)) return;
       setPresentation(pluginId, { kind: "stopped", reason: "运行已停止。" });
       set((current) => {
         const refusals = { ...current.refusals };
@@ -692,17 +751,21 @@ export function createWebuiMiniAppWorkflows(deps: {
         return { ...current, refusals };
       });
     } catch (error) {
+      if (!currentOperation(pluginId, revision)) return;
+      if (state.presentations[pluginId]?.kind === "opening") setPresentation(pluginId, undefined);
       setRefusal(pluginId, refusalOf(error));
       return;
+    } finally {
+      if (currentOperation(pluginId, revision))
+        set((current) => current.opening === pluginId ? { ...current, opening: undefined } : current);
     }
     await loadListing(true);
   };
 
   const syncPresentations = async (): Promise<void> => {
-    if (!available) return;
+    if (disposed || !available) return;
     const openPlugins = Object.entries(state.presentations)
-      .filter(([, presentation]) => presentation.kind === "open")
-      .map(([pluginId]) => pluginId);
+      .filter(([, presentation]) => presentation.kind === "open");
     if (openPlugins.length === 0) return;
     try {
       await loadListing();
@@ -710,9 +773,11 @@ export function createWebuiMiniAppWorkflows(deps: {
       // A read that failed says nothing about a view that is up; the next one does.
       return;
     }
+    if (disposed || state.listing.error !== undefined) return;
     set((current) => {
       let presentations: Record<string, WebuiMiniAppPresentation> | undefined;
-      for (const pluginId of openPlugins) {
+      for (const [pluginId, previous] of openPlugins) {
+        if (current.presentations[pluginId] !== previous || current.opening === pluginId) continue;
         const row = current.listing.rows.find((candidate) => candidate.pluginId === pluginId);
         const reason = webuiMiniAppStopReason(row);
         if (!reason) continue;
@@ -747,11 +812,12 @@ export function createWebuiMiniAppWorkflows(deps: {
     readonly pluginId: string;
     readonly sessionId?: string;
   }): (() => void) => {
-    if (!available || !port.watchMiniAppPresentation) return () => undefined;
-    return port.watchMiniAppPresentation(
+    if (disposed || !available || !port.watchMiniAppPresentation) return () => undefined;
+    let active = true;
+    const unwatch = port.watchMiniAppPresentation(
       input,
       (frame) => {
-        if (frame.pluginId !== input.pluginId) return;
+        if (!active || disposed || frame.pluginId !== input.pluginId) return;
         set((current) => {
           const next: WebuiMiniAppWorkflowsState = {
             ...current,
@@ -772,12 +838,21 @@ export function createWebuiMiniAppWorkflows(deps: {
       // stored as `standalone.session = "ended"`: nothing here knows what the
       // session is, only that the service could not say.
       (error) => {
+        if (!active || disposed) return;
         set((current) => ({
           ...current,
           standaloneFailure: error.message,
         }));
       },
     );
+    const release = (): void => {
+      if (!active) return;
+      active = false;
+      standaloneReleases.delete(release);
+      unwatch();
+    };
+    standaloneReleases.add(release);
+    return release;
   };
 
   /**
@@ -789,8 +864,9 @@ export function createWebuiMiniAppWorkflows(deps: {
    */
   const presentInline = async (
     pluginId: string,
+    isCurrent: () => boolean = () => !disposed,
   ): Promise<"presented" | "waiting" | "blocked"> => {
-    if (!available) return "blocked";
+    if (!available || !isCurrent()) return "blocked";
     const current = state;
     const existing = current.presentations[pluginId];
     if (existing?.kind === "opening") return "presented";
@@ -804,10 +880,12 @@ export function createWebuiMiniAppWorkflows(deps: {
       // could present a Mini App another tab is already showing. Ask again.
       return "waiting";
     }
+    if (!isCurrent() || state.presentations[pluginId] !== existing || state.refusals[pluginId] !== undefined)
+      return "blocked";
     // A host that does not wire the catalogue has no presentation record to read,
     // so there is nothing to wait for and nothing to honour: start it, as the
     // mount always did.
-    if (catalogue === undefined) return (await open(pluginId)) ? "presented" : "blocked";
+    if (catalogue === undefined) return (await open(pluginId, undefined, isCurrent)) ? "presented" : "blocked";
     const row = catalogue.miniApps.find((candidate) => candidate.pluginId === pluginId);
     if (row?.detached === true) return "waiting";
     if (row?.runtime.status === "stopped") {
@@ -823,7 +901,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     // A local `open` may be stale after another browser document opened the
     // standalone route and replaced the server connection generation. Reopen
     // against the latest service state so this frame never keeps an obsolete id.
-    return (await open(pluginId)) ? "presented" : "blocked";
+    return (await open(pluginId, undefined, isCurrent)) ? "presented" : "blocked";
   };
 
   /**
@@ -976,6 +1054,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     if (!response.ok) return;
     const selection = deps.selection;
     if (
+      disposed ||
       (shownEpochs.get(input.pluginId) ?? 0) !== epoch ||
       (selection !== undefined && selection.current() !== input.sessionId)
     ) {
@@ -1029,7 +1108,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       // now been told this session is on screen, so it has to be told otherwise
       // before this client records a session nobody is looking at as shown.
       const selection = deps.selection;
-      if (selection && selection.current() !== resting.sessionId) {
+      if (disposed || (selection && selection.current() !== resting.sessionId)) {
         await closePanel(resting);
         return;
       }
@@ -1066,6 +1145,7 @@ export function createWebuiMiniAppWorkflows(deps: {
    * leave the page's `open` promise unsettled.
    */
   const awaitSelection: WebuiMiniAppWorkflows["awaitSelection"] = (sessionId, timeoutMs = 2_000) => {
+    if (disposed) return Promise.resolve(false);
     const selection = deps.selection;
     if (!selection) return Promise.resolve(false);
     if (selection.current() === sessionId) return Promise.resolve(true);
@@ -1073,16 +1153,23 @@ export function createWebuiMiniAppWorkflows(deps: {
       let done = false;
       let unsubscribe: () => void = () => undefined;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const cancel = (): void => finish(false);
       const finish = (value: boolean): void => {
         if (done) return;
         done = true;
         unsubscribe();
         if (timer !== undefined) clearTimeout(timer);
+        selectionWaiters.delete(cancel);
         resolve(value);
       };
+      selectionWaiters.add(cancel);
       unsubscribe = selection.subscribe(() => {
         if (selection.current() === sessionId) finish(true);
       });
+      if (done) {
+        unsubscribe();
+        return;
+      }
       timer = setTimeout(() => finish(false), timeoutMs);
       // The selection may have landed between the first read and the subscription.
       if (selection.current() === sessionId) finish(true);
@@ -1150,13 +1237,104 @@ export function createWebuiMiniAppWorkflows(deps: {
 
   // Follow the selection owner: every change either keeps the shown session or
   // closes its lease, which is the fact the runtime's approval router reads. The
-  // subscription lives as long as the store and this owner do, which is the
-  // application's own lifetime, so it is never released separately.
-  deps.selection?.subscribe(() => {
+  // subscription lives until the application disposes this owner.
+  const releaseSelection = deps.selection?.subscribe(() => {
     noteSelectedSession(deps.selection?.current());
   });
 
+  // One clock for interested readers. A slow read never overlaps the next tick.
+  const needsClock = (): boolean => [...presentationInterests.keys()].some((pluginId) => {
+    const presentation = state.presentations[pluginId];
+    return presentation?.kind === "open" ||
+      (presentation === undefined && state.refusals[pluginId] === undefined);
+  }) ||
+    [...listingInterests.values()].some((kind) => kind === "launcher");
+  const scheduleObservation = (): void => {
+    if (disposed || suspended || observing || observationTimer !== undefined || !needsClock()) return;
+    observationTimer = setTimeout(() => {
+      observationTimer = undefined;
+      void observe();
+    }, 2_000);
+  };
+  const observe = async (): Promise<void> => {
+    if (disposed || suspended || observing) return;
+    observing = true;
+    try {
+      if (listingInterests.size > 0 || presentationInterests.size > 0) await loadListing();
+      for (const [pluginId, interest] of presentationInterests) {
+        const isCurrent = (): boolean => !disposed && !suspended && presentationInterests.get(pluginId) === interest;
+        if (!isCurrent()) continue;
+        if (state.opening === pluginId || state.refusals[pluginId] !== undefined) continue;
+        const presentation = state.presentations[pluginId];
+        if (presentation === undefined) {
+          if (interest.standalone) await open(pluginId, undefined, isCurrent);
+          else await presentInline(pluginId, isCurrent);
+        } else if (presentation.kind === "open") {
+          const row = state.listing.rows.find((candidate) => candidate.pluginId === pluginId);
+          // Failed reads cannot turn the last good catalogue into a stop verdict.
+          const reason = state.listing.error ? undefined : webuiMiniAppStopReason(row);
+          if (reason) setPresentation(pluginId, { kind: "stopped", reason });
+          else if (!interest.standalone) await refreshInline(pluginId, isCurrent);
+        }
+      }
+    } finally {
+      observing = false;
+      scheduleObservation();
+    }
+  };
+  const stopClock = (): void => {
+    if (observationTimer !== undefined) clearTimeout(observationTimer);
+    observationTimer = undefined;
+  };
+
   return {
+    acquireListing: (kind) => {
+      if (disposed) return () => undefined;
+      const key = Symbol();
+      listingInterests.set(key, kind);
+      void observe();
+      return () => {
+        listingInterests.delete(key);
+        if (!needsClock()) stopClock();
+      };
+    },
+    acquirePresentation: (pluginId, standalone) => {
+      if (disposed) return () => undefined;
+      const interest = presentationInterests.get(pluginId) ?? { count: 0, standalone };
+      interest.count += 1;
+      presentationInterests.set(pluginId, interest);
+      if (state.presentations[pluginId] === undefined) void observe();
+      else scheduleObservation();
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        if (--interest.count === 0) {
+          presentationInterests.delete(pluginId);
+        }
+        if (!needsClock()) stopClock();
+      };
+    },
+    setSuspended: (value) => {
+      if (suspended === value) return;
+      suspended = value;
+      if (value) stopClock();
+      else void observe();
+    },
+    refreshInterested: () => { void observe(); },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      stopClock();
+      listingInterests.clear();
+      presentationInterests.clear();
+      releaseSelection?.();
+      for (const cancel of selectionWaiters) cancel();
+      for (const cancel of reconnectWaiters) cancel();
+      for (const release of standaloneReleases) release();
+      if (state.agentShown) void closePanel(state.agentShown);
+      listeners.clear();
+    },
     getSnapshot: () => state,
     subscribe: (listener) => {
       listeners.add(listener);

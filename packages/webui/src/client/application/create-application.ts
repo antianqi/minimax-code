@@ -15,6 +15,7 @@
 // a source of duplicated state.
 
 import { createWebuiPortSlices, type WebuiPortSlices } from "./port-slices.js";
+import { createWebuiMiniAppPresenterCoordinator } from "./miniapp-presenter.js";
 import {
   createWebuiSessionComposerAccess,
   createWebuiSessionWorkflows,
@@ -392,6 +393,7 @@ export interface WebuiApplication {
   readonly pluginWorkflows: ReturnType<typeof createWebuiPluginWorkflows>;
   /** The Mini App business's owner: catalogue, presentations and refusals. */
   readonly miniAppWorkflows: ReturnType<typeof createWebuiMiniAppWorkflows>;
+  readonly miniAppPresenter: ReturnType<typeof createWebuiMiniAppPresenterCoordinator>;
   /** The composer's plugin/skill read model, separate from the manager's. */
   readonly composerPluginCatalogue: ReturnType<typeof createWebuiComposerPluginCatalogue>;
   /** The plan-review reply workflow. */
@@ -954,6 +956,12 @@ export function createWebuiApplication(
       subscribe: store.subscribe,
     },
   });
+  const miniAppPresenter = createWebuiMiniAppPresenterCoordinator({
+    watch: miniAppWorkflows.watchPresenter,
+    awaitSelection: miniAppWorkflows.awaitSelection,
+    selected: () => store.getSelectedSessionId(),
+    open: miniAppWorkflows.open,
+  });
   // The composer's view of what is installed and what the agent can run: a
   // separate read model from `pluginWorkflows` on purpose, so neither overwrites
   // the other when one reloads.
@@ -1110,6 +1118,7 @@ export function createWebuiApplication(
     modelsWorkflows,
     pluginWorkflows,
     miniAppWorkflows,
+    miniAppPresenter,
     composerPluginCatalogue,
     activeTurnProbe,
     planReviewWorkflow,
@@ -1175,6 +1184,9 @@ export function createWebuiApplication(
       // single shared teardown would hide which family was missed next time.
       shutDown("models owner", () => modelsWorkflows.dispose());
       shutDown("settings owner", () => settingsWorkflows.dispose());
+      shutDown("Mini App owner", () => miniAppWorkflows.dispose());
+      shutDown("Mini App presenter", () => miniAppPresenter.dispose());
+      shutDown("channel owner", () => channelOwner.dispose());
       shutDown("workspace owners", () => workspaceQueries.dispose());
       shutDown("workspace review resource", () => workspaceReview.dispose());
       shutDown("turn review owner", () => turnReview.dispose());

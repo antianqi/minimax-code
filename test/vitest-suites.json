@@ -566,6 +566,7 @@
       "packages/webui/test/unit/miniapp-operations.test.ts",
       "packages/webui/test/unit/workspace-write-fence.test.ts",
       "packages/webui/test/unit/miniapp-client-state.test.ts",
+      "packages/webui/test/unit/application-observation-interests.test.ts",
       "packages/webui/test/unit/miniapp-bridge.test.ts",
       "packages/webui/test/unit/miniapp-agent-observe.test.ts",
       "packages/webui/test/unit/miniapp-port-slices.test.ts",

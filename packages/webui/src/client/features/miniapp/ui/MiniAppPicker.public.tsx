@@ -17,6 +17,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import {
   useWebuiMiniAppWorkflows,
   useWebuiMiniAppWorkflowsState,
+  useWebuiMiniAppListingInterest,
 } from "../bindings/use-miniapp-workflows.js";
 import {
   webuiMiniAppCapacityText,
@@ -76,21 +77,7 @@ export function MiniAppLauncher({ sessionId }: { readonly sessionId?: string }):
     if (surface) window.requestAnimationFrame(placeSurface);
   }, [placeSurface]);
 
-  useEffect(() => {
-    if (!open) return;
-    void workflows?.loadListing();
-    const refresh = () => {
-      if (!dom.isPageHidden()) void workflows?.loadListing();
-    };
-    window.addEventListener("focus", refresh);
-    const stopVisibility = dom.listenForVisibilityChange(refresh);
-    const timer = window.setInterval(refresh, 2_000);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      stopVisibility();
-      window.clearInterval(timer);
-    };
-  }, [open, workflows, dom]);
+  useWebuiMiniAppListingInterest("launcher", open);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -268,10 +255,7 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const { loading } = state.listing;
-  // The page's visibility is the platform's fact, not this component's: the
-  // dependency rules keep `document` out of the bindings, and the browser port
-  // already answers both questions this surface asks of it.
-  const { dom } = useWebuiBrowserCapabilities();
+  useWebuiMiniAppListingInterest("catalogue");
   // Only a startable package belongs here: the picker exists to open one, and a
   // disabled Mini App cannot be opened — the catalogue's apps area is where it is
   // enabled, and this surface would otherwise offer an action that always fails.
@@ -284,19 +268,6 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
   useWebuiToastError(capacityRefused ? webuiMiniAppCapacityText(rows) : undefined, {
     testId: "miniapp-picker-capacity",
   });
-
-  useEffect(() => {
-    void workflows?.loadListing();
-    const refresh = () => {
-      if (!dom.isPageHidden()) void workflows?.loadListing();
-    };
-    window.addEventListener("focus", refresh);
-    const stopVisibility = dom.listenForVisibilityChange(refresh);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      stopVisibility();
-    };
-  }, [workflows, dom]);
 
   return (
     <div className="webui-miniapp-picker" data-testid="miniapp-picker">

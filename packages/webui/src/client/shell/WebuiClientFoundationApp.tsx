@@ -699,65 +699,35 @@ export function WebuiClientFoundationApp(
   // The panel/tab state belongs to the workspace business: the shell reads the
   // slice for the session it shows and dispatches; it owns neither.
   const workspacePanelOwner = workspaceQueries.panel;
-  const latestSelectedSessionId = useRef(selectedSessionId);
-  latestSelectedSessionId.current = selectedSessionId;
-  const presenterEpoch = useRef<string>();
-  const presenterRevision = useRef(0);
-  const presenterTask = useRef(0);
   useEffect(() => {
-    let disposed = false;
-    const release = miniAppWorkflows.watchPresenter((intent) => {
-      if (presenterEpoch.current !== intent.epoch) {
-        presenterEpoch.current = intent.epoch;
-        presenterRevision.current = 0;
-      }
-      if (intent.revision <= presenterRevision.current) return;
-      presenterRevision.current = intent.revision;
-      const task = ++presenterTask.current;
-      if (intent.action === "close") {
-        for (const tab of workspacePanelOwner.stateFor(intent.sessionId).workspacePanel.tabs) {
-          if (tab.content.kind === "miniapp" && tab.content.pluginId === intent.pluginId) {
-            workspacePanelOwner.dispatch(intent.sessionId, { type: "close-tab", tabId: tab.id });
+    return application.miniAppPresenter.bind({
+      onFailure: (error) => setPageError(error instanceof Error ? error.message : String(error)),
+      close: (sessionId, pluginId) => {
+        for (const tab of workspacePanelOwner.stateFor(sessionId).workspacePanel.tabs) {
+          if (tab.content.kind === "miniapp" && tab.content.pluginId === pluginId) {
+            workspacePanelOwner.dispatch(sessionId, { type: "close-tab", tabId: tab.id });
           }
         }
-        return;
-      }
-      dispatchShellSurface({ type: "show-conversation" });
-      selectSession(intent.sessionId);
-      if (typeof window !== "undefined")
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${window.location.search}${sessionHash(intent.sessionId)}`,
-        );
-      void (async () => {
-        if (!(await miniAppWorkflows.awaitSelection(intent.sessionId))) return;
-        const alreadyOpen = workspacePanelOwner.stateFor(intent.sessionId).workspacePanel.tabs.some(
-          (tab) => tab.content.kind === "miniapp" && tab.content.pluginId === intent.pluginId,
-        );
-        const opened =
-          alreadyOpen || (await miniAppWorkflows.open(intent.pluginId, intent.path));
-        if (
-          disposed ||
-          presenterTask.current !== task ||
-          !opened ||
-          latestSelectedSessionId.current !== intent.sessionId
-        ) return;
-        workspacePanelOwner.dispatch(intent.sessionId, {
+      },
+      select: (sessionId) => {
+        dispatchShellSurface({ type: "show-conversation" });
+        selectSession(sessionId);
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${sessionHash(sessionId)}`);
+      },
+      isOpen: (sessionId, pluginId) => workspacePanelOwner.stateFor(sessionId).workspacePanel.tabs.some(
+        (tab) => tab.content.kind === "miniapp" && tab.content.pluginId === pluginId,
+      ),
+      show: (sessionId, pluginId) => {
+        workspacePanelOwner.dispatch(sessionId, {
           type: "open-tab",
           kind: "miniapp",
-          sessionId: intent.sessionId,
-          pluginId: intent.pluginId,
+          sessionId,
+          pluginId,
         });
-        workspacePanelOwner.dispatch(intent.sessionId, { type: "open-panel" });
-      })();
+        workspacePanelOwner.dispatch(sessionId, { type: "open-panel" });
+      },
     });
-    return () => {
-      disposed = true;
-      presenterTask.current += 1;
-      release();
-    };
-  }, [application, dispatchShellSurface, miniAppWorkflows, selectSession, workspacePanelOwner]);
+  }, [application, dispatchShellSurface, selectSession, workspacePanelOwner]);
 
   // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板 — the Desktop's
   // `browserUseAutoOpenPanelEnabled`: a page the Agent starts while the panel is

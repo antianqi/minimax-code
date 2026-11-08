@@ -97,7 +97,6 @@ import {
  * The same read is what tells this view that a standalone tab took the
  * presentation, or gave it back.
  */
-const PRESENTATION_SYNC_MS = 2_000;
 
 /** Which of ADR 0020's two presentations is mounting this view. */
 export type WebuiMiniAppSurface = "inline" | "standalone";
@@ -313,60 +312,8 @@ export function MiniAppView({
    * catalogue reports is its own.
    */
   useEffect(() => {
-    if (!workflows || presentation !== undefined) return;
-    if (standalone) {
-      void workflows.open(pluginId);
-      return;
-    }
-    let stopped = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const ask = async (): Promise<void> => {
-      const outcome = await workflows
-        .presentInline(pluginId)
-        .catch(() => "waiting" as const);
-      if (stopped) return;
-      if (outcome !== "waiting") {
-        if (timer !== undefined) clearInterval(timer);
-        return;
-      }
-      timer ??= setInterval(() => void ask(), PRESENTATION_SYNC_MS);
-    };
-    void ask();
-    return () => {
-      stopped = true;
-      if (timer !== undefined) clearInterval(timer);
-    };
-  }, [pluginId, presentation, standalone, workflows]);
-
-  /** While a view is up, the runtime is asked whether it still is. */
-  useEffect(() => {
-    if (!workflows || presentation?.kind !== "open") return;
-    const timer = setInterval(
-      () => void workflows.syncPresentations(),
-      PRESENTATION_SYNC_MS,
-    );
-    return () => clearInterval(timer);
-  }, [presentation?.kind, workflows]);
-
-  /**
-   * A standalone document can replace the service connection while this inline
-   * view remains mounted. When its lease ends, reacquire the current generation
-   * before sending any more page bridge calls through the old one.
-   */
-  useEffect(() => {
-    if (standalone || detached || presentation?.kind !== "open" || !workflows)
-      return;
-    if (row && row.presentationRevision > presentation.presentationRevision) {
-      void workflows.refreshInline(pluginId);
-    }
-  }, [
-    detached,
-    pluginId,
-    presentation,
-    row?.presentationRevision,
-    standalone,
-    workflows,
-  ]);
+    return workflows?.acquirePresentation(pluginId, standalone);
+  }, [pluginId, standalone, workflows]);
 
   /**
    * Claim the tab's browsing-context name, so the inline view can focus it.

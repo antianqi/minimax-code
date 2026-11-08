@@ -34,6 +34,19 @@ directory it happens to sit in:
 
 The dependency rules and the role checks that enforce them are in `../architecture/boundaries.md`.
 
+Mini App readers declare catalogue or presentation interest to `miniapp-workflows.ts`.
+The owner shares listing reads and the observation clock; launcher interest requests periodic
+freshness, while catalogue-only interest refreshes on acquisition and browser return. The provider
+binds visibility/focus facts once. Presentation interest waits for detached leases, reconciles open
+views, and ends automatic work on a stopped/refused state. Release and application disposal fence
+pending work. User open/stop commands have per-plugin operation revisions.
+
+`client/application/miniapp-presenter.ts` coordinates host presenter epochs, revisions, selection
+and asynchronous opening. The composition root constructs it; the shell binds navigation, history
+and workspace commands. A newer intent or released binding prevents an older task from showing a tab.
+The channel owner likewise owns pending authorization polling and shares it among open-pane readers;
+selection, replacement QR, last-reader release and disposal fence delayed authorization results.
+
 ## Lifetime: one application, explicitly started
 
 - The composition root (`client/application/create-application.ts`) constructs **dormant** owners,

@@ -90,6 +90,7 @@ export type WebuiChannelMutation =
   | { readonly ok: false; readonly message: string };
 
 export interface WebuiChannelOwner {
+  readonly dispose: () => void;
   readonly subscribe: (listener: () => void) => () => void;
   readonly getSnapshot: () => WebuiChannelSnapshot;
   /** Reads the bot list once. Concurrent calls share one request. */
@@ -153,9 +154,28 @@ export function createWebuiChannelOwner(
   const listeners = new Set<() => void>();
   let snapshot: WebuiChannelSnapshot = { status: "idle", connections: [] };
   let inFlight: Promise<void> | undefined;
+  let disposed = false;
+  let selectionRevision = 0;
+  let interestRevision = 0;
+  let refreshConsumers = 0;
+  let refreshTimer: unknown;
+  let authorizationTimer: unknown;
+  let authorizationRead: { authorization: WebuiChannelAuthorization; promise: Promise<WebuiChannelAuthorization | undefined> } | undefined;
+
+  const reconcileAuthorizationTimer = (): void => {
+    const pending = !disposed && refreshConsumers > 0 && snapshot.authorization?.status === "pending";
+    if (pending && authorizationTimer === undefined) {
+      authorizationTimer = setIntervalFn(() => { void readAuthorization(); }, 2_000);
+    } else if (!pending && authorizationTimer !== undefined) {
+      clearIntervalFn(authorizationTimer);
+      authorizationTimer = undefined;
+    }
+  };
 
   const publish = (next: WebuiChannelSnapshot): void => {
+    if (disposed) return;
     snapshot = next;
+    reconcileAuthorizationTimer();
     for (const listener of listeners) listener();
   };
 
@@ -163,6 +183,7 @@ export function createWebuiChannelOwner(
     error instanceof Error && error.message ? error.message : WEBUI_CHANNEL_FAILED;
 
   const load = async (): Promise<void> => {
+    if (disposed) return;
     if (inFlight) return inFlight;
     const read = options.port.listChannelConnections;
     if (!read) {
@@ -217,6 +238,7 @@ export function createWebuiChannelOwner(
    * stores one filter per IM client, keyed by the transport identity of its binding.
    */
   const loadSelection = async (connectionId: string | undefined): Promise<void> => {
+    const revision = selectionRevision;
     const connection =
       connectionId === undefined
         ? undefined
@@ -247,6 +269,7 @@ export function createWebuiChannelOwner(
         filterError = error instanceof Error && error.message ? error.message : WEBUI_CHANNEL_FILTER_FAILED;
       }
     }
+    if (disposed || revision !== selectionRevision || snapshot.selectedId !== connectionId) return;
     publish({ ...snapshot, config, filter, filterError });
   };
 
@@ -283,6 +306,7 @@ export function createWebuiChannelOwner(
   const startAuthorization = async (
     connectionId: string,
   ): Promise<WebuiChannelMutation> => {
+    if (disposed) return { ok: false, message: WEBUI_CHANNEL_FAILED };
     const connection = snapshot.connections.find(
       (entry) => entry.connectionId === connectionId,
     );
@@ -305,11 +329,16 @@ export function createWebuiChannelOwner(
       selectedId: connectionId,
       authorization: { ...base, status: "starting" },
     });
+    const revision = ++selectionRevision;
+    const interest = interestRevision;
+    const isCurrent = (): boolean => !disposed && revision === selectionRevision &&
+      interest === interestRevision && snapshot.selectedId === connectionId;
     try {
       const result = await start({
         name: webuiChannelBotName(connection),
         connectionId,
       });
+      if (!isCurrent()) return { ok: false, message: WEBUI_CHANNEL_FAILED };
       if (!result.ok) {
         const message = result.error ?? WEBUI_CHANNEL_FAILED;
         publish({
@@ -331,6 +360,7 @@ export function createWebuiChannelOwner(
       return { ok: true };
     } catch (error) {
       const message = failureMessage(error);
+      if (!isCurrent()) return { ok: false, message };
       publish({
         ...snapshot,
         authorization: { ...base, status: "error", error: message },
@@ -340,6 +370,8 @@ export function createWebuiChannelOwner(
   };
 
   const select = async (connectionId: string | undefined): Promise<void> => {
+    if (disposed) return;
+    const revision = ++selectionRevision;
     const keepsAuthorization =
       connectionId !== undefined && snapshot.authorization?.connectionId === connectionId;
     publish({
@@ -351,6 +383,7 @@ export function createWebuiChannelOwner(
       ...(keepsAuthorization ? {} : { authorization: undefined }),
     });
     await loadSelection(connectionId);
+    if (disposed || revision !== selectionRevision || snapshot.selectedId !== connectionId) return;
     if (connectionId === undefined) return;
     const connection = snapshot.connections.find(
       (entry) => entry.connectionId === connectionId,
@@ -412,8 +445,12 @@ export function createWebuiChannelOwner(
    * A confirmed authorization binds the bot, so the list is read again and the create flow closes:
    * the bot then appears in the list, where it belongs.
    */
-  const readAuthorization = async (): Promise<WebuiChannelAuthorization | undefined> => {
+  const readAuthorizationOnce = async (): Promise<WebuiChannelAuthorization | undefined> => {
     const current = snapshot.authorization;
+    const revision = selectionRevision;
+    const interest = interestRevision;
+    const isCurrent = (): boolean => !disposed && revision === selectionRevision &&
+      interest === interestRevision && snapshot.authorization === current;
     const read = options.port.getChannelWechatBindStatus;
     // The runtime files the authorization under a session, and under the bot's connection, so
     // either one names it.
@@ -425,6 +462,7 @@ export function createWebuiChannelOwner(
         connectionId: current.connectionId,
         ...(current.sessionId === undefined ? {} : { sessionId: current.sessionId }),
       });
+      if (!isCurrent()) return snapshot.authorization;
       const status =
         result.status === "confirmed"
           ? "confirmed"
@@ -441,11 +479,13 @@ export function createWebuiChannelOwner(
       publish({ ...snapshot, authorization: next });
       if (status === "confirmed") {
         await load();
-        publish({ ...snapshot, authorization: undefined });
+        if (!disposed && revision === selectionRevision && interest === interestRevision && snapshot.authorization === next)
+          publish({ ...snapshot, authorization: undefined });
         return undefined;
       }
       return next;
     } catch (error) {
+      if (!isCurrent()) return snapshot.authorization;
       const next: WebuiChannelAuthorization = {
         ...current,
         status: "error",
@@ -456,7 +496,30 @@ export function createWebuiChannelOwner(
     }
   };
 
+  const readAuthorization = (): Promise<WebuiChannelAuthorization | undefined> => {
+    if (disposed) return Promise.resolve(undefined);
+    const authorization = snapshot.authorization;
+    if (!authorization || authorization.status !== "pending") return Promise.resolve(authorization);
+    if (authorizationRead?.authorization === authorization) return authorizationRead.promise;
+    const promise = readAuthorizationOnce();
+    authorizationRead = { authorization, promise };
+    void promise.finally(() => {
+      if (authorizationRead?.promise === promise) authorizationRead = undefined;
+    });
+    return promise;
+  };
+
   return {
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      selectionRevision += 1;
+      interestRevision += 1;
+      if (refreshTimer !== undefined) clearIntervalFn(refreshTimer);
+      refreshTimer = undefined;
+      reconcileAuthorizationTimer();
+      listeners.clear();
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -464,8 +527,26 @@ export function createWebuiChannelOwner(
     getSnapshot: () => snapshot,
     load,
     startRefreshing: () => {
-      const handle = setIntervalFn(() => void load(), refreshMs);
-      return () => clearIntervalFn(handle);
+      if (disposed) return () => undefined;
+      refreshConsumers += 1;
+      refreshTimer ??= setIntervalFn(() => void load(), refreshMs);
+      reconcileAuthorizationTimer();
+      if (snapshot.selectedId !== undefined && snapshot.authorization === undefined)
+        void select(snapshot.selectedId);
+      let released = false;
+      return () => {
+        if (released || disposed) return;
+        released = true;
+        if (--refreshConsumers === 0) {
+          interestRevision += 1;
+          authorizationRead = undefined;
+          if (refreshTimer !== undefined) clearIntervalFn(refreshTimer);
+          refreshTimer = undefined;
+          if (snapshot.authorization?.status === "starting")
+            publish({ ...snapshot, authorization: undefined });
+        }
+        reconcileAuthorizationTimer();
+      };
     },
     select,
     addBot,

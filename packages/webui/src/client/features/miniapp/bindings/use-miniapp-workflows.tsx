@@ -7,7 +7,8 @@
 // component renders "no Mini App capability", which is the same thing a host
 // without the cell does.
 
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 
 import {
   initialWebuiMiniAppWorkflowsState,
@@ -24,11 +25,31 @@ export function WebuiMiniAppWorkflowsProvider({
   readonly workflows: WebuiMiniAppWorkflows;
   readonly children: ReactNode;
 }): JSX.Element {
+  const { dom } = useWebuiBrowserCapabilities();
+  useEffect(() => {
+    const update = (): void => workflows.setSuspended(dom.isPageHidden());
+    const refresh = (): void => {
+      update();
+      if (!dom.isPageHidden()) workflows.refreshInterested();
+    };
+    update();
+    const release = dom.listenForVisibilityChange(refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      release();
+      window.removeEventListener("focus", refresh);
+    };
+  }, [dom, workflows]);
   return (
     <WebuiMiniAppWorkflowsContext.Provider value={workflows}>
       {children}
     </WebuiMiniAppWorkflowsContext.Provider>
   );
+}
+
+export function useWebuiMiniAppListingInterest(kind: "launcher" | "catalogue", active = true): void {
+  const workflows = useWebuiMiniAppWorkflows();
+  useEffect(() => active ? workflows?.acquireListing(kind) : undefined, [active, kind, workflows]);
 }
 
 /** The owner, for a component that submits commands. */

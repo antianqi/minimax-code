@@ -2,7 +2,7 @@
 // state. Plugin metadata owns identity and icon projection; Mini App workflows
 // own lifecycle state and actions, the same runtime rows the launcher reads.
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   IconDots,
   IconExternalLink,
@@ -12,10 +12,10 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 
-import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
   useWebuiMiniAppWorkflows,
   useWebuiMiniAppWorkflowsState,
+  useWebuiMiniAppListingInterest,
 } from "../bindings/use-miniapp-workflows.js";
 import {
   webuiMiniAppFailureCodeText,
@@ -94,23 +94,7 @@ export function MiniAppAppsList({
   useWebuiToastError(error);
   useWebuiToastError(state.unavailable);
   useWebuiToastError(permissionSlice?.error);
-  // The page's visibility is the platform's fact, not this component's: the
-  // dependency rules keep `document` out of the bindings, and the browser port
-  // already answers both questions this surface asks of it.
-  const { dom } = useWebuiBrowserCapabilities();
-
-  useEffect(() => {
-    void workflows?.loadListing();
-    const refresh = () => {
-      if (!dom.isPageHidden()) void workflows?.loadListing();
-    };
-    window.addEventListener("focus", refresh);
-    const stopVisibility = dom.listenForVisibilityChange(refresh);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      stopVisibility();
-    };
-  }, [workflows, dom]);
+  useWebuiMiniAppListingInterest("catalogue");
 
   if (loading && rows.length === 0 && installedPlugins.length === 0) {
     return <FeedbackBusy label="加载中…" />;

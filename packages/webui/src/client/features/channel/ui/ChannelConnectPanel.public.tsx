@@ -664,7 +664,6 @@ export function ChannelConnectPanelView(props: ChannelConnectPanelViewProps): Re
 }
 
 /** How often the pane reads the authorization one bot's card is showing. */
-const AUTHORIZATION_POLL_MS = 2_000;
 
 export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactElement {
   const snapshot = useSyncExternalStore(
@@ -691,19 +690,6 @@ export function ChannelConnectPanel(props: ChannelConnectPanelProps): ReactEleme
     if (!first) return;
     void props.owner.select(first.connectionId);
   }, [props.owner, snapshot.connections, snapshot.selectedId]);
-
-  // The authorization is the one thing on this page that moves without the host saying anything,
-  // so the clock ticks only while one is on screen.
-  const authorizationPending = snapshot.authorization?.status === "pending";
-  useEffect(() => {
-    if (!authorizationPending) return;
-    const timer = setInterval(() => {
-      void props.owner.readAuthorization();
-    }, AUTHORIZATION_POLL_MS);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [props.owner, authorizationPending]);
 
   const selected = snapshot.connections.find(
     (entry) => entry.connectionId === snapshot.selectedId,

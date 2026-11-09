@@ -48,6 +48,7 @@ export default defineConfig({
     colorScheme: "light",
     reducedMotion: "reduce",
     browserName: "chromium",
+    channel: process.env.WEBUI_DIAGNOSTIC_CHANNEL === "chromium" ? "chromium" : undefined,
     headless: true,
     trace: "retain-on-failure",
     launchOptions: {

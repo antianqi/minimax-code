@@ -217,6 +217,28 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   expect(await lastFile.locator(".webui-turn-review-code").evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(1000);
 });
 
+test("a contained unified diff keeps long lines horizontally scrollable", async ({ page }) => {
+  await configureFixture(page, () => {
+    const file = { fileId: "src/long.ts", path: "src/long.ts", additions: 1, deletions: 0, status: "modified" };
+    window.__fixture.setWorkspaceReview({
+      repositoryId: "repo-1", reviewSnapshotId: "long-line-snapshot", files: [file],
+      totals: { files: 1, additions: 1, deletions: 0 },
+    }, [{ fileId: file.fileId, diff: { type: "text", diff: `diff --git a/src/long.ts b/src/long.ts\n--- a/src/long.ts\n+++ b/src/long.ts\n@@ -0,0 +1 @@\n+${"x".repeat(800)}` } }]);
+  });
+  await openApp(page);
+  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
+  await openLauncherTile(page, "review");
+  const code = page.getByTestId("workspace-review").locator(".webui-turn-review-code");
+  await expect(code).toBeVisible();
+  await expect(code).toContainText("x".repeat(800));
+  const geometry = await code.evaluate((element) => {
+    element.scrollLeft = 200;
+    return { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, scrollLeft: element.scrollLeft };
+  });
+  expect(geometry.scrollWidth).toBeGreaterThan(geometry.clientWidth);
+  expect(geometry.scrollLeft).toBe(200);
+});
+
 test("the workspace file tree uses the shared disclosure transition when a directory opens and closes", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);

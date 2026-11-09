@@ -307,7 +307,7 @@
   .webui-turn-review-file-heading .webui-diff-file-icon { width: 18px; height: 18px; }
   .webui-turn-review-file-heading .webui-diff-file-icon .webui-workspace-filetype-badge { width: 18px; height: 18px; }
   .webui-turn-review-file-path { min-width: 0; flex: 1; overflow: hidden; font-size: var(--size_14); text-overflow: ellipsis; white-space: nowrap; }
-  .webui-turn-review-code { width: max-content; min-width: 100%; margin: 0; padding: 0; overflow: auto; background: var(--bg_default_primary); font-size: var(--size_12); line-height: 1.65; white-space: pre; overflow-wrap: normal; }
+  .webui-turn-review-code { width: 100%; min-width: 100%; margin: 0; padding: 0; overflow: auto; background: var(--bg_default_primary); font-size: var(--size_12); line-height: 1.65; white-space: pre; overflow-wrap: normal; }
   .webui-turn-review-code code { display: block; min-width: max-content; }
   .webui-turn-review-line { display: grid; min-width: max-content; grid-template-columns: 48px 48px 20px minmax(0, 1fr); }
   .webui-turn-review-code--split { width: 100%; }

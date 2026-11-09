@@ -9,17 +9,28 @@ permissions:
 
 jobs:
   diagnose:
-    name: Diagnostic ${{ matrix.runner }} (${{ matrix.channel }})
+    name: Diagnostic ${{ matrix.runner }} (${{ matrix.mode }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-15
-            channel: shell
-          - runner: macos-26-intel
-            channel: shell
+          - runner: macos-26
+            channel: chromium
+            mode: headless
+            headed: false
+            caffeinate: false
+          - runner: macos-26
+            channel: chromium
+            mode: headed
+            headed: true
+            caffeinate: false
+          - runner: macos-26
+            channel: chromium
+            mode: awake
+            headed: false
+            caffeinate: true
     env:
       WEBUI_DIAGNOSTIC_CHANNEL: ${{ matrix.channel }}
     steps:
@@ -40,18 +51,19 @@ jobs:
       - run: pnpm install:webui-browsers
       - name: Probe frame source and failing interactions
         run: >-
-          pnpm exec playwright test
+          ${{ matrix.caffeinate && 'caffeinate -diu' || '' }} pnpm exec playwright test
           packages/webui/test/browser/streaming-performance.spec.mjs
           packages/webui/test/browser/workspace-panel-actions.spec.mjs
           packages/webui/test/browser/browser-workspace.spec.mjs
           packages/webui/test/browser/rail-pin.spec.mjs
           packages/webui/test/browser/surface-appearance.spec.mjs
           --grep 'a streamed reply|a long reply|continuous chunks|workspace review stays responsive|contained unified diff|browser page fills|hovering a child session|calendar tip is drawn'
+          ${{ matrix.headed && '--headed' || '' }}
       - name: Retain diagnostic artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: macos-diagnostic-${{ matrix.runner }}-${{ matrix.channel }}
+          name: macos-diagnostic-${{ matrix.runner }}-${{ matrix.mode }}
           path: ${{ runner.temp }}/mac-browser-${{ matrix.channel }}/
           retention-days: 7
           if-no-files-found: ignore

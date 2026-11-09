@@ -85,6 +85,7 @@ async function measureStreamedReply(page, options) {
   }, historyMessages(historyTurns));
   const clock = async (label) => {
     const result = await page.evaluate(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const gaps = [], lags = [], timers = [];
       let active = true, previous = performance.now();
       const frame = (timestamp) => {
@@ -99,7 +100,7 @@ async function measureStreamedReply(page, options) {
         setTimeout(() => { timers.push(performance.now() - start); timer(); }, 4);
       };
       requestAnimationFrame(frame); timer();
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       active = false;
       return { gaps, lags, timers, visibility: document.visibilityState, focused: document.hasFocus() };
     });

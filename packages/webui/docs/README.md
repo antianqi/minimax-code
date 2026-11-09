@@ -102,9 +102,8 @@ composer's keyboard bindings as the settings page stores them: one canonical not
 settings page owns the change, the composer reads the stored binding when a key is pressed, and only
 the actions that already have keyboard meaning are bindable. ADR 0027 records the WebUI's
 scheduled-task surface: the WebUI is a scheduler host. It reaches the v2 runtime's Cron
-service, arms the persisted scheduled tasks and fires them, and when the electron app runs at
-the same time the shared database decides which host acts on a given slot — the electron app
-needs no change. [ADR 0028](adr/0028-the-webui-has-one-shared-presentation-layer.md) establishes the
+service, arms the persisted scheduled tasks and fires them; when another host runs at the same time,
+the shared database decides which host acts on a given slot. [ADR 0028](adr/0028-the-webui-has-one-shared-presentation-layer.md) establishes the
 shared presentation layer and its motion foundations; [ADR 0029](adr/0029-page-surfaces-share-layout-skeleton-and-motion-contracts.md)
 defines the page, skeleton and shared motion contracts for route pages, dialogs, drawers and
 repeated semantic elements. ADR 0030 records the client's one way of saying something that has

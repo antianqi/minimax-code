@@ -215,7 +215,7 @@ describe("the plugin catalogue's apps area", () => {
     );
 
     expect(apps).toContain("其他客户端运行中");
-    expect(apps).toContain("electron");
+    expect(apps).not.toContain("electron");
     // Each attribute is asserted on its own: the row renders `data-testid`,
     // `aria-label`, `disabled` and `title`, and a substring that spans two of
     // them pins the attribute order instead of the state the test is about.
@@ -249,9 +249,10 @@ describe("the plugin catalogue's apps area", () => {
       workflows,
     );
 
-    // The row names the other client and still offers the action that ends the
+    // The row identifies another client and still offers the action that ends the
     // Mini App: the process serving it can be stopped from here too.
-    expect(picker).toContain("其他客户端运行中（electron）");
+    expect(picker).toContain("其他客户端运行中");
+    expect(picker).not.toContain("electron");
     expect(picker).toContain('data-testid="miniapp-picker-stop-shared"');
     expect(picker).not.toMatch(/data-testid="miniapp-picker-stop-shared"[^>]*disabled=""/u);
   });

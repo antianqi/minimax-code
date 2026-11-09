@@ -1,13 +1,11 @@
 // Whether a page the Agent opens brings the browser panel up with it.
 //
-// The Desktop keeps this as `browserUseAutoOpenPanelEnabled`, off by default,
-// and turns it into "open the right-side Browser panel when the agent operates a
-// page". It is a client preference — the runtime's browser-use service has no
+// This opens the right-side browser panel when the agent operates a page.
+// It is a client preference — the runtime's browser-use service has no
 // such setting — so it lives in browser storage beside this client's other
 // remembered choices.
 //
-// Default off, like the Desktop: a panel that opens itself is a surprise unless
-// the reader asked for it.
+// It is off by default.
 
 import { getWebuiBrowserStorage } from "./storage.js";
 

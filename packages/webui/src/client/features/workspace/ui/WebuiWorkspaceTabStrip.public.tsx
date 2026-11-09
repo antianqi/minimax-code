@@ -180,8 +180,7 @@ export function webuiWorkspaceTabStripReconcile(
 /**
  * Whether a published snapshot must bring the workspace panel up with it.
  *
- * 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板, the Desktop's
- * `browserUseAutoOpenPanelEnabled`: a page the Agent starts on a panel that is
+ * 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板: a page the Agent starts on a panel that is
  * not showing opens the panel. Only a target the panel has no tab for counts —
  * a snapshot that merely moves an open tab's page must not re-open a panel the
  * reader closed — and the reader's "off" wins over both.

@@ -20,7 +20,7 @@ export function webuiPluginFailureText(input: {
       // The cloud refuses to serve a client it does not accept. The declared
       // version is named because the person can act on it: it is the one the
       // cloud answered for, not the one the runtime happened to send.
-      return `市场拒绝了当前声明的客户端版本（本客户端声明的是 ${MARKETPLACE_VISIBILITY_DESKTOP_VERSION}）。请更新 WebUI 或联系维护者同步桌面版本。`;
+      return `市场拒绝了当前声明的客户端版本（本客户端声明的是 ${MARKETPLACE_VISIBILITY_DESKTOP_VERSION}）。请更新 WebUI 或联系维护者。`;
     case "PLUGIN_AUTH_REQUIRED":
       return "官方账号未登录，无法操作市场插件。";
     case "PLUGIN_AUTH_SYNC_TIMEOUT":

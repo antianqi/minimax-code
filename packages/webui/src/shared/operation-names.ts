@@ -245,8 +245,8 @@ export const GET_CHANNEL_WECHAT_BIND_STATUS_OPERATION_NAME = "getChannelWechatBi
  * credentials the browser signs and pushes down.
  *
  * `watchRemoteControlStatus` is a stream because the phone link's phase changes on the host: a
- * pairing code expires, a socket drops, the phone asks a permission question. The electron app
- * pushes each of those to the renderer; the WebUI pushes them down one stream so the pairing page
+ * pairing code expires, a socket drops, or the phone asks a permission question. The WebUI sends
+ * updates down one stream so the pairing page
  * shows the live phase without polling.
  */
 export const GET_REMOTE_CONTROL_STATUS_OPERATION_NAME = "getRemoteControlStatus" as const;
@@ -266,8 +266,7 @@ export const PUBLISH_REMOTE_CONTROL_COMPOSER_MODE_OPERATION_NAME =
  * The SSH surface: the hosts this machine can reach, the projects rooted on them, and the remote
  * terminal.
  *
- * The electron app owns these in its Electron main process (`dist/main/modules/ssh-runtime/`); the
- * WebUI owns them in its loopback service, which is the same host-side position.
+ * The loopback service owns these host-side operations.
  */
 export const LIST_SSH_CONNECTIONS_OPERATION_NAME = "listSshConnections" as const;
 export const SAVE_SSH_CONNECTION_OPERATION_NAME = "saveSshConnection" as const;
@@ -1122,7 +1121,7 @@ export interface OperationSpec {
   /**
    * Creating the bot a create flow is adding.
    *
-   * The electron app creates the bot first and authorizes it second, which is why a bot that has
+   * The bot is created first and authorized second, so a bot that has
    * never been authorized still appears in the list.
    */
   prepareChannelConnection: {
@@ -1188,7 +1187,7 @@ export interface OperationSpec {
    * The phone link's live state.
    *
    * A stream, because the phase changes on the host: a pairing code expires, a socket drops, the
-   * phone asks a permission question. The electron app pushes each of those to the renderer.
+   * phone asks a permission question.
    */
   watchRemoteControlStatus: {
     request: undefined;

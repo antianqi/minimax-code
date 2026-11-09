@@ -258,7 +258,7 @@ beforeAll(() => {
 });
 
 describe("W0 · the section save button's three states", () => {
-  it("is the desktop's black primary, 76x30, and takes its states from the contract", () => {
+  it("is a black primary button, 76x30, and takes its states from the contract", () => {
     // Both personalization headers pass `variant: "black"`, a filled primary.
     // Its fill, its disabled state and its hover belong to the variant in
     // `client/styles/button.css`; the settings stylesheet used to restate all
@@ -281,7 +281,7 @@ describe("W0 · the section save button's three states", () => {
     expect(declaration(geometry, "text-align")).toBe("center");
     expect(declaration(geometry, "line-height")).toBe("var(--line_height_20)");
 
-    // The disabled state is the variant's, measured on the Desktop: the fill
+    // The disabled state is the variant's: the fill
     // swaps to the inactive grey, the label stays and the control keeps its
     // opacity. The settings stylesheet's half-transparent override is gone.
     const disabled = winning(".webui-mavis-button-black:disabled").body;
@@ -425,9 +425,7 @@ describe("W0 · the memory manager's header controls", () => {
     // the two buttons. There is no divider -- the gap is the divider.
     const footer = winning(".webui-dialog-footer.webui-memory-manager-footer").body;
     expect(declaration(footer, "justify-content")).toBe("space-between");
-    // The divider and the padding are the shared shell's: the Desktop MCP
-    // editor's footer is 16px/24px/20px with a hairline top edge, and a surface
-    // that adds a footer-specific rule for either is re-deriving it.
+    // The divider and padding belong to the shared shell footer.
     expect(declaration(footer, "border-top")).toBeUndefined();
     expect(declaration(footer, "padding")).toBeUndefined();
     const sharedFooter = winning(".webui-dialog-footer").body;
@@ -527,7 +525,7 @@ describe("W0 · stylesheet composition", () => {
 });
 
 describe("W0 · structural declarations W5 must preserve", () => {
-  it("keeps the rail at the desktop's fixed width", () => {
+  it("keeps the rail at its fixed width", () => {
     // The rail's width is the shell skeleton's, and it is declared once: the
     // markup used to carry `w-[240px]` as well, so the two had to keep
     // agreeing — a rail that is 240 in CSS but 256 in markup renders at
@@ -720,13 +718,12 @@ describe("W0 · structural declarations W5 must preserve", () => {
     expect(declaration(panel.body, "position")).toBe("relative");
     expect(declaration(panel.body, "flex")).toBe("0 1 50%");
     expect(declaration(panel.body, "width")).toBe("50%");
-    // The panel has a floor, and it may not claim the space the conversation
-    // column needs. `min-width: 0` was the declaration that a flex child may
-    // be clipped to nothing, and it is what let the conversation column be
-    // squeezed away entirely (ADR 0025).
+    // The panel may cover the full surface while the conversation retains its
+    // own layout floor. The surface excludes the navigation rail.
     expect(declaration(panel.body, "min-width")).toBe("var(--webui-panel-min)");
-    expect(declaration(panel.body, "max-width")).toBe(
-      "calc(100% - var(--webui-conversation-min))",
+    expect(declaration(panel.body, "max-width")).toBe("100%");
+    expect(declaration(panel.body, "margin-left")).toBe(
+      "min(0px, calc(100% - var(--webui-conversation-min) - var(--webui-workspace-width, 50%)))",
     );
     // The expanded panel is declared together with the covering one, so the
     // cascade lookup is the one that reads a grouped selector.
@@ -1023,23 +1020,11 @@ describe("W0 · stacking order", () => {
       // 5 is `.webui-workspace-panel-resize-handle`, the eight-pixel strip on
       // the panel's left edge that drags its width. It is the panel's own
       // child, so it needs a layer of its own to sit above the panel's
-      // content. It stays in the low band with the pinned headers (1 and 2)
-      // and the browser notice (3): the panel is an in-flow region of the
-      // shell, so nothing it draws may cover the goal overlay at 20 or the
-      // workspace drawer at 40. It is an edge affordance rather than an
+      // content. Its value is local to the panel's stacking context. It is an
+      // edge affordance rather than an
       // overlay — eight pixels wide, transparent, and on the panel's border.
-      // 40 is `.webui-workspace-panel` inside `@media (max-width: 1080px)`.
-      // Above that breakpoint the panel is an in-flow flex sibling and needs no
-      // layer; below it the panel is pulled out of flow into a right-docked
-      // drawer (`position: absolute; inset: 0 0 0 auto`), so 40 is what lifts
-      // it over the transcript and the composer overlay (20). The layers above
-      // it stay above the drawer: 45 (`.webui-progress-panel-motion`) and 50
-      // (`.webui-workspace-panel-controls`) are siblings of the panel, not
-      // children — the controls only render while the panel is closed — and
-      // 60 (`.webui-session-composer-overlay` and the hover bubbles) keeps
-      // the clearance the note below describes. 45 and 50 in particular are
-      // not a band the drawer has to join: they are the collapsed-state
-      // affordances, and 40 landing below both leaves that ordering intact.
+      // 40 is the narrow workspace overlay. 61 puts the resizable panel above
+      // the composer's 60 band when it covers the conversation.
       // 60 is the composer's own overlay and the band the hover bubbles sit
       // in (`.webui-context-usage-label`, `.webui-thinking-label`,
       // `.webui-settings-info-hint-bubble`): they have to clear the transcript
@@ -1085,7 +1070,7 @@ describe("W0 · stacking order", () => {
       // The band above 100 is the shared dialog shell's. Every `WebuiDialog`
       // registers at the shell's 100 mask and 111 surface instead of declaring
       // a layer of its own.
-      0, 1, 2, 3, 5, 20, 40, 45, 50, 60, 70, 80, 90, 100, 111, 120, 121, 130,
+      0, 1, 2, 3, 5, 20, 40, 45, 50, 60, 61, 70, 80, 90, 100, 111, 120, 121, 130,
       140, 150, 155, 160,
     ]);
   });

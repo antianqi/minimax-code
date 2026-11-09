@@ -7,8 +7,7 @@
  * The regression this pins is specific. The pairing client used to read the *legacy cli-auth
  * projection* on disk, which is the older store and is empty on an installation that only ever
  * logged in through OAuth. The pairing request was then unsigned and the panel answered
- * "no user JWT available" — the same dead end Desktop's own main process is in under Shared
- * OAuth, where it deliberately fails closed on the legacy SSO token projection.
+ * "no user JWT available".
  *
  * Three things are asserted:
  *

@@ -5,8 +5,8 @@
 //
 // Two honesty rules live here:
 //
-//   * **The hold label never names a host.** The task's row records no owner and the electron app
-//     publishes none, so the panel can say whether *this* client holds the task and that another
+//   * **The hold label never names a host.** The task's row records no owner, so the panel can say
+//     whether *this* client holds the task and that another
 //     runtime instance may be running — naming one would be a promise nobody can keep.
 //   * **An unknown schedule is shown as it is.** A cron expression this module cannot humanize is
 //     printed verbatim rather than guessed at, because a wrong "every day at 09:00" is worse than

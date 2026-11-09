@@ -225,7 +225,7 @@ caller.
 
 The add Skill, create Agent, add MCP Server and Git repository import controls are clicked in the
 built browser suite. Those cases assert dialog semantics, full-viewport fixed overlay and centered
-geometry, desktop field alignment, 390×844 constrained viewport fit, field widths, cancel/backdrop
+geometry, field alignment, 390×844 constrained viewport fit, field widths, cancel/backdrop
 dismissal, validation, successful request payloads and close-after-save behavior. The MCP case also
 switches transport and checks advanced HTTP headers and timeout. Linux screenshots accompany each
 dialog. These remain level-4 UI/request evidence because the browser transport uses the in-page

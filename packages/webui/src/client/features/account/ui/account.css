@@ -377,8 +377,7 @@
   }
 
   /* ---------------------------------------------------------- login page */
-  /* The electron app opens this surface as its own window; the browser's
-   * equivalent is a full-viewport overlay. The overlay is the modal's mask —
+  /* The login page is a full-viewport overlay. The overlay is the modal's mask —
    * the application behind it is inert while the page is open — and the page
    * inside it carries its own geometry. */
   .webui-account-login-page-overlay {
@@ -402,8 +401,7 @@
   .webui-account-login-logo {
     object-fit: contain;
   }
-  /* The electron app's wordmark is an image; this client draws its own, the same
-   * way the rail's product mark does. */
+  /* The wordmark uses the same structure as the rail's product mark. */
   .webui-account-login-wordmark {
     display: flex;
     align-items: baseline;
@@ -416,9 +414,7 @@
   .webui-account-login-wordmark > span:last-child {
     color: var(--text_label_accent_default);
   }
-  /* The electron app's call to action is a 44px fully rounded button with a 16px
-   * medium label. The shared button contract states no size that carries all
-   * three, so this class holds those numbers. */
+  /* The login action uses a fully rounded shape and a medium label. */
   .webui-account-login-action {
     border-radius: 9999px;
   }

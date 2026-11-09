@@ -14,9 +14,8 @@
  *       RC-events outlet, so the phone receives the bare bus type.
  *
  * Bus subscription surface: a host-injected stream of events already admitted
- * by the shared frontend Global Event catalog. The electron app's adapter owns
- * the generated DesktopService client, wire decoding, and stream close
- * semantics.
+ * by the shared frontend Global Event catalog. The host adapter owns wire
+ * decoding and stream close semantics.
  *
  * Events consumed (train choke points @ api/routes/permissions.ts):
  *   permission.ask      payload = serializePermissionRequest(record):

@@ -145,7 +145,7 @@ describe("记忆摘要 save button states", () => {
 });
 
 describe("记忆摘要 dialog markup", () => {
-  it("pairs a grey 取消 with a black 保存, as the desktop does", () => {
+  it("pairs a grey 取消 with a black 保存", () => {
     // The last row is `flex justify-between` with the timestamp on the
     // left; the two buttons are `variant:"gray"` for 取消 and `variant:"black"`
     // for 保存. Drawing both grey made the committing action the quieter of the
@@ -177,7 +177,7 @@ describe("记忆摘要 dialog markup", () => {
 });
 
 describe("「在会话中创建」 hand-off", () => {
-  it("leaves the line the desktop's composer already has typed", () => {
+  it("leaves the line already typed in the composer", () => {
     // The whole text the user finds waiting, with the attachment chip carrying
     // the file identity.
     expect(MEMORY_HANDOFF_PROMPT).toBe("我想调整下这个记忆文件");
@@ -234,7 +234,7 @@ describe("「在会话中创建」 hand-off", () => {
 });
 
 describe("the delete confirmation's copy", () => {
-  it("matches the desktop's modal word for word", () => {
+  it("renders the modal copy", () => {
     // The title ends on a
     // half-width `?` (a full-width one carries a full em of advance and opens a
     // visible gap), the body's comma and full stop are full-width, and there is
@@ -260,7 +260,7 @@ describe("formatMemoryTimestamp", () => {
   // The footer reads `更新于 2026-10-06 04:48:48`. Hand-rolled rather
   // than `toLocaleString`, so these assertions are the thing that keeps the
   // shape from quietly following the host locale.
-  it("renders the stamp in the desktop's own shape", () => {
+  it("renders the stamp shape", () => {
     const stamp = formatMemoryTimestamp(new Date(2026, 9, 6, 4, 48, 48).toISOString());
     expect(stamp).toMatch(/^更新于 2026-10-06 \d{2}:\d{2}:\d{2}$/u);
   });
@@ -352,7 +352,7 @@ describe("PersonalizationSettings markup", () => {
     expect(markup).toContain("字节");
   });
 
-  it("shows no file size on the 记忆摘要 row, matching the desktop", () => {
+  it("shows no file size on the 记忆摘要 row", () => {
     const markup = renderToStaticMarkup(
       <PanelHost
         getAgentMemory={() => Promise.resolve({
@@ -435,7 +435,7 @@ describe("PersonalizationSettings markup", () => {
 });
 
 describe("记忆 section markup", () => {
-  it("presents the three desktop rows rather than one textarea", () => {
+  it("presents three rows rather than one textarea", () => {
     const markup = renderToStaticMarkup(<PersonalizationSettings />);
 
     expect(markup).toContain("记忆");
@@ -648,7 +648,7 @@ describe("关于你 section markup", () => {
     expect(markup).not.toContain("# User profile");
   });
 
-  it("uses the desktop placeholder so the field reads as a profile, not a file", () => {
+  it("uses a profile placeholder", () => {
     const markup = renderToStaticMarkup(<PersonalizationSettings />);
 
     expect(markup).toContain("告诉 Agent 你的背景和长期偏好");
@@ -729,7 +729,7 @@ describe("section hints", () => {
     }
   });
 
-  it("carries the desktop's own wording for all three sections", () => {
+  it("renders the wording for all three sections", () => {
     // The previous strings described the mechanism instead of the effect
     // ("注入每个会话的 <user_profile>…"), which is a note to whoever debugs
     // the injection rather than a line that tells a user what the field is

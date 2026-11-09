@@ -66,8 +66,7 @@ type DedicatedHandler<Descriptor> = WebuiOperationHandler<BodyOf<Descriptor>, un
  * How long a page's cancellation waits for the runtime to confirm the abort.
  *
  * Past this the abort is unproven, and an unproven abort is `result_unknown`: the
- * turn may have run. The electron app's broker uses the same bound for the same
- * reason, so a page written against it sees the same timing here.
+ * turn may have run.
  */
 const SETTLEMENT_TIMEOUT_MS = 15_000;
 

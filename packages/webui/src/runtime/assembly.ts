@@ -202,8 +202,7 @@ export interface CreateWebuiRuntimeHostOptions {
   /**
    * The Mini App presenter, when this client supplies one.
    *
-   * The runtime's `MiniAppPresenter` is a host-owned port: on the electron app it
-   * moves a native view, and here it is the browser implementation
+   * The runtime's `MiniAppPresenter` is a host-owned port. Its browser implementation
    * (`server/miniapp/presenter.ts`). It is an option rather than something the
    * assembly builds because the two sides may not import each other — the server
    * holds the presenter, the runtime holds the port — so the file outside the layer
@@ -249,7 +248,6 @@ export async function createWebuiRuntimeHost(
   options: CreateWebuiRuntimeHostOptions,
 ): Promise<WebuiRuntimeHost> {
   const factory = options.factory ?? defaultWebuiRuntimeHostFactory;
-  const baseConfig = getDefaultLocalRuntimeConfig();
   // Reflect the installed client's scope into this process's environment
   // before the host is built, so `getRuntimeRegion()` /
   // `getRuntimeBuildEnv()` / `isManagedRuntime()` see the same scope the
@@ -259,6 +257,8 @@ export async function createWebuiRuntimeHost(
   // defaults a fresh install to cn/prod, so the login flow has a reachable
   // account endpoint before the OAuth namespace exists.
   const scope = configureWebuiRuntimeEnvironment({ dataDir: options.dataDir });
+  // 必须先初始化环境，避免缓存未启用 managed provider 的空模型配置。
+  const baseConfig = getDefaultLocalRuntimeConfig();
   const quotaRegion = scope.region as "cn" | "en";
   const quotaBuildEnv = scope.buildEnv as "dev" | "test" | "staging" | "prod";
   // The one OAuth core, lease and refresh timer. It reads the shared `mcode
@@ -311,8 +311,8 @@ export async function createWebuiRuntimeHost(
     ...(options.appVersion !== undefined
       ? { appVersion: options.appVersion }
       : {}),
-    // The cloud filters the marketplace by the desktop version a client
-    // declares. This client declares the desktop version the shared constant
+    // The cloud filters the marketplace by the version a client
+    // declares. This client declares the version the shared constant
     // names — and the runtime only carries the declaration.
     marketplaceVisibilityVersion: MARKETPLACE_VISIBILITY_DESKTOP_VERSION,
     runtimeOwnerKind: "webui",

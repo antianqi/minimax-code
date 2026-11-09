@@ -7,9 +7,8 @@
 // it gates (`packages/local-runtime/src/runtime/app-mode.ts`) — so this module
 // only remembers which one the reader chose, and hands it to session creation.
 //
-// The preference is a client preference, not a server setting: the Desktop keeps
-// it in its own desktop config (`appModePreference`), and this client has no
-// equivalent persisted store, so it lives in browser storage beside the other
+// The preference is a client preference, not a server setting. It lives in
+// browser storage beside the other
 // choices this client remembers (the no-project flag, the team-mode flag).
 
 import { getWebuiBrowserStorage } from "./storage.js";

@@ -621,7 +621,7 @@ test("a floating Mini App can leave the workspace panel and stay above the main 
   });
   await frame.evaluate(() => window.parent.postMessage({
     type: "webui.miniapp.window.request",
-    requestId: "put-on-desktop",
+    requestId: "put-in-window",
     method: "update",
     patch: { mode: "window", x: 640, y: 220, width: 320, height: 360 },
   }, "*"));
@@ -860,7 +860,7 @@ test("a Mini App owned by another client reports the refusal and stays unopened 
       window.__fixture.refuseOperation(
         "openMiniApp",
         "OWNED_ELSEWHERE",
-        "Mini App is already running in Desktop",
+        "Mini App is already running in another client",
       );
     });
   });
@@ -870,7 +870,7 @@ test("a Mini App owned by another client reports the refusal and stays unopened 
   await page.getByTestId("miniapp-picker").getByRole("button", { name: "打开" }).click();
 
   await expect(page.getByTestId("miniapp-picker-refusal-demo.miniapp")).toContainText(
-    "已在其他客户端运行：Mini App is already running in Desktop",
+    "已在其他客户端运行：Mini App is already running in another client",
   );
   await expect(page.getByTestId("miniapp-view-frame")).toHaveCount(0);
   expect(
@@ -891,7 +891,7 @@ test("a Mini App another client is running can be stopped from here", async ({ p
           kind: "process",
           status: "stopped",
           ownership: "other-client",
-          ownerClient: "electron",
+          ownerClient: "another-client",
         },
       }] });
     });
@@ -901,8 +901,8 @@ test("a Mini App another client is running can be stopped from here", async ({ p
   await openLauncherTile(page, "miniapp-picker");
 
   const row = page.getByTestId("miniapp-picker-row-demo.shared");
-  await expect(row).toContainText("其他客户端运行中（electron）");
-  // The row names the other client and still offers the action that ends the
+  await expect(row).toContainText("其他客户端运行中（another-client）");
+  // The row identifies another client and still offers the action that ends the
   // Mini App. The click has to reach the operation, not just draw a button.
   await row.getByRole("button", { name: "停止" }).click();
   await expect.poll(() =>

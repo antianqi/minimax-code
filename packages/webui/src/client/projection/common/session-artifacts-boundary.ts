@@ -7,10 +7,8 @@
 //   <dataDir>/v2/sessions/<YYYY>/<MM>/<DD>/<HH-mm-ss-SSS>-session_<base64url(sessionId)>/artifacts/plan.md
 //
 // That directory is outside the workspace, but it is this session's own
-// output: the runtime put it there, on this session's behalf. Desktop treats
-// it the same way -- it opens a plan file with the file's own directory as the
-// read root -- so a WebUI that withholds the body of such a file shows less
-// than the Desktop client shows for the same session.
+// output: the runtime put it there on this session's behalf. Its directory is
+// the read root for that file.
 //
 // The client names this directory from what it already has. The runtime never
 // hands the history directory to the client, but the directory name carries

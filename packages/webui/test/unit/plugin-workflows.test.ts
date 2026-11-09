@@ -138,7 +138,7 @@ describe("the plugin listing has one owner", () => {
     expect(requests.find((request) => request.action === "listMarketplacePlugins")?.input?.category).toBeUndefined();
   });
 
-  it("maps Desktop marketplace categories to their protocol enum values", async () => {
+  it("maps marketplace categories to their protocol enum values", async () => {
     const requests: { action: string; input?: Record<string, unknown> }[] = [];
     const workflows = createWebuiPluginWorkflows({ port: { pluginManagement: async (request) => {
       requests.push(request);

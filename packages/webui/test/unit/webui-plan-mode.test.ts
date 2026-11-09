@@ -314,7 +314,7 @@ describe("plan cards — SSR", () => {
     expect(html).not.toContain('data-testid="plan-review-feedback-submit"');
   });
 
-  it("renders the entry confirmation with both buttons and the desktop copy", () => {
+  it("renders the entry confirmation with both buttons", () => {
     const request = {
       ...planReviewRequest(),
       modePayload: undefined,

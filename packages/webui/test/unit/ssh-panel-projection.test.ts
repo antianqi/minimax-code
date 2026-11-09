@@ -3,7 +3,7 @@
  *
  * The claims are about what the panel says:
  *
- *   * the two Desktop empty states stay apart — "no host in `~/.ssh/config`" and "no host added
+ *   * the two empty states stay apart — "no host in `~/.ssh/config`" and "no host added
  *     and enabled yet" are different answers, and a panel that merges them sends the person to
  *     the wrong place;
  *   * a host's status word is printed as it is, so a host in `probe_failed` never reads as a
@@ -86,7 +86,7 @@ describe("the SSH projection", () => {
 
   it("keeps an override, drops it when the config value comes back, and asks for a new one", () => {
     // A host named in `~/.ssh/config` follows the config file unless a value is overridden on
-    // purpose. This is Desktop's own rule for such a host.
+    // purpose.
     // Untouched, and the host follows the config: no override at all.
     expect(webuiSshOverrideValue("build.example.com", undefined, "build.example.com")).toBeUndefined();
     // Untouched, and the host carries an override: the override stays.
@@ -196,7 +196,7 @@ describe("the SSH panel", () => {
       }),
     );
 
-  it("shows the Desktop's empty card when there is no host at all", () => {
+  it("shows the empty card when there is no host at all", () => {
     const markup = view();
     expect(markup).toContain(WEBUI_SSH_EMPTY_TITLE);
     expect(markup).toContain(WEBUI_SSH_EMPTY_DESCRIPTION);
@@ -234,7 +234,7 @@ describe("the SSH panel", () => {
     expect(markup).toContain("探测失败");
     expect(markup).toContain("连接被拒绝。");
     expect(markup).toContain("data-webui-ssh-toggle=\"build\"");
-    // The Desktop's row carries a remote-project action and the row's own menu.
+    // The row carries a remote-project action and its own menu.
     expect(markup).toContain("data-webui-ssh-new-project=\"build\"");
     expect(markup).toContain("data-webui-ssh-more=\"build\"");
     expect(markup).toContain("查看 Build machine 的连接详情");

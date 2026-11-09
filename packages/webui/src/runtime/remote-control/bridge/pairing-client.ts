@@ -190,7 +190,7 @@ export class PairingClient {
       token: jwt,
       Authorization: `Bearer ${jwt}`,
       "X-Device-Id": this.opts.getDeviceId(),
-      // 方案 §4.5.11：producer 侧统一声明类型，Electron 端明确为 desktop。
+      // producer 侧声明协议类型。
       // 服务端按 producer identity（type + device id）区分同一 raw id 的不同端类型。
       "X-Producer-Type": this.opts.getProducerType?.() ?? "desktop",
       Accept: "application/json",

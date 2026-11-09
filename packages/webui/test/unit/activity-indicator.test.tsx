@@ -33,7 +33,7 @@ import {
 import { pickWeightedPhrase, bucketPhrases } from "../../src/client/ui/activity-phrase.js";
 import { shouldPlayWebuiAnimation } from "../../src/client/ui/feedback.js";
 
-describe("ActivityIndicator markup (desktop parity)", () => {
+describe("ActivityIndicator markup", () => {
   beforeEach(() => {
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: false,
@@ -47,7 +47,7 @@ describe("ActivityIndicator markup (desktop parity)", () => {
     }));
   });
 
-  it("renders the desktop testid and the inner lottie container", () => {
+  it("renders the testid and the inner lottie container", () => {
     const html = renderToStaticMarkup(
       createElement(ActivityIndicator, { showLabel: true, label: "思考中…" }),
     );
@@ -62,7 +62,7 @@ describe("ActivityIndicator markup (desktop parity)", () => {
     expect(html).not.toContain('data-testid="streaming-rose-loader-label"');
   });
 
-  it("computes the pulse container size with the desktop formula", () => {
+  it("computes the pulse container size", () => {
     const html = renderToStaticMarkup(
       createElement(ActivityIndicator, {
         iconSizePx: 24,
@@ -85,7 +85,7 @@ describe("ActivityIndicator markup (desktop parity)", () => {
     );
   });
 
-  it("concatenates the className prop onto the desktop container", () => {
+  it("concatenates the className prop onto the container", () => {
     const html = renderToStaticMarkup(
       createElement(ActivityIndicator, { className: "extra-class" }),
     );
@@ -101,7 +101,7 @@ describe("shared Lottie motion policy", () => {
   });
 });
 
-describe("ActivityIndicator placeholders (desktop parity)", () => {
+describe("ActivityIndicator placeholders", () => {
   it("MessageViewportStreamingLoader mounts a flex container with the slot testid", () => {
     const html = renderToStaticMarkup(
       createElement(MessageViewportStreamingLoader, {
@@ -114,7 +114,7 @@ describe("ActivityIndicator placeholders (desktop parity)", () => {
     expect(html).toContain("mb-4 min-h-9 w-full flow-root pointer-events-none");
   });
 
-  it("MessageAfterQueryStreamingPlaceholder matches the desktop snapshot", () => {
+  it("renders MessageAfterQueryStreamingPlaceholder", () => {
     const html = renderToStaticMarkup(createElement(MessageAfterQueryStreamingPlaceholder));
     expect(html).toContain('data-testid="message-after-query-streaming-placeholder"');
     expect(html).toContain('aria-hidden="true"');

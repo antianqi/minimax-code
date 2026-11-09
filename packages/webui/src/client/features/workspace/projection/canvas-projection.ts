@@ -12,7 +12,7 @@ import type { CanvasMutation, CanvasNodeLayout, CanvasOperation } from "../../..
 import type { WebuiCanvasDocument } from "../../../../shared/contracts/canvas.js";
 import { randomId } from "../../../../shared/random-id.js";
 
-export const DESKTOP_COPY = {
+export const WEBUI_CANVAS_COPY = {
   canvasEmptyTitle: "把文件放到画布上",
   canvasEmptyDescription: "添加图片或其他工作区文件，然后自由排列和调整大小。",
   canvasAddLabel: "工作区相对路径",
@@ -303,7 +303,7 @@ export function nextCanvasNodeLayout(nodes: readonly CanvasNodeView[]): CanvasNo
 export function describeCanvasError(cause: unknown): string {
   if (cause instanceof Error && cause.message.trim()) return cause.message;
   if (typeof cause === "string" && cause.trim()) return cause.trim();
-  return DESKTOP_COPY.canvasFailed;
+  return WEBUI_CANVAS_COPY.canvasFailed;
 }
 
 function readCanvasRecord(value: unknown): Record<string, unknown> | undefined {

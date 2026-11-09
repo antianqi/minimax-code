@@ -6,7 +6,7 @@
  * frames are evt.session.message_chunk (403) / evt.session.message (404).
  *
  * Decode is total: malformed input returns a typed error, never throws.
- * Encode enforces the max_message_bytes cap. The electron app's floor/default
+ * Encode enforces the max_message_bytes cap. The floor/default
  * is 128MiB; ctrl.hello may raise it further, but does not lower that floor.
  */
 import { randomUUID } from "node:crypto";
@@ -49,7 +49,7 @@ export const FRAME_NAMESPACES = {
 
 export const PROTOCOL_VERSION = 1;
 
-/** The electron app's frame size floor/default: 128MiB. */
+/** The frame size floor/default: 128MiB. */
 export const DEFAULT_MAX_MESSAGE_BYTES = 128 * 1024 * 1024;
 
 export type FrameCodecError =

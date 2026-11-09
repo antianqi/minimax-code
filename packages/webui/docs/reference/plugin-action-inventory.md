@@ -34,9 +34,8 @@ writes); the component column names the presentation that invokes it.
 The official marketplace reads all plugin pages and groups the returned plugin tags using
 the server's tag definitions. A tag such as Mini App is both a section and a filter;
 installation still goes through the plugin action below. The cloud filters its catalogue by the
-desktop version a client declares, so WebUI declares one: the shared constant
-`MARKETPLACE_VISIBILITY_DESKTOP_VERSION` (`packages/shared/src/marketplace-visibility.ts`),
-which is a copy of the electron app's current release version. The marketplace requests —
+version a client declares, so WebUI declares one: the shared constant
+`MARKETPLACE_VISIBILITY_DESKTOP_VERSION` (`packages/shared/src/marketplace-visibility.ts`). The marketplace requests —
 listing, detail, installation, package download authorization and official state recovery —
 declare it, and the other cloud calls retain the host's own version.
 The runtime carries that declaration; it never decides the value.
@@ -112,7 +111,7 @@ empty roster.
 runtime keeps two skill lists: the roster (`listRuntimeSkills`), which is what a turn can load and
 which carries the plugin skills and the workspace's own skills, and the management catalogue
 (`listManageableSkills`), which is paged, user-facing, and stops at the first page. The composer's
-slash palette shows the roster, the way the Desktop palette does — reading the management catalogue
+slash palette shows the roster — reading the management catalogue
 there offered a fraction of the skills, and none of the plugin ones.
 
 The action is dispatched by the composer-facing read model

@@ -64,7 +64,7 @@ describe("the formatters", () => {
     expect(formatWebuiError(undefined)).toBe("undefined");
   });
 
-  it("rounds a credit balance the way the desktop does", () => {
+  it("rounds a credit balance", () => {
     // The formatter renders `7,726` for `7726.2119999999995`. That example does NOT
     // tell rounding from truncation — both give 7726 — so the discriminating
     // cases are below: `.6` rounds up where truncation would drop it. A second

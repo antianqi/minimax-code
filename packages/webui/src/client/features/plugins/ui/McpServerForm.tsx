@@ -303,8 +303,7 @@ export function McpServerForm({ editing, onSubmit, onClose }: McpServerFormProps
   /**
    * Whether the primary action can be pressed at all.
    *
-   * Desktop disables it while the form is invalid, so an invalid value never
-   * becomes a request the person has to read an error for. The conditions are
+   * An invalid value must not become a request. The conditions are
    * the ones `configFromForm` throws on: a named server, a reachable endpoint, a
    * header block that parses, and a positive whole-number timeout.
    */

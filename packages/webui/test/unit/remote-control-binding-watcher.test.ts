@@ -8,9 +8,8 @@
  * bridge's own pairing poll lives only inside a pairing window and confirms
  * whichever binding exists when it first ticks — which, right after a second
  * pairing, is the *previous* one. The phone then sits on a new binding while
- * the producer stays on the old one, and the phone reports the desktop as
- * offline. The watcher is the WebUI's stand-in for the Desktop's renderer,
- * which owns the binding and pushes it down whenever it changes.
+ * the producer stays on the old one, and the phone reports the client as
+ * offline. The watcher keeps the binding up to date.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

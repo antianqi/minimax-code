@@ -555,8 +555,7 @@ export function createWebuiMiniAppAgentBridge(
  * The shipped preload resolves the payload of a call, not the envelope around it:
  * `models()` answers the catalogue with its default, `agents()` answers the agent
  * list, `create()` answers the created session, and the calls with nothing to
- * return answer nothing. A page written against the electron app destructures
- * those values, so an extra layer here is a page that breaks on its first line.
+ * return answer nothing. An extra envelope would break consumers of these values.
  */
 function pageValueOf(
   response: Extract<WebuiMiniAppAgentCallResponse, { readonly ok: true }>,

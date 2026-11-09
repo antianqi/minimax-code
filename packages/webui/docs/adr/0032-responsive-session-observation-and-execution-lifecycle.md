@@ -111,8 +111,7 @@ Do not infer all-task completion or media durability from a turn-terminal event.
 
 Keep the existing visual language, main interaction patterns, historical-session readability and
 supported content. Add necessary task, pending, stopping and recovery states. This is not a
-general visual redesign. Preserve existing Desktop behavior when shared contracts change;
-Desktop UI redesign is out of scope.
+general visual redesign. Preserve existing behavior of other consumers when shared contracts change.
 
 ### D08 — Send now immediately presents intent
 
@@ -209,7 +208,7 @@ Converge messages, queue, tasks and history when another WebUI document or compa
 changes the session. The harness adjudicates conflicts; reject or reconcile obsolete commands
 rather than silently overwriting a newer revision. A document owns only its pending intents;
 attachment/reload is not an instruction to repeat execution. Cover multiple WebUI tabs and
-external-client changes while preserving existing Desktop contracts.
+external-client changes while preserving shared contracts.
 
 ### D18 — Measured performance budgets
 

@@ -17,9 +17,7 @@
 // would tell a page its request was wrong when the plugin simply has no Agent
 // access.
 //
-// Validators are the shared contract's readers, not a second copy of them:
-// `@mavis/shared/miniapp-surface` is what the electron app's preload and its Main process
-// already validate against, so a page that validates there validates here.
+// Validators are the shared contract's readers, not a second copy of them.
 import type {
   WebuiMiniAppAgentCallRequest,
   WebuiMiniAppAgentCallResponse,

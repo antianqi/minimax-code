@@ -260,7 +260,7 @@ test("a page the Agent starts opens the closed panel, when 自动打开浏览器
   await expect(page.getByTestId("workspace-panel")).toHaveCount(0);
 
   // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板 turned on: the next page the
-  // Agent starts brings the panel up with it, which is the Desktop's rule.
+  // Agent starts brings the panel up with it.
   await page.evaluate(() => window.localStorage.setItem("webui-browser-auto-open", "true"));
   await page.evaluate(() =>
     window.__fixture.setBrowserTabs([

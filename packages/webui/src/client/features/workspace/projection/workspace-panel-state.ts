@@ -258,13 +258,13 @@ export const WEBUI_WORKSPACE_TAB_KINDS: Readonly<
 
 /**
  * The launcher's tiles, in the order they are laid out. It is not the table's:
- * 变更 leads and 查看文件 trails the kinds that open a process.
+ * 应用 leads and 查看文件 trails the kinds that open a process.
  */
 export const WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER: readonly WebuiWorkspaceTabKind[] = [
+  "miniapp-picker",
   "review",
   "terminal",
   "canvas",
-  "miniapp-picker",
   "files",
 ];
 

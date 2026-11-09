@@ -3,8 +3,7 @@
 // The runtime keeps two skill lists: the roster (`listRuntimeSkills`) — what a
 // turn can load, carrying the plugin skills and the workspace's own skills —
 // and the management catalogue (`listManageableSkills`) — the paged,
-// user-facing list of what is installed. The slash palette shows the roster,
-// the way the Desktop palette does.
+// user-facing list of what is installed. The slash palette shows the roster.
 //
 // The palette used to read the management catalogue, which is why it offered a
 // fraction of the skills and none of the plugin ones. These cases pin the

@@ -290,8 +290,7 @@ test("the shared modal frame keeps its header and actions fixed around a scrolli
   expect(geometry?.editorScrollHeight ?? 0).toBeGreaterThan(geometry?.editorClientHeight ?? 0);
   expect(geometry?.header.top).toBeGreaterThanOrEqual(geometry?.surface.top ?? 0);
   expect(Math.abs((geometry?.footer.bottom ?? 0) - (geometry?.surface.bottom ?? 0))).toBeLessThanOrEqual(2);
-  // The scrim is the shared modal token, and the Desktop's colorBgMask binds it
-  // to utility_overlay: black at 25% in the light palette.
+  // The scrim uses the shared modal token: black at 25% in the light palette.
   expect(geometry?.scrim).toBe("rgba(0, 0, 0, 0.25)");
 
   await page.getByTestId("agent-memory-textarea").evaluate((editor) => {
@@ -299,7 +298,7 @@ test("the shared modal frame keeps its header and actions fixed around a scrolli
   });
   await expect.poll(() => page.getByTestId("agent-memory-textarea").evaluate((editor) => editor.scrollTop)).toBeGreaterThan(0);
   await expect(page.getByTestId("agent-memory-save")).toBeVisible();
-  await testInfo.attach("shared-modal-desktop-long-content", {
+  await testInfo.attach("shared-modal-long-content", {
     body: await page.screenshot(),
     contentType: "image/png",
   });

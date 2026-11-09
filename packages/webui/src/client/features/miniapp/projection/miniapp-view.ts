@@ -101,6 +101,7 @@ export function webuiMiniAppRows(
     // A disabled package has no runtime state to report: it is installed and not
     // startable, which is a fact about the package rather than about a process.
     const enabled = miniApp.enabled !== false;
+    const ownerClient = miniApp.runtime.ownerClient?.replace(/\b(?:electron|desktop)\b/giu, "其他客户端");
     return {
       pluginId: miniApp.pluginId,
       name: miniApp.displayName || miniApp.pluginId,
@@ -112,8 +113,8 @@ export function webuiMiniAppRows(
       statusLabel: !enabled
         ? "已停用"
         : miniApp.runtime.ownership === "other-client"
-          ? miniApp.runtime.ownerClient
-          ? `其他客户端运行中（${miniApp.runtime.ownerClient}）`
+          ? ownerClient && ownerClient !== "其他客户端"
+            ? `其他客户端运行中（${ownerClient}）`
             : "其他客户端运行中"
           : webuiMiniAppStatusLabel(miniApp.runtime.status),
       running: enabled && miniApp.runtime.status === "running",
@@ -123,7 +124,7 @@ export function webuiMiniAppRows(
         miniApp.runtime.ownership === "other-client",
       enabled,
       ownedElsewhere: miniApp.runtime.ownership === "other-client",
-      ...(miniApp.runtime.ownerClient ? { ownerClient: miniApp.runtime.ownerClient } : {}),
+      ...(ownerClient && ownerClient !== "其他客户端" ? { ownerClient } : {}),
       detached: miniApp.detached,
       presentationRevision: miniApp.presentationRevision,
     };
@@ -166,12 +167,8 @@ export function webuiMiniAppCapacityText(rows: readonly WebuiMiniAppRow[]): stri
 /**
  * What a refusal says, in words the person can act on.
  *
- * `OWNED_ELSEWHERE` is the runtime's answer when another client holds the app —
- * the message it carries names that client and its pid, and this client cannot
- * discover either on its own: the credential that reaches the app never leaves
- * the process that minted it, so "is it running elsewhere?" is answered by
- * trying to start it. The message is kept rather than replaced, because the
- * runtime is the only party that knows who the other client is.
+ * `OWNED_ELSEWHERE` is the runtime's answer when another client holds the app.
+ * Keep the diagnostic message while using neutral wording for client names.
  */
 export function webuiMiniAppRefusalText(input: {
   readonly code: string;
@@ -179,7 +176,7 @@ export function webuiMiniAppRefusalText(input: {
   readonly rows: readonly WebuiMiniAppRow[];
 }): string {
   if (input.code === "BUSY") return webuiMiniAppCapacityText(input.rows);
-  if (input.code === "OWNED_ELSEWHERE") return `已在其他客户端运行：${input.message}`;
+  if (input.code === "OWNED_ELSEWHERE") return `已在其他客户端运行：${input.message.replace(/\b(?:electron|desktop)\b/giu, "其他客户端")}`;
   return input.message;
 }
 

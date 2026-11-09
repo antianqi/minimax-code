@@ -238,7 +238,7 @@ function renderCard(props: Partial<Parameters<typeof SigninCard>[0]> = {}): stri
   );
 }
 
-describe("SigninCard desktop parity", () => {
+describe("SigninCard", () => {
   it("uses the shared two-column skeleton for the initial panel load", () => {
     const html = renderToStaticMarkup(
       createElement(FeedbackSkeleton, {
@@ -313,7 +313,7 @@ describe("SigninCard desktop parity", () => {
     expect(html).toContain("stroke-border_default");
   });
 
-  it("renders the claimed-today state as the disabled desktop button", () => {
+  it("renders the claimed-today state as a disabled button", () => {
     const html = renderCard({ panel: CLAIMED_PANEL });
     expect(html).toContain("今日已签到");
     // The claimed-today state is the shared accent button in its disabled

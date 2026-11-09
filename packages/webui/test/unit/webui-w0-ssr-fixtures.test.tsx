@@ -174,7 +174,7 @@ describe("W0 · SSR · WebuiTurnProcess", () => {
 describe("W0 · SSR · WebuiMessageActionButton", () => {
   const icon = createElement("span", null, "i");
 
-  it("renders the desktop's glyph-only action button", () => {
+  it("renders the glyph-only action button", () => {
     const html = render(
       createElement(WebuiMessageActionButton, {
         testId: "w0-action",

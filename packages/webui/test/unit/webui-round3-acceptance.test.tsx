@@ -197,7 +197,7 @@ describe("turn review unified diff projection", () => {
     ]);
   });
 
-  it("keeps the no-newline marker as its own row, the way Desktop renders it", () => {
+  it("keeps the no-newline marker as its own row", () => {
     // pierre — the diff component the card renders with — keeps this marker in
     // the hunk's line list and draws it as a row with no gutter numbers. The
     // projection dropping it made a patch whose last line has no newline look
@@ -387,7 +387,7 @@ describe("round-3 goal and questionnaire behavior", () => {
     expect(waiting).toContain("等待你确认权限");
   });
 
-  it("validates goal edits, status actions, clear confirmation, and desktop actions", () => {
+  it("validates goal edits, status actions and clear confirmation", () => {
     expect(buildWebuiGoalEditPatch("  objective  ", "50K")).toEqual({ ok: true, patch: { objective: "objective", tokenBudget: 50000 } });
     expect(buildWebuiGoalEditPatch(" ", "50K")).toMatchObject({ ok: false });
     expect(buildWebuiGoalEditPatch("objective", "not-a-budget")).toMatchObject({ ok: false });
@@ -525,7 +525,7 @@ describe("round-3 stream state and transcript render units", () => {
     }))).toContain("hello");
   });
 
-  it("renders Goal identity and Desktop-style visible process segments", () => {
+  it("renders Goal identity and visible process segments", () => {
     const goalMarkup = renderToStaticMarkup(createElement(MessageItem, {
       view: {
         source: "live",

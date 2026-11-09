@@ -357,19 +357,19 @@ export function DisabledBillingActions(): ReactElement {
   const disabledProps = { disabled: true, "aria-disabled": "true" as const, title: unavailable };
   return <WebuiStack gap="none" className="w-full rounded-[16px] bg-bg_grouped_tertiary p-1" aria-label={unavailable}>
     <WebuiInline gap="small" justify="end" className="w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2">
-      <DesktopGrayAction label="升级" {...disabledProps} />
-      <DesktopGrayAction label="管理" dropdown {...disabledProps} />
-      <DesktopGrayAction label="开启自动续费" {...disabledProps} />
+      <BillingGrayAction label="升级" {...disabledProps} />
+      <BillingGrayAction label="管理" dropdown {...disabledProps} />
+      <BillingGrayAction label="开启自动续费" {...disabledProps} />
     </WebuiInline>
     <WebuiInline justify="center" className="w-full px-3 py-1.5"><div className="h-px w-full bg-border_light" /></WebuiInline>
     <WebuiInline gap="small" justify="end" className="w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2">
-      <DesktopGrayAction label="去充值" {...disabledProps} />
-      <DesktopGrayAction label="管理" dropdown {...disabledProps} />
-      <DesktopGrayAction label="明细" {...disabledProps} />
+      <BillingGrayAction label="去充值" {...disabledProps} />
+      <BillingGrayAction label="管理" dropdown {...disabledProps} />
+      <BillingGrayAction label="明细" {...disabledProps} />
       <ToggleSwitch checked={false} label={unavailable}  {...disabledProps} />
     </WebuiInline>
     <WebuiInline justify="center" className="w-full px-3 py-1.5"><div className="h-px w-full bg-border_light" /></WebuiInline>
-    <WebuiInline gap="small" justify="end" className="w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><DesktopGrayAction label="申请" external {...disabledProps} /></WebuiInline>
+    <WebuiInline gap="small" justify="end" className="w-full overflow-hidden rounded-[12px] py-2 pl-3 pr-2"><BillingGrayAction label="申请" external {...disabledProps} /></WebuiInline>
   </WebuiStack>;
 }
 
@@ -378,7 +378,7 @@ function InfoIcon(): ReactElement {
   return <IconInfoCircle aria-hidden="true" size={16} stroke={1.4} className="text-icon_default_secondary" />;
 }
 
-function DesktopGrayAction({ label, dropdown = false, external = false, disabled = true, title, "aria-disabled": ariaDisabled = "true" }: { readonly label: string; readonly dropdown?: boolean; readonly external?: boolean; readonly disabled?: boolean; readonly title?: string; readonly "aria-disabled"?: "true" }): ReactElement {
+function BillingGrayAction({ label, dropdown = false, external = false, disabled = true, title, "aria-disabled": ariaDisabled = "true" }: { readonly label: string; readonly dropdown?: boolean; readonly external?: boolean; readonly disabled?: boolean; readonly title?: string; readonly "aria-disabled"?: "true" }): ReactElement {
   return <WebuiButton variant="surface-quiet" size="panel" disabled={disabled} aria-disabled={ariaDisabled} title={title}><span className="flex items-center justify-center gap-1">{label}{dropdown ? <ChevronDownIcon className="size-4 text-icon_default_secondary" /> : external ? <ExternalArrowIcon /> : null}</span></WebuiButton>;
 }
 

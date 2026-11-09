@@ -1,11 +1,8 @@
 /**
  * Remote Control bridge — shared types.
  *
- * Contract sources (in priority order, see plan §12 / drift list):
- *   1. the remote_gateway_base IDL (WsEnvelope + ctrl payloads — wire authority)
- *   2. the remote-control desktop plan (v1.5, aligned to the IDL per
- *      rc-ws-protocol-desktop-doc-drift)
- *   3. the archon_biz RemoteControlService IDL
+ * The wire contracts are the remote gateway envelope and control payloads,
+ * together with the RemoteControlService binding API.
  */
 
 /**
@@ -77,7 +74,7 @@ export type RCPhase =
  * 新判据 = `user + producer identity + producer_generation`。
  */
 export interface RcProducerIdentity {
-  /** Electron 端固定 'desktop'；预留给未来 cli 等 producer 类型（方案 §4.5.11）。 */
+  /** 协议 producer 类型，预留给其他 producer。 */
   producer_type: string;
   /** 本机稳定 device id（= desktop_device_id），不随解绑重置。 */
   producer_device_id: string;
@@ -124,7 +121,7 @@ export interface RCStatus {
   request_epoch?: number;
   /** 当前连接身份中的 producer 代次，随状态推送给 renderer 便于对账。 */
   producer_generation?: number;
-  /** 当前连接身份中的 producer 类型（Electron 端固定 'desktop'）。 */
+  /** 当前连接身份中的 producer 类型。 */
   producer_type?: string;
   /**
    * 存在未确认的 producer 全删解绑请求时携带其 request_id（方案 §4.5.4）。
@@ -157,7 +154,7 @@ export interface RcPersistedState {
    * 凭据推送能和重启前的代次比较 —— 否则每次冷启动都会被判成「代次变了」而重建连接。
    */
   producer_generation?: number;
-  /** producer 类型，Electron 端固定 'desktop'；持久化用于跨重启的身份比较。 */
+  /** 持久化 producer 类型，用于跨重启的身份比较。 */
   producer_type?: string;
   /**
    * 未确认的 producer 全删解绑（方案 §4.5.4 / ADR-011 D12：request_id 持久化放 main

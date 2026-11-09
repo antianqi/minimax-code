@@ -7,7 +7,7 @@
  * runtime has no route behind. Rendering goes through `renderToStaticMarkup` — this package has no
  * jsdom.
  *
- * The list is Desktop's bot list, not its bound-client list: a bot whose QR scan has not finished
+ * The list is the bot list, not the bound-client list: a bot whose QR scan has not finished
  * belongs in it, in the unbound shape. That distinction is what the first block pins.
  */
 import { createElement } from "react";
@@ -130,7 +130,7 @@ function view(snap: WebuiChannelSnapshot, menuOpen = false): string {
 }
 
 describe("the 接入 IM projection", () => {
-  it("names the platforms Desktop names and prints an unknown one as it came", () => {
+  it("names known platforms and prints an unknown one as it came", () => {
     expect(webuiChannelPlatformLabel("wechat")).toBe("微信");
     expect(webuiChannelPlatformLabel("feishu")).toBe("飞书");
     expect(webuiChannelPlatformLabel("telegram")).toBe("Telegram");
@@ -191,14 +191,14 @@ describe("the 接入 IM projection", () => {
     expect(row.botName).toBe("ClawBot");
   });
 
-  it("orders the rows the way Desktop's platform catalogue does, not by creation time", () => {
+  it("orders the rows by platform rather than creation time", () => {
     const rows = webuiChannelRows([
       connection({ connectionId: "connection_feishu", channel: "feishu" }),
       connection({ connectionId: "connection_wechat", channel: "wechat", state: "configured" }),
       connection({ connectionId: "connection_telegram", channel: "telegram", state: "configured" }),
     ]);
 
-    // Desktop groups the list by platform in its catalogue order (微信, 飞书, Telegram), so the
+    // The list groups platforms in catalogue order (微信, 飞书, Telegram), so the
     // first row — the one the card opens on — is the WeChat bot whatever order the store returns.
     expect(rows.map((row) => row.platform)).toEqual(["wechat", "feishu", "telegram"]);
   });
@@ -331,7 +331,7 @@ describe("the 接入 IM owner", () => {
     const result = await owner.addBot("wechat");
 
     expect(result).toEqual({ ok: true });
-    // Desktop creates the bot and authorizes it second, so the authorization belongs to the bot
+    // The bot is created before authorization, so authorization belongs to the bot
     // that was just prepared rather than to the agent's default one.
     expect(started).toEqual([{ name: "ClawBot", connectionId: "connection_new" }]);
     expect(owner.getSnapshot().selectedId).toBe("connection_new");
@@ -417,7 +417,7 @@ describe("the 接入 IM owner", () => {
     const release = owner.startRefreshing();
     await owner.select("connection_pending");
 
-    // Desktop shows the QR for an unbound bot without waiting for 刷新二维码.
+    // An unbound bot shows its QR without waiting for 刷新二维码.
     expect(started).toEqual(["connection_pending"]);
     expect(owner.getSnapshot().authorization?.sessionId).toBe("sess-2");
     release();
@@ -635,7 +635,7 @@ describe("the rendered 接入 IM pane", () => {
     expect(markup).toContain("创建 IM Bot");
   });
 
-  it("offers the platform menu the Desktop's create action opens", () => {
+  it("offers a platform menu for the create action", () => {
     // The menu is a popup: it renders its entries only while it is open.
     const markup = view(snapshot({ connections: [] }), true);
 
@@ -701,7 +701,7 @@ describe("the rendered 接入 IM pane", () => {
     expect(markup).toContain('data-testid="authorization-qr-container"');
     expect(markup).not.toContain('data-webui-channel-unbind="true"');
     // The runtime answers the WeChat bind route with the link the phone opens rather than with a
-    // picture, so the pane encodes it inline — the branch Desktop takes for text.
+    // picture, so the pane encodes it inline.
     expect(markup).toContain('data-testid="authorization-qr-code"');
     expect(markup).toContain("<svg");
     expect(markup).toContain("微信扫码授权以绑定MiniMax Code");
@@ -768,7 +768,7 @@ describe("the rendered 接入 IM pane", () => {
   });
 
   it("names the agent's configuration state where the projection reads it", () => {
-    // The Desktop's Agent slot carries the selector alone, so the configuration state stays in
+    // The Agent slot carries the selector alone, so the configuration state stays in
     // the projection rather than in the slot.
     expect(webuiChannelConfigLabel({ configured: true })).toBe("已配置");
     expect(webuiChannelConfigLabel({ configured: false })).toBe("未配置");

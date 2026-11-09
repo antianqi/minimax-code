@@ -80,7 +80,7 @@ export function toolCallLabel(tool: Record<string, unknown>): string {
     todo_write: "todowrite",
     todowrite: "todowrite",
   };
-  return WEBUI_DESKTOP_TOOL_DISPLAY_LABELS[normalized] ?? labels[normalized] ?? "工具";
+  return WEBUI_TOOL_DISPLAY_LABELS[normalized] ?? labels[normalized] ?? "工具";
 }
 
 /** Pretty-printed JSON of the tool input arguments, or the raw string when
@@ -127,10 +127,10 @@ export function toolCallResourcePath(tool: Record<string, unknown>): string | un
 
 export type WebuiToolCallStatus = "pending" | "running" | "completed" | "error" | "cancelled" | "unknown";
 
-export type WebuiDesktopToolIcon = "command" | "file" | "code" | "search" | "web" | "browser" | "logo" | "memory" | "image" | "video" | "music" | "combine" | "task" | "bot" | "goal" | "tool" | "thinking";
+export type WebuiToolIcon = "command" | "file" | "code" | "search" | "web" | "browser" | "logo" | "memory" | "image" | "video" | "music" | "combine" | "task" | "bot" | "goal" | "tool" | "thinking";
 
 /** Icon category identifiers for the tool rows. */
-export const WEBUI_DESKTOP_TOOL_ICON_GROUPS: Readonly<Record<WebuiDesktopToolIcon, readonly string[]>> = {
+export const WEBUI_TOOL_ICON_GROUPS: Readonly<Record<WebuiToolIcon, readonly string[]>> = {
   command: ["bash", "python", "python3", "shell", "command", "terminal"],
   file: ["read", "read_file", "ls", "find", "glob", "read_mcp_resource", "list_mcp_resources", "list_mcp_resource_templates", "deliver_asset", "archon.asset.deliver"],
   code: ["write", "write_file", "edit", "str_replace", "file_edit", "apply_patch"],
@@ -152,7 +152,7 @@ export const WEBUI_DESKTOP_TOOL_ICON_GROUPS: Readonly<Record<WebuiDesktopToolIco
 
 /** Chinese `tool_call.display` values, keyed by
  * the tool ids/aliases the runtime exposes. */
-export const WEBUI_DESKTOP_TOOL_DISPLAY_LABELS: Readonly<Record<string, string>> = {
+export const WEBUI_TOOL_DISPLAY_LABELS: Readonly<Record<string, string>> = {
   bash: "终端", terminal: "终端", command: "终端", shell: "终端",
   python: "Python", python3: "Python", read: "读取文件", read_file: "读取文件",
   read_image: "读取图片", read_skill_file: "读取 Skill {{name}}.md", ls: "列出目录", list_files: "列出目录",
@@ -178,7 +178,7 @@ export const WEBUI_DESKTOP_TOOL_DISPLAY_LABELS: Readonly<Record<string, string>>
   create_goal: "目标创建", update_goal: "目标更新", get_goal: "目标读取",
 };
 
-export function toolCallIconCategory(tool: Record<string, unknown>): WebuiDesktopToolIcon {
+export function toolCallIconCategory(tool: Record<string, unknown>): WebuiToolIcon {
   const rawName = toolCallName(tool);
   const name = rawName.trim().toLowerCase().replace(/[\s-]+/gu, "_");
   if (name === "thinking" || name === "think" || name.includes("thinking")) return "thinking";
@@ -194,7 +194,7 @@ export function toolCallIconCategory(tool: Record<string, unknown>): WebuiDeskto
     const capability = input.tool;
     if (typeof capability === "string" && capability.includes("describe_images")) return "image";
   }
-  for (const [icon, names] of Object.entries(WEBUI_DESKTOP_TOOL_ICON_GROUPS) as [WebuiDesktopToolIcon, readonly string[]][]) {
+  for (const [icon, names] of Object.entries(WEBUI_TOOL_ICON_GROUPS) as [WebuiToolIcon, readonly string[]][]) {
     if (names.includes(name)) return icon;
   }
   return name.startsWith("mcp:") || name.includes("__mcp__") ? "logo" : "tool";

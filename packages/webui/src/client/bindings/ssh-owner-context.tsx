@@ -1,7 +1,7 @@
 // The SSH owner's binding.
 //
-// One owner, two homes: the settings page's `连接` tab (where the electron app puts
-// `设置 > 连接 > SSH`) and the 远程 page's SSH entry. A context keeps it one
+// One owner, two homes: the settings page's `连接` tab and the 远程 page's
+// SSH entry. A context keeps it one
 // instance — a second owner over the same slice would be a second authority for
 // the same hosts, and the two panels would then disagree about a host's status.
 import { createContext, useContext, type ReactNode } from "react";

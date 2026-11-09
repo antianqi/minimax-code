@@ -1,8 +1,6 @@
 // The WebUI's remote-control owner.
 //
-// It owns the bridge and answers the nine operations the 远程控制 tab issues. It is the
-// WebUI's counterpart of the electron app's main-process glue (`ipc.js`), minus the parts
-// that only exist because Electron splits a process in two.
+// It owns the bridge and answers the nine operations the 远程控制 tab issues.
 //
 // ## What the owner owns
 //
@@ -27,9 +25,7 @@
 // ## Where the bearer comes from
 //
 // The service's OAuth lease — the one the quota and the daily check-in sign with, and the one
-// the assembly owns. The electron app's main process cannot do this: under Shared OAuth it
-// fails closed on the legacy SSO token projection, so its pairing-code request is unsigned.
-// The WebUI's service holds a first-party lease, so it signs the pairing pipeline with that.
+// the assembly owns. The service signs the pairing pipeline with that first-party lease.
 //
 // ## What is never faked
 //
@@ -213,8 +209,7 @@ export function createWebuiRemoteControl(
   /**
    * The self-heal loop.
    *
-   * The electron app asks its renderer to re-sign; the WebUI has no renderer with the
-   * credential, so the service re-signs for itself: it asks archon_biz for the current binding
+   * The service re-signs for itself: it asks archon_biz for the current binding
    * and, when the binding is live, pushes the fresh one-shot ticket straight into the bridge.
    */
   /**
@@ -342,9 +337,7 @@ export function createWebuiRemoteControl(
   /**
    * Re-establish the link when the service comes back.
    *
-   * The electron app's renderer pushes the binding down when it starts; the
-   * WebUI's service has no renderer with the credential, so the service does it
-   * for itself: it asks archon_biz for the binding it already owns and opens the
+   * The service asks archon_biz for the binding it already owns and opens the
    * socket with a fresh one-shot ticket. Without this, a service restart would
    * leave the phone paired but the producer offline, and only a second pairing
    * would bring it back.
@@ -358,11 +351,8 @@ export function createWebuiRemoteControl(
   /**
    * The binding watcher.
    *
-   * The electron app's renderer owns the binding: it asks the server which
-   * binding this device has and pushes it down whenever that changes. The
-   * WebUI's service has no renderer with the credential, so the service does it
-   * for itself — and it has to keep doing it, for two reasons the electron app
-   * never has to think about:
+   * The service asks the server which binding this device has and follows
+   * changes for two reasons:
    *
    *   * the binding id changes every time the phone pairs again, and the
    *     producer has to follow it to the new one;

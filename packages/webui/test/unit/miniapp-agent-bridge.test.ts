@@ -480,8 +480,8 @@ describe("the page bridge's agent block", () => {
 
     const askingModels = page.agent.models();
     deliver(page, host);
-    // `const { models, default: model } = await …models()` must work as it does on
-    // the desktop client: the envelope around the payload is the host's business.
+    // `const { models, default: model } = await …models()` resolves the payload;
+    // the envelope is the host's business.
     await expect(askingModels).resolves.toEqual(models);
 
     const askingAgents = page.agent.agents();

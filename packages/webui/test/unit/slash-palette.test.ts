@@ -363,7 +363,7 @@ describe("WebUI slash palette — skill fixtures", () => {
     );
   });
 
-  it("WEBUI_SKILL_FIXTURES lists the four desktop skills", () => {
+  it("WEBUI_SKILL_FIXTURES lists the four skills", () => {
     expect(WEBUI_SKILL_FIXTURES.map((entry) => entry.name).sort()).toEqual([
       "ask-matt",
       "code-review",
@@ -451,7 +451,7 @@ describe("WebUI slash palette — fetched skills", () => {
     expect(entry).toMatchObject({
       name: "review-pr",
       // The row shows the skill's NAME — the token the user types — and not
-      // the runtime's display name, the way the Desktop palette does.
+      // the runtime's display name.
       displayName: "review-pr",
       label: "review-pr",
       description: "Reviews a pull request",
@@ -489,7 +489,7 @@ describe("WebUI slash palette — fetched skills", () => {
     expect(entry.source_kind).toBe("plugin");
   });
 
-  it("drops the agent prefix from a built-in skill's name, as the Desktop palette does", () => {
+  it("drops the agent prefix from a built-in skill's name", () => {
     // A built-in the runtime owns as "mavis-<skill>" reads as "<skill>": the
     // prefix names the owner, not the skill. The token stays the full name.
     const entry = slashSkillSummaryToEntry({

@@ -55,7 +55,7 @@ describe("WebUI mixed stream reducer", () => {
     expect(final.messages[0]?.parts).toEqual(parts);
     expect(final.messages[0]?.contextUsage).toEqual({ usedTokens: 42 });
   });
-  it("retains Desktop ordered activity parts from the live wire envelope", () => {
+  it("retains ordered activity parts from the live wire envelope", () => {
     const state = reduceWebuiStreamFrame(initialWebuiStreamState, frame(JSON.stringify({
       type: "agent_message",
       agent_message: {
@@ -114,7 +114,7 @@ describe("WebUI mixed stream reducer", () => {
     expect(state.phase).toBe("done");
   });
 
-  it("projects Desktop-compatible Todo and Subagent events into session state", () => {
+  it("projects Todo and Subagent events into session state", () => {
     let state = reduceWebuiStreamFrame(
       initialWebuiStreamState,
       frame(JSON.stringify({

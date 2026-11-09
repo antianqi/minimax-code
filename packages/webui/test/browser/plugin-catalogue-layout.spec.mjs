@@ -779,7 +779,7 @@ test("MCP add form validates inputs, switches transport and sends advanced HTTP 
   await expect.poll(() => advancedFields.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
   await dialog.getByLabel("请求头").fill('{"x-test":"synthetic"}');
   await dialog.getByLabel("超时（毫秒）").fill("0");
-  // The Desktop dialog disables its primary action while the form is invalid,
+  // The dialog disables its primary action while the form is invalid,
   // so the invalid state is asserted on the control: a disabled action cannot be
   // pressed and cannot send a request.
   await expect(dialog.getByRole("button", { name: "添加服务器" })).toBeDisabled();

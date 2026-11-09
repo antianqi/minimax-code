@@ -33,7 +33,7 @@ The current businesses are `account`, `browser`, `channel`, `composer`, `goal`, 
 `ssh`, `terminal`, `transcript`, `turn` and `workspace`. What a business is — and what it is not — is in
 `../client/ownership.md`.
 
-`remote` is the 远程 page: the shell for the two tabs the electron app's remote page carries.
+`remote` is the 远程 page and its two tabs.
 `remote-control` is the phone pairing and the live phone link; `channel` is 接入 IM; `ssh` is the SSH
 host management, the projects rooted on a host and the remote terminal.
 

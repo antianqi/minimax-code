@@ -523,7 +523,7 @@
     min-width: 0;
     flex: 0 1 auto;
   }
-  /* Slash palette rows reproduce the icon, bold title, dim
+  /* Slash palette rows use an icon, bold title, dim
      description pattern. The leading icon is the command glyph; the trailing
      "/name" suffix is dim and shows the literal slash form. */
   .webui-command-option {
@@ -578,8 +578,8 @@
   }
   /* Inert palette rows render with the same shape as live rows (1:1)
      but show as unavailable: muted icon, dimmer label/description, no hover
-     tint, and a not-allowed cursor so the user can tell the row exists for
-     visual parity only. The harness port still wires the supported commands
+     tint, and a not-allowed cursor so the user can tell the row is unavailable.
+     The harness port wires the supported commands
      (compact, new); unsupported entries wait for the matching feature. The
      selected highlight stays so keyboard navigation is still legible. */
   .webui-command-option[data-webui-command-option-inert="true"] {

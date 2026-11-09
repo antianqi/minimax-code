@@ -4,14 +4,9 @@
 // two icon actions: a remote project and the row's own menu. The menu carries the commands that
 // belong to a host — 设置, 登录, 删除.
 //
-// Two of those three have no counterpart in this client's runtime: 登录 needs the
-// electron app's remote-account authorization, and no SSH service here offers it. The row
-// keeps that shape and leaves that command disabled rather than giving it a handler that
-// cannot work.
+// 登录 is disabled because the SSH service does not offer remote-account authorization.
 //
-// 打开终端 is this client's own addition: a remote terminal opens from the remote
-// project's workspace in the electron app, while this client keeps the terminal inside the
-// connection settings, so the command has to live somewhere the person can reach it from.
+// 打开终端 opens a remote terminal inside connection settings.
 import { useState, type ReactElement } from "react";
 import { IconDots, IconFolderPlus, IconLogin, IconSettings, IconTerminal2, IconTrash } from "@tabler/icons-react";
 

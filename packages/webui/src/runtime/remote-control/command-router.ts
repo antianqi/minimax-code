@@ -4,10 +4,7 @@
 //
 // 桥自带一整套命令路由（`bridge/command-router.ts`）：17 条具名命令加一条通用 `cmd.route`
 // 通道。每条命令都被翻译成一条 `/minimax-desktop/api/v1/...` 的 `Request`，再等一个 `Response`
-// 回来。Electron 端里这个入口叫 `handleLocalRuntimeRequest`，住在 Electron 端的主进程里；本仓库
-// 没有对应物 —— WebUI 的运行时是通过 `cliService` 调的，不是通过一个 fetch 形态的路由。
-//
-// 所以这里补上这个入口：把 Electron 端路由映射到 WebUI 运行时。
+// 回来。这里把协议路由映射到 WebUI 的 `cliService` 运行时能力。
 // `RcDataPlaneOptions.localRuntimeInvoke` 一旦存在，桥就自己装配 `StreamPump` 与
 // `createCommandRouter`（`bridge/data-plane.ts`），不再需要外部传入 `commandRouter`。
 //
@@ -22,9 +19,8 @@
 //
 // ## 会话的帧
 //
-// Electron 端把这一轮的输出以 daemon SSE 的形式泵进 `evt.*` 帧；WebUI 运行时交出来的是已解码的
-// 帧，其 `dataJson` 本身就是 SSE 的 `data:` 载荷，所以桥自己的 `StreamPump` 可以直接复用：
-// 帧被重新写成 SSE 文本，泵按读 Electron 端的方式读它。
+// WebUI 运行时交出来的是已解码的帧，其 `dataJson` 是 SSE 的 `data:` 载荷。
+// 帧重新写成 SSE 文本，供桥的 `StreamPump` 消费。
 import { mapPermissionDecision, normalizePermissionResponses } from "./bridge/command-router.js";
 import type { RcLogger } from "./bridge/types.js";
 import type {
@@ -33,9 +29,9 @@ import type {
   WebuiRuntimeCliService,
 } from "../harness/host-contract.js";
 
-/** Electron 端生成的 API 前缀。 */
-const DESKTOP_API_PREFIX = "/minimax-desktop/api/v1";
-/** 旧版 Mavis API 前缀：桥在 Electron 端路由 404 时会回退到这里，同一套运行时能力。 */
+/** 远程控制协议的 API 前缀。 */
+const REMOTE_API_PREFIX = "/minimax-desktop/api/v1";
+/** 旧版 Mavis API 前缀：协议路由返回 404 时回退到这里。 */
 const LEGACY_API_PREFIX = "/mavis/api";
 
 /** 运行时没有的能力的 code。 */
@@ -44,11 +40,11 @@ const NOT_IMPLEMENTED = "NOT_IMPLEMENTED";
 /** 本机唯一的 agent 名。 */
 const DEFAULT_AGENT_NAME = "main";
 
-/** 桥盖在本地请求上的来源标记与内联文件内容上限头（同 Electron 端 `files/api.ts`）。 */
+/** 桥盖在本地请求上的来源标记与内联文件内容上限头。 */
 const RC_REQUEST_SOURCE_HEADER = "x-mcode-request-source";
 const RC_REQUEST_SOURCE_VALUE = "remote-control";
 const RC_FILE_CONTENT_MAX_BYTES_HEADER = "x-mcode-remote-control-file-content-max-bytes";
-/** Electron 端的默认内联上限：10 MiB。 */
+/** 默认内联上限：10 MiB。 */
 const DEFAULT_RC_FILE_CONTENT_MAX_BYTES = 10 * 1024 * 1024;
 
 /** 运行时的权限回复编号。 */
@@ -59,7 +55,7 @@ type RuntimePermissionReply = Parameters<
 /**
  * 权限决策 → 运行时编号。
  *
- * 桥的 Electron 端批量回复编号（`toDesktopBatchPermissionDecision`）恰好与运行时一致：
+ * 桥的批量回复编号与运行时一致：
  * allowOnce=0 / allowAlways=1 / deny=2。所以桥发过来的数字编号可以直接用，手机侧的原始
  * 形状（字符串决策）则先经桥自己的 `normalizePermissionResponses` / `mapPermissionDecision`
  * 归一化，再落到这张表上。
@@ -120,7 +116,7 @@ interface RouteEntry {
  * 桥的命令路由所调用的本地运行时入口。
  *
  * 入参是桥拼出来的 `Request`，出参是桥读得懂的 `Response`：命令词汇与手机侧形状由 bridge
- * 拥有，这里只负责把 Electron 端路由映射到 WebUI 运行时。
+ * 拥有，这里只负责把协议路由映射到 WebUI 运行时。
  */
 export function createRemoteControlLocalRuntimeInvoke(
   options: RemoteControlLocalRuntimeInvokeOptions,
@@ -138,8 +134,8 @@ export function createRemoteControlLocalRuntimeInvoke(
       ...(limit !== undefined ? { limit } : {}),
       ...(cursor !== undefined ? { cursor } : {}),
     });
-    // Electron 端的 typed HTTP 响应使用 snake_case。
-    return desktopViewResponse({
+    // 协议的 typed HTTP 响应使用 snake_case。
+    return protocolViewResponse({
       sessions: page.sessions,
       ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
     });
@@ -156,7 +152,7 @@ export function createRemoteControlLocalRuntimeInvoke(
       ...(limit !== undefined ? { limit } : {}),
       ...(cursor !== undefined ? { cursor } : {}),
     });
-    return desktopViewResponse({
+    return protocolViewResponse({
       sessions: page.sessions,
       ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
     });
@@ -164,7 +160,7 @@ export function createRemoteControlLocalRuntimeInvoke(
 
   /** `GET /preferences/pinned-items-order` —— 运行时拥有的置顶名册。 */
   const pinnedItemsOrderGet = async (): Promise<Response> =>
-    desktopViewResponse(await cliService.getPinnedItemsOrder());
+    protocolViewResponse(await cliService.getPinnedItemsOrder());
 
   /** `PUT /preferences/pinned-items-order` —— 调整置顶顺序。 */
   const pinnedItemsOrderPut = async (ctx: RouteContext): Promise<Response> => {
@@ -180,7 +176,7 @@ export function createRemoteControlLocalRuntimeInvoke(
       }
       items.push({ itemType, id });
     }
-    return desktopViewResponse(await cliService.putPinnedItemsOrder(items));
+    return protocolViewResponse(await cliService.putPinnedItemsOrder(items));
   };
 
   /** `GET /session/{id}/message` —— 一页会话记录。 */
@@ -252,31 +248,31 @@ export function createRemoteControlLocalRuntimeInvoke(
       ...(attachments ? { attachments } : {}),
       ...(model ? { model } : {}),
     });
-    return desktopViewResponse({
+    return protocolViewResponse({
       ...(result.itemId ? { itemId: result.itemId } : {}),
       ...(result.status ? { status: result.status } : {}),
       ...(result.position !== undefined ? { position: result.position } : {}),
     });
   };
 
-  /** Electron 端的队列读取与删除使用同一运行时队列。 */
+  /** 队列读取与删除使用同一运行时队列。 */
   const sessionQueueList = async (
     _ctx: RouteContext,
     match: RegExpExecArray,
-  ): Promise<Response> => desktopViewResponse(await cliService.listQueueMessages({
+  ): Promise<Response> => protocolViewResponse(await cliService.listQueueMessages({
     id: decodeURIComponent(match[1] ?? ""),
   }));
 
   const sessionQueueDelete = async (
     _ctx: RouteContext,
     match: RegExpExecArray,
-  ): Promise<Response> => desktopViewResponse(await cliService.deleteQueueItem({
+  ): Promise<Response> => protocolViewResponse(await cliService.deleteQueueItem({
     id: decodeURIComponent(match[1] ?? ""),
     itemId: decodeURIComponent(match[2] ?? ""),
   }));
 
   const sessionQueueGet = async (_ctx: RouteContext, match: RegExpExecArray): Promise<Response> =>
-    desktopViewResponse(await cliService.getQueueItem({ id: decodeURIComponent(match[1] ?? ""), itemId: decodeURIComponent(match[2] ?? "") }));
+    protocolViewResponse(await cliService.getQueueItem({ id: decodeURIComponent(match[1] ?? ""), itemId: decodeURIComponent(match[2] ?? "") }));
 
   const sessionQueueUpdate = async (ctx: RouteContext, match: RegExpExecArray): Promise<Response> => {
     const content = readString(ctx.body.content);
@@ -286,7 +282,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     if (rawAttachments !== undefined && !Array.isArray(rawAttachments)) return errorResponse(400, "INVALID_ARGUMENT", "attachments must be an array");
     const attachments = Array.isArray(rawAttachments) && rawAttachments.length === 0 ? [] : toRuntimeAttachments(rawAttachments);
     const expiresAt = readNumber(ctx.body.expires_at ?? ctx.body.expiresAt);
-    return desktopViewResponse(await cliService.updateQueueItem({
+    return protocolViewResponse(await cliService.updateQueueItem({
       id: decodeURIComponent(match[1] ?? ""), itemId: decodeURIComponent(match[2] ?? ""),
       ...(content !== undefined ? { content } : {}), ...(model !== undefined ? { model } : {}),
       ...(attachments !== undefined ? { attachments } : {}), ...(expiresAt !== undefined ? { expiresAt } : {}),
@@ -296,7 +292,7 @@ export function createRemoteControlLocalRuntimeInvoke(
   const sessionQueueReorder = async (ctx: RouteContext, match: RegExpExecArray): Promise<Response> => {
     const itemIds = ctx.body.item_ids ?? ctx.body.itemIds;
     if (!Array.isArray(itemIds) || itemIds.some((item) => typeof item !== "string" || !item.trim())) return errorResponse(400, "INVALID_ARGUMENT", "item_ids must be an array of nonempty strings");
-    return desktopViewResponse(await cliService.reorderQueue({ id: decodeURIComponent(match[1] ?? ""), itemIds }));
+    return protocolViewResponse(await cliService.reorderQueue({ id: decodeURIComponent(match[1] ?? ""), itemIds }));
   };
 
   /** `POST /agent/{agent}/session` —— 新建会话。 */
@@ -330,7 +326,7 @@ export function createRemoteControlLocalRuntimeInvoke(
       ...(model !== undefined ? { model } : {}),
       ...(runLocation !== undefined ? { runLocation } : {}),
     });
-    return desktopViewResponse(created);
+    return protocolViewResponse(created);
   };
 
   /** `GET /models/list` —— 可选模型。 */
@@ -392,8 +388,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     const turnId = readString(ctx.body.turn_id ?? ctx.body.turnId);
     const reason = readString(ctx.body.reason);
     // 运行时认 `turnId` 与 `reason`：`user_stop` 会暂停目标与队列并触发用户停止的级联，
-    // 而 WebUI 的 host contract 只声明了 `id`。丢掉 `reason` 会让手机的停止按钮与桌面端的
-    // 停止按钮行为不同，所以这里用一个更宽的局部类型把两个字段带过去。
+    // 而 WebUI 的 host contract 只声明了 `id`。这里用更宽的局部类型把两个字段带过去。
     const abortRequest: {
       readonly id: string;
       readonly turnId?: string;
@@ -415,7 +410,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     const pinned = readBoolean(ctx.body.pinned);
     if (!sessionId || pinned === undefined) return errorResponse(400, "INVALID_ARGUMENT", "session_id and pinned are required");
     const insertIndex = readNumber(ctx.body.insert_index ?? ctx.body.insertIndex);
-    return desktopViewResponse(await cliService.pinSession({ sessionId, pinned, ...(insertIndex === undefined ? {} : { insertIndex }) }));
+    return protocolViewResponse(await cliService.pinSession({ sessionId, pinned, ...(insertIndex === undefined ? {} : { insertIndex }) }));
   };
 
   /** `POST /permission/batch-reply` —— 批量回复权限请求。 */
@@ -479,11 +474,11 @@ export function createRemoteControlLocalRuntimeInvoke(
   const questionnairePending = async (ctx: RouteContext, match: RegExpExecArray): Promise<Response> => {
     const sessionId = readString(ctx.url.searchParams.get("session_id"));
     if (!sessionId) return errorResponse(400, "INVALID_ARGUMENT", "session_id is required");
-    return desktopViewResponse(await cliService.getPendingQuestionnaire({ name: decodeURIComponent(match[1] ?? ""), sessionId }));
+    return protocolViewResponse(await cliService.getPendingQuestionnaire({ name: decodeURIComponent(match[1] ?? ""), sessionId }));
   };
 
   const questionnairePlanReview = async (_ctx: RouteContext, match: RegExpExecArray): Promise<Response> =>
-    desktopViewResponse(await cliService.getLatestPlanReview({ name: decodeURIComponent(match[1] ?? ""), sessionId: decodeURIComponent(match[2] ?? "") }));
+    protocolViewResponse(await cliService.getLatestPlanReview({ name: decodeURIComponent(match[1] ?? ""), sessionId: decodeURIComponent(match[2] ?? "") }));
 
   const questionnaireReply = async (ctx: RouteContext, match: RegExpExecArray): Promise<Response> => {
     const schemaVersion = readNumber(ctx.body.schema_version ?? ctx.body.schemaVersion);
@@ -504,14 +499,14 @@ export function createRemoteControlLocalRuntimeInvoke(
       mapped.push({ stepId, ...(selected !== undefined ? { selectedOptionIds: selected as string[] } : {}), ...(selectedOther !== undefined ? { selectedOther } : {}), ...(otherText !== undefined ? { otherText } : {}), ...(skipped !== undefined ? { skipped } : {}) });
     }
     const submittedAt = readNumber(ctx.body.submitted_at ?? ctx.body.submittedAt);
-    return desktopViewResponse(await cliService.replyQuestionnaire({ name: decodeURIComponent(match[1] ?? ""), requestId: decodeURIComponent(match[2] ?? ""), schemaVersion, answers: mapped, ...(submittedAt !== undefined ? { submittedAt } : {}) }));
+    return protocolViewResponse(await cliService.replyQuestionnaire({ name: decodeURIComponent(match[1] ?? ""), requestId: decodeURIComponent(match[2] ?? ""), schemaVersion, answers: mapped, ...(submittedAt !== undefined ? { submittedAt } : {}) }));
   };
 
   const questionnaireDismiss = async (_ctx: RouteContext, match: RegExpExecArray): Promise<Response> =>
-    desktopViewResponse(await cliService.dismissQuestionnaire({ name: decodeURIComponent(match[1] ?? ""), requestId: decodeURIComponent(match[2] ?? "") }));
+    protocolViewResponse(await cliService.dismissQuestionnaire({ name: decodeURIComponent(match[1] ?? ""), requestId: decodeURIComponent(match[2] ?? "") }));
 
   const pendingPermissions = async (): Promise<Response> =>
-    desktopViewResponse(await cliService.listPendingPermissions({}));
+    protocolViewResponse(await cliService.listPendingPermissions({}));
 
   const sessionGoal = async (_ctx: RouteContext, match: RegExpExecArray): Promise<Response> => {
     const goal = await cliService.getGoal(decodeURIComponent(match[1] ?? ""));
@@ -519,9 +514,9 @@ export function createRemoteControlLocalRuntimeInvoke(
   };
 
   const goalResponse = (goal: Awaited<ReturnType<WebuiRuntimeCliService["getGoal"]>>): Response => {
-    if (!goal) return desktopViewResponse({});
+    if (!goal) return protocolViewResponse({});
     const { tokenBudget, statusReason, executionWait, objectiveResources, ...fields } = goal;
-    return desktopViewResponse({ goal: {
+    return protocolViewResponse({ goal: {
       ...fields,
       objectiveResources: (objectiveResources ?? []).map((resource) => ({
         meta: { attachmentType: resource.type, fileName: resource.fileName, mimeType: resource.mimeType },
@@ -579,10 +574,10 @@ export function createRemoteControlLocalRuntimeInvoke(
   /**
    * `GET /projects` —— 项目分组，每个项目内嵌它自己的会话。
    *
-   * 这是 Electron 端的 `ListProjectsResp`：手机侧的「最近」就是从每个 project 的
+   * 手机侧的「最近」就是从每个 project 的
    * sessions 渲染出来的，所以只回 project 而不带 sessions，手机既看不到最近
    * 的会话，也找不到自己刚建的那个会话。运行时的分组投影（project + 会话树）
-   * 就是 Electron 端 daemon 那份形状，直接透传。
+   * 满足协议要求，直接透传。
    */
   const projectsList = async (ctx: RouteContext): Promise<Response> => {
     const listProjectGroups = cliService.listProjectGroups;
@@ -593,10 +588,10 @@ export function createRemoteControlLocalRuntimeInvoke(
         "this runtime cannot list projects with their sessions",
       );
     }
-    // Electron 端的 `ListProjectsReq.agentName` 是可选过滤：给了就只算这个 owner，没给
+    // `ListProjectsReq.agentName` 是可选过滤：给了就只算这个 owner，没给
     // 就是跨 agent 的全量（`project/service.ts` 的 `resolveOwnerFilter`）。所以这里
     // 不能拿默认 agent 兜底 —— 那会把子 agent（verifier/worker/explore）的会话从手机
-    // 的「最近」里剔掉，而 Electron 端会带上。运行时的 `ProjectListInput.agentName` 同样是
+    // 的「最近」里剔掉。运行时的 `ProjectListInput.agentName` 同样是
     // 可选，未给即不过滤。
     const requestedAgent = readString(
       ctx.url.searchParams.get("agent_name") ?? ctx.url.searchParams.get("agentName"),
@@ -616,7 +611,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     const includeArchived = readQueryBoolean(ctx.url.searchParams.get("include_archived"));
     const result = await listProjectGroups.call(cliService, {
       ...(requestedAgent === undefined ? {} : { agentName: requestedAgent }),
-      // Electron 端的项目列表口径：会话含隐藏项、排除内部树会话、归档只在请求
+      // 项目列表口径：会话含隐藏项、排除内部树会话、归档只在请求
       // 显式要求时带上；隐藏的项目本身不返回。
       sessionFilter: {
         archived: includeArchived ? undefined : false,
@@ -642,7 +637,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     logger.info(
       `[rc.invoke] GET /projects -> ${groups.length} projects, ${sessionCount} sessions`,
     );
-    return desktopViewResponse(result);
+    return protocolViewResponse(result);
   };
 
   const projectSessions = async (ctx: RouteContext): Promise<Response> => {
@@ -658,7 +653,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     const excludePurposePrefix = readString(query.get("exclude_purpose_prefix") ?? query.get("excludePurposePrefix"));
     const includePurposePrefix = readString(query.get("include_purpose_prefix") ?? query.get("includePurposePrefix"));
     if (!cliService.listProjectSessions) return errorResponse(501, NOT_IMPLEMENTED, "project sessions are not available");
-    return desktopViewResponse(await cliService.listProjectSessions(
+    return protocolViewResponse(await cliService.listProjectSessions(
       { ...(projectKey !== undefined ? { projectKey } : {}), ...(projectId !== undefined ? { projectId } : {}), ...(workspaceDir !== undefined ? { workspaceDir } : {}) },
       { ...(requestedAgent !== undefined ? { agentName: requestedAgent } : {}), filter: { archived: false, includeHidden: true, excludeInternalTreeSessions: true, ...(excludePurposePrefix !== undefined ? { excludePurposePrefix } : {}), ...(includePurposePrefix !== undefined ? { includePurposePrefix } : {}) }, ...(limit !== undefined ? { limit } : {}), ...(cursor !== undefined ? { cursor } : {}) },
     ));
@@ -813,7 +808,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     const result = await cliService.getSession({
       id: decodeURIComponent(match[1] ?? ""),
     });
-    return desktopViewResponse(result);
+    return protocolViewResponse(result);
   };
 
   /** `PATCH /session/{id}` —— 改会话标题。 */
@@ -826,7 +821,7 @@ export function createRemoteControlLocalRuntimeInvoke(
       id: decodeURIComponent(match[1] ?? ""),
       ...(title !== undefined ? { title } : {}),
     });
-    return desktopViewResponse(result);
+    return protocolViewResponse(result);
   };
 
   /** `DELETE /session/{id}` —— 删会话。 */
@@ -896,7 +891,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     if (!cliService.listWorkspaceFileTree) return errorResponse(501, NOT_IMPLEMENTED, "workspace file listing is not supported");
     const path = readString(ctx.url.searchParams.get("path"));
     const entries = await cliService.listWorkspaceFileTree({ workspaceDir, ...(path !== undefined ? { path } : {}) });
-    return ctx.pathname.startsWith(LEGACY_API_PREFIX) ? jsonResponse(200, entries) : desktopViewResponse({ entries });
+    return ctx.pathname.startsWith(LEGACY_API_PREFIX) ? jsonResponse(200, entries) : protocolViewResponse({ entries });
   };
 
   const workspaceFileSearch = async (ctx: RouteContext): Promise<Response> => {
@@ -907,22 +902,22 @@ export function createRemoteControlLocalRuntimeInvoke(
     if (!cliService.searchWorkspaceFiles) return errorResponse(501, NOT_IMPLEMENTED, "workspace file search is not supported");
     const limit = readQueryNumber(ctx.url.searchParams.get("limit")) ?? 100;
     const paths = await cliService.searchWorkspaceFiles({ workspaceDir, query, limit });
-    return ctx.pathname.startsWith(LEGACY_API_PREFIX) ? jsonResponse(200, paths) : desktopViewResponse({ paths });
+    return ctx.pathname.startsWith(LEGACY_API_PREFIX) ? jsonResponse(200, paths) : protocolViewResponse({ paths });
   };
 
   /**
    * `GET /file/content` —— 一个文件的内容（手机打开文件时走这条）。
    *
-   * Electron 端的 `ReadWorkspaceFile` 与旧版 `/mavis/api/file/content` 回同一个体的
+   * `ReadWorkspaceFile` 与旧版 `/mavis/api/file/content` 回同一个体的
    * JSON：`{type, content, encoding?, mimeType?, sizeBytes?, error?, code?}`，图片把
    * base64 放进 `content` 并带 `encoding: "base64"`。运行时回的是
    * `{type, content, mimeType?, previewDataUrl?, error?}` —— 图片走 data URL 而不是
    * base64 正文，所以这里把 data URL 拆回 `content` + `encoding`。
    *
    * 手机这条读还受内联上限约束：桥在请求上盖 `X-MCode-Request-Source` 与
-   * `X-MCode-Remote-Control-File-Content-Max-Bytes`，Electron 端的旧路径据此回 413。
-   * 运行时的读入本身不带上限，因此这里读完之后按内容字节数复核一次，413 体与 Electron 端
-   * 逐字段一致（`error` / `code` / `sizeBytes` / `maxBytes`）。
+   * `X-MCode-Remote-Control-File-Content-Max-Bytes`，超限时返回 413。
+   * 运行时的读入本身不带上限，因此这里按内容字节数复核，返回 `error` / `code` /
+   * `sizeBytes` / `maxBytes`。
    */
   const workspaceFileContent = async (ctx: RouteContext): Promise<Response> => {
     const workspaceDir = readString(ctx.url.searchParams.get("workspace"));
@@ -930,7 +925,7 @@ export function createRemoteControlLocalRuntimeInvoke(
     if (!workspaceDir || !filePath) {
       return errorResponse(400, "INVALID_ARGUMENT", "workspace and path are required");
     }
-    // Electron 端的旧路径不支持字节区间（`offset`/`length`/`maxBytes`/`raw` 只在
+    // 旧路径不支持字节区间（`offset`/`length`/`maxBytes`/`raw` 只在
     // Runtime V2 的 typed 路由上存在），这里如实拒绝而不是悄悄忽略。
     if (["offset", "length", "maxBytes", "raw"].some((key) => ctx.url.searchParams.has(key))) {
       return errorResponse(501, NOT_IMPLEMENTED, "workspace file byte ranges are not supported");
@@ -943,7 +938,7 @@ export function createRemoteControlLocalRuntimeInvoke(
       workspaceDir,
       path: filePath,
     });
-    const body = toDesktopFileContent(result);
+    const body = toProtocolFileContent(result);
     const maxBytes = remoteControlFileContentMaxBytes(ctx.headers);
     if (
       maxBytes !== undefined &&
@@ -1052,9 +1047,9 @@ export function createRemoteControlLocalRuntimeInvoke(
 
 /** 剥掉 API 前缀；不是本运行时认识的 API 路径时返回 undefined。 */
 function stripApiPrefix(pathname: string): string | undefined {
-  if (pathname === DESKTOP_API_PREFIX) return "/";
-  if (pathname.startsWith(`${DESKTOP_API_PREFIX}/`)) {
-    return pathname.slice(DESKTOP_API_PREFIX.length);
+  if (pathname === REMOTE_API_PREFIX) return "/";
+  if (pathname.startsWith(`${REMOTE_API_PREFIX}/`)) {
+    return pathname.slice(REMOTE_API_PREFIX.length);
   }
   if (pathname === LEGACY_API_PREFIX) return "/";
   if (pathname.startsWith(`${LEGACY_API_PREFIX}/`)) {
@@ -1091,18 +1086,18 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-/** Electron 端的 typed session/project 视图在 HTTP 上使用 snake_case 字段。 */
-function desktopViewResponse(body: unknown): Response {
-  return jsonResponse(200, desktopViewWire(body));
+/** typed session/project 视图在 HTTP 上使用 snake_case 字段。 */
+function protocolViewResponse(body: unknown): Response {
+  return jsonResponse(200, protocolViewWire(body));
 }
 
-function desktopViewWire(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(desktopViewWire);
+function protocolViewWire(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(protocolViewWire);
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(
     Object.entries(value).map(([key, item]) => [
       key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`),
-      desktopViewWire(item),
+      protocolViewWire(item),
     ]),
   );
 }
@@ -1172,8 +1167,8 @@ type RuntimeFileContent = Awaited<
   ReturnType<NonNullable<WebuiRuntimeCliService["readWorkspaceFile"]>>
 >;
 
-/** Electron 端旧版 `/mavis/api/file/content` 的响应体字段。 */
-interface DesktopFileContentBody {
+/** 旧版 `/mavis/api/file/content` 的响应体字段。 */
+interface ProtocolFileContentBody {
   readonly type: "text" | "binary";
   readonly content: string;
   readonly encoding?: "base64";
@@ -1183,13 +1178,13 @@ interface DesktopFileContentBody {
 }
 
 /**
- * 运行时的文件内容 → Electron 端的文件内容体。
+ * 运行时的文件内容 → 协议文件内容体。
  *
  * 两边的差别只有一处：图片在运行时里是 `previewDataUrl`（`data:image/png;base64,...`），
- * 在 Electron 端里是 `content` + `encoding: "base64"` + `mimeType`。文本两边一致。错误
- * 也照 Electron 端放在 200 的响应体里（`Path traversal denied` 之类），不升级成 HTTP 错误。
+ * 在协议里是 `content` + `encoding: "base64"` + `mimeType`。文本两边一致。错误
+ * 放在 200 的响应体里（`Path traversal denied` 之类），不升级成 HTTP 错误。
  */
-function toDesktopFileContent(value: RuntimeFileContent): DesktopFileContentBody {
+function toProtocolFileContent(value: RuntimeFileContent): ProtocolFileContentBody {
   const inline =
     typeof value.previewDataUrl === "string"
       ? parseInlineDataUrl(value.previewDataUrl)
@@ -1236,7 +1231,7 @@ function utf8ByteLength(text: string): number {
  * 这条读是不是手机发来的，以及它的内联上限。
  *
  * 只有桥盖了 `X-MCode-Request-Source: remote-control` 的请求才受限；上限取请求头，
- * 没有头时用 Electron 端的 10 MiB 默认值。非手机来源（或没有上限头也没有来源头）返回
+ * 没有头时用 10 MiB 默认值。非手机来源（或没有上限头也没有来源头）返回
  * `undefined`，即不限流。
  */
 function remoteControlFileContentMaxBytes(headers: Headers): number | undefined {
@@ -1286,7 +1281,7 @@ function errorMessage(error: unknown): string {
 /**
  * 权限批量回复的分组：运行时编号 → 请求号列表。
  *
- * 桥发过来的是 Electron 端编号（0/1/2），与运行时一致，直接用；手机侧的原始形状（字符串决策）
+ * 桥发过来的是协议编号（0/1/2），与运行时一致，直接用；手机侧的原始形状（字符串决策）
  * 则交给桥自己的两个映射函数归一化，这里只负责把 canonical decision 落到同一张编号表上。
  */
 function resolvePermissionGroups(
@@ -1340,7 +1335,7 @@ function isRuntimePermissionReply(value: number): value is RuntimePermissionRepl
 /**
  * 桥的模型形状 → 运行时的模型选择。
  *
- * 桥发的是 Electron 端的 snake_case（`provider_id` / `model_id` / `context_limit`），运行时要的是
+ * 桥发的是 snake_case（`provider_id` / `model_id` / `context_limit`），运行时要的是
  * camelCase。provider 与 model 缺一不可，否则半截的模型选择没有意义。
  */
 function toRuntimeModel(value: unknown) {
@@ -1366,7 +1361,7 @@ function toRuntimeModel(value: unknown) {
 /**
  * 桥的附件形状 → 运行时的附件形状。
  *
- * 桥的 Electron 端线是 snake_case（`meta.attachment_type` / `local.file_path`），运行时是
+ * 桥的协议字段是 snake_case（`meta.attachment_type` / `local.file_path`），运行时是
  * camelCase；旧版 Mavis 线是平铺的（`filePath` / `fileName` / `mimeType`），一并吃下。
  */
 function toRuntimeAttachments(
@@ -1423,7 +1418,7 @@ interface RuntimeStreamFrame {
  *
  * The runtime's `dataJson` *is* the SSE `data:` payload — the runtime's own session delivery
  * writes the agent-core frame verbatim — so the bridge's pump reads it exactly as it reads the
- * The electron app's daemon stream. The cursor rides as the SSE `id:` line, which the pump
+ * The daemon stream. The cursor rides as the SSE `id:` line, which the pump
  * keeps pump-internal and never puts on the wire.
  */
 function sseResponseFromFrames(

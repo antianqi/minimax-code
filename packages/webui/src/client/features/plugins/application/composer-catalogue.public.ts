@@ -38,8 +38,7 @@ export interface WebuiComposerPluginCatalogue {
    * not the management catalogue. The two are different lists in the runtime:
    * the roster is what a turn can load (it carries the plugin skills and the
    * workspace's own skills), while the management catalogue is the paged,
-   * user-facing list of what is installed. The slash palette shows the roster,
-   * the way the Desktop palette does.
+   * user-facing list of what is installed. The slash palette shows the roster.
    *
    * The scope is the roster's own: the agent names which roster is read, and
    * the session names the workspace the roster is read for, because the

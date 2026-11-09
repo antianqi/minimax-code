@@ -4,7 +4,7 @@
  * Shapes the payload of a subset of admitted Global Events (field pruning,
  * camelCase→snake_case, JSON carriers) while keeping the frame `type` a
  * verbatim `evt.<event type>` — dots preserved — so the phone receives an
- * event type that maps one-to-one onto the electron app's Event接口 bus type
+ * event type that maps one-to-one onto the event bus type
  * (`session.start` → `evt.session.start`; the gateway strips the `evt.` prefix
  * on the broadcast path so the phone sees the bare `session.start`).
  *
@@ -13,7 +13,7 @@
  * upstream, which does the same top-level snake_case + ts_ms.
  *
  * compaction and thread_goal are NOT collapsed — each public event maps to
- * its own verbatim type. The Electron host adapter admits events against the
+ * its own verbatim type. The host adapter admits events against the
  * shared Global Event catalog before they reach this mapper.
  */
 

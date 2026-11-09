@@ -88,8 +88,7 @@ export async function prepareExtractionRoot(
 /**
  * `resolve`, then a separator-terminated containment check.
  *
- * Ported from `resolveEntryPath` in `deployed-website-source.ts` and kept in
- * the form the sibling's own comment argues for: a string prefix wrongly
+ * A string prefix wrongly
  * accepts `/tmp/evil` for a root of `/tmp/ev`.
  */
 function resolveInside(

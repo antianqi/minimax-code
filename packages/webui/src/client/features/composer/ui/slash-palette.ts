@@ -393,7 +393,7 @@ export function slashSkillSummaryToEntry(
 ): SlashCommandEntry {
   const name = skill.name;
   // The palette shows the skill's NAME — the token the user types — and not
-  // the runtime's display name, the way the Desktop palette does. A built-in
+  // the runtime's display name. A built-in
   // skill the runtime prefixes with the agent's own name loses that prefix
   // ("mavis-doctor" reads as "doctor"), because the prefix names the owner and
   // not the skill. A plugin skill keeps its namespaced name: that is the token

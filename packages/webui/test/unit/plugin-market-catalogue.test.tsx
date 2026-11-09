@@ -20,7 +20,7 @@
 // shared layout — with no effect run there is no data, and an empty list
 // renders 「暂无内容」 instead of the grid — so the layout contract itself is
 // pinned by reading the component, and the two render branches are pinned by
-// SSR. See 「marketplace page layout parity」 below.
+// SSR. See 「marketplace page layout」 below.
 
 import { readWebuiSource, squashWhitespace } from "./support/source-text.js";
 import { describe, expect, it } from "vitest";
@@ -55,7 +55,7 @@ const owner = squashWhitespace(
 );
 
 describe("plugin marketplace catalogue", () => {
-  it("builds Desktop ordered sections from available tags and category data", () => {
+  it("builds ordered sections from available tags and category data", () => {
     const rows = projectWebuiPluginCatalogue({
       data: [
         { name: "board", category: MarketplaceCategory.OFFICE, tags: [{ key: "miniapp" }] },
@@ -96,7 +96,7 @@ describe("plugin marketplace catalogue", () => {
     expect(buildPluginMarketplaceSections(rows, [{ key: "empty", displayName: "Empty" }], "board").map(({ value }) => value))
       .toEqual([`category:${MarketplaceCategory.OFFICE}`]);
   });
-  it("renders only supplied Desktop sections as anchor navigation", () => {
+  it("renders only supplied sections as anchor navigation", () => {
     const html = renderToStaticMarkup(createElement(PluginMarketplaceFilters, {
       sections: [
         { value: "featured", label: "精选", rows: [] },
@@ -154,7 +154,7 @@ describe("plugin marketplace catalogue", () => {
 // `area === "plugins" && view === "market"`, so the skill tab inherited none of
 // it. One condition now decides "this is a marketplace page", and every layout
 // consequence hangs off that single condition rather than off the plugin area.
-describe("marketplace page layout parity", () => {
+describe("marketplace page layout", () => {
   it("keys the card grid off the catalogue, not the plugin area", () => {
     // The regression in one assertion: re-gating the grid on the plugin area
     // would put 技能 back into the divided list while this file still passes

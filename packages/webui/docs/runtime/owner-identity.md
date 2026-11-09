@@ -5,23 +5,17 @@ resolves its own row in `packages/local-runtime/src/runtime/runtime-owner-policy
 harness code editable for this work; ADR 0007's read-only reasoning assumed the work would go
 upstream).
 
-The `webui` row is the `electron` row. Every cell carries the electron row's value except
-`wiring.channelService`, which stays off until the browser client has a surface to bind an IM
-channel with. The two rows are kept in step by
-`packages/local-runtime/test/unit/runtime-owner-policy.test.ts`, which asserts that they differ on
-exactly that one cell.
-
-| Cell | `tui` | `webui` (= the electron row) | Why |
+| Cell | `tui` | `webui` | Why |
 | --- | --- | --- | --- |
 | `wiring.schedulerHost` | false | true | The runtime host exposes scheduler capability, and the WebUI's `scheduling` business is the surface that uses it ([ADR 0027](../adr/0027-the-webui-is-a-scheduler-host-for-scheduled-tasks.md)) |
-| `wiring.cronService` | false | true | The runtime host exposes cron capability without the `electron` owner, and the WebUI reaches it through the six `*CronTask*` operations |
+| `wiring.cronService` | false | true | The runtime host exposes cron capability, and the WebUI reaches it through the six `*CronTask*` operations |
 | `execution.restricted` | true | false | The WebUI is not a restricted runtime |
 | `execution.memoryFeature` | false | true | The memory collection opens for this client |
 | `execution.mavisFeatureBundle` | false | true | Same class of feature bundle as the terminal client |
 | `execution.executesTerminalControl` | true | false | A browser client cannot run terminal control sequences |
 | `wiring.browserActivation` | explicit-config | desktop-plugin | Browser control comes from the installed `browser-use` plugin's `browser.use` host binding, and the built-in `browser` tool is exposed under the `mcp_browser` alias |
-| `wiring.remoteSkillHub` | false | true | The skill market reads the remote catalogue the way the electron app does. The gate used to compare owner kinds inline, so every browser client fell back to the local install ledger and showed no browsable skills |
-| `execution.promptProfile` | tui | desktop | The WebUI loads the shared `_v2/<appMode>/SYSTEM.md.hbs` asset and the workspace prompt context, like the electron app |
+| `wiring.remoteSkillHub` | false | true | The skill market reads the remote catalogue |
+| `execution.promptProfile` | tui | desktop | The WebUI loads the shared `_v2/<appMode>/SYSTEM.md.hbs` asset and the workspace prompt context |
 | `execution.promptSurfaceDefault` | cli | interactive | The WebUI has a browser panel, a workspace panel and a Mini App presenter; `cli` told the agent it had no interactive surface |
 | `execution.reviewPolicy` | tui | neither | A browser client takes neither the command-line nor the terminal review bundle |
 | `execution.titleSafetyBypass` | true | false | Generated titles go through the safety filter again, like every non-terminal client |
@@ -29,16 +23,9 @@ exactly that one cell.
 `ownsV2Runtime` is set explicitly rather than inherited: `tui` gets it from a `cli || tui` clause the
 `webui` row is not in. Both expressions answer `true` for this client.
 
-`wiring.channelService` is the one cell that still differs from the electron row: the runtime
-assembles the IM channel service for a desktop owner, but the WebUI has no screen to bind a
-channel with, so
-turning it on would start a service nobody can configure. The runtime capabilities the WebUI does
-not expose are recorded in `.temp/desktop-webui-capability-gaps.md`.
+Two consequences are visible to the person using the browser:
 
-Two consequences of the alignment with the electron row are worth stating here, because they are
-visible to the person using the browser:
-
-- Browser control is now plugin-gated, exactly as in the electron app. The `browser-use` plugin supplies the
+- Browser control is plugin-gated. The `browser-use` plugin supplies the
   `browser.use` host binding; without it installed, the Agent has no browser tool. The runtime
   injects `DESKTOP_PLUGIN_DISABLED_GUIDANCE` into the prompt in that case.
 - The Agent's prompt is the shared one, so the prompt context flag `profile.tui` is false and

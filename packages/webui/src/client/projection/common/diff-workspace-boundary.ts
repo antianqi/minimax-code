@@ -20,8 +20,7 @@
 //  * the session's workspace, which is where the work is supposed to happen;
 //  * the session's own artifacts directory, where the runtime puts the
 //    session's own products -- the plan document above all. It is outside the
-//    workspace, but it belongs to this session, and the Desktop client opens
-//    such a file with the file's own directory as its read root. The client
+//    workspace, but it belongs to this session. The client
 //    names that directory from the session id it already holds
 //    (`session-artifacts-boundary.ts`).
 //

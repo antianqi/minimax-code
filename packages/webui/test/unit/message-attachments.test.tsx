@@ -60,7 +60,7 @@ describe("MessageAttachments", () => {
     expect(html).not.toContain("flex flex-wrap gap-2");
   });
 
-  it("wraps multiple images in the desktop flex container", () => {
+  it("wraps multiple images in a flex container", () => {
     const html = renderToStaticMarkup(
       createElement(MessageAttachments, {
         attachments: [baseAttachments[0]!, baseAttachments[1]!],

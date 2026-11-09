@@ -100,7 +100,7 @@ It is a statement about **one machine**, and it must not be widened:
 
 | This measurement establishes | It does not establish |
 | --- | --- |
-| On the host the probe ran on, neither `secret-tool` nor `kwallet-query` was installed, and no Secret Service client answered | Anything about Linux in general — another distribution, desktop or server may ship either client |
+| On the host the probe ran on, neither `secret-tool` nor `kwallet-query` was installed, and no Secret Service client answered | Anything about Linux in general — another distribution or host may ship either client |
 | On that host the store was unavailable, so the explicit-failure path is reachable there | Anything about **macOS** or **Windows** — neither was probed, and no probe artifact for them exists |
 | A keyring daemon plus a session bus is not by itself evidence of a store | Anything about the *implementation*: the macOS and Windows mechanisms above are `implemented` in source, not `measured` on a host |
 

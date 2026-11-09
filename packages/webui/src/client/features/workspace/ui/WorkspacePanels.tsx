@@ -77,7 +77,7 @@ export {
   chunkWebuiWorkspaceReviewFileIds,
   WEBUI_WORKSPACE_REVIEW_DIFF_BATCH_SIZE,
 };
-const DESKTOP_COPY = { terminalExited: "已退出", terminalLoading: "正在读取终端…" } as const;
+const WEBUI_TERMINAL_COPY = { terminalExited: "已退出", terminalLoading: "正在读取终端…" } as const;
 
 /**
  * The tab, when it is showing the Mini App tool page.
@@ -671,7 +671,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
             testId="workspace-terminal-status"
             dataAttributes={{ "data-webui-terminal-availability": terminal.support }}
           >
-            {!terminal.ready ? DESKTOP_COPY.terminalLoading : terminal.availability}
+            {!terminal.ready ? WEBUI_TERMINAL_COPY.terminalLoading : terminal.availability}
           </FeedbackLiveRegion>
         ) : null}
     </div> : null}

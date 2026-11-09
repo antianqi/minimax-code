@@ -166,7 +166,7 @@ describe("WebUI design tokens", () => {
     }
   });
 
-  it("names its scale tokens the same way the desktop does", () => {
+  it("declares its scale tokens", () => {
     // tokens.css lists these exact names and the design-language doc
     // records them in the same shape. Drift means the utility mapping in
     // tailwind.config.cjs no longer lines up with the token names.
@@ -182,7 +182,7 @@ describe("WebUI design tokens", () => {
     }
   });
 
-  it("names its primitive ramps the same way the desktop does", () => {
+  it("declares its primitive ramps", () => {
     const expectedRamps = [
       // blue / cyan / gray / green / orange / purple / red / yellow each carry
       // ten steps from _25 to _1000; gray has _0 instead of _25.
@@ -201,9 +201,8 @@ describe("WebUI design tokens", () => {
     }
   });
 
-  it("is not the compiled desktop stylesheet copied across", () => {
-    // The token file is authored here rather than copied wholesale. The easiest
-    // proxy is checking that the file is *only* tokens: no font-family
+  it("keeps the token file limited to tokens", () => {
+    // The file contains no font-family
     // declarations, no Tailwind directives, no @media queries, no @keyframes.
     expect(tokens).not.toMatch(/font-family/u);
     expect(tokens).not.toMatch(/@tailwind/u);

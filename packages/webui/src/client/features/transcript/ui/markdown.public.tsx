@@ -57,7 +57,7 @@ const MARKDOWN_CODE_LANGUAGES = {
 
 // The inline-code path rule: a path may contain directories, but a
 // bare filename is a file reference only when its extension is recognized.
-const DESKTOP_FILE_EXTENSIONS = new Set([
+const INLINE_FILE_EXTENSIONS = new Set([
   "astro", "bash", "bat", "c", "cc", "cjs", "clj", "cljs", "cljc", "cmd", "cpp", "cs", "css", "cts", "cxx",
   "dart", "elm", "erl", "ex", "exs", "fish", "fs", "fsi", "fsx", "go", "gradle", "groovy", "h", "handlebars",
   "hbs", "hcl", "hh", "hpp", "hrl", "htm", "html", "java", "jl", "js", "json", "jsx", "kt", "kts", "less",
@@ -65,17 +65,17 @@ const DESKTOP_FILE_EXTENSIONS = new Set([
   "sass", "scala", "scss", "sh", "sol", "sql", "svelte", "swift", "tf", "thrift", "toml", "ts", "tsx", "vb",
   "vbs", "vue", "xml", "yaml", "yml", "zig", "zsh",
 ]);
-const DESKTOP_EXTENSIONLESS_FILE_NAMES = new Set([
+const INLINE_EXTENSIONLESS_FILE_NAMES = new Set([
   "cmakelists.txt", "dockerfile", "gemfile", "jenkinsfile", "makefile", "rakefile",
 ]);
 
-function parseDesktopInlineFileReference(value: string, workspaceDir?: string): ReturnType<typeof parseWebuiMessageFileReference> {
+function parseInlineFileReference(value: string, workspaceDir?: string): ReturnType<typeof parseWebuiMessageFileReference> {
   const reference = parseWebuiMessageFileReference(value, workspaceDir);
   if (!reference) return undefined;
   const name = reference.path.split("/").at(-1)?.toLowerCase() ?? "";
   const extension = name.split(".").at(-1) ?? "";
   const hasExtension = /\.[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(name);
-  return (hasExtension && (reference.path.includes("/") || DESKTOP_FILE_EXTENSIONS.has(extension) || webuiInlineMediaKind(name) !== undefined)) || DESKTOP_EXTENSIONLESS_FILE_NAMES.has(name)
+  return (hasExtension && (reference.path.includes("/") || INLINE_FILE_EXTENSIONS.has(extension) || webuiInlineMediaKind(name) !== undefined)) || INLINE_EXTENSIONLESS_FILE_NAMES.has(name)
     ? reference
     : undefined;
 }
@@ -279,7 +279,7 @@ function inline(tokens: readonly Token[] | undefined, onOpenFile?: (reference: N
       return <strong key={key}>{inline(token.tokens, onOpenFile, workspaceDir, lexBareText)}</strong>;
     if (token.type === "em") return <em key={key}>{inline(token.tokens, onOpenFile, workspaceDir, lexBareText)}</em>;
     if (token.type === "codespan") {
-      const reference = onOpenFile ? parseDesktopInlineFileReference(token.text, workspaceDir) : undefined;
+      const reference = onOpenFile ? parseInlineFileReference(token.text, workspaceDir) : undefined;
       return reference
         ? fileReferenceAnchor(key, token.text, reference, onOpenFile!)
         : <code key={key}>{token.text}</code>;

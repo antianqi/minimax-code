@@ -1,6 +1,6 @@
 // The account's own legal documents.
 //
-// The Desktop's login page closes with "登录即表示你同意 [服务条款] 和 [隐私政策]",
+// The login page closes with "登录即表示你同意 [服务条款] 和 [隐私政策]",
 // and both links point at the account's own site. The account scope decides
 // the site and the language it publishes its documents in, so the resolver is
 // a pure function of the scope — and the browser resolves it from the same

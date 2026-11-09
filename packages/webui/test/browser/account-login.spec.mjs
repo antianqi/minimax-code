@@ -7,8 +7,8 @@
 // browser. This spec walks both entries and the full device-authorization
 // round trip:
 //
-//   1. the user menu's 账号与登录 item opens the login page — the Desktop's
-//      own page — and its 登录 action starts the device flow, opens the
+//   1. the user menu's 账号与登录 item opens the login page, and its 登录
+//      action starts the device flow, opens the
 //      authorization page in a tab and waits for the human;
 //   2. the page flips to its signed-in state when the server observes the
 //      credential (the fixture's setAccountLoginState stands in for the human

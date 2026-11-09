@@ -118,16 +118,13 @@ export type ExpansionBudget = { remaining: number };
 // ---------------------------------------------------------------------------
 
 /**
- * Ported from `assertSafeZipEntry` in `deployed-website-source.ts`, widened from
- * zip to every container: no NUL, not absolute on any platform, no `..`
+ * Validate every container name: no NUL, not absolute on any platform, no `..`
  * segment, and no Windows drive letter.
  *
- * Two deliberate differences from the sibling, both about not refusing archives
- * that are not attacks:
+ * Two cases avoid refusing archives that are not attacks:
  *
  *   * A `.` segment is *dropped* rather than refused. `tar cf x.tar .` and
- *     `zip -r x.zip .` put `./` on every single member, so the sibling's rule
- *     would make the most common tarball in existence unreadable. A `.` cannot
+ *     `zip -r x.zip .` put `./` on every single member. A `.` cannot
  *     escape anything — `resolve` collapses it — and the traversal that matters,
  *     `..`, stays refused.
  *   * A name that normalises away to nothing (`./`, `.`) is reported as a *root

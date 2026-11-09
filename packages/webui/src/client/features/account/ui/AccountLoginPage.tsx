@@ -1,26 +1,8 @@
 // AccountLoginPage — the browser's sign-in page.
 //
-// The electron app opens a dedicated window for this: a page, not a dialog, with
-// the product mark at the top, one call to action, and the legal notice at the
-// bottom. The browser's equivalent is a full-viewport surface that takes the
-// viewport while it is open, because the flow it drives — a device
-// authorization the user completes in another tab — is the one the electron
-// app's window drives.
-//
-// The page's own order: the mark, the wordmark, the subtitle, the call to
-// action, the "the browser did not open" assist, the error, the legal notice.
-// The geometry and the copy are the page's own.
-// Two things are the browser's own, and both are declared here rather than
-// hidden:
-//
-//   * The electron app asks the operating system to open the authorization page.
-//     A browser may only open a tab from a user gesture, so the call to action
-//     reserves the tab in the click itself and sends it to the authorization
-//     page once the device code has travelled to the server and back. The
-//     assist — the copy-the-link row that appears while the code is
-//     waiting — is what covers a browser that refuses to open the tab at all.
-//   * The electron app's wordmark is an image; this client draws its own. The
-//     mark above it is the same mascot the electron app shows.
+// Device authorization opens in another browser tab. The click reserves that
+// tab before the device code arrives; a copy-the-link action covers browsers
+// that refuse to open it.
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
@@ -218,7 +200,7 @@ export function AccountLoginPage({
       data-webui-account-login-phase={phase.kind}
     >
       <div
-        data-testid="desktop-login-hero"
+        data-testid="account-login-hero"
         className="mx-auto flex w-[294px] flex-none flex-col items-center gap-5"
       >
         <img

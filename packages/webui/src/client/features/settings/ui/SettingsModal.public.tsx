@@ -36,7 +36,7 @@ import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilit
 import { selectWebuiCatalogFlatPage } from "../../../features/sessions/application/session-catalog.public.js";
 import { BrowserSettingsPage } from "../../browser/ui/BrowserSettingsPage.public.js";
 import { ConnectionSettingsPage } from "./ConnectionSettingsPage.js";
-import { DESKTOP_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, HIDDEN_SETTINGS_GROUPS, SETTINGS_GROUPS } from "../projection/settings-view.js";
+import { WEBUI_SETTINGS_TABS, resolveThemePreference, filterSettingsTabs, HIDDEN_SETTINGS_GROUPS, SETTINGS_GROUPS } from "../projection/settings-view.js";
 import type { SettingsTabKey } from "../projection/settings-view.js";
 import { DEFAULT_SHORTCUT_BINDINGS, parseShortcutBindings, serializeShortcutBindings, SHORTCUT_STORAGE_KEY } from "../../../projection/common/shortcuts.js";
 import { ShortcutsSettings } from "./ShortcutsSettings.js";
@@ -57,7 +57,7 @@ import { WebuiMotion, WebuiPage } from "../../../ui/page.js";
 
 import { FeedbackEmpty } from "../../../ui/feedback.js";
 const ICONS = {
-  desktop: IconLayoutDashboard,
+  general: IconLayoutDashboard,
   browser: IconBrowser,
   shortcuts: IconBraces,
   "custom-instructions": IconBook,
@@ -94,7 +94,7 @@ export interface SettingsModalProps {
    * The tab the dialog opens on.
    *
    * The 远程 page's 设置 entry opens the connection tab, the way the 设置 entry opens
-   * the settings at 连接. Without this the dialog would always open on the desktop tab and
+   * the settings at 连接. Without this the dialog would always open on the general tab and
    * the entry would land the reader one step away from what they asked for.
    */
   readonly initialTab?: SettingsTabKey;
@@ -166,7 +166,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   const models = modelsState.models.value ?? [];
   const account = accountState.account.value;
   const archived = archivedState.sessions;
-  const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "desktop");
+  const [active, setActive] = useState<SettingsTabKey>(initialTab ?? "general");
   const [query, setQuery] = useState("");
   const [theme, setTheme] = useState(() => stored("webui-theme", "light", storage));
   const [systemDark, setSystemDark] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
@@ -177,9 +177,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
   // The application mode: what a session created from this client runs as. The
   // runtime owns what the mode means; this page owns the choice.
   const [appMode, setAppMode] = useState(() => parseWebuiAppMode(stored(WEBUI_APP_MODE_STORAGE_KEY, WEBUI_APP_MODE_DEFAULT, storage)));
-  // Agent 控制权限 › 自动打开浏览器面板. Off by default, like the Desktop's
-  // `browserUseAutoOpenPanelEnabled`: a panel that opens itself is a surprise
-  // unless the reader asked for it.
+  // Agent 控制权限 › 自动打开浏览器面板 is off by default.
   const [autoOpenBrowser, setAutoOpenBrowser] = useState(
     () => stored(WEBUI_BROWSER_AUTO_OPEN_STORAGE_KEY, "false", storage) === "true",
   );
@@ -222,7 +220,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
     ...group,
     tabs: visibleTabs.filter((tab) => tab.group === group.key),
   })).filter((group) => group.tabs.length > 0);
-  const label = DESKTOP_SETTINGS_TABS.find((tab) => tab.key === active)?.label;
+  const label = WEBUI_SETTINGS_TABS.find((tab) => tab.key === active)?.label;
   // The request is Models' to build: the option value and the selection are two
   // halves of one round trip, and this panel used to spell its own thinner copy
   // of the builder, so a field added to a selection could reach the composer and
@@ -295,7 +293,7 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
               {active === "account" ? <AccountUsageShareAction /> : null}
             </header>
             <WebuiZoneBoundary zone={active === "coding" ? "review" : "settings"}>
-              {active === "desktop" ? <GenericPage theme={theme} setTheme={setTheme} wrap={wrap} setWrap={setWrap} newTab={newTab} setNewTab={setNewTab} contextWindow={contextWindow} setContextWindow={setContextWindow} appMode={appMode} setAppMode={setAppMode} autoOpenBrowser={autoOpenBrowser} setAutoOpenBrowser={setAutoOpenBrowser} version={version?.version ?? ""} /> : null}
+              {active === "general" ? <GenericPage theme={theme} setTheme={setTheme} wrap={wrap} setWrap={setWrap} newTab={newTab} setNewTab={setNewTab} contextWindow={contextWindow} setContextWindow={setContextWindow} appMode={appMode} setAppMode={setAppMode} autoOpenBrowser={autoOpenBrowser} setAutoOpenBrowser={setAutoOpenBrowser} version={version?.version ?? ""} /> : null}
               {active === "custom-instructions" ? <PersonalizationSettings {...(onCreateMemorySession ? { onCreateInSession: onCreateMemorySession } : {})} /> : null}
               {active === "shortcuts" ? <ShortcutsSettings bindings={shortcuts} onChange={setShortcuts} onReset={() => setShortcuts(DEFAULT_SHORTCUT_BINDINGS)} /> : null}
               {active === "browser" ? <BrowserSettingsPage /> : null}
@@ -318,8 +316,8 @@ export function SettingsModal({ open, onClose, initialTab, dataDir, version, ses
               ) : null}
               {active === "coding" ? <ReviewSettingsPage workspaceDir={workspaceDir} onOpenFileLine={onOpenFileLine} /> : null}
               {active === "worktree" ? <SettingsWorktreePage /> : null}
-              {active !== "desktop" && active !== "usage" && active !== "account" && active !== "archived" && active !== "coding" && active !== "worktree" && active !== "custom-instructions" && active !== "browser" && active !== "shortcuts" && active !== "connection" ? <div className="webui-settings-empty-panel" aria-label="空设置面板" /> : null}
-              {active === "desktop" && dataDir ? <p className="webui-settings-data-dir">{dataDir}</p> : null}
+              {active !== "general" && active !== "usage" && active !== "account" && active !== "archived" && active !== "coding" && active !== "worktree" && active !== "custom-instructions" && active !== "browser" && active !== "shortcuts" && active !== "connection" ? <div className="webui-settings-empty-panel" aria-label="空设置面板" /> : null}
+              {active === "general" && dataDir ? <p className="webui-settings-data-dir">{dataDir}</p> : null}
             </WebuiZoneBoundary>
           </WebuiPage>
         </WebuiPage>

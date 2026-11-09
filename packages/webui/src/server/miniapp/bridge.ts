@@ -1,11 +1,9 @@
 // The page half of the Mini App bridge, served by the proxy.
 //
-// A Mini App page reaches its host through `window.mcode.miniapp.*`. On the
-// electron app that namespace comes from an Electron preload; a browser tab
-// cannot install one, so the proxy injects a script and this module is it. The
+// A Mini App page reaches its host through `window.mcode.miniapp.*`. The proxy
+// injects this module as a script. The
 // namespace's composer method is `message.append(text)`: it resolves on a
-// confirmed append and rejects with the failure code — the same codes, because a
-// page written against the electron app must not see a different vocabulary here.
+// confirmed append and rejects with the failure code.
 //
 // The page half knows no identity. It cannot name a session or a plugin: the
 // host supplies both from the view it framed, so the most a page can ask for is
@@ -115,9 +113,7 @@ const SCRIPT = `(function () {
   // ---------------------------------------------------------------------
   // The agent block: window.mcode.miniapp.agent.
   //
-  // The same namespace as the electron app's preload, so a page written against
-  // it finds every method here. What changes is the transport: a browser page
-  // cannot call a preload, so each call is one postMessage and the client that
+  // Each call is one postMessage and the client that
   // framed the page answers it. Identity never travels from here — the page
   // names content and a correlation id, nothing else.
   //

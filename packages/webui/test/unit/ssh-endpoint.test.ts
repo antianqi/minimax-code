@@ -4,12 +4,11 @@
  * Three claims, and they are the ones the SSH settings page stands or falls by:
  *
  *   * **A host picked from `~/.ssh/config` is stored as its alias alone.** OpenSSH resolves the
- *     host, the user, the port and the key when it is asked for that alias, and Desktop stores
- *     nothing else (`ssh-runtime/connection-service.js`, `createPendingConnection`). A stored
+ *     host, the user, the port and the key when it is asked for that alias. A stored
  *     copy of what `ssh -G` reported would pin the host to the config as it reads today.
  *   * **A key path may be written the way OpenSSH writes it.** `ssh -G` reports
  *     `~/.ssh/id_ed25519` and the form offers it as an example, so the runtime has to accept it
- *     and store the expanded path — Desktop does the same in `parseIdentityFile`.
+ *     and store the expanded path.
  *   * **The values the person overrode reach OpenSSH as its own options.** The user an `ssh_config`
  *     host overrides travels as `-l`, the key as `-i`, and neither is dropped on the way.
  *

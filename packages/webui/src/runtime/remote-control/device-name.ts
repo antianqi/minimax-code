@@ -16,8 +16,8 @@ let cachedOsName: string | undefined;
 /**
  * Marks the name as this client's.
  *
- * The electron app and the WebUI can run on the same machine; the suffix keeps
- * them two devices in the paired-device list instead of one name that changes
+ * Clients can run on the same machine; the suffix keeps
+ * their entries distinct in the paired-device list instead of one name that changes
  * depending on which client asked last.
  */
 const WEBUI_DEVICE_SUFFIX = ".WEBUI";

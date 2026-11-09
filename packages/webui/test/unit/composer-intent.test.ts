@@ -399,7 +399,7 @@ describe("resolveWebuiSubmissionIntent — disabled command inputs do not fill t
   });
 });
 
-describe("Desktop composer interaction contracts", () => {
+describe("composer interaction contracts", () => {
   it("keeps the @ query range at the caret and preserves the surrounding draft", () => {
     const value = "fix @plug tail";
     const range = findWebuiMentionRange(value, 9);
@@ -513,7 +513,7 @@ describe("Desktop composer interaction contracts", () => {
     }).ok).toBe(false);
   });
 
-  it("restricts the permission selector to the three Desktop modes", () => {
+  it("restricts the permission selector to three modes", () => {
     for (const mode of ["default", "auto", "bypassPermissions"]) {
       expect(setPermissionModeOperation.validate({ mode }).ok).toBe(true);
     }

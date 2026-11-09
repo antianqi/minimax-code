@@ -382,9 +382,8 @@ describe("the Mini App business", () => {
       message: refusal!.message,
       rows: snapshot.listing.rows,
     });
-    // The client and its pid are the runtime's to report — this client cannot
-    // discover them, and must not invent them.
-    expect(text).toContain("electron");
+    // Keep diagnostics while presenting a neutral client name.
+    expect(text).not.toContain("electron");
     expect(text).toContain("4242");
     expect(snapshot.presentations["shared-app"]).toBeUndefined();
   });

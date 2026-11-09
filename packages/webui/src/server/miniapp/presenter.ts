@@ -27,8 +27,7 @@ export type MiniAppPresentationIntent =
 /**
  * The browser implementation of the host-owned Mini App presenter.
  *
- * The electron app's presenter moves a native view; there is no such view here. ADR 0020 maps the
- * page's `open` onto the session rail plus the standalone presentation: `open` selects that session
+ * ADR 0020 maps the page's `open` onto the session rail plus the standalone presentation: `open` selects that session
  * through the client's ordinary selection path and records that the panel is showing that Mini App,
  * and `close` stops showing it. Selection is what makes a Mini-App-created session's permission asks
  * answerable, so the record has to follow the selection rather than the page's wishes.

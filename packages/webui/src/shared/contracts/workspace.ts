@@ -73,8 +73,7 @@ export interface WebuiWorkspaceArchiveExtractResult {
 /**
  * One level of the local directory tree, for the composer's project
  * picker. A browser cannot hand the WebUI an absolute path — the File
- * System Access API returns a bare directory name, and `File.path` only
- * exists inside Electron — so the server enumerates the candidates and
+ * System Access API returns a bare directory name, so the server enumerates the candidates and
  * the browser picks from what the server reports.
  */
 export interface WebuiWorkspaceDirectoryListing {

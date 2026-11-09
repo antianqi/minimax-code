@@ -48,7 +48,7 @@ import {
   useWebuiWorkspaceCanvas,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
-import { DESKTOP_COPY, resolveCanvasPointerGesture, stepCanvasZoom, canvasPointerMoveLayout, canvasPointerResizeLayout, canvasArrowDirection, canvasKeyStep, nudgeCanvasLayout, resizeCanvasLayoutBy, canvasLayoutsEqual, buildCanvasUpdateLayoutMutation, buildCanvasAddFileMutation, buildCanvasRemoveNodeMutation, createCanvasOperationId, createCanvasNodeId, buildCanvasOperation, nextCanvasNodeLayout, describeCanvasError, parseCanvasNodes, applyCanvasLayoutPreview } from "../projection/canvas-projection.js";
+import { WEBUI_CANVAS_COPY, resolveCanvasPointerGesture, stepCanvasZoom, canvasPointerMoveLayout, canvasPointerResizeLayout, canvasArrowDirection, canvasKeyStep, nudgeCanvasLayout, resizeCanvasLayoutBy, canvasLayoutsEqual, buildCanvasUpdateLayoutMutation, buildCanvasAddFileMutation, buildCanvasRemoveNodeMutation, createCanvasOperationId, createCanvasNodeId, buildCanvasOperation, nextCanvasNodeLayout, describeCanvasError, parseCanvasNodes, applyCanvasLayoutPreview } from "../projection/canvas-projection.js";
 import type { CanvasNodeView, CanvasPointerGesture, CanvasLayoutPreview } from "../projection/canvas-projection.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
 import { useWebuiToastError } from "../../../ui/toast.js";
@@ -138,7 +138,7 @@ export function WorkspaceCanvas({ sessionId }: {
   ): void => {
     const targetSessionId = sessionId;
     if (!queries?.canApplyCanvas || !targetSessionId) {
-      setLocalError(DESKTOP_COPY.canvasReadOnly);
+      setLocalError(WEBUI_CANVAS_COPY.canvasReadOnly);
       return;
     }
     let operation: CanvasOperation;
@@ -169,7 +169,7 @@ export function WorkspaceCanvas({ sessionId }: {
     const context = readCanvasGestureContext(event.target);
     if (context.kind === "none") return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (busy) { setNotice(DESKTOP_COPY.canvasBusy); return; }
+    if (busy) { setNotice(WEBUI_CANVAS_COPY.canvasBusy); return; }
     const startLayout = context.nodeId
       ? confirmedNodes.find((node) => node.id === context.nodeId)?.layout
       : undefined;
@@ -247,7 +247,7 @@ export function WorkspaceCanvas({ sessionId }: {
   ): void => {
     const direction = canvasArrowDirection(event.key);
     if (!direction) return;
-    if (readOnly) { setLocalError(DESKTOP_COPY.canvasReadOnly); return; }
+    if (readOnly) { setLocalError(WEBUI_CANVAS_COPY.canvasReadOnly); return; }
     event.preventDefault();
     const step = canvasKeyStep(event.shiftKey);
     // Drag and resize both have a real keyboard equivalent, so the pointer
@@ -262,7 +262,7 @@ export function WorkspaceCanvas({ sessionId }: {
     event.preventDefault();
     const relativePath = draftPath.trim();
     if (!validateRequired([{ name: "path", label: "文件路径", value: relativePath }])) return;
-    if (readOnly) { setLocalError(DESKTOP_COPY.canvasReadOnly); return; }
+    if (readOnly) { setLocalError(WEBUI_CANVAS_COPY.canvasReadOnly); return; }
     applyMutations(
       [buildCanvasAddFileMutation(createCanvasNodeId(), nextCanvasNodeLayout(confirmedNodes), { relativePath })],
       () => setDraftPath((current) => current === draftPath ? "" : current),
@@ -275,10 +275,10 @@ export function WorkspaceCanvas({ sessionId }: {
   };
 
   return <div className="webui-canvas-content" onWheel={handleWheel}>
-    {nodes.length === 0 ? <><strong>{DESKTOP_COPY.canvasEmptyTitle}</strong><p>{DESKTOP_COPY.canvasEmptyDescription}</p></> : <div
+    {nodes.length === 0 ? <><strong>{WEBUI_CANVAS_COPY.canvasEmptyTitle}</strong><p>{WEBUI_CANVAS_COPY.canvasEmptyDescription}</p></> : <div
       ref={viewportRef}
       role="group"
-      aria-label={DESKTOP_COPY.canvasStageLabel}
+      aria-label={WEBUI_CANVAS_COPY.canvasStageLabel}
       tabIndex={0}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -313,7 +313,7 @@ export function WorkspaceCanvas({ sessionId }: {
           className="webui-canvas-node"
           role="group"
           tabIndex={0}
-          aria-label={`${node.label}。${DESKTOP_COPY.canvasNodeHint}`}
+          aria-label={`${node.label}。${WEBUI_CANVAS_COPY.canvasNodeHint}`}
           aria-keyshortcuts="ArrowUp ArrowRight ArrowDown ArrowLeft"
           // Literal attributes, matching CANVAS_GESTURE_ATTRIBUTE /
           // CANVAS_NODE_ID_ATTRIBUTE, which readCanvasGestureContext queries.
@@ -342,7 +342,7 @@ export function WorkspaceCanvas({ sessionId }: {
             disabled={readOnly || busy}
             onClick={() => applyMutations([buildCanvasRemoveNodeMutation(node.id)])}
             className="absolute right-2 top-2"
-          >{DESKTOP_COPY.canvasNodeRemove}</WebuiButton>
+          >{WEBUI_CANVAS_COPY.canvasNodeRemove}</WebuiButton>
           <div
             aria-hidden="true"
             data-canvas-gesture="resize"
@@ -357,7 +357,7 @@ export function WorkspaceCanvas({ sessionId }: {
       style={{ position: "absolute", left: "var(--spacing_16)", top: "var(--spacing_16)", display: "flex", gap: "var(--spacing_8)", alignItems: "flex-end" }}
     >
       <WebuiField
-        label={DESKTOP_COPY.canvasAddLabel}
+        label={WEBUI_CANVAS_COPY.canvasAddLabel}
         required
         error={fieldErrors.path}
         className="w-[180px]"
@@ -367,7 +367,7 @@ export function WorkspaceCanvas({ sessionId }: {
             controlSize="dense"
             appearance="boxed"
             textSize="small"
-            placeholder={DESKTOP_COPY.canvasAddPlaceholder}
+            placeholder={WEBUI_CANVAS_COPY.canvasAddPlaceholder}
             value={draftPath}
             disabled={readOnly}
             onChange={(event) => { setDraftPath(event.target.value); clearFieldError("path"); }}
@@ -379,14 +379,14 @@ export function WorkspaceCanvas({ sessionId }: {
         size="inline-dense"
         type="submit"
         disabled={readOnly || busy}
-      >{DESKTOP_COPY.canvasAddSubmit}</WebuiButton>
+      >{WEBUI_CANVAS_COPY.canvasAddSubmit}</WebuiButton>
     </form>
     {/* Status text is stacked in one column so the read-only note, the
         in-flight state, a notice and a failure can never overlap. */}
     <div style={{ position: "absolute", left: "var(--spacing_16)", bottom: "var(--spacing_8)", display: "flex", flexDirection: "column", gap: "var(--spacing_4)", alignItems: "flex-start", textAlign: "left" }}>
-      {readOnly ? <p style={{ margin: 0, color: "var(--text_default_tertiary)", fontSize: "var(--size_12)" }}>{DESKTOP_COPY.canvasReadOnly}</p> : null}
+      {readOnly ? <p style={{ margin: 0, color: "var(--text_default_tertiary)", fontSize: "var(--size_12)" }}>{WEBUI_CANVAS_COPY.canvasReadOnly}</p> : null}
       {/* 保存中的状态与结果都要被听到；播报交给共享契约，内联样式留在承载文字的元素上。 */}
-      {busy ? <FeedbackLiveRegion><p style={{ margin: 0, color: "var(--text_default_tertiary)", fontSize: "var(--size_12)" }}>{DESKTOP_COPY.canvasSaving}</p></FeedbackLiveRegion> : null}
+      {busy ? <FeedbackLiveRegion><p style={{ margin: 0, color: "var(--text_default_tertiary)", fontSize: "var(--size_12)" }}>{WEBUI_CANVAS_COPY.canvasSaving}</p></FeedbackLiveRegion> : null}
       {notice ? <FeedbackLiveRegion><p style={{ margin: 0, color: "var(--text_default_tertiary)", fontSize: "var(--size_12)" }}>{notice}</p></FeedbackLiveRegion> : null}
     </div>
   </div>;

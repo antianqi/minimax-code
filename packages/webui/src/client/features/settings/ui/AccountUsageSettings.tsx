@@ -252,13 +252,9 @@ export function AccountUsageSettings(): ReactElement {
  * The account's avatar, with the initial letter as its fallback.
  *
  * The image IS the circle: it fills the 80px box and is clipped by its own
- * `rounded-full`. The electron app draws the same avatar the same way — its
- * container is a white circle, but the picture is a disc that reaches the
- * edges of the square, so the white is never visible and only the picture
- * shows.
+ * `rounded-full`. The picture reaches the edges of the square.
  *
- * The white container is not reproduced here on purpose. Two things make it
- * wrong rather than merely different:
+ * The image needs no separate white container:
  *
  *  * This design system has no `size-full` utility — `theme.size` is the
  *    token scale (`size_12` … `size_64`), so `size-full` is dropped by the

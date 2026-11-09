@@ -14,11 +14,8 @@ import type { ArchiveContents, ArchiveEntry } from "./archive-types.js";
  * carries the same `path` an explicit entry would, with no trailing slash: the
  * name alone distinguishes a directory, and the view navigates by name.
  *
- * `shouldStripArchiveRoot` in `remote/archive.ts` is deliberately *not* ported
- * here. It strips a single top-level directory because a skill install needs
- * the path *inside* the repository, whereas a preview has to name what the
- * archive actually contains — silently dropping the root a user is looking at
- * would make this panel disagree with every other zip tool.
+ * A preview names what the archive actually contains, including a single
+ * top-level directory.
  */
 export function listOneLevel(
   contents: ArchiveContents,

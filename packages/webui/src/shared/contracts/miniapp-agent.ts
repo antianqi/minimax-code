@@ -1,8 +1,7 @@
 // The Mini App page's agent bridge, as a wire contract.
 //
-// A Mini App page calls `window.mcode.miniapp.agent.*`. On the electron app that
-// namespace is an Electron preload and its calls ride IPC. Here the page is a
-// browser iframe on the proxy's own origin, so every call crosses `postMessage`
+// A Mini App page calls `window.mcode.miniapp.agent.*` from a browser iframe on
+// the proxy's own origin, so every call crosses `postMessage`
 // to the client that framed it, and the client relays it to the service. Three
 // records make that auditable — the page/host message frames, the operation
 // bodies, and the stream frames — and all three are declared here rather than in

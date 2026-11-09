@@ -66,7 +66,7 @@ test("the active settings navigation row uses the shared selected interaction fi
   await openApp(page, "#session=A");
   await openSettings(page);
 
-  const activeRow = page.locator('.webui-settings-nav [data-menu-key="desktop"]');
+  const activeRow = page.locator('.webui-settings-nav [data-menu-key="general"]');
   await expect(activeRow).toHaveAttribute("aria-current", "page");
   const actual = await activeRow.evaluate((element) => getComputedStyle(element).backgroundColor);
   const expected = await page.evaluate(() => {

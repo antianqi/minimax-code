@@ -217,8 +217,7 @@ test("the window fits a constrained viewport without losing the terminal", async
     return { width: rect.width, height: rect.height, maxHeight: getComputedStyle(element).maxHeight };
   });
 
-  // The window is bounded by the viewport's own margin, not by the desktop
-  // size it would have on a wide screen.
+  // The window is bounded by the viewport's own margin.
   expect(frame.width).toBe(672);
   expect(frame.maxHeight).toBe("592px");
   expect(frame.height).toBeLessThanOrEqual(592);

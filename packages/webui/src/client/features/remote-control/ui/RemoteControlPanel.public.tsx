@@ -15,19 +15,8 @@
 // The bound page carries no device line and no disconnect action: the linked devices and the
 // revoke action live in the connection settings, which 设置 opens.
 //
-// ## What changed and why
+// ## Layout
 //
-//   * The `desktop-text-*` typography classes do not exist in the WebUI. Each one is
-//     replaced by the size and weight utilities the markup already carries
-//     (`text-4xl font-medium leading-[1.2]`, `text-base`, `text-sm`, `text-xs`), so the measured
-//     sizes are reproduced with the WebUI's type scale.
-//   * The card's `ring-[0.5px] ring-inset ring-border_default` becomes
-//     `border-[0.5px] border-border_default`: the WebUI's Tailwind theme has no `ringColor`
-//     entry for the token, and a half-pixel border is the same line.
-//   * The three row icons are the WebUI's own glyphs — the phone (`WebuiIconRemote`), the chat
-//     bubble (`WebuiIconSession`) and the globe (`WebuiIconGlobe`).
-//   * The phone mockup column keeps its geometry and uses the WebUI's own copy of the
-//     same asset (`/assets/img/remote_control_phone_zh.png`, already in `client/assets/img`).
 //   * The vertical rhythm is one step that scales with the window's height instead of fixed
 //     gaps. An application window has a fixed height, and fixed gaps stop fitting in a short
 //     browser window: the column then scrolls and the page no longer fits on one screen. At the

@@ -17,8 +17,7 @@
 //
 //   * `presentationRevision` is monotonic per plugin and survives a release. It
 //     is what makes a fast detach-then-release visible to a poll that would
-//     otherwise see `detached: false` on both reads (the same property the field
-//     has in the electron app's contract).
+//     otherwise see `detached: false` on both reads.
 //   * A second acquisition for a plugin replaces the first, and the older
 //     lease's release does not clear the newer. Two documents can overlap for a
 //     moment — a tab reload, a switch that races a close — and the record must

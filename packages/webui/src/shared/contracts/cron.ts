@@ -42,8 +42,8 @@ export interface WebuiCronTask {
   /**
    * Whether **this client** holds the armed timer for the task (ADR 0027).
    *
-   * Not "who will run it": the job row records no owner and an unmodified electron app publishes
-   * none, so naming another host would be a promise nobody can keep. The panel says this client
+   * Not "who will run it": the job row records no owner, so naming another host would be
+   * unsupported. The panel says this client
    * holds the task or it does not, and that another runtime instance may be armed on the same
    * machine.
    */

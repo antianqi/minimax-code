@@ -10,12 +10,12 @@ import {
   toolCallStatus,
   toolCallStatusLabel,
   toolCallIconCategory,
-  WEBUI_DESKTOP_TOOL_ICON_GROUPS,
-  WEBUI_DESKTOP_TOOL_DISPLAY_LABELS,
+  WEBUI_TOOL_ICON_GROUPS,
+  WEBUI_TOOL_DISPLAY_LABELS,
 } from "../../src/client/features/transcript/projection/tool-projection.js";
 
-describe("Desktop message parts projection", () => {
-  it("normalizes Desktop tool lifecycle states without inventing completion", () => {
+describe("message parts projection", () => {
+  it("normalizes tool lifecycle states without inventing completion", () => {
     expect(toolCallStatus({ status: "pending" })).toBe("pending");
     expect(toolCallStatus({ status: "running" })).toBe("running");
     expect(toolCallStatus({ status: "done" })).toBe("completed");
@@ -31,20 +31,20 @@ describe("Desktop message parts projection", () => {
     expect(toolCallStatusLabel("unknown")).toBeUndefined();
   });
 
-  it("keeps the Desktop-visible labels for the supported tool categories", () => {
+  it("keeps the labels for the supported tool categories", () => {
     expect(toolCallLabel({ name: "bash" })).toBe("终端");
     expect(toolCallLabel({ name: "read_file" })).toBe("读取文件");
     expect(toolCallLabel({ name: "edit_file" })).toBe("编辑文件");
     expect(toolCallLabel({ name: "web_fetch" })).toBe("网页抓取");
     expect(toolCallLabel({ name: "my_tool" })).toBe("工具");
-    expect(WEBUI_DESKTOP_TOOL_DISPLAY_LABELS.website_deploy).toBe("部署网站");
-    expect(WEBUI_DESKTOP_TOOL_DISPLAY_LABELS.task_query).toBe("任务进度");
-    expect(WEBUI_DESKTOP_TOOL_DISPLAY_LABELS.create_goal).toBe("目标创建");
+    expect(WEBUI_TOOL_DISPLAY_LABELS.website_deploy).toBe("部署网站");
+    expect(WEBUI_TOOL_DISPLAY_LABELS.task_query).toBe("任务进度");
+    expect(WEBUI_TOOL_DISPLAY_LABELS.create_goal).toBe("目标创建");
     expect(toolCallLabel({ name: "website_deploy" })).toBe("部署网站");
     expect(toolCallLabel({ name: "task_query" })).toBe("任务进度");
   });
 
-  it("maps every tool id exposed by the Desktop 3.0.73 registry to its icon category", () => {
+  it("maps supported tool ids to their icon categories", () => {
     const fixtures = [
       ["command", "bash", "python", "python3", "shell", "command", "terminal"],
       ["file", "read", "read_file", "ls", "find", "glob", "read_mcp_resource", "list_mcp_resources", "list_mcp_resource_templates", "deliver_asset", "archon.asset.deliver"],
@@ -66,14 +66,14 @@ describe("Desktop message parts projection", () => {
     for (const [icon, ...ids] of fixtures) {
       for (const id of ids) expect(toolCallIconCategory({ name: id })).toBe(icon);
     }
-    expect(Object.values(WEBUI_DESKTOP_TOOL_ICON_GROUPS).flat().sort()).toEqual(
+    expect(Object.values(WEBUI_TOOL_ICON_GROUPS).flat().sort()).toEqual(
       fixtures.flatMap(([, ...ids]) => ids).sort(),
     );
     expect(toolCallIconCategory({ name: "mcp:external-tool" })).toBe("logo");
     expect(toolCallIconCategory({ name: "read_file", input: { path: "image.png" } })).toBe("image");
   });
 
-  it("keeps thinking, text, and tool calls in Desktop order", () => {
+  it("keeps thinking, text, and tool calls in order", () => {
     const tool = { id: "tool-1", name: "bash" };
     expect(
       projectMessageParts({
@@ -89,7 +89,7 @@ describe("Desktop message parts projection", () => {
     ]);
   });
 
-  it("projects standalone Desktop media tags instead of showing their raw XML", () => {
+  it("projects standalone media tags instead of showing their raw XML", () => {
     const parts = projectMessageParts({
       msgId: "standalone-media",
       msgContent: '生成结果：<media type="png" src="/workspace/chart.png" caption="图表" /> 已完成。',
@@ -117,7 +117,7 @@ describe("Desktop message parts projection", () => {
     });
   });
 
-  it("preserves the Desktop parts order for thinking, delegation, tools, and final text", () => {
+  it("preserves parts order for thinking, delegation, tools, and final text", () => {
     const parts = projectMessageParts({
       msgId: "ordered",
       parts: [
@@ -132,7 +132,7 @@ describe("Desktop message parts projection", () => {
     expect(parts[1]).toMatchObject({ type: "delegation", message: { toAgent: "reviewer" } });
   });
 
-  it("expands Desktop delegation parts arrays in their source order", () => {
+  it("expands delegation parts arrays in their source order", () => {
     const parts = projectMessageParts({
       msgId: "delegation-array",
       parts: [{
@@ -307,7 +307,7 @@ describe("Desktop message parts projection", () => {
     }
   });
 
-  it("projects Desktop path tags as linkable path text and hides video option metadata", () => {
+  it("projects path tags as linkable path text and hides video option metadata", () => {
     const content = [
       "已生成文件：<path>src/components/Map View.tsx</path>",
       "<video-generation-options><duration>5</duration><ratio>16:9</ratio></video-generation-options>",
@@ -318,7 +318,7 @@ describe("Desktop message parts projection", () => {
     ]);
   });
 
-  it("runs Desktop special-message projection inside explicit text parts", () => {
+  it("runs special-message projection inside explicit text parts", () => {
     const parts = projectMessageParts({
       msgId: "explicit-special",
       parts: [{

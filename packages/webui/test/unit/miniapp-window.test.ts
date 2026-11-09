@@ -137,7 +137,7 @@ describe("a page's window request", () => {
   });
 
   it("names click-through as something a tab cannot do", () => {
-    // A page that asks to fall through wants clicks to reach the desktop behind it. A tab
+    // A page that asks to fall through wants clicks to reach the surface behind it. A tab
     // has nothing behind it, and making the frame ignore pointer events would also stop
     // the page from ever seeing the pointer again — the page's own "is the pointer over
     // me" logic is driven by those events, so it would never ask to become interactive

@@ -90,9 +90,7 @@ export interface WebuiRemoteControlPendingUnbind {
 /**
  * The one-shot ticket bundle the browser signed and pushed to the service.
  *
- * The electron app's renderer owns the binding HTTP pipeline (only its axios can sign
- * `GET /desktop/bindings`), then hands the fresh ticket to the main process over
- * `rc:binding-ready`. The WebUI keeps that split: the browser signs, the service holds the socket.
+ * The service uses the supplied ticket to open the socket.
  */
 export interface WebuiRemoteControlCredentials {
   readonly bindingId: number;
@@ -112,8 +110,7 @@ export interface WebuiRemoteControlComposerMode {
  * One frame of the remote-control stream.
  *
  * The phone link changes on the host, not in the browser: the pairing code expires, the socket
- * drops, the phone asks a permission question. The electron app pushes each change to the renderer;
- * the WebUI pushes them down one stream instead, so the pairing page reflects the live phase
+ * drops, or the phone asks a permission question. The WebUI sends updates down one stream so the pairing page reflects the live phase
  * without polling.
  */
 export type WebuiRemoteControlEvent =

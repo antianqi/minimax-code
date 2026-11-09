@@ -133,6 +133,7 @@ for (const theme of THEMES) {
       await expect(railRow).toBeEnabled();
       await railRow.click();
       await expect(page.getByTestId("remote-page")).toBeVisible();
+      await expect(page.getByText("通过 MiniMax App 访问此电脑，随时随地继续你的任务")).toBeVisible();
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await expect(page.locator('[data-webui-shell="two-column"]')).toHaveAttribute("data-webui-rail-mode", viewport.railMode);
 

@@ -6,7 +6,7 @@ Accepted. It supersedes the premise of the retired 0012 record ("the WebUI runs 
 scheduled tasks until the runtime offers one", listed in the
 [Decisions table](../README.md)). The WebUI gets a scheduled-task surface back and it
 executes scheduled tasks. It does not get a scheduler of its own: it uses the v2 runtime's
-one scheduler, the same one the electron app uses, and the two of them are kept correct by the
+one scheduler, the same one the other host uses, and the two of them are kept correct by the
 shared database rather than by an agreement between the applications.
 
 ## Context
@@ -19,7 +19,7 @@ shared database rather than by an agreement between the applications.
   (`packages/local-runtime/src/cron/store.ts:30-41`); markdown with YAML frontmatter is the
   legacy form it migrates from
   (`packages/local-runtime/src/cron/legacy-md-migration.ts:231`). The terminal client drives
-  it, and the electron app exposes it to the model through the `mavis` tool's cron commands
+  it, and the other host exposes it to the model through the `mavis` tool's cron commands
   (`packages/local-runtime/src/runtime/mavis-cron-adapter.ts`). Its HTTP routes are
   retired sources.
 - The v2 model lives in `packages/local-runtime-v2/src/service/cron/`. It stores definitions
@@ -36,8 +36,8 @@ The WebUI resolves to a v2 host that declares itself a scheduler host.
 `packages/webui/src/runtime/assembly.ts:325` sets `runtimeOwnerKind: "webui"`, and the
 `webui` row of the runtime owner policy grants `schedulerHost: true`
 (`packages/local-runtime/src/runtime/runtime-owner-policy.ts:405`) and `cronService: true`
-(``:411`) — deliberately aligned with the `electron` row (`:273`). The WebUI also
-shares the data directory with the electron app
+(``:411`). The WebUI also
+shares the data directory with the other host
 ([ADR 0006](0006-webui-shares-the-cli-data-directory.md)), so both processes open the same
 SQLite file. Two processes are already an accepted arrangement there: the client opens it
 with `journal_mode=WAL, busy_timeout=5000` (`infra/db/client.ts:119`).
@@ -93,17 +93,14 @@ schedulers over one queue.
 
 ### The constraint that shapes the answer
 
-The electron app is owned by another team and its source is not in this repository.
-A design that requires the electron app to change its behaviour, or to ship a new runtime,
-cannot be relied on. So the WebUI feature has to be correct against an electron app that stays
-exactly as it is.
+The WebUI must remain correct when another host uses the same data without changing its behavior.
 
 That rules out electing a single armed process by a lock both sides must take, and it
 rules out making the WebUI a passive client that never fires anything — which would also
 leave a WebUI-only user with no scheduler at all.
 
 What it does not rule out is making the shared database the arbiter. Every mechanism below
-is either a conditional write or a new nullable column, so an unmodified electron app keeps
+is either a conditional write or a new nullable column, so an unmodified peer host keeps
 working and simply behaves correctly.
 
 ## Decision
@@ -111,15 +108,14 @@ working and simply behaves correctly.
 **The WebUI is a scheduler host. It arms the persisted scheduled tasks and fires them.
 When another host is also armed, the database decides which one acts on a given slot.**
 
-The WebUI is a peer of the electron app here, not a subordinate. There is no lease, no
-election, no reconcile loop, and no electron app change.
+There is no lease, election, reconcile loop or required change to a peer host.
 
 ### R1. Cron arming no longer follows the cold-start policy
 
 `restorePersistedJobExecution` currently comes from `startupExecutionEnabled`
 (`runtime.ts:857`), which is false for the WebUI because its cold start is `quarantined`.
-It comes from the owner policy's `schedulerHost` cell instead, which is true for both
-`electron` and `webui` (`runtime-owner-policy.ts:273`, `:405`).
+It comes from the owner policy's `schedulerHost` cell instead, which is true for the WebUI
+(`runtime-owner-policy.ts:405`).
 
 `recoverPersistedState` (`runtime.ts:878`) and `greetingEnabled` (`:879`) stay gated by the
 cold-start policy. This is a narrow amendment to
@@ -133,7 +129,7 @@ restoring that policy wholesale.
 ### R2. A restore must not roll a peer back
 
 `restoreTimer` writes the whole row today (`infra/scheduler/index.ts:341`), so a WebUI
-boot that lands between an electron app's read and its write can move the electron app's `run_count`
+boot that lands between another host's read and its write can move the other host's `run_count`
 backwards. Restore writes become conditional:
 
 ```
@@ -159,17 +155,17 @@ in-memory record on `run_count`, `schedule_generation`, `state`, `schedule_json`
 
 This one rule is what makes the trigger id safe, and it is why the trigger id does not
 change. The id stays `${schedulerId}:${scheduleGeneration}:${runCount}`, because an
-unmodified electron app computes it that way and the two must agree for the run to converge.
+unmodified other host computes it that way and the two must agree for the run to converge.
 What changes is that the precondition — both hosts holding the same counter — becomes
 true instead of assumed: the host that drifted adopts the row and defers, and the slot it
 was late for is already covered by the host that did not drift.
 
 The same rule subsumes two further problems without a separate mechanism for each:
 
-- **A pause made in the electron app.** The electron app's `cancel()` sets
+- **A pause made in the other host.** The other host's `cancel()` sets
   `state = 'cancelled'` in the shared row (`infra/scheduler/index.ts:199-204`). The WebUI's next
   fire sees the disagreement, adopts, stops its timer, and does not fire the old expression.
-- **A schedule changed in the electron app.** The row's `schedule_json` and
+- **A schedule changed in the other host.** The row's `schedule_json` and
   `schedule_generation` change. The WebUI adopts the new schedule and re-arms to it
   instead of firing the expression it was holding.
 
@@ -178,7 +174,7 @@ The same rule subsumes two further problems without a separate mechanism for eac
 `recoverPendingRuns` lists pending runs globally
 (`adapters/run.repository.ts:138-146`) and marks every claimed pending run failed with
 `PROCESS_RESTARTED` (`service/cron/orchestration/executor.ts:259-282`). That is wrong in
-both directions once the WebUI executes. The electron app's boot sweep kills a live WebUI run;
+both directions once the WebUI executes. The other host's boot sweep kills a live WebUI run;
 and if the WebUI never sweeps, a run the WebUI claimed and then died on stays pending
 forever — and `delete` then refuses the definition with "Cron definition has pending runs"
 (`service/cron/orchestration/lifecycle.ts:95-97`), so a WebUI-only user is left with a
@@ -189,9 +185,9 @@ instance id. Recovery reclaims a claimed run only when the claimant's runtime-ow
 is gone, which the runtime already knows how to answer:
 `RuntimeOwnerIdentity.isOwnerAlive` (`infra/runtime-owner/identity.ts:27`, `:109-136`).
 
-The column is nullable, so the electron app keeps writing nothing and its existing sweep
-is untouched. The electron app's sweep may still mark a live WebUI run failed at the
-electron app's next boot. That residual cannot be closed without an electron app change,
+The column is nullable, so the other host keeps writing nothing and its existing sweep
+is untouched. The other host's sweep may still mark a live WebUI run failed at the
+other host's next boot. That residual cannot be closed without another host change,
 and it is accepted and bounded: it affects one run, it fails visibly rather than silently,
 and the run's definition stays deletable once the run reaches a terminal state.
 
@@ -222,7 +218,7 @@ That last field is not decoration. Two scheduler hosts can serve one data direct
 person has to be able to tell whether a task keeps running when they close the browser.
 
 It deliberately does not name the other host. The job row records no owner, and an
-unmodified electron app does not publish one, so naming it would require the electron app to change
+unmodified other host does not publish one, so naming it would require the other host to change
 — which this ADR rules out. The panel reports what the browser can truthfully report:
 this client has the task armed, or it does not, and another runtime instance may be
 running on the same machine.
@@ -230,8 +226,8 @@ running on the same machine.
 ## Considered Options
 
 - **Elect a single armed host with a cross-process lease.** Rejected. The lease is only
-  meaningful if both sides implement it, and the electron app's source is not in this
-  repository. A lease the WebUI honours and an unchanged electron app does not produce one
+  meaningful if both sides implement it, and the other host's source is not in this
+  repository. A lease the WebUI honours and an unchanged other host does not produce one
   armed host; they produce two, which is the failure this ADR exists to prevent. The
   instance lease under `v2/runtime-owner-leases/` is also already spoken for: the
   generation fence scans that directory for `*.owner` files
@@ -240,8 +236,8 @@ running on the same machine.
 - **Make the WebUI a passive client that never fires.** Rejected. It leaves a WebUI-only
   user with no scheduler at all, which is the requirement the feature exists to satisfy.
 - **Derive the trigger id from the slot's fire instant instead of the counter.** Rejected.
-  An unmodified electron app still emits `${schedulerId}:${generation}:${runCount}`, so a
-  WebUI-emitted slot-derived id never collides with the electron app's. The unique index
+  An unmodified other host still emits `${schedulerId}:${generation}:${runCount}`, so a
+  WebUI-emitted slot-derived id never collides with the other host's. The unique index
   (`infra/db/schema/cron.ts:71-73`) would dedupe nothing and two runs would be guaranteed
   rather than merely possible.
 - **Re-read the counter from the row at fire time.** Rejected. It fires the wrong slot:
@@ -253,9 +249,9 @@ running on the same machine.
   `sessionTarget`, `model` and `project`
   (`service/cron/contracts.ts:291-297`), so rotating the definition's `scheduler_id`
   needs a new repository method on a shared public contract. It is also asymmetric: it
-  would kill a stale fire caused by a WebUI edit, but a schedule edit made in the electron
-  app keeps the same `scheduler_id`, so the WebUI's stale timer would still fire the old
-  expression — and the electron-app-side edit is the common case under this ADR's constraint.
+  would kill a stale fire caused by a WebUI edit, but a schedule edit made by another host
+  keeps the same `scheduler_id`, so the WebUI's stale timer would still fire the old
+  expression — and the peer-side edit is the common case under this ADR's constraint.
   R3 handles both directions with one rule.
 - **Reconcile the scheduler against the definitions on a timer.** Rejected. There is no
   adopt path to reconcile with: `schedule()` inserts a new row and collides on the primary
@@ -277,15 +273,15 @@ running on the same machine.
 
 - A user who runs only the WebUI gets working scheduled tasks. They are restored at boot,
   they survive a restart, and they are listed with their next fire time.
-- A user who runs the electron app and the WebUI at the same time gets one execution per slot,
+- A user who runs the other host and the WebUI at the same time gets one execution per slot,
   and edits made in either client take effect in both.
-- The electron app needs no change. It keeps restoring persisted jobs at boot, keeps
+- The other host needs no change. It keeps restoring persisted jobs at boot, keeps
   firing them, and keeps its existing sweep. It gains correct behaviour from the shared
   row.
 - The panel cannot name the host that will fire a task. It reports whether this client
   has the task armed, and that another runtime instance may be running on the same
-  machine. The job row records no owner and an unmodified electron app publishes none, so
-  naming the other host would need an electron app change.
+  machine. The job row records no owner and an unmodified other host publishes none, so
+  naming the other host would need another host change.
 - `cronRuns` gains one nullable column and a migration.
 - The scheduler's restore path stops writing whole rows and starts writing conditionally.
 - A host that is slow enough to overlap its own next fire still skips that slot
@@ -306,11 +302,11 @@ running on the same machine.
 ## Deferred
 
 - **The trigger id stays counter-based.** A slot-derived id would close the last drift
-  case, and closing it properly needs the electron app on the same runtime. Until then, a
+  case, and closing it properly needs the other host on the same runtime. Until then, a
   host that drifts adopts the row and defers (R3), which is safe but skips the slot it
   was late for.
-- **The electron app's boot sweep can still mark a live WebUI run failed.** Closing it
-  needs the electron app to write the claim owner, which is an electron app change.
+- **The other host's boot sweep can still mark a live WebUI run failed.** Closing it
+  needs the other host to write the claim owner, which is another host change.
 - **A host that is slow enough to overlap its own next fire still skips that slot.**
   Whether a skipped slot should queue or catch up is a product decision this ADR does not
   make.

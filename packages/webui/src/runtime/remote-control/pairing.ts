@@ -6,11 +6,8 @@
 //
 // ## Who signs the binding
 //
-// The electron app splits the binding HTTP across two processes: the renderer owns it because
-// only the renderer's axios can sign `GET /desktop/bindings`, and the main process owns the
-// WebSocket. The WebUI's split is its own: the operation `applyRemoteControlCredentials`
-// carries a browser-signed ticket down to the service, and the service holds the socket — but the
-// signer is the **service**, not the browser document.
+// The service signs the binding request and holds the socket. The operation
+// `applyRemoteControlCredentials` can also supply an already signed ticket.
 //
 // The reason is the credential's location. The WebUI's account token lives in the service's
 // OAuth store (`cli-auth/<scope>/local-runtime.auth.json`); the browser document never receives
@@ -27,10 +24,7 @@
 //
 // The bearer is the service's **OAuth lease**, not the legacy cli-auth projection.
 //
-// The electron app's main process cannot do this: under Shared OAuth it fails closed on the
-// legacy SSO token projection (`getJwt: () => ''`), so the electron app's own pairing-code
-// request cannot be signed from the main process. The WebUI's service does hold a first-party
-// lease — the one the quota and the daily check-in sign with — so it signs the pairing pipeline
+// The service holds a first-party lease — the one the quota and daily check-in use — and signs the pairing pipeline
 // with that, and the account id travels in the `user_id` common-param the server cross-checks
 // against the token.
 import { remoteControlDeviceName } from "./device-name.js";

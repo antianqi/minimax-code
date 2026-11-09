@@ -3256,8 +3256,7 @@ describe("WebUI service", () => {
 
 describe("WebUI workspace directory browsing", () => {
   // A browser cannot hand the WebUI an absolute path: the File System Access
-  // API returns a bare directory name and `File.path` exists only inside
-  // Electron. The server therefore enumerates the candidates the picker
+  // API returns a bare directory name. The server enumerates the candidates the picker
   // offers, and every path it reports has to satisfy the same rule
   // createSession enforces.
   async function withTempTree(
@@ -3538,7 +3537,7 @@ describe("WebUI runtime host assembly", () => {
       expect(lastOptions?.startupExecutionPolicy).toBe("quarantined");
       expect(lastOptions?.dataDir).toBe(dataDir);
       expect(lastOptions?.appVersion).toBe("0.4.2-assembly-test");
-      // The WebUI declares the desktop version the cloud filters the
+      // The WebUI declares the version the cloud filters the
       // marketplace by, and the shared constant is the only place that
       // version is written. The runtime only carries the declaration.
       expect(lastOptions?.marketplaceVisibilityVersion).toBe(
@@ -3552,7 +3551,7 @@ describe("WebUI runtime host assembly", () => {
   });
 
   it("keeps the configured mcode-tools capability switch when the host integration is not ready", async () => {
-    // The Desktop client keeps `beta.mcodeTools` as the configured value, so
+    // The runtime keeps `beta.mcodeTools` as the configured value, so
     // the `mcode-tools-master` skill stays in the agent's catalog even when
     // this client's host integration could not start. Overwriting the
     // configured value with the readiness dropped that skill from the catalog,

@@ -241,7 +241,7 @@ describe("WebUI shell", () => {
     expect(markup).not.toContain("webui-stack--gap-hairline");
   });
 
-  it("projects desktop workspace state and exposes only the supported add-menu tabs", () => {
+  it("projects workspace state and exposes only the supported add-menu tabs", () => {
     expect(projectWebuiTodos([{ toolCalls: [{ name: "todowrite", input: { todos: [{ content: "完成面板", status: "in_progress" }] } }] }])).toEqual([{ content: "完成面板", status: "in_progress" }]);
     expect(projectWebuiTodos([{ msgContent: JSON.stringify({ eventType: "todo_updated", todos: [{ content: "事件进度", status: "completed", priority: "high" }] }) }])).toEqual([{ content: "事件进度", status: "completed", priority: "high" }]);
     let state = initialWorkspacePanelState;
@@ -282,7 +282,7 @@ describe("WebUI shell", () => {
     }
   });
 
-  it("renders Desktop-compatible Subagents and exposes child selection", () => {
+  it("renders Subagents and exposes child selection", () => {
     const markup = renderToStaticMarkup(createElement(WebuiSubagentsPanel, {
       subagents: [{ sessionId: "child-1", agentName: "goal-verification", title: "Goal verification", status: "completed" }],
     }));
@@ -416,7 +416,7 @@ describe("WebUI shell", () => {
     expect(markup).toContain("worker");
   });
 
-  it("does not render Desktop's environment section for a non-git session", () => {
+  it("does not render the environment section for a non-git session", () => {
     const overview = renderToStaticMarkup(createElement(WebuiProgressOverviewPanel, {
       // The panel is opened to be inspected: a closed one is not mounted, and
       // a closed panel says nothing about what a non-git session shows.
@@ -737,7 +737,7 @@ describe("WebUI shell", () => {
     expect(groups[1]?.totalOutputTokens).toBe(350);
   });
 
-  it("matches the Desktop rate (outputTokens / wallClockDurationMs) after dedup", () => {
+  it("computes the output rate (outputTokens / wallClockDurationMs) after dedup", () => {
     // Replays the target session: user ts=1790087735738, assistant ts=1790088159203,
     // 33 assistant messages, sum(outputTokens)=18411.
     //   18411 / (1790088159203 - 1790087735738) = 43.5 token/s
@@ -841,7 +841,7 @@ describe("WebUI shell", () => {
     expect(html).toContain('data-webui-message-list="true"');
   });
 
-  it("projects the desktop's project-first rail from session workspaces", () => {
+  it("projects the project-first rail from session workspaces", () => {
     const sessions = [
       {
         sessionId: "new-project-session",
@@ -911,7 +911,7 @@ describe("WebUI shell", () => {
     expect(resolveDefaultExpandedProjectKey([], undefined, false)).toBeUndefined();
   });
 
-  it("renders the desktop context-menu vocabulary and inert WebUI-only gaps", () => {
+  it("renders the context menu and unavailable actions", () => {
     const html = renderToStaticMarkup(
       createElement(WebuiContextMenu, {
         x: 12,
@@ -942,7 +942,7 @@ describe("WebUI shell", () => {
     expect(html).toContain("webui-menu-separator");
   });
 
-  it("uses Desktop-sized SVGs and separate pinned and unpinned pin glyphs", () => {
+  it("sizes SVGs and uses separate pinned and unpinned pin glyphs", () => {
     const glyphs = [
       WebuiIconContextRename,
       WebuiIconContextArchive,
@@ -954,7 +954,7 @@ describe("WebUI shell", () => {
     ];
     for (const Glyph of glyphs) {
       const markup = renderToStaticMarkup(createElement(Glyph));
-      // Desktop-sized, and drawn in the current colour so the glyph follows
+      // Drawn in the current colour so the glyph follows
       // the text. The tabler glyphs draw with a stroke rather than a fill, so
       // the colour is on the stroke.
       expect(markup).toContain('width="18" height="18"');
@@ -1134,7 +1134,7 @@ async function submitTurn(
   return ticket.completion;
 }
 
-describe("WebUI shell — desktop anatomy", () => {
+describe("WebUI shell layout", () => {
   it("declares the shell as a two-column rail plus surface", () => {
     const html = renderShell();
     expect(html).toMatch(/data-webui-shell="two-column"/u);
@@ -1142,7 +1142,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(html).toMatch(/data-webui-shell-region="surface"/u);
   });
 
-  it("sizes and colours the rail the way the desktop does", () => {
+  it("sizes and colours the rail", () => {
     const html = renderShell();
 
     // 240px fixed, one step off the main surface, and no border between the two.
@@ -1176,7 +1176,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(webkitScrollbarRule![1]).toMatch(/display:\s*none/u);
   });
 
-  it("stacks the rail in the desktop's order", () => {
+  it("stacks the rail in order", () => {
     const html = renderShell();
     const order = [
       'data-webui-rail-brand="true"',
@@ -1281,7 +1281,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(html.split("message-input-home-container")).toHaveLength(2);
   });
 
-  it("uses the desktop's own class composition for rows and pills", () => {
+  it("uses the expected class composition for rows and pills", () => {
     const html = renderShell();
 
     // Row and control geometry stated as utilities rather than as
@@ -1292,8 +1292,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(html).toMatch(/text-sm/u);
     expect(html).toMatch(/h-12/u);
     expect(html).toMatch(/webui-user-menu-anchor/u);
-    // The trigger is the shared button now, so what it keeps from the desktop
-    // anatomy is the identity row's hook and its accessible name, not a local
+    // The trigger is the shared button, retaining the identity row's hook and accessible name, not a local
     // button class: `sidebar-user-menu-trigger` is the element a keyboard user
     // lands on and what the browser suite drives.
     expect(html).toMatch(/data-testid="sidebar-user-menu-trigger"/u);
@@ -1395,7 +1394,7 @@ describe("WebUI shell — desktop anatomy", () => {
     expect(send).toMatch(/(?:^|\s)disabled(?:=|\s|>)/u);
   });
 
-  it("puts the hero and the desktop composer on the home surface", () => {
+  it("puts the hero and composer on the home surface", () => {
     const html = renderShell();
 
     expect(html).toMatch(/data-webui-home-content="true"/u);
@@ -1711,7 +1710,7 @@ describe("WebUI composer send/resume loop", () => {
     expect(observedPhases.at(-1)).toBe("done");
   });
 
-  it("resyncs one stream message per history record and retains ordered Desktop parts", async () => {
+  it("resyncs one stream message per history record and retains ordered parts", async () => {
     const orderedHistoryMessage = {
       msgId: "resync-ordered",
       role: "assistant",
@@ -3180,7 +3179,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     expect(html).toContain("18 token/s");
   });
 
-  it("renders the desktop thinking block: history and live forms", () => {
+  it("renders the thinking block: history and live forms", () => {
     const history = renderToStaticMarkup(
       createElement(WebuiThinkingBlock, {
         text: "推理过程",
@@ -3204,7 +3203,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     expect(live).toContain(">5s<");
   });
 
-  it("ticks the turn clock as the desktop 已执行 N 秒 row", () => {
+  it("ticks the turn clock in the 已执行 N 秒 row", () => {
     const html = renderToStaticMarkup(
       createElement(TurnElapsedRow, {
         startedAtMs: Date.now() - 5000,
@@ -3222,7 +3221,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     ).toBe("");
   });
 
-  it("renders desktop's edited-files card for edit tools", () => {
+  it("renders the edited-files card for edit tools", () => {
     const html = renderToStaticMarkup(
       createElement(WebuiToolResults, {
         tools: [
@@ -3251,7 +3250,7 @@ describe("WebUI composer transcriptIncomplete", () => {
     expect(noEdits).toContain("webui-tool-list");
   });
 
-  it("renders the desktop questionnaire card copy and layout", () => {
+  it("renders the questionnaire card copy and layout", () => {
     const questionnaire: WebuiQuestionnaireRequest = {
       // The wire shape the runtime sends: current schema, and the default
       // presentation for an ordinary questionnaire. `showProgress` and

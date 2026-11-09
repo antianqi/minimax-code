@@ -181,8 +181,7 @@ const EMPTY_WORKSPACE_DIRS: readonly string[] = [];
  * Directory browser behind the composer's "选择新项目".
  *
  * A browser cannot name a directory for us: the File System Access API
- * hands back a bare directory name, `File.path` exists only inside
- * Electron, and `webkitRelativePath` is relative by definition — while
+ * hands back a bare directory name and `webkitRelativePath` is relative — while
  * the server requires a real absolute path for a session's working
  * directory. So the server enumerates this machine's directories and the
  * user picks from what it reports.

@@ -307,7 +307,7 @@ describe("choosing a workspace to review", () => {
 
 /* Why these two are source assertions and not render assertions:
  *
- * `SettingsModal` opens on the `desktop` tab and only moves to another one
+ * `SettingsModal` opens on the `general` tab and only moves to another one
  * from a click handler, so no `renderToStaticMarkup` call can ever reach the
  * `coding` or `worktree` branch — the panels are asserted directly above and
  * the wiring between the tab and the panel is not. Negative injection proved

@@ -93,7 +93,7 @@ describe("TurnNavigator", () => {
     expect(html).toContain('data-testid="message-turn-navigator-mask-bottom"');
   });
 
-  it("renders the preview card with every desktop testid", () => {
+  it("renders the preview card with its testids", () => {
     const html = renderToStaticMarkup(
       createElement(TurnNavigator, {
         turns: baseTurns,

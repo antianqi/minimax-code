@@ -176,7 +176,7 @@ export function projectWebuiMessageToStreamMessage(
   // must survive either one:
   //
   //   - `context_usage` (camelCase inside: `contextWindowTokens` /
-  //     `usedTokens` / `components`) is the Electron-local snapshot. It is not
+  //     `usedTokens` / `components`) is a local snapshot. It is not
   //     sent to the cloud, but the local session history can retain it in the
   //     message's opaque rawJson field.
   //   - `usage` (`total_tokens` / `context_window`) is the turn-level token

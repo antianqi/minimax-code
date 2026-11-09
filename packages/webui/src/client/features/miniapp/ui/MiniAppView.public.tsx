@@ -702,7 +702,7 @@ export function MiniAppView({
       className={frameLayout.className}
       data-testid="miniapp-view-frame"
       // The same iframe stays in one portal for its lifetime. Moving to the page's
-      // desktop changes only its fixed geometry and does not reload the Mini App.
+      // floating surface changes only its fixed geometry and does not reload the Mini App.
       style={frameStyle}
       allow={grantsMicrophone ? "microphone" : undefined}
       title={title ?? name}

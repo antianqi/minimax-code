@@ -15,9 +15,8 @@ surface says what is withheld instead of showing it.
 
 There are **two trusted roots**: the session's workspace, and the session's own artifacts
 directory — the place the runtime writes this session's own products, the plan document above
-all. The second root is not a relaxation of the first. It is the same rule asked in the terms
-the Desktop client asks it in: a file is shown when the client can place it, and the artifacts
-directory belongs to the session that wrote it.
+all. The second root is not a relaxation of the first: the artifacts directory belongs to the
+session that wrote it.
 
 ## Why the boundary is drawn here
 
@@ -43,9 +42,7 @@ products into the session's own history directory:
 
     <dataDir>/v2/sessions/<YYYY>/<MM>/<DD>/<HH-mm-ss-SSS>-session_<base64url(sessionId)>/artifacts/plan.md
 
-That directory is outside the workspace, but it is this session's own output, and the Desktop
-client opens such a file with the file's own directory as its read root. A WebUI that withheld
-its body would show less than the Desktop client shows for the same session, so a file in that
+That directory is outside the workspace, but it is this session's own output, so a file in that
 directory keeps its body too.
 
 The client names the directory from what it already has. The runtime does not hand the history

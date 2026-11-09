@@ -19,7 +19,7 @@ function countByClass(html: string, className: string): number {
 }
 
 describe("TranscriptSkeletons", () => {
-  it("ChatSkeleton emits the desktop testid and a left-aligned column", () => {
+  it("ChatSkeleton emits its testid and a left-aligned column", () => {
     const html = renderToStaticMarkup(createElement(ChatSkeleton));
     expect(html).toContain('data-testid="chat-skeleton"');
     // The column width comes from the shared constant rather than a literal,
@@ -140,7 +140,7 @@ describe("Agent activity disclosure", () => {
     expect((html.match(/final answer/g) ?? []).length).toBe(1);
   });
 
-  it("renders all Desktop activity row kinds in their projected order", () => {
+  it("renders all activity row kinds in their projected order", () => {
     const html = renderToStaticMarkup(createElement(WebuiAssistantBody, {
       messageId: "activity-view",
       answers: [],
@@ -177,7 +177,7 @@ describe("Agent activity disclosure", () => {
     expect((html.match(/data-testid="activity-group"/gu) ?? []).length).toBe(1);
   });
 
-  it("combines a message's thinking and file tools into one Desktop activity summary", () => {
+  it("combines a message's thinking and file tools into one activity summary", () => {
     const tools = Array.from({ length: 5 }, (_, index) => ({
       id: `read-${index}`,
       name: "read_file",
@@ -281,7 +281,7 @@ describe("Agent activity disclosure", () => {
     expect(html).toContain("运行中");
   });
 
-  it("treats Desktop Preparing and Prepared statuses as pending active work", () => {
+  it("treats Preparing and Prepared statuses as pending active work", () => {
     for (const status of [4, 5]) {
       const html = renderToStaticMarkup(createElement(WebuiActivityGroup, {
         tools: [{ name: "bash", tool_call_status: status }],
@@ -304,7 +304,7 @@ describe("Agent activity disclosure", () => {
     expect(mixed).toContain('data-webui-activity-icon-category="combine"');
   });
 
-  it("renders tool input, result, and error as distinct Desktop detail sections", () => {
+  it("renders tool input, result, and error as distinct detail sections", () => {
     const html = renderToStaticMarkup(createElement(WebuiActivityGroup, {
       tools: [{ name: "bash", status: "error", input: "false", result: "exit code 1", error: "command failed" }],
     }));

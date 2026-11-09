@@ -6,7 +6,7 @@
  * `invoke` — zero network, identity inherited from the host login via
  * setLocalRuntimeAuthContext; the bridge never mints its own auth).
  *
- * Downstream path map (verified against the generated desktop-service route
+ * Downstream path map (verified against the generated protocol route
  * table + /mavis/api routes on this tree):
  *   1  cmd.session.list        GET  /minimax-desktop/api/v1/agent/:name/session/tree
  *                              (keyword → GET /minimax-desktop/api/v1/session/search)
@@ -30,12 +30,12 @@
  *   7  cmd.session.pin         POST /minimax-desktop/api/v1/pin/session
  *                              (plan names /mavis/api/session/:id/pin — that route
  *                              does not exist on this tree; PinSession is the
- *                              generated DesktopService route)
+ *                              generated service route)
  *   8  cmd.permission.respond  POST /minimax-desktop/api/v1/permission/batch-reply
  *   9  cmd.workspace.list      GET  /minimax-desktop/api/v1/projects
  *                              → 简化 workspaces 投影(路径列表 + 名字,保 wire 兼容老 phone)
  *  10  cmd.model.list          GET  /minimax-desktop/api/v1/models/list (BYOK-face
- *                              live: DesktopService.listModels → /mavis/api/models)
+ *                              live: model listing → /mavis/api/models)
  *  11  cmd.projects.list       GET  /minimax-desktop/api/v1/projects
  *                              → 完整 typed ListProjectsResp(project + 内嵌 session tree),
  *                              对齐 remote-control IDL + archon_biz MR !138
@@ -62,7 +62,7 @@
  * computed downstream), workspace.list and model.list (§4-9/§4-10 projections),
  * and session.list / session.history — the plan §4-L155 verbatim rule for
  * those two contradicts the frozen IDL Ack*Payload shapes the rgw
- * translate.go parses (wire frozen, the electron app follows): T6 real-device tests
+ * translate.go parses: T6 real-device tests
  * showed rgw reading `{id,title,pinned,status,last_msg_at_ms,…}` /
  * `{messages_json,has_more,oldest_msg_id}` out of the web bodies → all-empty
  * sidebar rows and empty history. Both are projected to the IDL shapes here.
@@ -100,7 +100,7 @@ export const CMD_DEDUP_MAX_ENTRIES = 512;
 /** Synthetic origin for in-process Requests — routing is pathname-only. */
 const LOCAL_ORIGIN = "http://rc-bridge.local";
 
-const DESKTOP_API = "/minimax-desktop/api/v1";
+const PROTOCOL_API = "/minimax-desktop/api/v1";
 const LEGACY_MAVIS_API = "/mavis/api";
 const RC_REQUEST_SOURCE_HEADER = "X-MCode-Request-Source";
 const RC_REQUEST_SOURCE_VALUE = "remote-control";
@@ -115,7 +115,7 @@ export interface CommandRouterDeps {
   logger: RcLogger;
   nowMs?: () => number;
   /**
-   * common_config value fetched by the electron app. When present, the bridge
+   * common_config value. When present, the bridge
    * stamps it onto generic local-runtime requests as the RC inline file content
    * cap.
    */
@@ -126,7 +126,7 @@ export interface CommandRouterDeps {
    * err with ATTACHMENT_UNSUPPORTED instead of silently dropping files.
    */
   attachments?: AttachmentFetcher;
-  /** Delivers a phone-owned temporary composer choice to the electron app's renderers. */
+  /** Delivers a phone-owned temporary composer choice to the client. */
   onSessionComposerModeChange?: (change: RcSessionComposerModeChange) => void | Promise<void>;
 }
 
@@ -454,13 +454,13 @@ async function sessionList(
   const agent = readString(payload.agent) ?? DEFAULT_AGENT_NAME;
   const keyword = readString(payload.keyword) ?? readString(payload.search);
   const url = keyword
-    ? withQuery(`${DESKTOP_API}/session/search`, {
+    ? withQuery(`${PROTOCOL_API}/session/search`, {
         keyword,
         agent_name: agent,
         limit: payload.limit,
         cursor: payload.cursor,
       })
-    : withQuery(`${DESKTOP_API}/agent/${encodeURIComponent(agent)}/session/tree`, {
+    : withQuery(`${PROTOCOL_API}/agent/${encodeURIComponent(agent)}/session/tree`, {
         limit: payload.limit,
         cursor: payload.cursor,
       });
@@ -501,7 +501,7 @@ async function sessionList(
  *   into (V1 phone sidebar renders a flat list, no session tree).
  * - `visibility !== 'visible'` rows are filtered (missing field defaults to
  *   visible, as `?? 'visible'` in toDaemonSession does).
- * - pinned: pin facts live in PinService only — the desktop-service session
+ * - pinned: pin facts live in PinService only — the protocol session
  *   wire carries none (SessionInfoView declares no pin fields, and the raw
  *   tree serializer never emits one; T6 confirmed absence), so pinned =
  *   membership in the concurrently-fetched pinned-items-order roster, OR-ed
@@ -511,7 +511,7 @@ async function sessionList(
  *   translate falls back to last_msg_at_ms for the web pinned_at); the
  *   tolerant wire read stays for forward-compat.
  * - status: local SessionStatusView (0=Idle 1=Started 2=Error 3=Abort;
- *   desktop-session-mappers SESSION_STATUS_VIEW) → IDL SessionStatus.
+ *   SESSION_STATUS_VIEW) → IDL SessionStatus.
  *   Started is the only in-flight state → RUNNING(3); Idle/Error/Abort are
  *   all settled → IDLE(1). The session record level has no THINKING /
  *   AWAITING_PERMISSION distinction (permission waits ride evt.permission).
@@ -552,7 +552,7 @@ function toSessionSummary(entry: unknown, pinnedIds: Set<string>): RcSessionSumm
   ];
 }
 
-/** Generated desktop-service PinnedItemType enum: Session=1, Agent=2. */
+/** Generated protocol PinnedItemType enum: Session=1, Agent=2. */
 const PINNED_ITEM_TYPE_SESSION = 1;
 
 /**
@@ -574,7 +574,7 @@ async function fetchPinnedSessionIds(deps: CommandRouterDeps): Promise<Set<strin
     const response = await invokeLocal(
       deps,
       undefined,
-      new Request(`${LOCAL_ORIGIN}${DESKTOP_API}/preferences/pinned-items-order`),
+      new Request(`${LOCAL_ORIGIN}${PROTOCOL_API}/preferences/pinned-items-order`),
     );
     if (!response.ok) {
       deps.logger.warn(
@@ -613,7 +613,7 @@ async function sessionHistory(
 ): Promise<DispatchOutcome> {
   const sessionId = readString(payload.session_id);
   if (!sessionId) return missingField("session_id");
-  const url = withQuery(`${DESKTOP_API}/session/${encodeURIComponent(sessionId)}/message`, {
+  const url = withQuery(`${PROTOCOL_API}/session/${encodeURIComponent(sessionId)}/message`, {
     before: payload.before_msg_id,
     limit: payload.limit,
   });
@@ -657,9 +657,9 @@ async function sessionSend(
   if (!sessionId) return missingField("session_id");
   const content = readString(payload.content);
   if (content === undefined) return missingField("content");
-  // The desktop-service and legacy endpoints deliberately receive separately-
+  // The protocol and legacy endpoints deliberately receive separately-
   // built bodies: their attachment contracts are not prefix-compatible.
-  const desktopBody: Payload = { content, ...modelBody(payload.model) };
+  const protocolBody: Payload = { content, ...modelBody(payload.model) };
   const legacyBody: Payload = { content, ...modelBody(payload.model) };
   const clientIntent = readString(payload.client_intent);
   if (clientIntent === "plan-entry") {
@@ -671,7 +671,7 @@ async function sessionSend(
     clientIntent === "plan-exit" ||
     clientIntent === "retry-continuation"
   ) {
-    desktopBody.client_intent = clientIntent;
+    protocolBody.client_intent = clientIntent;
     legacyBody.client_intent = clientIntent;
   }
   if (Array.isArray(payload.attachments) && payload.attachments.length > 0) {
@@ -682,7 +682,7 @@ async function sessionSend(
         kind: "err",
         err: {
           code: "ATTACHMENT_UNSUPPORTED",
-          message: "attachments are not supported by this desktop build",
+          message: "attachments are not supported by this client",
           retryable: false,
         },
       };
@@ -691,18 +691,18 @@ async function sessionSend(
     // Any single failure fails the whole send (no partial sends).
     const fetched = await deps.attachments.fetchAll(payload.attachments);
     if (!fetched.ok) return { kind: "err", err: fetched.failure };
-    // Fetch exactly once: a desktop-service 404 retry must reuse the downloaded
+    // Fetch exactly once: a protocol 404 retry must reuse the downloaded
     // files.
-    desktopBody.attachments = fetched.attachments.map((file) => toDesktopAttachment(file));
+    protocolBody.attachments = fetched.attachments.map((file) => toProtocolAttachment(file));
     legacyBody.attachments = fetched.attachments.map(toLegacyAttachment);
   }
-  const desktopMessagePath = `${DESKTOP_API}/session/${encodeURIComponent(sessionId)}/message`;
+  const protocolMessagePath = `${PROTOCOL_API}/session/${encodeURIComponent(sessionId)}/message`;
   const legacyMessagePath = `${LEGACY_MAVIS_API}/session/${encodeURIComponent(sessionId)}/message`;
-  const send = await postDesktopThenLegacyOnNotFound(
+  const send = await postProtocolThenLegacyOnNotFound(
     deps,
     cmd,
-    postJson(desktopMessagePath, desktopBody),
-    `${DESKTOP_API}/session/:id/message`,
+    postJson(protocolMessagePath, protocolBody),
+    `${PROTOCOL_API}/session/:id/message`,
     postJson(legacyMessagePath, legacyBody),
     `${LEGACY_MAVIS_API}/session/:id/message`,
   );
@@ -711,7 +711,7 @@ async function sessionSend(
     deps.logger.info(
       `[rc.router] ${cmd.type} id=${cmd.id} route=${send.route} status=${sendResponse.status} disposition=sent`,
     );
-    // D-8: idle path — the final desktop-service or legacy-fallback response
+    // D-8: idle path — the final protocol or legacy-fallback response
     // accepted the turn; SSE stream follows the ack.
     return {
       kind: "ack",
@@ -721,15 +721,15 @@ async function sessionSend(
   }
   const sendErr = await readErrorBody(sendResponse);
   if (sendResponse.status === 409 && isBusyCode(sendErr.rawCode)) {
-    // D-8: busy path — enqueue instead (the desktop-service queue keeps turn
+    // D-8: busy path — enqueue instead (the protocol queue keeps turn
     // ordering).
-    const desktopQueuePath = `${DESKTOP_API}/session/${encodeURIComponent(sessionId)}/queue`;
+    const protocolQueuePath = `${PROTOCOL_API}/session/${encodeURIComponent(sessionId)}/queue`;
     const legacyQueuePath = `${LEGACY_MAVIS_API}/session/${encodeURIComponent(sessionId)}/queue`;
-    const queue = await postDesktopThenLegacyOnNotFound(
+    const queue = await postProtocolThenLegacyOnNotFound(
       deps,
       cmd,
-      postJson(desktopQueuePath, desktopBody),
-      `${DESKTOP_API}/session/:id/queue`,
+      postJson(protocolQueuePath, protocolBody),
+      `${PROTOCOL_API}/session/:id/queue`,
       postJson(legacyQueuePath, legacyBody),
       `${LEGACY_MAVIS_API}/session/:id/queue`,
     );
@@ -796,7 +796,7 @@ async function sessionNew(
   return oneShot(
     deps,
     cmd,
-    postJson(`${DESKTOP_API}/agent/${encodeURIComponent(agent)}/session`, body),
+    postJson(`${PROTOCOL_API}/agent/${encodeURIComponent(agent)}/session`, body),
     "session",
   );
 }
@@ -808,7 +808,7 @@ async function rcCatalogModel(
   const response = await invokeLocal(
     deps,
     cmd,
-    new Request(`${LOCAL_ORIGIN}${DESKTOP_API}/models/list`),
+    new Request(`${LOCAL_ORIGIN}${PROTOCOL_API}/models/list`),
   );
   if (!response.ok) return { error: await toErrShape(response, "model") };
   const models = (await readJson(response)).models;
@@ -850,24 +850,24 @@ async function sessionResume(
   const afterMsgId = readString(payload.after_msg_id);
   const afterCursor = readString(payload.after_cursor);
   const drainQueued = readBoolean(payload.drain_queued);
-  const desktopBody: Payload = {
+  const protocolBody: Payload = {
     ...(afterMsgId ? { after_msg_id: afterMsgId } : {}),
     ...(afterCursor ? { after_cursor: afterCursor } : {}),
     ...(drainQueued !== undefined ? { drain_queued: drainQueued } : {}),
   };
   // Legacy resume parses the original camelCase + snake_case aliases; keep
-  // them separate from the generated desktop-service wire, which is snake_case
+  // them separate from the generated protocol wire, which is snake_case
   // only.
   const legacyBody: Payload = {
     ...(afterMsgId ? { afterMsgId, after_msg_id: afterMsgId, after_message_id: afterMsgId } : {}),
     ...(afterCursor ? { afterCursor, after_cursor: afterCursor } : {}),
     ...(drainQueued !== undefined ? { drainQueued, drain_queued: drainQueued } : {}),
   };
-  const resume = await postDesktopThenLegacyOnNotFound(
+  const resume = await postProtocolThenLegacyOnNotFound(
     deps,
     cmd,
-    postJson(`${DESKTOP_API}/session/${encodeURIComponent(sessionId)}/resume`, desktopBody),
-    `${DESKTOP_API}/session/:id/resume`,
+    postJson(`${PROTOCOL_API}/session/${encodeURIComponent(sessionId)}/resume`, protocolBody),
+    `${PROTOCOL_API}/session/:id/resume`,
     postJson(`${LEGACY_MAVIS_API}/session/${encodeURIComponent(sessionId)}/resume`, legacyBody),
     `${LEGACY_MAVIS_API}/session/:id/resume`,
   );
@@ -900,11 +900,11 @@ async function sessionStop(
   return oneShot(
     deps,
     cmd,
-    postJson(`${DESKTOP_API}/session/${encodeURIComponent(sessionId)}/abort`, {
+    postJson(`${PROTOCOL_API}/session/${encodeURIComponent(sessionId)}/abort`, {
       ...(turnId ? { turn_id: turnId } : {}),
       // Explicit stop source. Without it the daemon defaults to `unknown`, which
       // neither pauses the Thread Goal nor cascades into background work, so a
-      // phone stop would behave differently from the electron app's Stop button.
+      // the phone stop would not pause the goal or cascade into background work.
       reason: "user_stop",
     }),
     "session",
@@ -924,7 +924,7 @@ async function sessionPin(
   return oneShot(
     deps,
     cmd,
-    postJson(`${DESKTOP_API}/pin/session`, { session_id: sessionId, pinned: payload.pinned }),
+    postJson(`${PROTOCOL_API}/pin/session`, { session_id: sessionId, pinned: payload.pinned }),
     "session",
   );
 }
@@ -951,8 +951,8 @@ async function permissionRespond(
   const processed: unknown[] = [];
   const skipped: unknown[] = [];
   for (const [decision, requestIds] of groups) {
-    const desktopDecision = toDesktopBatchPermissionDecision(decision);
-    if (desktopDecision === undefined) {
+    const protocolDecision = toProtocolBatchPermissionDecision(decision);
+    if (protocolDecision === undefined) {
       return {
         kind: "err",
         err: {
@@ -965,9 +965,9 @@ async function permissionRespond(
     const response = await invokeLocal(
       deps,
       cmd,
-      postJson(`${DESKTOP_API}/permission/batch-reply`, {
+      postJson(`${PROTOCOL_API}/permission/batch-reply`, {
         request_ids: requestIds,
-        decision: desktopDecision,
+        decision: protocolDecision,
       }),
     );
     if (!response.ok) return { kind: "err", err: await toErrShape(response, "permission") };
@@ -975,7 +975,7 @@ async function permissionRespond(
     if (Array.isArray(body.processed)) processed.push(...body.processed);
     if (Array.isArray(body.skipped)) skipped.push(...body.skipped);
     deps.logger.info(
-      `[rc.router] ${cmd.type} id=${cmd.id} route=/minimax-desktop/api/v1/permission/batch-reply status=${response.status} decision=${desktopDecision} processed_count=${Array.isArray(body.processed) ? body.processed.length : 0} skipped_count=${Array.isArray(body.skipped) ? body.skipped.length : 0}`,
+      `[rc.router] ${cmd.type} id=${cmd.id} route=/minimax-desktop/api/v1/permission/batch-reply status=${response.status} decision=${protocolDecision} processed_count=${Array.isArray(body.processed) ? body.processed.length : 0} skipped_count=${Array.isArray(body.skipped) ? body.skipped.length : 0}`,
     );
   }
   // Downstream web shape: processed/skipped are request-id ARRAYS (IDL
@@ -1015,8 +1015,8 @@ export function normalizePermissionResponses(payload: Payload): Map<string, stri
 /**
  * IDL PermissionDecision/PermissionRemember → canonical local decision.
  * `allow` / `allow-always` aliases remain accepted for phone compatibility;
- * the desktop-service batch route converts them to its numeric enum below.
- * remember=SESSION(2) has no desktop-service equivalent → allowOnce.
+ * the protocol batch route converts them to its numeric enum below.
+ * remember=SESSION(2) has no protocol equivalent → allowOnce.
  */
 export function mapPermissionDecision(decision: unknown, remember: unknown): string | undefined {
   if (typeof decision === "string") {
@@ -1050,7 +1050,7 @@ async function workspaceList(
   const response = await invokeLocal(
     deps,
     cmd,
-    new Request(withQuery(`${DESKTOP_API}/projects`, { limit: payload.limit })),
+    new Request(withQuery(`${PROTOCOL_API}/projects`, { limit: payload.limit })),
   );
   if (!response.ok) return { kind: "err", err: await toErrShape(response, "workspace") };
   const body = await readJson(response);
@@ -1094,7 +1094,7 @@ async function modelList(
   const response = await invokeLocal(
     deps,
     cmd,
-    new Request(withQuery(`${DESKTOP_API}/models/list`, { session_id: payload.session_id })),
+    new Request(withQuery(`${PROTOCOL_API}/models/list`, { session_id: payload.session_id })),
   );
   if (!response.ok) return { kind: "err", err: await toErrShape(response, "model") };
   const body = await readJson(response);
@@ -1110,7 +1110,7 @@ async function modelList(
 // 与 §4-9 cmd.workspace.list 共用底层 daemon 端点 GET /minimax-desktop/api/v1/projects
 // (LocalProjectService.listProjects,已在 dev/preview_train 就绪),但**不做投影**:
 // 直接把 daemon 返回的 project.ListProjectsResp(matrix/api_common/project.thrift,
-// web / Electron 端 / RC 三端共用契约)verbatim 塞进 ack.projects.list.payload。
+// 共用契约)verbatim 塞进 ack.projects.list.payload。
 //
 // 上游链路(全部已合入 main / MR review 中):
 //   phone GET /minimax-cloud/api/v1/remote-control/projects (archon_biz MR !138)
@@ -1135,7 +1135,7 @@ async function projectsList(
     deps,
     cmd,
     new Request(
-      withQuery(`${DESKTOP_API}/projects`, {
+      withQuery(`${PROTOCOL_API}/projects`, {
         agent_name: readString(payload.agent_name),
         limit: readNumber(payload.limit),
         cursor: readString(payload.cursor),
@@ -1189,7 +1189,7 @@ async function pinnedList(
   return oneShot(
     deps,
     cmd,
-    new Request(`${LOCAL_ORIGIN}${DESKTOP_API}/preferences/pinned-items-order`),
+    new Request(`${LOCAL_ORIGIN}${PROTOCOL_API}/preferences/pinned-items-order`),
     "pinned",
   );
 }
@@ -1215,7 +1215,7 @@ async function pinnedReorder(
   return oneShot(
     deps,
     cmd,
-    putJson(`${DESKTOP_API}/preferences/pinned-items-order`, payload),
+    putJson(`${PROTOCOL_API}/preferences/pinned-items-order`, payload),
     "pinned",
   );
 }
@@ -1243,7 +1243,7 @@ async function sessionGet(
   return oneShot(
     deps,
     cmd,
-    new Request(`${LOCAL_ORIGIN}${DESKTOP_API}/session/${encodeURIComponent(id)}`),
+    new Request(`${LOCAL_ORIGIN}${PROTOCOL_API}/session/${encodeURIComponent(id)}`),
     "session",
   );
 }
@@ -1251,7 +1251,7 @@ async function sessionGet(
 // ─── 15. cmd.session.update ─────────────────────────────────────────────
 //
 // PATCH /minimax-desktop/api/v1/session/:id
-// title 仍走 Electron 端的 Session PATCH；interaction_mode 仅作为临时 composer
+// title 走 Session PATCH；interaction_mode 仅作为临时 composer
 // intent 投递给 renderer，不得写 Session.interactionMode。
 // (避免向 daemon PATCH 语义里塞 {title: null|undefined},保持 "字段未提供 =
 // 不改" 的 CRUD 契约)。
@@ -1285,7 +1285,7 @@ async function sessionUpdate(
       kind: "err",
       err: {
         code: "COMPOSER_SYNC_UNAVAILABLE",
-        message: "Desktop composer sync is unavailable",
+        message: "Composer sync is unavailable",
         retryable: true,
       },
     };
@@ -1296,7 +1296,7 @@ async function sessionUpdate(
     const response = await invokeLocal(
       deps,
       cmd,
-      patchJson(`${DESKTOP_API}/session/${encodeURIComponent(id)}`, { title: payload.title }),
+      patchJson(`${PROTOCOL_API}/session/${encodeURIComponent(id)}`, { title: payload.title }),
     );
     if (!response.ok) return { kind: "err", err: await toErrShape(response, "session") };
     responsePayload = await readJson(response);
@@ -1330,7 +1330,7 @@ async function sessionDelete(
   return oneShot(
     deps,
     cmd,
-    new Request(`${LOCAL_ORIGIN}${DESKTOP_API}/session/${encodeURIComponent(id)}`, {
+    new Request(`${LOCAL_ORIGIN}${PROTOCOL_API}/session/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
     "session",
@@ -1354,7 +1354,7 @@ async function skillList(
   payload: Payload,
 ): Promise<DispatchOutcome> {
   const query = readString(payload.query);
-  const path = query ? `${DESKTOP_API}/skills?${query}` : `${DESKTOP_API}/skills`;
+  const path = query ? `${PROTOCOL_API}/skills?${query}` : `${PROTOCOL_API}/skills`;
   return oneShot(deps, cmd, new Request(`${LOCAL_ORIGIN}${path}`), "skill");
 }
 
@@ -1465,7 +1465,7 @@ async function genericExecute(deps: CommandRouterDeps, cmd: WsEnvelope): Promise
       kind: "err",
       err: {
         code: "ROUTE_NOT_ALLOWED",
-        message: `path blocked by desktop bedrock traversal guard: ${route.method} ${route.path}`,
+        message: `path blocked by traversal guard: ${route.method} ${route.path}`,
         retryable: false,
       },
     };
@@ -1566,7 +1566,7 @@ async function materializeGenericAttachments(
         ok: false,
         err: {
           code: "ATTACHMENT_UNSUPPORTED",
-          message: "attachments are not supported by this desktop build",
+          message: "attachments are not supported by this client",
           retryable: false,
         },
       };
@@ -1597,7 +1597,7 @@ async function materializeGenericAttachments(
       const download = downloads[downloadIndex];
       if (!download) return;
       const { entry, index } = download;
-      result[index] = toDesktopAttachment(
+      result[index] = toProtocolAttachment(
         file,
         isPayload(entry) && isPayload(entry.meta) ? entry.meta : undefined,
       );
@@ -1621,31 +1621,31 @@ async function oneShot(
 }
 
 /**
- * Fixed RC session POST operations are desktop-service-first. Only
+ * Fixed RC session POST operations are protocol-first. Only
  * `response.status === 404` retries its matching legacy Mavis endpoint; all
  * other outcomes retain
  * their original status/error semantics.
  */
-async function postDesktopThenLegacyOnNotFound(
+async function postProtocolThenLegacyOnNotFound(
   deps: CommandRouterDeps,
   cmd: WsEnvelope,
-  desktopRequest: Request,
-  desktopRoute: string,
+  protocolRequest: Request,
+  protocolRoute: string,
   legacyRequest: Request,
   legacyRoute: string,
 ): Promise<{ response: Response; route: string }> {
-  const desktopResponse = await invokeLocal(deps, cmd, desktopRequest);
-  if (desktopResponse.status !== 404) {
-    return { response: desktopResponse, route: desktopRoute };
+  const protocolResponse = await invokeLocal(deps, cmd, protocolRequest);
+  if (protocolResponse.status !== 404) {
+    return { response: protocolResponse, route: protocolRoute };
   }
 
   deps.logger.warn(
-    `[rc.router] event=desktop_404_fallback cmd_type=${cmd.type} id=${cmd.id} route=${desktopRoute} status=404 fallback_route=${legacyRoute}`,
+    `[rc.router] event=protocol_404_fallback cmd_type=${cmd.type} id=${cmd.id} route=${protocolRoute} status=404 fallback_route=${legacyRoute}`,
   );
   // invokeLocal inspected a clone for logging; cancel the original 404 body
   // before replacing it with the legacy response.
-  if (desktopResponse.body) {
-    await desktopResponse.body.cancel().catch(() => undefined);
+  if (protocolResponse.body) {
+    await protocolResponse.body.cancel().catch(() => undefined);
   }
   const legacyResponse = await invokeLocal(deps, cmd, legacyRequest);
   deps.logger.info(
@@ -1935,7 +1935,7 @@ async function ensureRcContinuationModel(
   const sessionResponse = await invokeLocal(
     deps,
     cmd,
-    new Request(`${LOCAL_ORIGIN}${DESKTOP_API}/session/${encodeURIComponent(sessionId)}`),
+    new Request(`${LOCAL_ORIGIN}${PROTOCOL_API}/session/${encodeURIComponent(sessionId)}`),
   );
   if (!sessionResponse.ok) return toErrShape(sessionResponse, "session");
   const sessionBody = await readJson(sessionResponse);
@@ -1951,7 +1951,7 @@ async function ensureRcContinuationModel(
     const listResponse = await invokeLocal(
       deps,
       cmd,
-      new Request(withQuery(`${DESKTOP_API}/models/list`, { session_id: sessionId })),
+      new Request(withQuery(`${PROTOCOL_API}/models/list`, { session_id: sessionId })),
     );
     if (!listResponse.ok) return toErrShape(listResponse, "model");
     const models = (await readJson(listResponse)).models;
@@ -1976,7 +1976,7 @@ async function ensureRcContinuationModel(
   const selectResponse = await invokeLocal(
     deps,
     cmd,
-    postJson(`${DESKTOP_API}/models/select`, {
+    postJson(`${PROTOCOL_API}/models/select`, {
       session_id: sessionId,
       provider_id: selectedProvider,
       model_id: selectedModel,
@@ -2008,7 +2008,7 @@ async function ensureRcContinuationModel(
 /**
  * Downloaded attachment → generated AttachmentInput wire.
  */
-function toDesktopAttachment(file: RcFetchedAttachment, sourceMeta?: Payload): Payload {
+function toProtocolAttachment(file: RcFetchedAttachment, sourceMeta?: Payload): Payload {
   const attachmentType = sourceMeta?.attachment_type ?? sourceMeta?.attachmentType;
   const sizeBytes = readNumber(sourceMeta?.size_bytes ?? sourceMeta?.sizeBytes);
   return {
@@ -2071,7 +2071,7 @@ function isBusyCode(rawCode: string | undefined): boolean {
   return rawCode === "local_session_busy" || rawCode === "local_session_has_queued_messages";
 }
 
-function toDesktopBatchPermissionDecision(decision: string): 0 | 1 | 2 | undefined {
+function toProtocolBatchPermissionDecision(decision: string): 0 | 1 | 2 | undefined {
   switch (decision) {
     case "allowOnce":
       return 0;
@@ -2104,7 +2104,7 @@ async function toErrShape(response: Response, domain: ErrDomain): Promise<ErrSha
 
 /**
  * Downstream failure → err payload. Codes are UPPER_SNAKE domain codes:
- * a desktop-service `key` (or legacy string `code`) wins (local_session_busy →
+ * a protocol `key` (or legacy string `code`) wins (local_session_busy →
  * SESSION_BUSY), otherwise the HTTP status maps per the IDL err.* convention
  * list.
  */

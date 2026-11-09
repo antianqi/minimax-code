@@ -1,8 +1,7 @@
 // The 用量与模型 page's account-billing surface: the plan name, the credit
 // fallback switch and the reset cards.
 //
-// The Desktop is the behavioural authority for all three. The three facts
-// this suite pins down are the ones that were wrong before the port:
+// This suite pins down three facts:
 //
 //  1. the plan name is the account's, not a constant — an M Plan account must
 //     not read as a Token Plan account, and only the legacy `token_plan`
@@ -11,7 +10,7 @@
 //  3. the reset cards are a real list / redeem / history triple, and the
 //     redemption answer is a phase rather than a boolean.
 //
-// The response fixtures are shaped after the Desktop's account client:
+// The response fixtures cover the account contract:
 // `token_plan_credit` answers with `token_plan_credit_fallback_enabled`, the
 // card list answers with `{ cards, total }`, the redemption answers with an
 // `outcome`, and the history answers with `{ flows }`.
@@ -59,14 +58,14 @@ describe("the plan name is the account's, not a constant", () => {
   });
 
   it("falls back to the generic plan name when the tier is a combo id", () => {
-    // A numeric tier is a combo id the Desktop resolves through the
+    // A numeric tier is a combo id resolved through the
     // subscription catalogue; without that catalogue the generic name is the
     // answer, not the raw number.
     expect(formatPlanTier("101004")).toBeUndefined();
     expect(formatPlanName({ hasTokenPlan: true, tokenPlanTier: "101004" })).toBe(WEBUI_PLAN_NAME);
   });
 
-  it("counts a tier without a plan flag as subscribed, the way the Desktop does", () => {
+  it("counts a tier without a plan flag as subscribed", () => {
     expect(hasWebuiPlan({ hasTokenPlan: false, tokenPlanTier: "M Plan" })).toBe(true);
     expect(hasWebuiPlan({ hasTokenPlan: false })).toBe(false);
     expect(formatPlanName({ hasTokenPlan: false, tokenPlanTier: "M Plan" })).toBe("M Plan");

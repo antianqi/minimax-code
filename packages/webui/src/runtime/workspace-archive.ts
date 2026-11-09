@@ -14,20 +14,8 @@
 // before creating the destination, then preserve each parser's extraction pass
 // and close resources in `finally`.
 //
-// The hardening is ported from the runtime's two battle-tested extractors:
-//   * `packages/local-runtime/src/website-management/deployed-website-source.ts`
-//     — `extractArchive`, `assertSafeZipEntry`, `isSymbolicLink`,
-//     `resolveEntryPath`, `readUncompressedSize`.
-//   * `packages/local-runtime/src/skills/remote/archive.ts` —
-//     `loadZipSkillFiles`, `shouldStripArchiveRoot`.
-// Neither can be imported across the package boundary (webui may not depend on
-// local-runtime, and the runtime already depends on webui), so the checks are
-// re-implemented against the raw bytes and the two-phase shape is kept: every
-// entry is validated and the declared sizes summed *before* a single byte is
-// written, so a hostile archive leaves nothing behind.
-//
-// `shouldStripArchiveRoot` is the one deliberate non-port — see the comment on
-// `archive-listing.ts`'s `listOneLevel`.
+// Every entry is validated and the declared sizes summed *before* a single byte
+// is written, so a hostile archive leaves nothing behind.
 
 import { readFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";

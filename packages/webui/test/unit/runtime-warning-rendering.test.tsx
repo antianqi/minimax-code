@@ -137,7 +137,7 @@ describe("runtime.warning envelope projection", () => {
     expect(parsed?.source).toBe("plugin-hook");
   });
 
-  it("keeps Desktop parts when the message carries them alongside envelope-looking content", () => {
+  it("keeps message parts alongside envelope-looking content", () => {
     // The claim sits on the msgContent path, after the parts branch has
     // returned: a message with structured parts keeps its parts even when
     // its msgContent also looks like an envelope (the original PR claimed

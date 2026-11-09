@@ -31,7 +31,7 @@ import { createWebuiBrowserAuthorizationOwner } from "../../src/client/features/
 import { BrowserPanelHost } from "../../src/client/features/browser/ui/BrowserPanelHost.public.js";
 import { BrowserSettingsPage } from "../../src/client/features/browser/ui/BrowserSettingsPage.public.js";
 import { PersonalizationSettings } from "../../src/client/features/settings/ui/PersonalizationSettings.js";
-import { DESKTOP_SETTINGS_TABS } from "../../src/client/features/settings/projection/settings-view.js";
+import { WEBUI_SETTINGS_TABS } from "../../src/client/features/settings/projection/settings-view.js";
 import { createWebuiSettingsWorkflows } from "../../src/client/features/settings/application/settings-workflows.js";
 import { WebuiSettingsWorkflowsProvider } from "../../src/client/bindings/use-query-state.js";
 import { WebuiPortSlicesProvider } from "../../src/client/bindings/port-slices-context.js";
@@ -64,7 +64,7 @@ describe("the browser panel no longer carries the settings", () => {
 
 describe("the settings nav carries a 浏览器 tab", () => {
   it("puts it under 偏好, below 个性化", () => {
-    const preferences = DESKTOP_SETTINGS_TABS.filter((tab) => tab.group === "preferences");
+    const preferences = WEBUI_SETTINGS_TABS.filter((tab) => tab.group === "preferences");
     const browser = preferences.find((tab) => tab.key === "browser");
     const personalization = preferences.find((tab) => tab.key === "custom-instructions");
 
@@ -77,7 +77,7 @@ describe("the settings nav carries a 浏览器 tab", () => {
   it("is reachable by its own name in the settings search", () => {
     // The search filters on the label and the key, so a tab the search cannot
     // find is a tab nobody opens.
-    const browser = DESKTOP_SETTINGS_TABS.find((tab) => tab.key === "browser");
+    const browser = WEBUI_SETTINGS_TABS.find((tab) => tab.key === "browser");
 
     expect(browser?.label).toContain("浏览器");
   });

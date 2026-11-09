@@ -5,7 +5,7 @@
  *
  *   * the page carries the two supported tabs, and the first one is the one that opens;
  *   * the removed controlled-devices tab and card are absent;
- *   * the SSH half mounts the SSH panel, so the hosts live where the Desktop keeps them.
+ *   * the SSH half mounts the SSH panel.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";

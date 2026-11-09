@@ -209,7 +209,7 @@ test("typing / opens the slash palette; filtering and Escape behave", async ({ p
   await expect(menu.getByRole("option", { name: /目标/ })).toBeVisible();
   await expect(menu.getByRole("option", { name: /计划/ })).toHaveCount(0);
 
-  // Escape drops the slash token under the caret (desktop behavior) and the
+  // Escape drops the slash token under the caret and the
   // popover with it.
   await input.press("Escape");
   await expect(commandMenu(page)).toHaveCount(0);

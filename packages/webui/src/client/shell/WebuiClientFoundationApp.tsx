@@ -716,8 +716,7 @@ export function WebuiClientFoundationApp(
     });
   }, [application, dispatchShellSurface, selectSession, workspacePanelOwner]);
 
-  // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板 — the Desktop's
-  // `browserUseAutoOpenPanelEnabled`: a page the Agent starts while the panel is
+  // 设置 › 通用 › Agent 控制权限 › 自动打开浏览器面板: a page the Agent starts while the panel is
   // closed brings the panel up with it. The subscription lives here rather than
   // in the tab strip because the strip is mounted by the panel: with the panel
   // closed there is no strip to hear the snapshot.
@@ -896,8 +895,7 @@ export function WebuiClientFoundationApp(
    * is the one element that spans the whole window — so this is the one form
    * the shell measures rather than queries.
    */
-  // The 远程 page's 设置 entry opens the connection settings, the way the electron app's own
-  // entry opens its settings app at 连接. The dialog is the shell's, so the entry and the
+  // The 远程 page's 设置 entry opens the connection settings. The dialog is the shell's, so the entry and the
   // settings business meet at one place.
   const [connectionSettingsOpen, setConnectionSettingsOpen] = useState(false);
   const openConnectionSettings = useCallback(() => setConnectionSettingsOpen(true), []);

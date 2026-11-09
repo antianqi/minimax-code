@@ -450,7 +450,7 @@ describe("the terminal roster is read before it is shown", () => {
     // limit. The binding waits for the roster instead, and the panel renders
     // what the binding answers with.
     expect(bindingSource).toContain("terminalsReady");
-    expect(panelSource).toContain("{!terminal.ready ? DESKTOP_COPY.terminalLoading");
+    expect(panelSource).toContain("{!terminal.ready ? WEBUI_TERMINAL_COPY.terminalLoading");
     // The create waits for the roster too: a terminal is opened only once the
     // first answer has landed, so a reload cannot open a second shell before
     // the roster has said what is already running.

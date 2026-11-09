@@ -29,8 +29,8 @@ import type {
 
 export { DEFAULT_PAIRING_POLL_INTERVAL_MS } from "./pairing-session.js";
 
-/** Electron 端作为 producer 的固定类型标识（方案 §4.5.11：Electron 端明确为 desktop）。 */
-export const DESKTOP_PRODUCER_TYPE = "desktop";
+/** 远程控制协议要求的 producer 类型标识。 */
+export const REMOTE_PRODUCER_TYPE = "desktop";
 
 /**
  * 比较两次连接身份，返回**第一个**不同的维度（方案 §4.5.1 / ADR-011 D12）。
@@ -71,14 +71,10 @@ export interface RemoteControlProxyOpts {
   isRuntimeHealthy: () => boolean;
   getCurrentUserId: () => string | undefined;
   /**
-   * Ask the renderer to re-sign the binding (main → renderer
-   * `rc:refresh-binding`). Invoked when the WS needs a fresh one-shot ticket
-   * but the electron app's main process cannot sign `GET /desktop/bindings` itself.
-   * ipc.ts wires this to a broadcast over every BrowserWindow (self-heal design
-   * §4.2/§4.3).
+   * Ask the host to refresh the binding when the socket needs a fresh one-shot ticket.
    */
   requestRendererRefresh?: () => void;
-  /** Deliver phone-owned temporary composer choices to the electron app's renderers. */
+  /** Deliver phone-owned temporary composer choices to the client. */
   onSessionComposerModeChange?: (change: RcSessionComposerModeChange) => void | Promise<void>;
   /**
    * In-process localRuntime entrypoint (handleLocalRuntimeRequest). When
@@ -93,7 +89,7 @@ export interface RemoteControlProxyOpts {
    * frontend Global Event catalog. Transport details must not cross this seam.
    */
   globalEventSource?: RcGlobalEventSource;
-  /** common_config value fetched by the electron app, used by generic file content routes. */
+  /** common_config value used by generic file content routes. */
   getRemoteControlFileContentMaxBytes?: () => number | undefined;
   /** §4-3 attachments download leg for cmd.session.send (attachment-fetch). */
   attachmentFetcher?: AttachmentFetcher;
@@ -110,7 +106,7 @@ export class RemoteControlProxy {
   private status: RCStatus = {
     phase: "idle",
     request_epoch: 0,
-    producer_type: DESKTOP_PRODUCER_TYPE,
+    producer_type: REMOTE_PRODUCER_TYPE,
   };
   private readonly listeners = new Set<(s: RCStatus) => void>();
 
@@ -167,7 +163,7 @@ export class RemoteControlProxy {
         ),
       acceptBinding: (info, owner, connect) => {
         opts.identity.setBinding(info.binding_id!, owner, {
-          producerType: DESKTOP_PRODUCER_TYPE,
+          producerType: REMOTE_PRODUCER_TYPE,
           producerGeneration: info.producer_generation,
         });
         this.producerGeneration = info.producer_generation;
@@ -242,7 +238,7 @@ export class RemoteControlProxy {
     const state = this.opts.identity.getState();
     return {
       user_id: state.bound_user_id,
-      producer_type: state.producer_type ?? DESKTOP_PRODUCER_TYPE,
+      producer_type: state.producer_type ?? REMOTE_PRODUCER_TYPE,
       producer_device_id: state.desktop_device_id,
       producer_generation: state.producer_generation,
     };
@@ -288,7 +284,7 @@ export class RemoteControlProxy {
    *    `request_epoch` 并随 IPC 回传；代次不符说明这份凭据属于上一段生命周期
    *    （典型场景：账号切换时上一个账号的 /binding 响应刚回来）。
    *    未携带代次时接受并记日志 —— 兼容尚未升级的 renderer 调用点，不能因为缺字段
-   *    就把已绑定的桌面端卡死。
+   *    就会让已绑定的客户端无法继续工作。
    */
   applyRendererCredentials(creds: {
     binding_id: number;
@@ -316,7 +312,7 @@ export class RemoteControlProxy {
     const previousIdentity = this.getCurrentIdentity();
     const nextIdentity: RcConnectionIdentity = {
       user_id: this.opts.getCurrentUserId(),
-      producer_type: DESKTOP_PRODUCER_TYPE,
+      producer_type: REMOTE_PRODUCER_TYPE,
       producer_device_id: this.opts.identity.getDeviceId(),
       producer_generation: creds.producer_generation ?? previousIdentity.producer_generation,
     };
@@ -329,7 +325,7 @@ export class RemoteControlProxy {
     // Only publish credentials after their durable identity has committed.
     this.opts.identity.setBinding(creds.binding_id, nextIdentity.user_id, {
       producerGeneration: creds.producer_generation,
-      producerType: DESKTOP_PRODUCER_TYPE,
+      producerType: REMOTE_PRODUCER_TYPE,
     });
     this.pairing.invalidate();
     this.rendererCredentials = {
@@ -883,7 +879,7 @@ export class RemoteControlProxy {
     this.status = {
       ...phaseStatus,
       request_epoch: this.requestEpoch,
-      producer_type: DESKTOP_PRODUCER_TYPE,
+      producer_type: REMOTE_PRODUCER_TYPE,
       ...(this.producerGeneration !== undefined
         ? { producer_generation: this.producerGeneration }
         : {}),

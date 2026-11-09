@@ -195,8 +195,7 @@ function UnwiredSelect(props: {
 /**
  * The Feishu credential form.
  *
- * The electron app binds Feishu by a QR code and a link; this runtime has no onboarding
- * route for it, and the credential path is the one it does serve, so the form asks for the app
+ * The runtime serves a credential path, so the form asks for the app
  * id and the secret and binds through the runtime's connect route — onto the bot the create
  * flow already prepared.
  */

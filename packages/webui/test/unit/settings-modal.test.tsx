@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GENERIC_FILE_ROW_ORDER, GENERIC_RADIO_CONTRACT, GENERIC_SECTION_TEST_IDS, SETTINGS_GROUPS, SETTINGS_ICON_PATHS } from "../../src/client/features/settings/ui/SettingsModal.js";
-import { DESKTOP_SETTINGS_TABS, filterSettingsTabs, HIDDEN_SETTINGS_GROUPS, resolveThemePreference } from "../../src/client/features/settings/projection/settings-view.js";
+import { WEBUI_SETTINGS_TABS, filterSettingsTabs, HIDDEN_SETTINGS_GROUPS, resolveThemePreference } from "../../src/client/features/settings/projection/settings-view.js";
 import { DisabledBillingActions, UsageModelSettings } from "../../src/client/features/settings/ui/UsageModelSettings.js";
 import { reorderModelIds } from "../../src/client/features/models/projection/model-reorder.js";
 import { formatResetLabel, getActiveSourceBadge } from "../../src/client/features/models/projection/usage-settings.public.js";
 import { projectProviderHeaders } from "../../src/client/features/models/projection/usage-settings.js";
 import { createWebuiBrowserDom } from "../../src/client/platform/browser-dom.js";
 
-describe("desktop settings registry", () => {
-  it("keeps the electron tab order, labels, and groups", () => {
-    expect(DESKTOP_SETTINGS_TABS.map((tab) => [tab.key, tab.group, tab.label])).toEqual([
-      ["desktop", "preferences", "通用"],
+describe("settings registry", () => {
+  it("keeps the tab order, labels, and groups", () => {
+    expect(WEBUI_SETTINGS_TABS.map((tab) => [tab.key, tab.group, tab.label])).toEqual([
+      ["general", "preferences", "通用"],
       ["shortcuts", "preferences", "快捷键"],
       ["custom-instructions", "preferences", "个性化"],
       ["browser", "preferences", "浏览器"],
@@ -24,10 +24,10 @@ describe("desktop settings registry", () => {
     ]);
   });
 
-  it("declares every desktop group exactly once", () => {
+  it("declares every settings group exactly once", () => {
     expect(SETTINGS_GROUPS.map((group) => group.key)).toEqual(["preferences", "management", "coding", "archived"]);
-    expect(new Set(DESKTOP_SETTINGS_TABS.map((tab) => tab.key)).size).toBe(DESKTOP_SETTINGS_TABS.length);
-    for (const group of SETTINGS_GROUPS) expect(DESKTOP_SETTINGS_TABS.some((tab) => tab.group === group.key)).toBe(true);
+    expect(new Set(WEBUI_SETTINGS_TABS.map((tab) => tab.key)).size).toBe(WEBUI_SETTINGS_TABS.length);
+    for (const group of SETTINGS_GROUPS) expect(WEBUI_SETTINGS_TABS.some((tab) => tab.group === group.key)).toBe(true);
   });
 
   it("hides the 编码 section without retiring its tabs", () => {
@@ -35,7 +35,7 @@ describe("desktop settings registry", () => {
     // keeps both tabs and the dialog keeps both pages. Retiring the section
     // would delete these entries instead.
     expect(HIDDEN_SETTINGS_GROUPS).toEqual(["coding"]);
-    expect(DESKTOP_SETTINGS_TABS.filter((tab) => tab.group === "coding").map((tab) => tab.key)).toEqual(["coding", "worktree"]);
+    expect(WEBUI_SETTINGS_TABS.filter((tab) => tab.group === "coding").map((tab) => tab.key)).toEqual(["coding", "worktree"]);
     expect(HIDDEN_SETTINGS_GROUPS.every((group) => SETTINGS_GROUPS.some((entry) => entry.key === group))).toBe(true);
   });
 
@@ -46,7 +46,7 @@ describe("desktop settings registry", () => {
     expect(resolveThemePreference("dark", false)).toBe("dark");
   });
 
-  it("returns the desktop empty-state condition for an unmatched search", () => {
+  it("returns the empty-state condition for an unmatched search", () => {
     expect(filterSettingsTabs("不存在的设置")).toHaveLength(0);
   });
 
@@ -55,7 +55,7 @@ describe("desktop settings registry", () => {
     expect(GENERIC_FILE_ROW_ORDER).toEqual(["file-open-in-new-tab-switch", "file-line-wrap-switch"]);
     expect(GENERIC_RADIO_CONTRACT).toEqual({ position: "absolute right-4 top-[22px]", accentToken: "icon_default_accent" });
     const iconPaths = SETTINGS_ICON_PATHS as Readonly<Record<string, string>>;
-    for (const tab of DESKTOP_SETTINGS_TABS) expect(iconPaths[tab.icon]).toBeTruthy();
+    for (const tab of WEBUI_SETTINGS_TABS) expect(iconPaths[tab.icon]).toBeTruthy();
   });
 
   it("renders one page-level usage loader without section-specific skeleton branches", () => {
@@ -152,7 +152,7 @@ it("leaves every tab clickable now that each one has a panel behind it", () => {
   // `disabled` while 账户, 代码审查, 工作树, 个性化, 快捷键 and 连接 were built.
   // The tab is gone, and no entry in the registry carries the gate any more —
   // re-adding one would mean a clickable label or an empty pane.
-  for (const tab of DESKTOP_SETTINGS_TABS) {
+  for (const tab of WEBUI_SETTINGS_TABS) {
     expect(tab.disabled).toBeUndefined();
   }
 });

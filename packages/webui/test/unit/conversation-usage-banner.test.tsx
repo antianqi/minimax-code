@@ -13,7 +13,7 @@ const baseNotice = {
 };
 
 describe("ConversationUsageBanner", () => {
-  it("emits the desktop testid and the action testids", () => {
+  it("emits the banner and action testids", () => {
     const html = renderToStaticMarkup(
       createElement(ConversationUsageBanner, {
         notice: baseNotice,

@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { OutputError } from "../../src/client/features/transcript/ui/OutputError.public.js";
 
 describe("OutputError", () => {
-  it("emits the desktop testids for the generic error variant", () => {
+  it("emits the testids for the generic error variant", () => {
     const html = renderToStaticMarkup(
       createElement(OutputError, {
         variant: "output_error",

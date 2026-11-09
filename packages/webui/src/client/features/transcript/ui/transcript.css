@@ -569,7 +569,7 @@
   .webui-delivered-asset-deleted { margin-left: var(--spacing_8); color: var(--text_default_tertiary); font-size: var(--size_12); }
 
 
-  /* ===== message-render parity: thinking pulse, turn clock, stop
+  /* ===== message rendering: thinking pulse, turn clock, stop
      button, questionnaire card, edited-files card ===== */
   .webui-thinking-elapsed {
     color: var(--text_default_secondary);

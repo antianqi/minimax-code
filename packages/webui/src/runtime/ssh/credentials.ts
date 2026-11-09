@@ -1,8 +1,6 @@
 // The staged password.
 //
-// The electron app keeps a password in its encrypted store and hands it to OpenSSH through an
-// askpass helper. The WebUI service has no OS keychain to encrypt into — it is a loopback
-// service, not the electron app's main process — so the password is staged **in memory only**:
+// The service stages passwords **in memory only**:
 //
 //   * it is never written to the data directory,
 //   * it never travels back to the browser, and

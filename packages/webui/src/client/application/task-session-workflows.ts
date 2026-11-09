@@ -243,8 +243,7 @@ export function createWebuiTaskSessionWorkflows(
           ...(input.workspaceDir !== undefined ? { workspaceDir: input.workspaceDir } : {}),
           teamModeOff: input.teamModeOff,
           // What the session runs as. The runtime resolves the mode to the
-          // session's prompts and to the capabilities it gates, so a session
-          // created in 通用 › 日常工作 behaves like the Desktop's.
+          // session's prompts and to the capabilities it gates.
           ...(deps.readAppMode ? { appMode: deps.readAppMode() } : {}),
         });
       } catch (error) {

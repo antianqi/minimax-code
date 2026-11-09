@@ -102,7 +102,7 @@ describe("the user profile marker contract", () => {
 });
 
 describe("readUserProfile", () => {
-  it("parses the region into the three fields the desktop writes", async () => {
+  it("parses the region into three fields", async () => {
     const dataDir = await tempDataDir();
     await mkdir(join(dataDir, "memory"), { recursive: true });
     await writeFile(
@@ -232,7 +232,7 @@ describe("readUserProfile", () => {
 });
 
 describe("writeUserProfile", () => {
-  it("writes the desktop's skeleton verbatim", async () => {
+  it("writes the expected skeleton", async () => {
     const dataDir = await tempDataDir();
     await mkdir(join(dataDir, "memory"), { recursive: true });
 
@@ -340,7 +340,7 @@ describe("writeUserProfile", () => {
     expect(after).toContain("<!-- mem-append-reason: kept -->");
   });
 
-  it("normalises each field the way the desktop does", async () => {
+  it("normalises each field", async () => {
     const dataDir = await tempDataDir();
     await mkdir(join(dataDir, "memory"), { recursive: true });
 

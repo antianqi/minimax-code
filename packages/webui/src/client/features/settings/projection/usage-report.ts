@@ -209,9 +209,7 @@ export interface WebuiUsageHeatmapModel {
  *
  * The shape: 50 week columns ending with the current week, seven days per
  * column, Monday first. The four usage buckets are cut at the 25th, 50th and
- * 75th percentile of the days that actually had usage inside the shown range —
- * the same rule the electron app applies, so the same account produces the
- * same picture.
+ * 75th percentile of the days that actually had usage inside the shown range.
  */
 export function buildUsageHeatmapModel(
   days: readonly WebuiUsageDayView[] | undefined,

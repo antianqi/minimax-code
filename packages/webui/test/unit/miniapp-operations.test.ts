@@ -12,7 +12,7 @@
  *
  * The runtime side is a scripted facade behind the harness port (evidence level
  * 3). What is *not* covered here: the runtime's own start/stop path, the
- * credential its guard installs, and an Electron/desktop consumer of `viewUrl`.
+ * credential its guard installs, and a separate consumer of `viewUrl`.
  */
 import http from "node:http";
 import type { Duplex } from "node:stream";

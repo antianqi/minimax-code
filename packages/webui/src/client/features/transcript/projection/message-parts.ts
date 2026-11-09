@@ -375,11 +375,11 @@ function parseMediaAsset(attributes: string): WebuiDeliveredAsset | undefined {
   };
 }
 
-const DESKTOP_INTERNAL_MESSAGE_BLOCK = /<(agent-message|agent-context|system-reminder|peer-memory-path|engine-message|inbound-context|archon_internal_context|locale-context|runtime-data-context|permission-ask|permission-response|questionnaire-ask|deliver-assets|deliver_assets|image-gallery)\b[^>]*>[\s\S]*?<\/\1\s*>/giu;
+const INTERNAL_MESSAGE_BLOCK = /<(agent-message|agent-context|system-reminder|peer-memory-path|engine-message|inbound-context|archon_internal_context|locale-context|runtime-data-context|permission-ask|permission-response|questionnaire-ask|deliver-assets|deliver_assets|image-gallery)\b[^>]*>[\s\S]*?<\/\1\s*>/giu;
 
-function stripDesktopInternalMessageBlocks(content: string): string {
+function stripInternalMessageBlocks(content: string): string {
   return content
-    .replace(DESKTOP_INTERNAL_MESSAGE_BLOCK, "")
+    .replace(INTERNAL_MESSAGE_BLOCK, "")
     // Normalize <path> to <asset-path> and unwrap <filepath> before
     // passing the remaining text through Markdown. Keep the path text so the
     // WebUI file-reference renderer can turn workspace paths into links.
@@ -427,7 +427,7 @@ export function projectMessageParts(
         const assetProjection = projectDeliveredAssets(content, `${message.msgId}-${id}`);
         const thinkingProjection = projectMavisThinking(assetProjection.content, `${message.msgId}-${id}`);
         const strippedContent = stripQuestionnaireResponse(
-          stripDesktopInternalMessageBlocks(thinkingProjection.content),
+          stripInternalMessageBlocks(thinkingProjection.content),
         );
         ordered.push(...thinkingProjection.parts);
         if (strippedContent.content.trim())
@@ -476,7 +476,7 @@ export function projectMessageParts(
     });
   }
   parts.push(...thinkingProjection.parts);
-  const strippedContent = stripQuestionnaireResponse(stripDesktopInternalMessageBlocks(thinkingProjection.content));
+  const strippedContent = stripQuestionnaireResponse(stripInternalMessageBlocks(thinkingProjection.content));
   if (strippedContent.content.trim()) {
     parts.push({
       id: "text",

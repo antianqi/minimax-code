@@ -71,10 +71,7 @@ export const WEBUI_CHANNEL_CREATE_BOT_LABEL = "创建 IM Bot";
 /**
  * The platforms the create menu offers.
  *
- * The electron app at 3.1.6 builds the menu from its platform catalogue: one
- * entry per platform, each with the platform's own icon and label
- * (`channel-<id>`). The electron app offers 微信 and 飞书, which is the pair this
- * repository's runtime binds.
+ * The runtime binds 微信 and 飞书. Each entry carries its icon and label.
  */
 export interface WebuiChannelAddOption {
   readonly key: "wechat" | "feishu";

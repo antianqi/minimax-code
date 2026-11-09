@@ -3,8 +3,8 @@
  *
  * The claims are about what the form lets the person do:
  *
- *   * **A saved host's alias is fixed.** Desktop's editor shows the alias as text and does not
- *     offer to change it; a changed alias here would save a second host and leave the first
+ *   * **A saved host's alias is fixed.** The editor shows it as text; a changed alias would
+ *     save a second host and leave the first
  *     one behind.
  *   * **A host that is added by hand names itself.** The alias field is the one the person
  *     types, so it stays editable there.

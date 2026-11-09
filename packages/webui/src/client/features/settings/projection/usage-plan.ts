@@ -6,9 +6,8 @@
 //
 // The rules:
 //
-// - a subscribed account shows its tier, and a tier that is a bare number (a
-//   combo id the electron app resolves through the subscription catalogue)
-//   falls back to the generic plan name;
+// - a subscribed account shows its tier; a numeric combo id falls back to the
+//   generic plan name;
 // - an unsubscribed account shows the plan name the membership answer carries;
 // - the model-source label depends on the subscription kind: the legacy
 //   `token_plan` kind still reads "Token Plan", every other kind reads
@@ -34,9 +33,7 @@ export interface WebuiPlanFacts {
 }
 
 /**
- * The tier as a display name. A tier that is a bare number is a combo id: the
- * electron app resolves it through the subscription catalogue and falls back to
- * the generic plan name when it cannot, so this does the same.
+ * The tier as a display name. A bare numeric combo id uses the generic plan name.
  */
 export function formatPlanTier(tier: string | undefined): string | undefined {
   const trimmed = tier?.trim();

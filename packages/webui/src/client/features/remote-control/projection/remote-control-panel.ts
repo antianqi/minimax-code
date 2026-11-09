@@ -47,7 +47,7 @@ export interface WebuiRemoteControlSnapshot {
 /** The hero title. */
 export const WEBUI_REMOTE_CONTROL_TITLE = "用手机连接你的 MiniMax Code";
 /** The line under the title. */
-export const WEBUI_REMOTE_CONTROL_SUBTITLE = "通过 MiniMax App 访问此电脑，随时随地继续桌面端的任务";
+export const WEBUI_REMOTE_CONTROL_SUBTITLE = "通过 MiniMax App 访问此电脑，随时随地继续你的任务";
 /** The three feature rows, in the order this panel shows them. */
 export const WEBUI_REMOTE_CONTROL_FEATURES: readonly {
   readonly key: "takeover" | "continuous" | "anywhere";
@@ -93,8 +93,7 @@ export const WEBUI_REMOTE_CONTROL_PLATFORM_MARKS: readonly {
   /**
    * Whether the host publishes a download QR code for this platform.
    *
-   * The electron app reads it from its native download config and shows the mark as a link
-   * that opens the QR code on hover. This host publishes no such config, so the mark carries the
+   * This host publishes no download configuration, so the mark carries the
    * disabled treatment rather than pretending a code is one hover away.
    */
   readonly enabled: boolean;

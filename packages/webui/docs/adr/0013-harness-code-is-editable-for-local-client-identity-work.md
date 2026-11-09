@@ -19,7 +19,7 @@ Permitted: adding a module, adding a test, and rewiring call sites **within**
 Not permitted, because they are the actual defects this work exists to fix rather
 than costs it accepts:
 
-- widening `'electron' | 'cli' | 'tui' | string` by appending `| string`. It already
+- widening an owner union that already includes `string` by appending `| string`. It already
   collapses to `string`; adding a member documents forward compatibility and enforces
   nothing.
 - routing a new owner value through the existing predicates without a declared row.
@@ -27,7 +27,7 @@ than costs it accepts:
 ## Why a policy resolver instead of a new string
 
 `runtimeOwnerKind` is read by more than twenty call sites that decide independently
-what the value means, and the readings disagree — three sites encode "am I a desktop",
+what the value means, and the readings disagree — three sites encode a host capability,
 two encode "am I a degraded runtime", and neither set is a subset of the other. An
 unrecognised value therefore lands in a bucket nobody designed: it would drop the V1
 compatibility layer while silently granting memory and cron.
@@ -51,7 +51,7 @@ lands in exactly that undesigned bucket.
 - `'absent'` and `'runtime'` stay **distinct** rows. They disagree today, and
   collapsing them would be a deliberate behaviour change chosen by the word
   "normalisation". The `'absent'` row records an incoherence rather than fixing it:
-  an undeclared owner is read as "assume desktop" by the service gates and as
+  an undeclared owner is treated as capability-enabled by the service gates and as
   "unknown" by the compatibility gate. Fixing it changes behaviour, so it is a named
   follow-up, not part of this work.
 - An unrecognised owner is **fail-closed on grants and fail-open on wiring**: an

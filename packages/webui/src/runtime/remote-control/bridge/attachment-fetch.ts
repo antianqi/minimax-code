@@ -74,7 +74,7 @@ export interface AttachmentFetcherDeps {
   /** Download landing directory, e.g. <userData>/remote-control/attachments. */
   saveDir: string;
   logger: RcLogger;
-  /** Injected in prod as Electron net.fetch; tests use a mock. */
+  /** Host-provided fetch implementation; tests use a mock. */
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   maxBytesPerAttachment?: number;

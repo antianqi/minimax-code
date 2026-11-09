@@ -1,13 +1,11 @@
 /**
  * The 远程控制 page: the projection and the rendered branches.
  *
- * The page is transcribed from the Desktop 3.1.6 远程控制 tab, so the wording is asserted here
- * rather than eyeballed: the hero, the subtitle, the three feature rows and their order, the
+ * The wording is asserted here: the hero, the subtitle, the three feature rows and their order, the
  * 连接 button, the 设置 entry with its accessible name, the two app-store marks and the
  * minimum-version line.
  *
- * The three states are asserted too, because they are the part the Desktop pushes and the WebUI
- * has to get right on its own: an unbound phone shows the hero and the 连接 button, a bound one
+ * The three states are asserted too: an unbound phone shows the hero and the 连接 button, a bound one
  * shows 已连接 and the settings entry alone, and a host that cannot host a phone link shows one
  * title and no card.
  *
@@ -45,11 +43,11 @@ function render(view: React.ReactElement): string {
 }
 
 describe("the remote-control page", () => {
-  it("carries the Desktop's copy, in the Desktop's order", () => {
+  it("renders the remote-control copy in order", () => {
     const model = webuiRemoteControlPanelModel(snapshot(), NOW_MS);
 
     expect(model.title).toBe("用手机连接你的 MiniMax Code");
-    expect(model.subtitle).toBe("通过 MiniMax App 访问此电脑，随时随地继续桌面端的任务");
+    expect(model.subtitle).toBe("通过 MiniMax App 访问此电脑，随时随地继续你的任务");
     expect(model.features.map((feature) => feature.text)).toEqual([
       "手机直接接管电脑上复杂任务，无需守在屏幕前。",
       "对话不断线，进度、指令和审批，手机端随时处理。",
@@ -76,7 +74,7 @@ describe("the remote-control page", () => {
     );
 
     expect(markup).toContain("用手机连接你的 MiniMax Code");
-    expect(markup).toContain("通过 MiniMax App 访问此电脑，随时随地继续桌面端的任务");
+    expect(markup).toContain("通过 MiniMax App 访问此电脑，随时随地继续你的任务");
     for (const feature of WEBUI_REMOTE_CONTROL_FEATURES) {
       expect(markup).toContain(feature.text);
     }

@@ -9,7 +9,7 @@
 //    `disabled` on a `<button>` is not a style, it is the browser refusing the
 //    click, so "the flag is gone" and "the panel opens" are different facts and
 //    only the second one is the feature. The panel also renders through a
-//    `key`-ed branch, and the account page it renders is the ported one: the
+//    `key`-ed branch, and the account page renders the
 //    profile block, the three headline numbers, the usage calendar and the
 //    "分享" action. The 分享 preview is what the unit suite cannot reach —
 //    it is a portal over the whole screen, and "the button opens a preview"
@@ -81,11 +81,11 @@ function signOutButton(page) {
 }
 
 /**
- * The account page the ported branch renders.
+ * The account page rendered by the settings branch.
  *
  * The account tab no longer carries a settings section of its own — the
  * "账户信息 / 退出登录" row was removed — so the page is located by the
- * element it actually is: the ported account page.
+ * element it actually is: the account page.
  */
 function accountPanel(page) {
   return page.locator('[data-testid="account-usage-settings"]');
@@ -173,9 +173,9 @@ test("clicking the account tab shows the account panel", async ({ page }) => {
   // reached the component state rather than only the button's own class list.
   await expect(page.locator(".webui-settings-content-header h2")).toHaveText("账户");
 
-  // The ported account page: the profile block, the three headline numbers and
+  // The account page: the profile block, the three headline numbers and
   // the usage calendar. The fixture transport reports no usage, so the numbers
-  // read as the Desktop's own empty reading ("--") rather than as a failure --
+  // read as empty ("--") rather than as a failure --
   // a missing answer is a runtime fact, not a rendering defect.
   await expect(accountPanel(page)).toBeVisible();
   await expect(page.locator('[data-testid="account-usage-profile"]')).toBeVisible();
@@ -184,10 +184,7 @@ test("clicking the account tab shows the account panel", async ({ page }) => {
   await expect(page.locator('[data-testid="account-usage-activity"]')).toBeVisible();
   await expect(accountPanel(page).getByText("Token 用量")).toBeVisible();
 
-  // The "账户信息 / 退出登录" row is gone: the account tab is the ported page
-  // and nothing else. Asserted rather than assumed, because a leftover row
-  // would be the one thing in this tab that no longer has a Desktop
-  // counterpart.
+  // The "账户信息 / 退出登录" row is absent from the account tab.
   await expect(signOutButton(page)).toHaveCount(0);
   await expect(accountPanel(page).getByText("账户信息")).toHaveCount(0);
   await expect(page.locator('[data-testid="webui-error-boundary"]')).toHaveCount(0);
@@ -269,8 +266,7 @@ test("the account panel's 分享 action opens the share preview", async ({ page 
   await openSettings(page);
   await accountTab(page).click();
 
-  // The action lives in the settings header, next to the tab title, the way
-  // the Desktop puts it in the account page's own top-right corner.
+  // The action lives in the settings header, next to the tab title.
   const share = page.locator('[data-testid="account-usage-share-button"]');
   await expect(share).toBeVisible();
   await expect(share).toBeEnabled();

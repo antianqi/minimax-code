@@ -1,7 +1,6 @@
 // The account page.
 //
-// The Desktop is the behavioural authority for this surface, and these tests
-// pin down the three things the port had to get right:
+// These tests pin down three account page behaviors:
 //
 //  1. the calendar model — 50 week columns ending with the current week, seven
 //     days per column, Monday first, the four usage buckets cut at the 25th,
@@ -100,7 +99,7 @@ describe("the account page's token arithmetic", () => {
     expect(formatSpacedToken("512")).toBe("512");
   });
 
-  it("buckets the ranking the way the Desktop does", () => {
+  it("buckets the ranking", () => {
     expect(formatUsageRanking(1)).toBe("前 1%");
     expect(formatUsageRanking(1.5)).toBe("前 5%");
     expect(formatUsageRanking(12)).toBe("前 25%");
@@ -118,7 +117,7 @@ describe("the account page's token arithmetic", () => {
     expect(quantile([1, 2, 3, 4], 0.75)).toBe(3);
   });
 
-  it("masks the account's phone number the way the Desktop does", () => {
+  it("masks the account's phone number", () => {
     expect(maskAccountPhone("19931152496")).toBe("199****2496");
     // Anything that is not a phone number is left alone.
     expect(maskAccountPhone("user@example.com")).toBe("user@example.com");

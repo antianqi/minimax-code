@@ -1,17 +1,16 @@
 /**
  * 桥的命令路由所调用的本地运行时入口。
  *
- * 被测的是映射本身：桥发过来的 Desktop 路由落到 WebUI 运行时上，回给桥的响应体是桥的解析器
- * 吃得懂的形状。运行时是脚本化的，路由是真实的那一份 —— 所以一个从 Desktop 学到词汇的手机，
- * 在这里也能读懂答案。
+ * 被测的是映射本身：桥发过来的协议路由落到 WebUI 运行时上，响应体符合桥的解析器。
+ * 运行时是脚本化的，路由使用真实实现。
  *
- * 置顶状态与队列由运行时拥有，入口只转换 Desktop 的 HTTP 字段。
+ * 置顶状态与队列由运行时拥有，入口只转换 HTTP 字段。
  */
 import { describe, expect, it } from "vitest";
 
 import { createRemoteControlLocalRuntimeInvoke } from "../../src/runtime/remote-control/command-router.js";
 
-const DESKTOP = "http://localhost/minimax-desktop/api/v1";
+const REMOTE_API = "http://localhost/minimax-desktop/api/v1";
 
 interface Call {
   readonly method: string;
@@ -327,7 +326,7 @@ function request(
   path: string,
   body?: unknown,
 ): Request {
-  return new Request(`${DESKTOP}${path}`, {
+  return new Request(`${REMOTE_API}${path}`, {
     method,
     ...(body === undefined
       ? {}
@@ -428,7 +427,7 @@ describe("本地运行时入口", () => {
     });
   });
 
-  it("读取和删除队列项时使用 Desktop 的 wire 字段", async () => {
+  it("读取和删除队列项时使用协议字段", async () => {
     const { invoke, calls } = harness();
     const list = await invoke(request("GET", "/session/s-1/queue"));
     expect(await json(list)).toEqual({
@@ -446,7 +445,7 @@ describe("本地运行时入口", () => {
     ]);
   });
 
-  it("读取、编辑和排序队列时保留运行时请求与 Desktop 应答", async () => {
+  it("读取、编辑和排序队列时保留运行时请求与协议应答", async () => {
     const { invoke, calls } = harness();
     expect(await json(await invoke(request("GET", "/session/s-1/queue/q-1")))).toEqual({ item: { item_id: "q-1", session_id: "s-1", status: "queued" } });
     expect(await json(await invoke(request("PATCH", "/session/s-1/queue/q-1", { content: "updated", attachments: [] })))).toMatchObject({ item: { content: "updated" } });
@@ -459,7 +458,7 @@ describe("本地运行时入口", () => {
     expect((await invoke(request("POST", "/session/s-1/queue/reorder", { item_ids: [1] }))).status).toBe(400);
   });
 
-  it("按会话读取待回答的问题并使用 Desktop 的 wire 字段", async () => {
+  it("按会话读取待回答的问题并使用协议字段", async () => {
     const { invoke, calls } = harness();
     const missing = await invoke(request("GET", "/agent/mavis/questionnaire/pending"));
     expect(missing.status).toBe(400);
@@ -480,7 +479,7 @@ describe("本地运行时入口", () => {
     ]);
   });
 
-  it("将运行时的目标等待状态映射为 Desktop GoalState", async () => {
+  it("将运行时的目标等待状态映射为 GoalState", async () => {
     const { invoke } = harness({ getGoal: async () => ({
       goalId: "g-1", sessionId: "s-1", objective: "test", status: "active", createdAt: 1, updatedAt: 2,
       tokensUsed: 3, turnsUsed: 4, timeUsedSeconds: 5, tokenBudget: null, statusReason: null,
@@ -521,7 +520,7 @@ describe("本地运行时入口", () => {
     expect(calls).toEqual([{ method: "patchGoal", args: { sessionId: "s-1", patch: { objective: "new", objectiveResources: [] } } }]);
   });
 
-  it("按 Desktop 的回答与取消契约转发问题", async () => {
+  it("按回答与取消契约转发问题", async () => {
     const { invoke, calls } = harness();
     const reply = await invoke(request("POST", "/agent/mavis/questionnaire/r-1/reply", {
       schema_version: 1, answers: [{ step_id: "step-1", selected_option_ids: ["a"], selected_other: true, other_text: "other" }], submitted_at: 120,
@@ -643,7 +642,7 @@ describe("本地运行时入口", () => {
 
     expect(response.status).toBe(200);
     expect(await json(response)).toEqual({ success: true });
-    // `reason: "user_stop"` 让运行时暂停目标与队列：丢掉它，手机的停止按钮就与桌面端不同。
+    // `reason: "user_stop"` 让运行时暂停目标与队列。
     expect(calls[0]).toEqual({
       method: "abortSession",
       args: { id: "s-1", turnId: "turn-1", reason: "user_stop" },
@@ -804,7 +803,7 @@ describe("本地运行时入口", () => {
     const all = await withoutAgent.invoke(request("GET", "/projects"));
     expect(all.status).toBe(200);
     const unfiltered = withoutAgent.calls[0] as { args: Record<string, unknown> };
-    // Desktop 的 ListProjectsReq：省略 agent_name = 跨 agent 全量。默认 agent 兜底
+    // ListProjectsReq：省略 agent_name = 跨 agent 全量。默认 agent 兜底
     // 会把子 agent 的会话从手机「最近」里剔掉。
     expect("agentName" in unfiltered.args).toBe(false);
 
@@ -862,7 +861,7 @@ describe("本地运行时入口", () => {
   it("列工作区分支选择器时把 worktree 一起回给桥", async () => {
     const { invoke, calls } = harness();
 
-    // 手机走的是 Desktop 的旧版 Mavis 前缀，两种前缀要落到同一条路由上。
+    // 手机使用旧版 Mavis 前缀，两种前缀要落到同一条路由上。
     const response = await invoke(
       new Request(
         "http://localhost/mavis/api/file/git/branch-picker?workspace=%2Fworkspace%2Fdemo",
@@ -999,7 +998,7 @@ describe("本地运行时入口", () => {
     });
   });
 
-  it("文件树和搜索调用运行时并返回 Desktop 与旧接口各自的格式", async () => {
+  it("文件树和搜索调用运行时并返回对应接口格式", async () => {
     const { invoke } = harness({
       listWorkspaceFileTree: async () => [{ name: "a.txt", path: "a.txt", type: "file" }],
       searchWorkspaceFiles: async () => ["a.txt"],
@@ -1012,7 +1011,7 @@ describe("本地运行时入口", () => {
     expect(unsupported.status).toBe(501);
   });
 
-  it("读文件内容时给出 Desktop 的文件体和字节数", async () => {
+  it("读文件内容时给出协议文件体和字节数", async () => {
     const { invoke, calls } = harness({
       readWorkspaceFile: async (input: unknown) => {
         calls.push({ method: "readWorkspaceFile", args: input });
@@ -1032,7 +1031,7 @@ describe("本地运行时入口", () => {
     });
   });
 
-  it("读图片时把 data URL 拆回 Desktop 的 base64 正文", async () => {
+  it("读图片时把 data URL 拆回 base64 正文", async () => {
     const { invoke } = harness({
       readWorkspaceFile: async () => ({
         type: "binary",
@@ -1047,7 +1046,7 @@ describe("本地运行时入口", () => {
     );
 
     expect(response.status).toBe(200);
-    // Desktop 的旧路径把图片字节放在 content 里带 encoding，不是 data URL。
+    // 旧路径把图片字节放在 content 里带 encoding，不是 data URL。
     expect(await json(response)).toEqual({
       type: "binary",
       content: "aGVsbG8=",
@@ -1057,7 +1056,7 @@ describe("本地运行时入口", () => {
     });
   });
 
-  it("手机读超大文件时按内联上限回 413，形状同 Desktop", async () => {
+  it("手机读超大文件时按内联上限回 413", async () => {
     const { invoke } = harness({
       readWorkspaceFile: async () => ({ type: "text", content: "0123456789" }),
     });

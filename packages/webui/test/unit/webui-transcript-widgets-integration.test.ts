@@ -309,7 +309,7 @@ describe("WebUI transcript widget wiring", () => {
     expect(html).not.toContain('data-webui-transcript-empty-live="true"');
   });
 
-  it("keeps a Desktop-style bottom spacer after the shared live viewport", () => {
+  it("keeps a bottom spacer after the shared live viewport", () => {
     const html = sessionShell({
       messages: [
         {

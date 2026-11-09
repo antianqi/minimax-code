@@ -15,7 +15,7 @@
 import { expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-import { configureFixture, finishCapturedTransition, openApp, openLauncherTile, pauseNextTransition, switchSession, test, transitionMidpointSize } from "./harness.mjs";
+import { attachJsonEvidence, configureFixture, finishCapturedTransition, openApp, openLauncherTile, pauseNextTransition, switchSession, test, transitionMidpointSize } from "./harness.mjs";
 
 // Neither injected DOM snapshots nor trace screenshots belong to the client's
 // performance budget. Capture failure screenshots after the measurement.
@@ -212,7 +212,7 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
     window.__reviewLongTaskObserver.disconnect();
     return tasks;
   });
-  await test.info().attach("workspace-drag-long-tasks.json", { body: JSON.stringify(dragLongTasks), contentType: "application/json" });
+  await attachJsonEvidence("workspace-drag-long-tasks.json", dragLongTasks);
   await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
   expect(dragLongTasks.filter((duration) => duration >= 50), `workspace panel drag produced ${dragLongTasks} ms long tasks`).toEqual([]);
   const lastFile = review.locator('[data-testid="turn-review-diff-file"]').last();

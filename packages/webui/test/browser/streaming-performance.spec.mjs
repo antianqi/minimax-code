@@ -18,7 +18,7 @@
 
 import { expect } from "@playwright/test";
 
-import { openApp, startTurn, test } from "./harness.mjs";
+import { attachJsonEvidence, openApp, startTurn, test } from "./harness.mjs";
 
 // Keep trace snapshots and screenshot capture outside the measured interval;
 // a failure screenshot is taken only after the performance assertions.
@@ -214,10 +214,7 @@ async function measureStreamedReply(page, options) {
     };
   }, chunkTexts);
   const idleAfter = await measureIdleFrames(page, Math.max(2000, metrics.settled));
-  await test.info().attach("stream-performance-raw.json", {
-    body: JSON.stringify({ historyTurns, chunks, idleBefore, active: metrics, idleAfter }, null, 2),
-    contentType: "application/json",
-  });
+  await attachJsonEvidence("stream-performance-raw.json", { historyTurns, chunks, idleBefore, active: metrics, idleAfter });
 
   if (cdp) {
     const { profile } = await cdp.send("Profiler.stop");

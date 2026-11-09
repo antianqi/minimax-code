@@ -67,6 +67,9 @@ test('public WebUI CI runs only WebUI checks and cannot publish packages', () =>
     assert.equal(step['continue-on-error'], undefined, `${command} must fail the job on a regression`);
   }
   assert.equal(job['continue-on-error'], undefined);
+  const diagnostics = job.steps.find(step => step.name === 'Upload WebUI browser diagnostics');
+  assert.equal(diagnostics.if, '${{ !cancelled() }}', 'Successful runs must retain raw performance samples too');
+  assert.equal(diagnostics.with['retention-days'], 7);
 });
 
 test('coverage review distinguishes declared browser scenarios from executed evidence', () => {

@@ -15,7 +15,9 @@ repository-wide `pnpm verify` pipeline or publish packages.
 | npm package build, installation and launcher verification | Yes | Yes | Yes |
 
 Package verification uses an isolated installation and does not publish to npm.
-Browser failure diagnostics are retained as Actions artifacts for seven days.
+Browser diagnostics and raw performance samples are retained as Actions artifacts
+for seven days on successful and failed runs. Samples are written to the output
+directory explicitly so the list reporter cannot discard in-memory attachments.
 After a successful build and Chromium installation, browser checks still run if
 unit tests fail. Package verification also runs after a successful build even if
 an earlier test suite failed. Each failure still makes the job fail; this keeps
@@ -27,9 +29,12 @@ visible and require diagnosis rather than relaxed assertions.
 
 Hosted macOS sets `WEBUI_BROWSER_HEADED=1` for the browser suite and runs full
 Chromium in a window. Native blank-page controls reproduced headless frame-source
-stalls without the WebUI; the same image and browser build passed the affected
-scenarios in windowed mode. Frame-gap, long-task and interaction budgets are
-unchanged. Linux, Windows and local runs remain headless by default. To reproduce
+stalls without the WebUI; windowed mode improves pacing but does not eliminate
+hosted-runner pauses. Streaming frame p95 is compared with the same page's idle
+samples before and after streaming, allowing one 60 Hz frame above idle p95 with
+a 50 ms floor. Raw frame gaps, timers and tasks are retained for investigation.
+Application long tasks retain the absolute 50 ms budget, and interaction budgets
+are unchanged. Linux, Windows and local runs remain headless by default. To reproduce
 the macOS CI browser mode locally, run `WEBUI_BROWSER_HEADED=1 pnpm test:webui-browser`
 after building the client and installing Chromium.
 

@@ -2327,6 +2327,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/settings/projection/usage-plan.public.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "settings",
+      "home": "target"
+    },
+    {
       "path": "client/features/settings/projection/usage-plan.ts",
       "layers": [
         "view"

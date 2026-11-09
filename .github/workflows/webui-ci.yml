@@ -9,13 +9,17 @@ permissions:
 
 jobs:
   diagnose:
-    name: Diagnostic macOS (${{ matrix.channel }})
-    runs-on: macos-latest
+    name: Diagnostic ${{ matrix.runner }} (${{ matrix.channel }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        channel: [shell, chromium]
+        include:
+          - runner: macos-15
+            channel: shell
+          - runner: macos-26-intel
+            channel: shell
     env:
       WEBUI_DIAGNOSTIC_CHANNEL: ${{ matrix.channel }}
     steps:
@@ -47,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: macos-diagnostic-${{ matrix.channel }}
+          name: macos-diagnostic-${{ matrix.runner }}-${{ matrix.channel }}
           path: ${{ runner.temp }}/mac-browser-${{ matrix.channel }}/
           retention-days: 7
           if-no-files-found: ignore

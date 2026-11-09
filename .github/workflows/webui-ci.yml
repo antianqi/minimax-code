@@ -52,10 +52,12 @@ jobs:
       - name: Check WebUI feedback
         run: pnpm check:webui-feedback
       - name: Build WebUI
+        id: build
         run: pnpm build:webui
       - name: Check WebUI build boundaries
         run: pnpm check:webui-boundary
       - name: Install Chromium
+        id: browsers
         run: pnpm install:webui-browsers
       - name: Install Chromium system dependencies
         if: runner.os == 'Linux'
@@ -63,8 +65,10 @@ jobs:
       - name: Test WebUI units and integrations
         run: pnpm test:webui
       - name: Test WebUI browser interactions
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.browsers.outcome == 'success' }}
         run: pnpm test:webui-browser
       - name: Verify WebUI package installation
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: pnpm test:webui-package
       - name: Upload WebUI browser diagnostics
         if: ${{ failure() }}

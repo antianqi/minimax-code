@@ -16,6 +16,10 @@ repository-wide `pnpm verify` pipeline or publish packages.
 
 Package verification uses an isolated installation and does not publish to npm.
 Browser failure diagnostics are retained as Actions artifacts for seven days.
+After a successful build and Chromium installation, browser checks still run if
+unit tests fail. Package verification also runs after a successful build even if
+an earlier test suite failed. Each failure still makes the job fail; this keeps
+independent failures visible in one run instead of masking later suites.
 Only installation of Linux system dependencies is platform-gated. CI does not
 skip the browser or package suites on macOS or Windows. This coverage declaration
 does not establish a passing run; platform and visual-baseline failures remain

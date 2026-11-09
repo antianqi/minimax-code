@@ -4,6 +4,13 @@
   "declaredDelta": "Public marker preserves the original layer and adds only the published- role prefix; publication legality has separate positive/negative fixtures. Post-baseline additions: conversation/pagination remains a mechanism, platform/transport-origin remains infrastructure, and runtime/ssh/authentication remains outside the client.",
   "cases": [
     {
+      "path": "runtime/native-pty.ts",
+      "layers": ["runtime"],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
       "path": "client/conversation/pagination.ts",
       "layers": ["mechanisms"],
       "role": "conversation",

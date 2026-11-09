@@ -4473,6 +4473,7 @@
     "packages/webui/src/runtime/mcode-tools-entry.ts",
     "packages/webui/src/runtime/mcode-tools-environment.ts",
     "packages/webui/src/runtime/mcode-tools.ts",
+    "packages/webui/src/runtime/native-pty.ts",
     "packages/webui/src/runtime/port.ts",
     "packages/webui/src/runtime/profile-files.ts",
     "packages/webui/src/runtime/remote-control/bridge/attachment-fetch.ts",

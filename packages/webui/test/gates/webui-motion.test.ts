@@ -5,7 +5,7 @@
 // the constants are read from disk, which is what makes the check cheap enough
 // to run on every change.
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { checkMotionOwnership } from "../../../../scripts/check-webui-motion.mjs";
 import { describe, expect, it } from "vitest";
 import { compareMotion, disabledTransitionOwnershipProblems, featureInteractionTransformOwnershipProblems, featureRotationOwnershipProblems, featureSmoothScrollOwnershipProblems, scanStylesheet, sharedFeedbackControlProblems, sourceMotionOwnershipProblems } from "../../../../scripts/check-webui-motion.mjs";
@@ -28,8 +28,14 @@ const inventory = {
 describe("the motion inventory", () => {
   it("recognizes shared owners and asset imports with Windows glob paths", async () => {
     const approved = JSON.parse(readFileSync(new URL("../../docs/design/motion-inventory.json", import.meta.url), "utf8"));
-    async function* windowsPaths(pattern: string, options: { cwd: string }) {
-      for (const entry of readdirSync(options.cwd, { recursive: true, encoding: "utf8" })) {
+    async function* windowsPaths(pattern: string) {
+      // Exercise the scanner with real shared implementations, approved
+      // feature styles and the asset owner, without parsing the whole client
+      // a second time inside a unit test.
+      for (const entry of [
+        "styles/motion.css", "features/account/ui/account.css", "features/transcript/ui/transcript.css",
+        "ui/page.tsx", "ui/feedback.tsx", "features/transcript/ui/ActivityIndicator.tsx",
+      ]) {
         if (pattern.endsWith(".css") ? entry.endsWith(".css") : /\.(?:ts|tsx)$/u.test(entry)) {
           yield entry.replaceAll("/", "\\");
         }

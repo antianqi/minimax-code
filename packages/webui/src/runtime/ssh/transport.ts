@@ -11,9 +11,7 @@
 //     window size to the remote pseudo-terminal it allocates. A remote pty whose size cannot be
 //     changed is a terminal that is lying about its size, so the local side is a real pty too.
 import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
+import { loadWebuiPty } from "../native-pty.js";
 
 type Pty = {
   readonly pid: number;
@@ -106,7 +104,7 @@ function stopProcessTree(child: { pid?: number; kill(signal?: NodeJS.Signals): b
  * a build without it can still serve the command surface.
  */
 export function createSystemSshTransport(
-  loadPty: () => PtyModule = () => require("node-pty") as PtyModule,
+  loadPty: () => PtyModule = loadWebuiPty,
 ): SshTransport {
   return {
     run(args, options = {}) {

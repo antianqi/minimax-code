@@ -9,8 +9,39 @@
 // for) instead of asserting that nothing seemed to happen.
 
 import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import { WebuiTerminalManager } from "../../src/runtime/terminal.js";
+import { prepareWebuiPtyHelper } from "../../src/runtime/native-pty.js";
+
+describe("native PTY helper permissions", () => {
+  it.skipIf(process.platform === "win32")("repairs the packaged macOS helper and preserves its existing permissions", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "webui-pty-"));
+    try {
+      for (const relative of ["build/Release/spawn-helper", "prebuilds/darwin-arm64/spawn-helper"]) {
+        const helper = path.join(root, relative);
+        mkdirSync(path.dirname(helper), { recursive: true });
+        writeFileSync(helper, "synthetic helper permission fixture", { mode: 0o640 });
+      }
+      prepareWebuiPtyHelper(root, "darwin", "arm64");
+      for (const relative of ["build/Release/spawn-helper", "prebuilds/darwin-arm64/spawn-helper"]) {
+        expect(statSync(path.join(root, relative)).mode & 0o777).toBe(0o751);
+      }
+      prepareWebuiPtyHelper(root, "darwin", "arm64");
+      expect(statSync(path.join(root, "prebuilds/darwin-arm64/spawn-helper")).mode & 0o777).toBe(0o751);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("requires a macOS helper and leaves other platforms alone", () => {
+    expect(() => prepareWebuiPtyHelper("missing-native-module", "darwin", "arm64")).toThrow("spawn-helper is missing");
+    expect(() => prepareWebuiPtyHelper("missing-native-module", "win32")).not.toThrow();
+    expect(() => prepareWebuiPtyHelper("missing-native-module", "linux")).not.toThrow();
+  });
+});
 
 interface FakePty {
   readonly pid: number;

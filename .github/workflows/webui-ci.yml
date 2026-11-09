@@ -18,21 +18,11 @@ jobs:
         include:
           - runner: macos-26
             channel: chromium
-            mode: headless
-            headed: false
-            caffeinate: false
-          - runner: macos-26
-            channel: chromium
             mode: headed
             headed: true
             caffeinate: false
-          - runner: macos-26
-            channel: chromium
-            mode: awake
-            headed: false
-            caffeinate: true
     env:
-      WEBUI_DIAGNOSTIC_CHANNEL: ${{ matrix.channel }}
+      WEBUI_BROWSER_HEADED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -59,6 +49,7 @@ jobs:
           packages/webui/test/browser/surface-appearance.spec.mjs
           --grep 'a streamed reply|a long reply|continuous chunks|workspace review stays responsive|contained unified diff|browser page fills|hovering a child session|calendar tip is drawn'
           ${{ matrix.headed && '--headed' || '' }}
+          --repeat-each=3
       - name: Retain diagnostic artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

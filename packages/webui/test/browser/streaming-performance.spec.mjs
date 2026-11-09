@@ -83,34 +83,8 @@ async function measureStreamedReply(page, options) {
       window.__fixture.setPage("A", { messages, hasMore: false }),
     );
   }, historyMessages(historyTurns));
-  const clock = async (label) => {
-    const result = await page.evaluate(async () => {
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const gaps = [], lags = [], timers = [];
-      let active = true, previous = performance.now();
-      const frame = (timestamp) => {
-        if (!active) return;
-        const now = performance.now();
-        gaps.push(now - previous); lags.push(now - timestamp); previous = now;
-        requestAnimationFrame(frame);
-      };
-      const timer = () => {
-        if (!active) return;
-        const start = performance.now();
-        setTimeout(() => { timers.push(performance.now() - start); timer(); }, 4);
-      };
-      requestAnimationFrame(frame); timer();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      active = false;
-      return { gaps, lags, timers, visibility: document.visibilityState, focused: document.hasFocus() };
-    });
-    console.info("[DEBUG-native-frame]", label, JSON.stringify(result));
-  };
-  await page.setContent("<p>Frame clock control</p>");
-  await clock("blank");
   await openApp(page);
   await startTurn(page, "A", "Stream a long answer");
-  await clock("live-empty");
 
   // The runtime replays the user's own message on the stream before the
   // assistant answers, exactly as the server does. Without it the live answer
@@ -137,9 +111,6 @@ async function measureStreamedReply(page, options) {
 
   const metrics = await page.evaluate(async (chunkTextsIn) => {
     const count = chunkTextsIn.length;
-    const animationFrames = [];
-    const animationObserver = new PerformanceObserver((entries) => animationFrames.push(...entries.getEntries()));
-    animationObserver.observe({ type: "long-animation-frame", buffered: false });
     const longTasks = [];
     const observer = new PerformanceObserver((entries) => {
       for (const entry of entries.getEntries()) longTasks.push(entry.duration);
@@ -148,14 +119,12 @@ async function measureStreamedReply(page, options) {
 
     // A rAF loop records the frame pacing the reader actually sees.
     const frameGaps = [];
-    const frameLags = [];
     let previousFrame = performance.now();
     let running = true;
-    const sample = (timestamp) => {
+    const sample = () => {
       if (!running) return;
       const now = performance.now();
       frameGaps.push(now - previousFrame);
-      frameLags.push(now - timestamp);
       previousFrame = now;
       requestAnimationFrame(sample);
     };
@@ -206,8 +175,6 @@ async function measureStreamedReply(page, options) {
     const settled = performance.now();
     running = false;
     timerRunning = false;
-    const longAnimations = [...animationFrames, ...animationObserver.takeRecords()];
-    animationObserver.disconnect();
     observer.disconnect();
     const records = observer.takeRecords().map((entry) => entry.duration);
     return {
@@ -215,17 +182,6 @@ async function measureStreamedReply(page, options) {
       settled: settled - started,
       longTasks: [...longTasks, ...records],
       frameGaps: frameGaps.slice(1),
-      frameLags,
-      longAnimations: longAnimations.sort((a, b) => b.duration - a.duration).slice(0, 10).map((entry) => ({
-        duration: entry.duration, blockingDuration: entry.blockingDuration,
-        renderOffset: entry.renderStart - entry.startTime,
-        styleOffset: entry.styleAndLayoutStart - entry.startTime,
-        scripts: entry.scripts.map((script) => ({
-          duration: script.duration, invoker: script.invoker, invokerType: script.invokerType,
-          sourceURL: script.sourceURL, sourceFunctionName: script.sourceFunctionName,
-          forcedStyleAndLayoutDuration: script.forcedStyleAndLayoutDuration,
-        })),
-      })),
       timerDelays,
       liveBodyFound: Boolean(document.querySelector('[data-webui-assistant-body="a-turn-1"]')),
     };
@@ -250,7 +206,6 @@ async function measureStreamedReply(page, options) {
   }
 
   const gaps = [...metrics.frameGaps].sort((left, right) => left - right);
-  console.info("[DEBUG-native-frame] active", JSON.stringify({ gaps: metrics.frameGaps, lags: metrics.frameLags, longAnimations: metrics.longAnimations }));
   const percentile = (fraction) =>
     gaps.length === 0 ? 0 : (gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * fraction))] ?? 0);
   const summary = {

@@ -395,17 +395,15 @@ export function WebuiClientFoundationApp(
   // session links and puts the conversation back.
   useEffect(() => {
     if (!selectedSessionId) return;
-    const onSessionLinkClick = (event: MouseEvent) => {
+    return browserDom.listenForClick((event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const link = target.closest("[data-webui-session-link]");
       if (!link) return;
       if (link.getAttribute("data-webui-session-link") !== selectedSessionId) return;
       dispatchShellSurface({ type: "show-conversation" });
-    };
-    document.addEventListener("click", onSessionLinkClick, true);
-    return () => document.removeEventListener("click", onSessionLinkClick, true);
-  }, [dispatchShellSurface, selectedSessionId]);
+    }, true);
+  }, [browserDom, dispatchShellSurface, selectedSessionId]);
   // Composer input history + per-session drafts. The one owner is the application
   // composer store: the shell subscribes to it and submits through it.
   const composerState = useSyncExternalStore(

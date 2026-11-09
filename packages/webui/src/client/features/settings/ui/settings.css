@@ -15,7 +15,10 @@
   .webui-account-login-uri { color: var(--text_default_primary); }
   .webui-account-login-status { margin: 0; color: var(--text_default_tertiary); }
   .webui-account-login-actions { display: flex; gap: var(--spacing_8); justify-content: center; }
-  .webui-settings-modal { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg_default_primary); color: var(--text_default_primary); }
+  /* The dialog spans the window and never scrolls, so it does not reserve the
+   * base layer's scrollbar gutter: that gutter painted the dialog's surface as
+   * a band beside the grouped content. */
+  .webui-settings-modal { display: flex; width: 100vw; height: 100vh; overflow: hidden; scrollbar-gutter: auto; background: var(--bg_default_primary); color: var(--text_default_primary); }
   .webui-settings-sidebar { width: 260px; flex: 0 0 260px; overflow-y: hidden; }
   .webui-settings-back { display: flex; width: 100%; align-items: center; gap: var(--spacing_8); text-align: left; }
   .webui-settings-nav-item { display: flex; width: 100%; align-items: center; gap: var(--spacing_8); text-align: left; }

@@ -25,7 +25,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { chromium, expect as browserExpect } from "@playwright/test";
 import { WebSocket } from "ws";
 import type { RawData } from "ws";
@@ -188,6 +188,28 @@ function connect(url: string): Promise<Client> {
 }
 
 describe("real host over the loopback service", () => {
+  it("lists builtin models on first boot without runtime environment or a remote catalog", async () => {
+    for (const key of ["MAVIS_REGION", "MAVIS_BUILD_ENV", "__MAVIS_RUNTIME_MANAGED"]) {
+      vi.stubEnv(key, undefined);
+    }
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline catalog")));
+    let client: Client | undefined;
+    try {
+      const host = await bootRealHost();
+      client = await connect(host.url);
+      const frame = await client.call("listModels");
+      expect(frame.kind).toBe("response");
+      const models = decodeWebuiOperationResult("listModels", frame.body);
+      expect(models.some((model) => model.providerId === "minimax" && model.enabled !== false)).toBe(true);
+      expect(await readFile(join(host.dataDir, "config.yaml"), "utf8")).toBe(CONFIG_MARKER_TEXT);
+    } finally {
+      client?.close();
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      (await import("@mavis/config")).resetConfig();
+    }
+  });
+
   it("answers a session round trip from the real host in an isolated data directory", async () => {
     const host = await bootRealHost();
     const client = await connect(host.url);

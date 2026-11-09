@@ -20,6 +20,7 @@ import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { rename } from "node:fs/promises";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -65,7 +66,7 @@ function host(alias: string) {
 afterEach(() => {
   while (directories.length > 0) {
     const directory = directories.pop();
-    if (directory) rmSync(directory, { recursive: true, force: true });
+    if (directory) rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
 
@@ -89,7 +90,7 @@ describe("the SSH connection store", () => {
     await entered;
     // 旧租约被抢走时，最终 rename 仍然挂起；新锁必须覆盖这个窗口。
     rmSync(`${file}.lock`, { recursive: true, force: true });
-    const loader = createRequire(import.meta.url).resolve("tsx");
+    const loader = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
     const child = spawn(process.execPath, ["--import", loader, "--input-type=module", "-e", `
       const { createRequire } = await import('node:module');
       const require = createRequire(process.cwd() + '/package.json');
@@ -192,7 +193,7 @@ describe("the SSH connection store", () => {
     await hosts.save(host("switch"));
     await hosts.save(host("doomed"));
     await projects.save({ id: "old", alias: "doomed", path: "/old", displayName: "Old" });
-    const loader = createRequire(import.meta.url).resolve("tsx");
+    const loader = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
     const script = `
       const { createSshConnectionRepository } = await import(${JSON.stringify(new URL("../../src/runtime/ssh/connection-repository.ts", import.meta.url).href)});
       const { createSshProjectRepository } = await import(${JSON.stringify(new URL("../../src/runtime/ssh/project-repository.ts", import.meta.url).href)});

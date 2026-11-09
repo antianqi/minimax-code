@@ -136,7 +136,7 @@ The shell case asserts that built
 image assets finish loading successfully. The tests also assert relevant DOM state and viewport
 geometry; screenshots are not the sole oracle. These are deterministic fixture renders with
 synthetic session content, not user workspace or account data. Review image diffs on the pinned
-Linux Chromium revision before accepting baseline changes.
+Chromium revision on the recorded platform before accepting baseline changes.
 
 `pnpm test:webui-browser` uses the already installed Playwright Chromium directly. It does not
 download a browser or install system packages. On a new machine, run `pnpm install:webui-browsers`
@@ -154,15 +154,17 @@ pnpm build:webui
 pnpm test:webui-browser
 ```
 
-The screenshots are comparable across machines, because the gate does not read the host's fonts.
-The font files under `packages/webui/test/browser/fonts/` are committed to this repository, and
-`scripts/lib/webui-font-environment.mjs` writes a fontconfig that exposes only those files. The
-browser is launched with `FONTCONFIG_FILE` pointing at it, so every name in the client's font
-stack resolves to a committed face. The fontconfig also selects grayscale antialiasing, because
-LCD subpixel rendering colours the glyph edges and that fringe depends on the display's subpixel
-layout and on the host's fontconfig version. A machine with no CJK font installed and a machine
-with a full set of them therefore render the same bytes: the recorded baseline is a property of
-this repository, not of the runner.
+The font files under `packages/webui/test/browser/fonts/` are committed to this repository.
+The fixture server exposes those files as web fonts under the client's first sans and monospace
+family names, and `openApp` waits for both faces and the initial layout observation before a test
+measures geometry. This also pins macOS and Windows, whose font engines do not use fontconfig.
+On Linux, `scripts/lib/webui-font-environment.mjs` additionally sets `FONTCONFIG_FILE` to expose
+only the committed files and selects grayscale antialiasing. Native rasterization can still differ,
+so screenshot baselines are platform-specific; review actual native captures before adding them.
+
+Headless Chromium runs without the virtual display's frame-rate limiter. Frame-gap and long-task
+budgets are still measured in elapsed milliseconds, with their original thresholds. This separates
+the client workload from a VM compositor's presentation clock rather than accepting dropped frames.
 
 That also removes the trap the previous arrangement carried. The gate used to depend on the CJK
 fonts that `playwright install --with-deps chromium` pulled in, so the installed set changed with

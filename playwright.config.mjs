@@ -51,6 +51,9 @@ export default defineConfig({
     headless: true,
     trace: "retain-on-failure",
     launchOptions: {
+      // Measure elapsed frame budgets without depending on a virtual display's
+      // vsync clock. This leaves the jank and long-task assertions unchanged.
+      args: ["--disable-frame-rate-limit"],
       env: { ...process.env, ...fontEnvironment.env },
     },
   },

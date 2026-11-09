@@ -1,4 +1,5 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import spawnCommand from "cross-spawn";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -38,7 +39,7 @@ mkdirSync(scratch, { recursive: true });
 const work = mkdtempSync(path.join(scratch, "installed-"));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, { cwd: root, encoding: "utf8", timeout: 300_000, maxBuffer: 4 * 1024 * 1024, ...options });
+  const result = spawnCommand.sync(command, args, { cwd: root, encoding: "utf8", timeout: 300_000, maxBuffer: 4 * 1024 * 1024, ...options });
   if (result.error || result.status !== 0) throw new Error(`${path.basename(command)} failed: ${result.error?.message ?? result.stderr ?? result.signal}`);
   return result.stdout;
 }

@@ -80,6 +80,17 @@ export async function openApp(page, hash = "#session=A") {
   await assertHarnessServer(page);
   await expect(page.locator("#webui-root")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "listSessions"))).toBe(true);
+  const loadedFonts = await page.evaluate(async () => {
+    const faces = await Promise.all([
+      document.fonts.load('14px "HarmonyOS Sans"'),
+      document.fonts.load('14px "Hack"'),
+    ]);
+    await document.fonts.ready;
+    // Let ResizeObserver and its React commit finish before reading geometry.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return faces.map((fonts) => fonts.length);
+  });
+  expect(loadedFonts, "both pinned browser fonts must load before measuring the client").toEqual([1, 1]);
 }
 
 export async function switchSession(page, sessionId) {

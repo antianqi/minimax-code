@@ -12,7 +12,7 @@
  * own DTO, and the validator accepting the envelope the panel actually sends. Each of those rots
  * independently, so the assertion runs through all of them.
  */
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,6 +20,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createWebuiRuntimeHost } from "../../src/runtime/assembly.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const disposers: Array<() => Promise<void> | void> = [];
 
@@ -29,10 +30,10 @@ afterEach(async () => {
 
 async function bootWebuiHost() {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-list-cron-tasks-"));
-  disposers.push(() => rm(dataDir, { recursive: true, force: true }));
+  disposers.push(() => removeRealHostDataDir(dataDir));
   await mkdir(join(dataDir, "workspace"), { recursive: true });
   const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "list-cron-tasks" });
-  disposers.push(() => assembled.host.apiHost.close().catch(() => undefined));
+  disposers.push(() => assembled.host.apiHost.close());
   return assembled;
 }
 

@@ -282,7 +282,8 @@ describe("the real host, what the Agent's Bash inherits", () => {
         )
         .toBeGreaterThan(0);
       const withResult = stub.requests.find((request) => carriesToolResult(request.body));
-      const toolOutput = withResult?.body ?? "";
+      const messages = JSON.parse(withResult!.body).messages as { role: string; content: string }[];
+      const toolOutput = messages.filter((message) => message.role === "tool").map((message) => message.content).join("\n");
 
       // The Bash subprocess saw the host keys — the endpoint and the
       // capability file that authenticate an mcode-tools run.

@@ -12,7 +12,7 @@
  * are counted, and a real host would try to deliver a turn to a model.
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -26,6 +26,7 @@ import { Scheduler } from "../../../local-runtime-v2/src/infra/scheduler/index.j
 import { composeCronService } from "../../../local-runtime-v2/src/service/cron/composition.js";
 import { createWebuiRuntimeHost } from "../../src/runtime/assembly.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const disposers: Array<() => Promise<void> | void> = [];
 
@@ -35,7 +36,7 @@ afterEach(async () => {
 
 async function temporaryDataDir(prefix: string): Promise<string> {
   const dataDir = await mkdtemp(join(tmpdir(), prefix));
-  disposers.push(() => rm(dataDir, { recursive: true, force: true }));
+  disposers.push(() => removeRealHostDataDir(dataDir));
   await mkdir(join(dataDir, "workspace"), { recursive: true });
   return dataDir;
 }
@@ -44,7 +45,7 @@ describe("run now and run history over the real host", () => {
   it("runs a task immediately and shows the run in its history", async () => {
     const dataDir = await temporaryDataDir("webui-cron-runs-");
     const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "cron-runs" });
-    disposers.push(() => assembled.host.apiHost.close().catch(() => undefined));
+    disposers.push(() => assembled.host.apiHost.close());
     const registry = createOperationRegistry(assembled.harnessPort);
     const call = async (name: string, body: unknown): Promise<unknown> => {
       const entry = registry.get(name);

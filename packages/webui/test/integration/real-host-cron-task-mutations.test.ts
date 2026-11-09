@@ -9,7 +9,7 @@
  * definition's schedule generation and next fire time belong to the shared row, and an operation
  * that answered with its own request would pass this test while the task ran on the wrong schedule.
  */
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -22,6 +22,7 @@ import { createOperationRegistry } from "../../src/server/operation/operations.j
 import { WebuiService } from "../../src/server/service.js";
 import { webuiCronDraftFromTask, webuiCronUpdateRequest } from "../../src/client/features/scheduling/projection/scheduling-panel.js";
 import type { WebuiCronTask } from "../../src/shared/contracts/cron.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const disposers: Array<() => Promise<void> | void> = [];
 
@@ -33,10 +34,10 @@ afterEach(async () => {
 async function boot() {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-cron-mutations-"));
   vi.stubEnv("MINIMAX_DATA_DIR", dataDir);
-  disposers.push(() => rm(dataDir, { recursive: true, force: true }));
+  disposers.push(() => removeRealHostDataDir(dataDir));
   await mkdir(join(dataDir, "workspace"), { recursive: true });
   const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "cron-mutations" });
-  disposers.push(() => assembled.host.apiHost.close().catch(() => undefined));
+  disposers.push(() => assembled.host.apiHost.close());
   const registry = createOperationRegistry(assembled.harnessPort);
   const call = async (name: string, body: unknown): Promise<unknown> => {
     const entry = registry.get(name);

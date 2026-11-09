@@ -4,12 +4,27 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { installFixtureTransport } from "./fixture.mjs";
+import { WEBUI_FONT_DIRECTORY, WEBUI_MONO_FONT, WEBUI_SANS_FONT } from "../../../../scripts/lib/webui-font-environment.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../dist-webui/client");
 const port = 4179;
 const serverId = process.env.WEBUI_BROWSER_SERVER_ID ?? randomUUID();
+const fontRoot = fileURLToPath(new URL(`../../../../${WEBUI_FONT_DIRECTORY}/`, import.meta.url));
+const fontCss = `
+@font-face { font-family: "HarmonyOS Sans"; src: url("/__webui-test-fonts/${WEBUI_SANS_FONT}") format("opentype"); }
+@font-face { font-family: "Hack"; src: url("/__webui-test-fonts/${WEBUI_MONO_FONT}") format("opentype"); }
+`;
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url ?? "/", `http://127.0.0.1:${port}`).pathname;
+  if (pathname.startsWith("/__webui-test-fonts/")) {
+    const name = pathname.slice("/__webui-test-fonts/".length);
+    if (![WEBUI_SANS_FONT, WEBUI_MONO_FONT].includes(name)) {
+      response.writeHead(404).end("unknown test font");
+      return;
+    }
+    response.writeHead(200, { "content-type": "font/otf" }).end(await readFile(path.join(fontRoot, name)));
+    return;
+  }
   if (pathname === "/health") {
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ status: "ok", serverId }));
     return;
@@ -36,7 +51,7 @@ const server = createServer(async (request, response) => {
     if (name === "index.html") {
       const html = body.toString().replace(
         "</head>",
-        `<script>window.__WEBUI_TEST_SERVER_ID__=${JSON.stringify(serverId)};window.__WEBUI_CONFIG__={websocketUrl:"ws://127.0.0.1:${port}",token:"synthetic-token"};(${installFixtureTransport.toString()})();for(const setup of window.__WEBUI_FIXTURE_SETUP__??[])setup();</script></head>`,
+        `<style>${fontCss}</style><script>window.__WEBUI_TEST_SERVER_ID__=${JSON.stringify(serverId)};window.__WEBUI_CONFIG__={websocketUrl:"ws://127.0.0.1:${port}",token:"synthetic-token"};(${installFixtureTransport.toString()})();for(const setup of window.__WEBUI_FIXTURE_SETUP__??[])setup();</script></head>`,
       );
       body = Buffer.from(html);
     }

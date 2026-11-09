@@ -78,7 +78,8 @@ describe("the trusted extension identities on disk", () => {
     expect(written.edge).toEqual([EDGE_ID]);
     // The file says which extensions this machine authorised. It is not a
     // secret, but it is not everybody's business either.
-    expect(statSync(file).mode & 0o077).toBe(0);
+    // Windows uses ACLs rather than the POSIX group/other mode bits.
+    if (process.platform !== "win32") expect(statSync(file).mode & 0o077).toBe(0);
   });
 
   it("treats a file it cannot read as no identities at all", () => {

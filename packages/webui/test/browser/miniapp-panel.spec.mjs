@@ -363,6 +363,8 @@ async function loadedMiniAppFrame(page) {
     .toBe(MINI_APP_VIEW_URL);
   const frame = await handle.contentFrame();
   if (!frame) throw new Error("the Mini App frame is not attached");
+  await frame.waitForLoadState("domcontentloaded");
+  await frame.locator("body").waitFor({ state: "attached" });
   return frame;
 }
 

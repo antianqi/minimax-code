@@ -35,8 +35,13 @@ test('public WebUI CI runs only WebUI checks and cannot publish packages', () =>
   assert.deepEqual(Object.keys(workflow.jobs), ['webui']);
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const job = workflow.jobs.webui;
+  assert.equal(job.env, undefined);
   assert.deepEqual(job.strategy.matrix.os, ['ubuntu-latest', 'macos-latest']);
-  const commands = job.steps.filter(step => step.run).map(step => step.run);
+  const directories = job.steps.find(step => step.name === 'Set isolated WebUI output directories');
+  assert.equal(directories.shell, 'bash');
+  assert.match(directories.run, /MCODE_WEBUI_VERIFY_DIR=\$RUNNER_TEMP\//);
+  assert.match(directories.run, /WEBUI_BROWSER_OUTPUT_DIR=\$RUNNER_TEMP\//);
+  const commands = job.steps.filter(step => step.run && step !== directories).map(step => step.run);
   for (const command of commands) {
     if (command === 'pnpm install --frozen-lockfile' || command === 'pnpm exec playwright install-deps chromium') continue;
     assert.match(command, /^pnpm (?:typecheck|check|build|install|test):webui(?:-[a-z]+)?$/);

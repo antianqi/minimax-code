@@ -39,6 +39,16 @@ async function acquire(dir: string, client = 'webui'): Promise<MiniAppOwnerAcqui
 }
 
 describe('Mini App ownership', () => {
+  it.skipIf(process.platform === 'win32')('holds long data paths without truncating or sharing their sockets', async () => {
+    const root = await pluginDataDir();
+    const first = join(root, 'a'.repeat(120));
+    const second = join(root, 'b'.repeat(120));
+    expect(Buffer.byteLength(resolveMiniAppOwnerEndpoint(first, 'fixture.miniapp'))).toBeLessThan(104);
+    expect((await acquire(first, 'desktop')).kind).toBe('acquired');
+    expect(await acquire(first)).toMatchObject({ kind: 'held', owner: { client: 'desktop' } });
+    expect((await acquire(second)).kind).toBe('acquired');
+  });
+
   it('acquires an unowned Mini App and can take it again after releasing', async () => {
     const dir = await pluginDataDir();
 

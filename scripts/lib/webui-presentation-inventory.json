@@ -229,7 +229,7 @@
     "features/settings/ui/SettingsModal.tsx": "85efc7db47572b26",
     "features/settings/ui/ShortcutsSettings.tsx": "ee297c77956443b8",
     "features/settings/ui/UsageHeatmap.tsx": "3effdfb9671baf89",
-    "features/settings/ui/UsageModelSettings.tsx": "965255c8cd5e0f22",
+    "features/settings/ui/UsageModelSettings.tsx": "82ca29b07f2ddfcc",
     "features/settings/ui/UsageResetCards.tsx": "ea83782db7f6af63",
     "features/settings/ui/UserProfileSection.tsx": "06a06ab9ab227da3",
     "features/settings/ui/account-usage-glyphs.tsx": "42d9ecdccaae8b0f",

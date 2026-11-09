@@ -112,13 +112,11 @@ export function webuiSurfaceTier(surfaceWidth: number): WebuiSurfaceTier {
 /**
  * The width the workspace panel may take while it is a column.
  *
- * The upper bound is the surface minus the conversation column's floor: a panel that claims more
- * than that does not shrink the conversation column, it eliminates it. The lower bound is the
- * panel's own floor, except where the surface is too narrow to hold even that, in which case the
- * two bounds meet and the panel is as wide as the space allows.
+ * The panel can cover the entire surface, which excludes the navigation rail.
+ * Below the panel's floor the two bounds meet at the available width.
  */
 export function webuiPanelWidthBounds(surfaceWidth: number): { readonly min: number; readonly max: number } {
-  const max = Math.max(0, surfaceWidth - WEBUI_LAYOUT_THRESHOLDS.conversationMin);
+  const max = Math.max(0, surfaceWidth);
   return { min: Math.min(WEBUI_LAYOUT_THRESHOLDS.panelMin, max), max };
 }
 

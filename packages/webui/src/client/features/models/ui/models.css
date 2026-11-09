@@ -69,7 +69,7 @@
     flex: 0 1 auto;
     gap: var(--spacing_4);
     height: 36px;
-    max-width: 244px;
+    max-width: min(244px, 100%);
     padding: 0 var(--spacing_12);
     border-radius: var(--radius_full);
     background: transparent;

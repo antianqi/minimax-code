@@ -196,6 +196,33 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   await handle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await panel.boundingBox()).width).toBeGreaterThan(after.width + 10);
+
+  const surface = page.locator('[data-webui-shell-region="surface"]');
+  const surfaceBox = await surface.boundingBox();
+  const handleBox = await handle.boundingBox();
+  await page.mouse.move(handleBox.x + 4, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(surfaceBox.x - 100, handleBox.y + handleBox.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => Math.abs((await panel.boundingBox()).x - surfaceBox.x)).toBeLessThanOrEqual(1);
+  const covered = await panel.boundingBox();
+  expect(covered.x + covered.width).toBeLessThanOrEqual(surfaceBox.x + surfaceBox.width + 1);
+  const railIsReachable = await page.evaluate((x) => {
+    const rail = document.querySelector('[data-webui-shell-region="surface"]').previousElementSibling;
+    return document.elementFromPoint(x - 10, 100)?.closest('[data-webui-shell-region="surface"]') === null && Boolean(rail);
+  }, surfaceBox.x);
+  expect(railIsReachable).toBe(true);
+  const panelCoversComposer = await page.evaluate(() => {
+    const composer = document.querySelector('.webui-composer-card').getBoundingClientRect();
+    return Boolean(document.elementFromPoint(composer.x + composer.width / 2, composer.y + composer.height / 2)?.closest('[data-testid="workspace-panel"]'));
+  });
+  expect(panelCoversComposer).toBe(true);
+  if (process.env.WEBUI_PANEL_RESIZE_SCREENSHOT) {
+    await page.screenshot({ path: process.env.WEBUI_PANEL_RESIZE_SCREENSHOT });
+  }
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await panel.boundingBox()).x).toBeGreaterThan(surfaceBox.x + 10);
 });
 
 test("the new tab launcher fits its wordmark, address box and shortcuts at compact panel sizes", async ({ page }) => {

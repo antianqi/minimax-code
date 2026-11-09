@@ -69,12 +69,11 @@
    * overlay form overrides it when the surface cannot hold both the panel's
    * floor and the conversation column's floor.
    *
-   * `max-width` is the shell's guarantee and not the resize logic's: the
-   * panel can never claim the space the conversation column needs, so a width
-   * that arrives by any route — a drag, a stale value, a restored session —
-   * cannot squeeze the conversation to nothing.
+   * The panel can cover the conversation, but never leave the surface shared
+   * with it. A negative margin preserves the conversation's layout floor as
+   * the panel crosses over it.
    */
-  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: var(--webui-panel-min); min-height: 0; flex: 0 1 50%; max-width: calc(100% - var(--webui-conversation-min)); flex-direction: column; overflow: hidden; scrollbar-gutter: auto; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); container: webui-workspace-panel / inline-size; }
+  .webui-workspace-panel { position: relative; z-index: 61; display: flex; width: 50%; min-width: var(--webui-panel-min); min-height: 0; flex: 0 1 50%; max-width: 100%; margin-left: min(0px, calc(100% - var(--webui-conversation-min) - var(--webui-workspace-width, 50%))); flex-direction: column; overflow: hidden; scrollbar-gutter: auto; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); container: webui-workspace-panel / inline-size; }
 
   /* The progress panel's gutter.
    *
@@ -100,10 +99,10 @@
     }
   }
 
-  .webui-workspace-panel[data-webui-surface-tier="overlay"]:not(.is-expanded) { position: absolute; inset: 0 0 0 auto; width: min(100%, var(--webui-panel-overlay-max)); max-width: none; flex: none; z-index: 40; }
+  .webui-workspace-panel[data-webui-surface-tier="overlay"]:not(.is-expanded) { position: absolute; inset: 0 0 0 auto; width: min(100%, var(--webui-panel-overlay-max)); max-width: none; margin-left: 0; flex: none; z-index: 40; }
   /* The overlay's width belongs to the stylesheet, so there is nothing to drag. */
   .webui-workspace-panel[data-webui-surface-tier="overlay"] .webui-workspace-panel-resize-handle { display: none; }
-  .webui-workspace-panel.is-expanded { position: absolute; inset: 0; z-index: 70; width: auto; max-width: none; flex: none; }
+  .webui-workspace-panel.is-expanded { position: absolute; inset: 0; z-index: 70; width: auto; max-width: none; margin-left: 0; flex: none; }
   .webui-workspace-panel.is-closing { pointer-events: none; }
   .webui-workspace-panel-resize-handle { position: absolute; top: 0; bottom: 0; left: 0; z-index: 5; width: 8px; cursor: col-resize; touch-action: none; }
   .webui-workspace-panel-resize-handle:focus-visible { outline: 2px solid var(--border_accent); outline-offset: -2px; }
@@ -201,9 +200,13 @@
   .webui-workspace-miniapp-tab { box-sizing: border-box; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: auto; padding: 24px clamp(16px, 3cqi, 32px); }
   .webui-workspace-miniapp-tab.webui-workspace-miniapp-tab--view { display: flex; min-height: 0; flex-direction: column; overflow: hidden; padding: 0; }
   .webui-workspace-miniapp-tab.webui-workspace-miniapp-tab--view > .webui-workspace-miniapp-view-mount { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; }
+  /* The inline iframe is portalled above the panel. Keep its hit area clear of
+     the panel's resize handle without changing the iframe's stacking layer. */
+  .webui-workspace-panel[data-webui-surface-tier="split"]:not(.is-expanded) .webui-workspace-miniapp-view-mount { padding-left: 8px; }
   .webui-workspace-miniapp-view-mount > .webui-miniapp-view { width: 100%; height: auto; }
-  .webui-workspace-miniapp-tab:not(.webui-workspace-miniapp-tab--view) { display: flex; flex-direction: column; }
-  .webui-workspace-miniapp-tab .webui-miniapp-picker { width: min(100%, 480px); margin: auto; }
+  .webui-workspace-miniapp-tab:not(.webui-workspace-miniapp-tab--view) { display: flex; flex-direction: column; overflow: hidden; }
+  .webui-workspace-miniapp-tab .webui-miniapp-picker { display: flex; width: min(100%, 480px); min-height: 0; flex: 1 1 auto; flex-direction: column; margin: 0 auto; }
+  .webui-workspace-miniapp-tab .webui-miniapp-picker-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
   .webui-workspace-miniapp-tab .webui-miniapp-picker-heading { display: flex; min-height: 32px; align-items: center; justify-content: space-between; gap: var(--spacing_12); margin: 0 0 16px; color: var(--text_default_primary); }
   .webui-workspace-miniapp-tab .webui-miniapp-picker-heading h1 { margin: 0; font-size: var(--size_16); font-weight: var(--weight_medium); line-height: var(--line_height_20); }
   .webui-workspace-miniapp-tab .webui-plugin-list { width: 100%; max-width: none; margin: 0; }
@@ -216,7 +219,7 @@
   .webui-workspace-miniapp-tab .webui-miniapp-picker .webui-plugin-copy p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--text_default_secondary); font-size: var(--size_14); line-height: var(--line_height_20); text-overflow: ellipsis; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
   .webui-workspace-miniapp-tab .webui-miniapp-picker-status { color: var(--text_default_tertiary); font-size: var(--size_12); line-height: var(--line_height_16); }
   .webui-workspace-miniapp-tab .webui-miniapp-picker .webui-plugin-actions { display: flex; flex: 0 0 auto; grid-area: auto; align-items: center; gap: var(--spacing_8); }
-  .webui-workspace-miniapp-tab .webui-miniapp-picker-create { width: 100%; margin-top: var(--spacing_8); }
+  .webui-workspace-miniapp-tab .webui-miniapp-picker-create { width: 100%; flex: none; margin-top: var(--spacing_8); }
   .webui-miniapp-launcher-trigger { display: block; min-width: 0; }
   .webui-miniapp-launcher-popover { position: fixed; z-index: 150; display: flex; width: min(700px, calc(100vw - 32px)); max-height: min(57.4vh, 574px); flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, var(--border_light) 68%, transparent); border-radius: 26px; background: color-mix(in srgb, var(--bg_default_secondary) 62%, transparent); box-shadow: 0 24px 72px color-mix(in srgb, #000 24%, transparent), inset 0 1px color-mix(in srgb, #fff 64%, transparent); -webkit-backdrop-filter: blur(48px) saturate(1.5); backdrop-filter: blur(48px) saturate(1.5); color: var(--text_default_primary); }
   .webui-miniapp-launcher-heading { display: flex; min-height: 56px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: var(--spacing_16); border-bottom: 1px solid color-mix(in srgb, var(--border_light) 68%, transparent); padding: 12px 16px; }

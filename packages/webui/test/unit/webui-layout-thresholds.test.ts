@@ -113,7 +113,7 @@ describe("the layout threshold contract", () => {
   it("reads the panel's floor and cap from the contract rather than from literals", () => {
     // A literal here would be a third copy of a number the module already owns.
     expect(workspaceCss).toContain("min-width: var(--webui-panel-min)");
-    expect(workspaceCss).toContain("max-width: calc(100% - var(--webui-conversation-min))");
+    expect(workspaceCss).toContain("calc(100% - var(--webui-conversation-min) - var(--webui-workspace-width, 50%))");
     expect(workspaceCss).toContain("width: min(100%, var(--webui-panel-overlay-max))");
     expect(workspaceCss).not.toMatch(/min-width:\s*360px/u);
   });
@@ -139,14 +139,14 @@ describe("the surface tier", () => {
 });
 
 describe("the panel's width bounds", () => {
-  it("never lets the panel claim the space the conversation column needs", () => {
+  it("lets the panel cover the surface without reaching the navigation rail", () => {
     const bounds = webuiPanelWidthBounds(1000);
-    expect(bounds.max).toBe(1000 - WEBUI_LAYOUT_THRESHOLDS.conversationMin);
+    expect(bounds.max).toBe(1000);
     expect(bounds.min).toBe(WEBUI_LAYOUT_THRESHOLDS.panelMin);
   });
 
   it("meets the two bounds where the surface cannot hold even the panel's floor", () => {
-    const bounds = webuiPanelWidthBounds(WEBUI_LAYOUT_THRESHOLDS.conversationMin + 10);
+    const bounds = webuiPanelWidthBounds(10);
     expect(bounds.max).toBe(10);
     expect(bounds.min).toBe(10);
   });

@@ -160,6 +160,7 @@ test("goal title stays by the leading status and actions clear the composer masc
     };
   });
   expect(geometry.title.x - geometry.leading.right).toBeLessThanOrEqual(48);
+  expect(geometry.mascot.width).toBeGreaterThan(0);
   expect(geometry.actions.bottom <= geometry.mascot.y || geometry.actions.right <= geometry.mascot.x).toBe(true);
   if (process.env.WEBUI_GOAL_MASCOT_SCREENSHOT) {
     await page.screenshot({ path: process.env.WEBUI_GOAL_MASCOT_SCREENSHOT });
@@ -181,7 +182,17 @@ test("goal title stays by the leading status and actions clear the composer masc
   });
   expect(narrow.usage.left).toBeGreaterThanOrEqual(narrow.banner.left);
   expect(narrow.actions.right).toBeLessThanOrEqual(narrow.banner.right);
+  expect(narrow.mascot.width).toBeGreaterThan(0);
   expect(narrow.actions.bottom <= narrow.mascot.top || narrow.actions.right <= narrow.mascot.left).toBe(true);
+  expect(narrow.banner.height).toBeLessThan(60);
+  const toolbar = await page.locator('[data-webui-composer-toolbar="true"]').evaluate((element) => {
+    const model = element.querySelector('.webui-model-selector-trigger').getBoundingClientRect();
+    const send = element.querySelector('[data-webui-composer-submit]').getBoundingClientRect();
+    const row = element.getBoundingClientRect();
+    return { modelRight: model.right, sendLeft: send.left, sendRight: send.right, rowRight: row.right };
+  });
+  expect(toolbar.modelRight).toBeLessThanOrEqual(toolbar.sendLeft + 1);
+  expect(toolbar.sendRight).toBeLessThanOrEqual(toolbar.rowRight + 1);
   if (process.env.WEBUI_GOAL_MASCOT_SCREENSHOT) {
     await page.screenshot({ path: `${process.env.WEBUI_GOAL_MASCOT_SCREENSHOT}.narrow.png` });
   }

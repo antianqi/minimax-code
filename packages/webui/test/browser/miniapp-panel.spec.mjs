@@ -442,6 +442,48 @@ test("the launcher's 应用 tile turns the tab into the Mini App tool page, and 
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "miniapp");
 });
 
+test("the workspace edge remains draggable while a Mini App is open", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.miniapp", displayName: "演示应用", runtime: { kind: "process", status: "stopped" },
+      }] });
+      window.__fixture.setResponse("openMiniApp", { pluginId: "demo.miniapp", viewUrl: `${window.location.origin}/__miniapp-stub` });
+    });
+  });
+  await page.route("**/__miniapp-stub*", (route) => route.fulfill({ contentType: "text/html", body: "<button>App control</button>" }));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openApp(page);
+  await openWorkspacePanel(page);
+  await openLauncherTile(page, "miniapp-picker");
+  await page.getByTestId("miniapp-picker").getByRole("button", { name: "打开" }).click();
+  const frame = page.getByTestId("miniapp-view-frame");
+  await expect(frame).toBeVisible();
+  const panel = page.getByTestId("workspace-panel");
+  const surface = page.locator('[data-webui-shell-region="surface"]');
+  const before = await panel.boundingBox();
+  const surfaceBox = await surface.boundingBox();
+  const x = before.x + 4;
+  const y = (await frame.boundingBox()).y + 50;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(surfaceBox.x - 40, y, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => Math.abs((await panel.boundingBox()).x - surfaceBox.x)).toBeLessThanOrEqual(1);
+  await expect.poll(async () => {
+    const panelBox = await panel.boundingBox();
+    const frameBox = await frame.boundingBox();
+    return Math.abs(frameBox.x - panelBox.x - 9);
+  }).toBeLessThanOrEqual(1);
+  await frame.contentFrame().getByRole("button", { name: "App control" }).click();
+  const handle = page.getByRole("separator", { name: "调整工作区面板宽度" });
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await panel.boundingBox()).x).toBeGreaterThan(surfaceBox.x + 10);
+  await page.screenshot({ path: test.info().outputPath("miniapp-resized.png") });
+});
+
 test("the running Mini App offers its refresh, its stop and the runtime's state, and the refresh reloads the page", async ({
   page,
 }) => {
@@ -694,6 +736,36 @@ test("the Mini App picker follows the centered app-list layout in a narrow works
   expect(Math.abs(geometry.actions.y + geometry.actions.height / 2 - (geometry.row.y + geometry.row.height / 2))).toBeLessThan(4);
   expect(geometry.status.y).toBeGreaterThan(geometry.copy.y);
   expect(geometry.descriptionHeight).toBeGreaterThan(18);
+});
+
+test("the Mini App picker keeps its create button at the bottom while the list scrolls", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: Array.from({ length: 16 }, (_, index) => ({
+        pluginId: `demo.app${index}`, displayName: `应用 ${index}`,
+        runtime: { kind: "process", status: index === 0 ? "running" : "stopped" },
+      })) });
+    });
+  });
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await openApp(page);
+  await openWorkspacePanel(page);
+  await openLauncherTile(page, "miniapp-picker");
+  const picker = page.getByTestId("miniapp-picker");
+  const scroll = picker.locator(".webui-miniapp-picker-scroll");
+  const button = picker.getByRole("button", { name: "创建 Mini App" });
+  await expect(picker.getByTestId("miniapp-picker-row-demo.app15")).toBeAttached();
+  await expect(picker.getByTestId("miniapp-picker-running")).toHaveCount(0);
+  const before = await button.boundingBox();
+  await scroll.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(picker.getByTestId("miniapp-picker-row-demo.app15")).toBeInViewport();
+  const after = await button.boundingBox();
+  const panel = await page.getByTestId("workspace-panel").boundingBox();
+  expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  expect(after.y + after.height).toBeLessThanOrEqual(panel.y + panel.height);
+  await page.screenshot({ path: test.info().outputPath("miniapp-picker-fixed-footer.png") });
 });
 
 test("the Mini App picker shows its default icon when an app icon fails to load", async ({ page }) => {
@@ -993,7 +1065,7 @@ test("a refused fourth start names the running Mini Apps and frees a slot from t
   await openLauncherTile(page, "miniapp-picker");
 
   const picker = page.getByTestId("miniapp-picker");
-  await expect(picker.getByTestId("miniapp-picker-running")).toContainText("看板、笔记、画板");
+  await expect(picker.getByTestId("miniapp-picker-running")).toHaveCount(0);
 
   await picker.getByTestId("miniapp-picker-row-demo.fourth").getByRole("button", { name: "打开" }).click();
   // The capacity refusal is an event, so it is said through the shared notice
@@ -1053,7 +1125,7 @@ test("a Mini App the runtime already reports as running can be shown in the pane
   const picker = page.getByTestId("miniapp-picker");
   const row = picker.getByTestId("miniapp-picker-row-demo.agentstarted");
   await expect(row).toContainText("运行中");
-  await expect(picker.getByTestId("miniapp-picker-running")).toContainText("代理启动");
+  await expect(picker.getByTestId("miniapp-picker-running")).toHaveCount(0);
   await expect(row.getByRole("button", { name: "停止" })).toBeEnabled();
 
   await row.getByRole("button", { name: "打开" }).click();

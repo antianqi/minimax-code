@@ -159,23 +159,20 @@
   }
 
   @container webui-goal-composer (max-width: 600px) {
-    .webui-session-layout .webui-goal-composer-panel > .webui-goal-banner {
-      padding-bottom: 80px;
+    .webui-goal-usage {
+      flex: 0 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .webui-goal-banner-actions-slot {
-      margin-right: 0;
+    .webui-goal-usage > span,
+    .webui-goal-timer {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-  }
-
-  @container webui-goal-composer (max-width: 360px) {
-    .webui-goal-banner-row {
-      flex-wrap: wrap;
-    }
-    .webui-goal-banner-content-row {
-      min-width: 150px;
-    }
-    .webui-goal-banner-actions-slot {
-      margin-left: auto;
+    .webui-goal-timer {
+      flex: 0 1 auto;
     }
   }
 

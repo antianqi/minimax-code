@@ -201,6 +201,18 @@ test("a running session title keeps its space before hover actions", async ({ pa
   expect(metaDisplay).toBe("none");
   expect(actionStyle.opacity).toBe("1");
   expect(actionStyle.transitionProperty).toContain("opacity");
+
+  await row.locator('[data-webui-session-link="A"]').click({ position: { x: 15, y: 15 } });
+  await page.mouse.move(0, 0);
+  await expect(spinner).toBeVisible();
+  await expect(metadata).toBeVisible();
+  await expect.poll(() => label.evaluate((element) => getComputedStyle(element).clipPath)).toBe(labelBeforeHover.clipPath);
+  await expect.poll(() => actions.evaluate((element) => getComputedStyle(element).opacity)).toBe("0");
+  await page.screenshot({ path: test.info().outputPath("selected-running-session.png") });
+
+  await page.keyboard.press("Tab");
+  await expect.poll(() => actions.evaluate((element) => getComputedStyle(element).opacity)).toBe("1");
+  await expect(metadata).toBeHidden();
 });
 
 test("the pin button offers the unpin glyph on a pinned row", async ({ page }) => {

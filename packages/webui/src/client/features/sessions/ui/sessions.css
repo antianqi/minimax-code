@@ -312,15 +312,15 @@
     clip-path: inset(0 0 0 0);
   }
   .webui-project-session-row:hover .webui-project-session-card > span:first-child,
-  .webui-project-session-row:focus-within .webui-project-session-card > span:first-child {
+  .webui-project-session-row:has(:focus-visible) .webui-project-session-card > span:first-child {
     clip-path: inset(0 88px 0 0);
   }
   .webui-pinned-session-row:hover .webui-rail-session-meta,
   .webui-pinned-session-row:has(:focus-visible) .webui-rail-session-meta,
   .webui-project-session-row:hover .webui-rail-session-meta,
-  .webui-project-session-row:focus-within .webui-rail-session-meta,
+  .webui-project-session-row:has(:focus-visible) .webui-rail-session-meta,
   .webui-project-child-session-row:hover .webui-rail-session-meta,
-  .webui-project-child-session-row:focus-within .webui-rail-session-meta {
+  .webui-project-child-session-row:has(:focus-visible) .webui-rail-session-meta {
     display: none;
   }
 
@@ -346,7 +346,7 @@
     clip-path: inset(0 0 0 0);
   }
   .webui-project-child-session-row:hover .webui-project-child-session-title,
-  .webui-project-child-session-row:focus-within .webui-project-child-session-title {
+  .webui-project-child-session-row:has(:focus-visible) .webui-project-child-session-title {
     clip-path: inset(0 28px 0 0);
   }
   .webui-project-child-session-card:hover,

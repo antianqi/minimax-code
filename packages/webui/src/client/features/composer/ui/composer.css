@@ -28,6 +28,10 @@
     flex: 0 0 18px;
     place-items: center;
   }
+  .webui-composer-mode-pill {
+    flex: none;
+    white-space: nowrap;
+  }
   .webui-composer-mode-pill-glyph > svg { grid-area: 1 / 1; }
   .webui-composer-mode-pill-close { display: none; }
   .webui-composer-mode-pill:hover .webui-composer-mode-pill-close,
@@ -78,6 +82,16 @@
     margin-left: auto;
     flex-wrap: nowrap;
     justify-content: flex-end;
+  }
+
+  .webui-composer-toolbar-actions > .webui-dropdown {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .webui-composer-toolbar-actions > [data-webui-composer-submit],
+  .webui-composer-toolbar-actions > [data-webui-composer-stop] {
+    flex: none;
   }
 
   /*

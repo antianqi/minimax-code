@@ -23,7 +23,6 @@ import {
   webuiMiniAppCapacityText,
   webuiMiniAppFailureCodeText,
   webuiMiniAppRefusalText,
-  webuiMiniAppRunningRows,
 } from "../projection/miniapp-view.js";
 import { WebuiIconApps, WebuiIconChevronRight, WebuiIconSites } from "../../../shell/icons.js";
 import { FeedbackLiveRegion } from "../../../ui/feedback.js";
@@ -260,7 +259,6 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
   // disabled Mini App cannot be opened — the catalogue's apps area is where it is
   // enabled, and this surface would otherwise offer an action that always fails.
   const rows = state.listing.rows.filter((row) => row.enabled);
-  const running = webuiMiniAppRunningRows(rows);
   const refused = Object.values(state.refusals);
   const capacityRefused = refused.some((refusal) => refusal.code === "BUSY");
   /* The capacity that was reached is an event, not a state: it is said once,
@@ -271,6 +269,7 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
 
   return (
     <div className="webui-miniapp-picker" data-testid="miniapp-picker">
+      <div className="webui-miniapp-picker-scroll">
       <div className="webui-miniapp-picker-heading">
         <h1>我的 Mini App</h1>
         <WebuiButton variant="quiet-highlight" size="inline" type="button" onClick={onManage} disabled={!onManage}>
@@ -368,17 +367,13 @@ export function MiniAppPicker({ sessionId, onOpened, onClose, onManage }: MiniAp
           );
         })}
       </PluginRowList>
-      <WebuiButton variant="primary" size="panel" className="webui-miniapp-picker-create" type="button" onClick={onManage} disabled={!onManage}>
-        创建 Mini App
-      </WebuiButton>
       {sessionId ? null : (
         <FeedbackEmpty className="webui-plugin-empty" title={"当前没有会话，Mini App 会打开在第一个标签页里。"} />
       )}
-      {running.length > 0 ? (
-        <p className="text-size_12 text-text_default_secondary" data-testid="miniapp-picker-running">
-          正在运行：{running.map((row) => row.name).join("、")}
-        </p>
-      ) : null}
+      </div>
+      <WebuiButton variant="primary" size="panel" className="webui-miniapp-picker-create" type="button" onClick={onManage} disabled={!onManage}>
+        创建 Mini App
+      </WebuiButton>
     </div>
   );
 }

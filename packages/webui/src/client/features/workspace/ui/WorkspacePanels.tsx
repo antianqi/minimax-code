@@ -121,9 +121,9 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
    *
    * The tier is measured rather than queried: the surface is not the window,
    * because the navigation rail takes its share of the window first, and a
-   * panel that sized itself against the window is what let the conversation
-   * column be squeezed to nothing. The panel reports the tier on itself and
-   * the stylesheet owns what each tier looks like.
+   * panel that sized itself against the window could cover the navigation
+   * rail. The panel reports the tier on itself and the stylesheet owns what
+   * each tier looks like.
    */
   const [surfaceTier, setSurfaceTier] = useState<WebuiSurfaceTier>("split");
   const panelStateRef = useRef(state);
@@ -181,7 +181,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
    *
    * The observer is also what re-clamps the width. A window that narrows after
    * a drag never moves the pointer, so a clamp that only ran while the pointer
-   * moved left the panel holding a width the conversation could not afford.
+   * moved left the panel wider than the surface.
    */
   useLayoutEffect(() => {
     const surface = panelRef.current?.closest<HTMLElement>(
@@ -468,9 +468,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
     const surfaceWidth = surfaceWidthRef.current
       ?? event.currentTarget.parentElement?.parentElement?.getBoundingClientRect().width
       ?? window.innerWidth;
-    // The panel may claim the surface's width less the conversation column's
-    // floor, and no more. A floor that did not subtract the conversation's
-    // share is what let the conversation be squeezed to nothing.
+    // The surface excludes the navigation rail and bounds the overlap.
     const bounds = webuiPanelWidthBounds(surfaceWidth);
     const requestedWidth = Math.min(bounds.max, Math.max(bounds.min, gesture.startWidth - (event.clientX - gesture.startX)));
     gesture.requestedWidth = requestedWidth;
@@ -480,6 +478,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
     // sample does not reconcile the panel's file tree, diff view and transcript.
     panel.style.width = `${requestedWidth}px`;
     panel.style.flex = `0 0 ${requestedWidth}px`;
+    panel.style.setProperty("--webui-workspace-width", `${requestedWidth}px`);
   };
   const stopPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = resizeGesture.current;
@@ -525,7 +524,7 @@ function WebuiWorkspacePanelView({ state, dispatch, sessionId, workspaceDir, wor
     setExpansionMotion(state.expanded ? "collapse" : "expand");
     dispatch({ type: "toggle-expanded" });
   };
-  return <WebuiPage as="aside" kind="panel" present={!panelClosing} motion={{ kind: "panel", state: expansionMotion ?? "enter", direction: "right" }} ref={panelRef} className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelClosing ? "is-closing" : ""}`} onExitComplete={handlePanelExitComplete} style={panelWidth !== undefined && !state.expanded && surfaceTier === "split" ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab} data-webui-surface-tier={surfaceTier}>
+  return <WebuiPage as="aside" kind="panel" present={!panelClosing} motion={{ kind: "panel", state: expansionMotion ?? "enter", direction: "right" }} ref={panelRef} className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelClosing ? "is-closing" : ""}`} onExitComplete={handlePanelExitComplete} style={panelWidth !== undefined && !state.expanded && surfaceTier === "split" ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px`, "--webui-workspace-width": `${panelWidth}px` } as React.CSSProperties : undefined} data-testid="workspace-panel" data-active-tab={tab} data-webui-surface-tier={surfaceTier}>
     <div className="webui-workspace-panel-resize-handle" role="separator" aria-label="调整工作区面板宽度" aria-orientation="vertical" aria-valuenow={Math.round(panelWidth ?? 50)} tabIndex={state.expanded ? -1 : 0} onPointerDown={startPanelResize} onPointerMove={movePanelResize} onPointerUp={stopPanelResize} onPointerCancel={stopPanelResize} onKeyDown={nudgePanelResize} />
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs">

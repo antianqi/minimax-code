@@ -171,6 +171,7 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   // panel: a gesture started before it finished is lost with the old tree.
   await expect(page.getByTestId("browser-toolbar")).toBeVisible();
 
+  await expect(page.getByTestId("browser-panel-frame")).toBeVisible();
   const { stageBox, frameBox } = await page.evaluate(() => {
     const rect = (selector) => {
       const { width, height } = document.querySelector(selector).getBoundingClientRect();

@@ -173,6 +173,13 @@ Headless Chromium runs without the virtual display's frame-rate limiter. Frame-g
 budgets are still measured in elapsed milliseconds, with their original thresholds. This separates
 the client workload from a VM compositor's presentation clock rather than accepting dropped frames.
 
+The streaming CPU/layout cases additionally pin software compositing and assert the actual CDP
+`gpu_compositing` feature status before measurement. They log the renderer identity and keep the
+same elapsed frame-gap and long-task budgets. This controls the virtual runner graphics environment;
+it does not establish hardware-GPU performance. Other browser and visual suites use their normal
+graphics path. The plugin scroll case waits for populated rows and the hover action's layout
+stability before recording its pre-wheel pinned geometry.
+
 Performance cases disable tracing during measurement and capture screenshots only on failure:
 Chromium CPU profiles showed Playwright's injected snapshot walker inside the drag measurement,
 and trace screenshots also occupy the renderer/compositor. The drag still runs through real pointer

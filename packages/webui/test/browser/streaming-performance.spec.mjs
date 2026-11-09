@@ -25,7 +25,13 @@ import { openApp, startTurn, test } from "./harness.mjs";
 
 // Keep trace snapshots and screenshot capture outside the measured interval;
 // a failure screenshot is taken only after the performance assertions.
-test.use({ trace: "off", screenshot: "only-on-failure" });
+test.use({
+  trace: "off",
+  screenshot: "only-on-failure",
+  // Pin software compositing for CPU/layout budgets on virtual CI displays.
+  // Other browser suites retain their normal graphics path and visual checks.
+  launchOptions: { args: ["--disable-frame-rate-limit", "--disable-gpu"] },
+});
 
 /** A reply body that exercises the markdown path: prose, a list and a fence. */
 function replyChunk(index) {
@@ -75,6 +81,11 @@ const DROPPED_FRAME_MS = 100;
  */
 async function measureStreamedReply(page, options) {
   const { historyTurns, chunks } = options;
+  const browserSession = await page.context().browser().newBrowserCDPSession();
+  const { gpu } = await browserSession.send("SystemInfo.getInfo");
+  console.info("streaming renderer:", JSON.stringify({ devices: gpu.devices, compositing: gpu.featureStatus.gpu_compositing }));
+  expect(gpu.featureStatus.gpu_compositing, "streaming CPU/layout budgets require software compositing").toBe("disabled_software");
+  await browserSession.detach();
   // The history has to exist before the transcript asks for its first page,
   // so it is staged through the fixture's boot-time setup hook.
   await page.addInitScript((messages) => {

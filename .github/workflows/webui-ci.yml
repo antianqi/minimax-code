@@ -1,0 +1,76 @@
+name: WebUI CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webui-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webui:
+    name: WebUI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set isolated WebUI output directories
+        shell: bash
+        run: |
+          echo "MCODE_WEBUI_VERIFY_DIR=$RUNNER_TEMP/webui-package-checks" >> "$GITHUB_ENV"
+          echo "WEBUI_BROWSER_OUTPUT_DIR=$RUNNER_TEMP/webui-browser-results" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check WebUI types
+        run: pnpm typecheck:webui
+      - name: Check WebUI dependency boundaries
+        run: pnpm check:webui-dependency
+      - name: Check WebUI presentation rules
+        run: pnpm check:webui-presentation
+      - name: Check WebUI motion rules
+        run: pnpm check:webui-motion
+      - name: Check WebUI overlays
+        run: pnpm check:webui-overlays
+      - name: Check WebUI feedback
+        run: pnpm check:webui-feedback
+      - name: Build WebUI
+        run: pnpm build:webui
+      - name: Check WebUI build boundaries
+        run: pnpm check:webui-boundary
+      - name: Install Chromium
+        run: pnpm install:webui-browsers
+      - name: Install Chromium system dependencies
+        if: runner.os == 'Linux'
+        run: pnpm exec playwright install-deps chromium
+      - name: Test WebUI units and integrations
+        run: pnpm test:webui
+      - name: Test WebUI browser interactions
+        run: pnpm test:webui-browser
+      - name: Verify WebUI package installation
+        run: pnpm test:webui-package
+      - name: Upload WebUI browser diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: webui-browser-${{ matrix.os }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/webui-browser-results/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -26,6 +26,36 @@ import { extensionIdFromPublicKey, parseExtensionIdList, readStoreExtensionIds }
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
+test('public WebUI CI runs only WebUI checks and cannot publish packages', () => {
+  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/webui-ci.yml', import.meta.url), 'utf8'));
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  assert.ok(Object.hasOwn(workflow.on, 'pull_request'));
+  assert.ok(Object.hasOwn(workflow.on, 'workflow_dispatch'));
+  assert.deepEqual(workflow.permissions, { contents: 'read' });
+  assert.deepEqual(Object.keys(workflow.jobs), ['webui']);
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const job = workflow.jobs.webui;
+  assert.equal(job.env, undefined);
+  assert.deepEqual(job.strategy.matrix.os, ['ubuntu-latest', 'macos-latest', 'windows-latest']);
+  const directories = job.steps.find(step => step.name === 'Set isolated WebUI output directories');
+  assert.equal(directories.shell, 'bash');
+  assert.match(directories.run, /MCODE_WEBUI_VERIFY_DIR=\$RUNNER_TEMP\//);
+  assert.match(directories.run, /WEBUI_BROWSER_OUTPUT_DIR=\$RUNNER_TEMP\//);
+  const commands = job.steps.filter(step => step.run && step !== directories).map(step => step.run);
+  for (const command of commands) {
+    if (command === 'pnpm install --frozen-lockfile' || command === 'pnpm exec playwright install-deps chromium') continue;
+    assert.match(command, /^pnpm (?:typecheck|check|build|install|test):webui(?:-[a-z]+)?$/);
+    assert.ok(Object.hasOwn(manifest.scripts, command.slice('pnpm '.length)), command);
+  }
+  for (const command of ['pnpm typecheck:webui', 'pnpm build:webui', 'pnpm test:webui', 'pnpm test:webui-browser', 'pnpm test:webui-package']) {
+    assert.ok(commands.includes(command), `Missing ${command}`);
+  }
+  assert.ok(commands.indexOf('pnpm build:webui') < commands.indexOf('pnpm test:webui-browser'));
+  for (const command of ['pnpm test:webui', 'pnpm test:webui-browser', 'pnpm test:webui-package']) {
+    assert.equal(job.steps.find(step => step.run === command).if, undefined, `${command} must run on every platform`);
+  }
+});
+
 test('coverage review distinguishes declared browser scenarios from executed evidence', () => {
   const output = execFileSync(process.execPath, ['scripts/coverage-review.mjs', '--check'], { encoding: 'utf8' });
   const evidence = JSON.parse(readFileSync(new URL('../scripts/lib/webui-browser-coverage-evidence.json', import.meta.url), 'utf8'));

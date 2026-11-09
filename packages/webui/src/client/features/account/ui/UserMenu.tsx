@@ -52,12 +52,12 @@ import {
   type SigninState,
 } from "./UserMenuSignin.js";
 import { UsagePanel, type UsageState } from "./UserMenuUsage.js";
+import { formatRailPlanLabel } from "../projection/usage.public.js";
 
 type AccountStatus = Record<string, unknown>;
 
 interface UserMenuProps {
   readonly collapsed: boolean;
-  readonly hostLabel?: string;
   readonly dataDir?: string;
   readonly version?: WebuiVersionInfo;
   readonly sessionId?: string;
@@ -151,7 +151,6 @@ function Chevron(): ReactElement {
 
 export function UserMenu({
   collapsed,
-  hostLabel,
   dataDir,
   sessionId,
   version,
@@ -285,10 +284,9 @@ export function UserMenu({
     "MiniMax Code";
   const avatarUrl =
     profile?.avatarUrl?.trim() || profile?.defaultAvatarUrl?.trim();
-  const plan =
-    accountString(account, "plan") ??
-    accountString(account, "planName") ??
-    (hostLabel ? `本地 · ${hostLabel}` : "本地");
+  const planLabel = formatRailPlanLabel(
+    usage.status === "ready" ? usage.result : undefined,
+  );
   const identity = objectValue(account?.identity);
   const auth = objectValue(account?.auth);
   const uid =
@@ -374,7 +372,7 @@ export function UserMenu({
                 </span>
                 <span className="webui-user-menu-identity">
                   <span>{nickname}</span>
-                  <small>{plan}</small>
+                  {planLabel ? <small>{planLabel}</small> : null}
                 </span>
                 <span className="webui-user-menu-bell" aria-hidden="true">
                   <WebuiIconBell />

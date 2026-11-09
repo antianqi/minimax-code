@@ -4202,7 +4202,7 @@
     "packages/webui/src/client/features/settings/contracts/settings-port.ts",
     "packages/webui/src/client/features/settings/projection/settings-shortcuts.ts",
     "packages/webui/src/client/features/settings/projection/settings-view.ts",
-    "packages/webui/src/client/features/settings/projection/usage-plan.ts",
+    "packages/webui/src/client/features/settings/projection/usage-plan.public.ts",
     "packages/webui/src/client/features/settings/projection/usage-report.ts",
     "packages/webui/src/client/features/settings/ui/AccountUsageSettings.tsx",
     "packages/webui/src/client/features/settings/ui/ConnectionSettingsPage.tsx",

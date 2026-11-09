@@ -386,6 +386,26 @@ export function WebuiClientFoundationApp(
   useEffect(() => {
     dispatchShellSurface({ type: "show-conversation" });
   }, [dispatchShellSurface, selectedSessionId]);
+  // Clicking the rail link of the session that is already selected changes
+  // nothing the hash subscription can observe: the hash is the same, so no
+  // `hashchange` fires, the selection does not change, and the effect above
+  // does not run again -- the shell keeps the surface it was showing (the
+  // marketplace, the 远程 page) although the user asked for the conversation.
+  // The click is the one signal left, so the shell listens for it on the rail's
+  // session links and puts the conversation back.
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const onSessionLinkClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const link = target.closest("[data-webui-session-link]");
+      if (!link) return;
+      if (link.getAttribute("data-webui-session-link") !== selectedSessionId) return;
+      dispatchShellSurface({ type: "show-conversation" });
+    };
+    document.addEventListener("click", onSessionLinkClick, true);
+    return () => document.removeEventListener("click", onSessionLinkClick, true);
+  }, [dispatchShellSurface, selectedSessionId]);
   // Composer input history + per-session drafts. The one owner is the application
   // composer store: the shell subscribes to it and submits through it.
   const composerState = useSyncExternalStore(

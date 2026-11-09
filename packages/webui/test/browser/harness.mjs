@@ -13,9 +13,18 @@
 // process happens to answer on the harness port.
 
 import { expect, test as base } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 /** The suite's `test`, carrying the harness-server guard for every test. */
 export const test = base;
+
+export async function attachJsonEvidence(name, value) {
+  const path = test.info().outputPath(name);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(value, null, 2));
+  await test.info().attach(name, { path, contentType: "application/json" });
+}
 
 /**
  * The pixel budget for a screenshot comparison, shared by every spec that

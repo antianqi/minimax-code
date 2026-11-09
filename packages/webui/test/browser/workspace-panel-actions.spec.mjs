@@ -15,7 +15,7 @@
 import { expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-import { configureFixture, finishCapturedTransition, openApp, openLauncherTile, pauseNextTransition, switchSession, test, transitionMidpointSize } from "./harness.mjs";
+import { attachJsonEvidence, configureFixture, finishCapturedTransition, openApp, openLauncherTile, pauseNextTransition, switchSession, test, transitionMidpointSize } from "./harness.mjs";
 
 // Neither injected DOM snapshots nor trace screenshots belong to the client's
 // performance budget. Capture failure screenshots after the measurement.
@@ -35,7 +35,7 @@ test.afterEach(async () => {
   const completed = new Promise((resolve) => timelineClient.once("Tracing.tracingComplete", resolve));
   await timelineClient.send("Tracing.end");
   await completed;
-  await test.info().attach("renderer-timeline.json", { body: JSON.stringify(timelineEvents), contentType: "application/json" });
+  await attachJsonEvidence("renderer-timeline.json", timelineEvents);
   timelineClient = undefined;
 });
 

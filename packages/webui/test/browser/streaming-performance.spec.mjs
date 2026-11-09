@@ -18,7 +18,7 @@
 
 import { expect } from "@playwright/test";
 
-import { openApp, startTurn, test } from "./harness.mjs";
+import { attachJsonEvidence, openApp, startTurn, test } from "./harness.mjs";
 
 // Keep trace snapshots and screenshot capture outside the measured interval;
 // a failure screenshot is taken only after the performance assertions.
@@ -38,7 +38,7 @@ test.afterEach(async () => {
   const completed = new Promise((resolve) => timelineClient.once("Tracing.tracingComplete", resolve));
   await timelineClient.send("Tracing.end");
   await completed;
-  await test.info().attach("renderer-timeline.json", { body: JSON.stringify(timelineEvents), contentType: "application/json" });
+  await attachJsonEvidence("renderer-timeline.json", timelineEvents);
   timelineClient = undefined;
 });
 

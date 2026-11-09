@@ -56,6 +56,7 @@ export function PluginItemDialog({
           : "配置 MiniMax Code 如何连接到该项"}
         onClose={onClose}
         dismissOnEscape
+        dismissOnBackdrop
         width="standard"
         portalTarget={portalTarget}
       >

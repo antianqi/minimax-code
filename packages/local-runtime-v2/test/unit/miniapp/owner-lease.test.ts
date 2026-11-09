@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,6 +46,9 @@ describe('Mini App ownership', () => {
     expect(Buffer.byteLength(resolveMiniAppOwnerEndpoint(first, 'fixture.miniapp'))).toBeLessThan(104);
     expect((await acquire(first, 'desktop')).kind).toBe('acquired');
     expect(await acquire(first)).toMatchObject({ kind: 'held', owner: { client: 'desktop' } });
+    const alias = join(root, 'alias');
+    await symlink(first, alias);
+    expect(await acquire(alias)).toMatchObject({ kind: 'held', owner: { client: 'desktop' } });
     expect((await acquire(second)).kind).toBe('acquired');
   });
 

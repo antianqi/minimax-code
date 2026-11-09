@@ -33,7 +33,7 @@ const SOCKET_FILE = 'owner.sock';
 const RECORD_FILE = 'owner.json';
 const WINDOWS_PIPE_PREFIX = '\\\\.\\pipe\\mcode-miniapp-owner-';
 
-/** A socket file on POSIX, a named pipe on Windows — named from the plugin id, never from the directory. */
+/** A directory-scoped socket on POSIX, a plugin-scoped named pipe on Windows. */
 export function resolveMiniAppOwnerEndpoint(
   pluginDataDir: string,
   pluginId: string,

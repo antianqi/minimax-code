@@ -20,10 +20,18 @@ After a successful build and Chromium installation, browser checks still run if
 unit tests fail. Package verification also runs after a successful build even if
 an earlier test suite failed. Each failure still makes the job fail; this keeps
 independent failures visible in one run instead of masking later suites.
-Only installation of Linux system dependencies is platform-gated. CI does not
-skip the browser or package suites on macOS or Windows. This coverage declaration
+Linux additionally installs Chromium system dependencies. Every platform runs
+the browser and package suites. This coverage declaration
 does not establish a passing run; platform and visual-baseline failures remain
 visible and require diagnosis rather than relaxed assertions.
+
+Hosted macOS sets `WEBUI_BROWSER_HEADED=1` for the browser suite and runs full
+Chromium in a window. Native blank-page controls reproduced headless frame-source
+stalls without the WebUI; the same image and browser build passed the affected
+scenarios in windowed mode. Frame-gap, long-task and interaction budgets are
+unchanged. Linux, Windows and local runs remain headless by default. To reproduce
+the macOS CI browser mode locally, run `WEBUI_BROWSER_HEADED=1 pnpm test:webui-browser`
+after building the client and installing Chromium.
 
 ## Active and archived workflows
 
@@ -41,8 +49,8 @@ Restoring a legacy YAML file to `.github/workflows/` would restore its triggers;
 the workflow-contract test rejects additional active YAML files.
 Dependabot can still create dependency-update PRs; those PRs run WebUI CI.
 
-The local `pnpm verify`, its profiles, all existing gate scripts and package
-commands are unchanged. Run them locally when broader runtime, CLI, release or
+The CI scope does not remove steps from local `pnpm verify` profiles or retire
+local package commands. Run them locally when broader runtime, CLI, release or
 security validation is needed. A green WebUI CI run does not establish those
 broader checks. The previously reported repository-history scan findings are
 outside this CI scope and have not been remediated by disabling Release audit.

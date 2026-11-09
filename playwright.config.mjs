@@ -31,6 +31,7 @@ const fontEnvironment = prepareFontEnvironment(root, {
 // explicitly and anything else fails loudly on a busy port instead. CI never
 // reuses: it is a fresh machine per run and has nothing to reuse.
 const reuseExistingServer = !process.env.CI && process.env.WEBUI_BROWSER_REUSE === "1";
+const headedBrowser = process.env.WEBUI_BROWSER_HEADED === "1";
 
 export default defineConfig({
   testDir: "./packages/webui/test/browser",
@@ -48,7 +49,8 @@ export default defineConfig({
     colorScheme: "light",
     reducedMotion: "reduce",
     browserName: "chromium",
-    headless: true,
+    channel: headedBrowser ? "chromium" : undefined,
+    headless: !headedBrowser,
     trace: "retain-on-failure",
     launchOptions: {
       env: { ...process.env, ...fontEnvironment.env },

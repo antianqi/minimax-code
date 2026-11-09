@@ -169,11 +169,23 @@ On Linux, `scripts/lib/webui-font-environment.mjs` additionally sets `FONTCONFIG
 only the committed files and selects grayscale antialiasing. Native rasterization can still differ,
 so screenshot baselines are platform-specific; review actual native captures before adding them.
 
-Headless Chromium uses its normal frame scheduling and graphics path. Live Markdown coalescing
+Chromium uses its normal frame scheduling and graphics path. Live Markdown coalescing
 is measured at the browser's paint opportunities rather than an artificially unbounded frame rate.
 Frame-gap and long-task budgets remain in elapsed milliseconds with their original thresholds.
 The plugin scroll case waits for populated rows and the hover action's layout stability before
 recording its pre-wheel pinned geometry.
+
+Hosted macOS CI sets `WEBUI_BROWSER_HEADED=1` and selects full Chromium in a window;
+Linux, Windows and local runs stay headless by default. Blank-page controls on native macOS
+reproduced long headless frame intervals without any client work. On the same image and browser
+build, windowed mode passed all nine affected interaction/performance scenarios, with the heavy
+stream's worst frame gap 38.3 ms and zero jank frames or long tasks. This changes the runner's
+browser session, not the 50/100 ms budgets. Use the same environment flag locally to reproduce
+the macOS CI mode; no frame-rate override or software-compositing override is used.
+
+Related launcher boxes are read in one DOM snapshot, and hover-dependent styles are polled for
+their exact final values. The long-line diff case scrolls the contained viewport into view and
+waits for real overflow before checking actual horizontal scrolling; DOM text alone is insufficient.
 
 Performance cases disable tracing during measurement and capture screenshots only on failure:
 Chromium CPU profiles showed Playwright's injected snapshot walker inside the drag measurement,

@@ -121,12 +121,17 @@ test("hovering a child session keeps its avatar and clips only the title for the
   const avatar = child.locator(".webui-agent-avatar");
   const title = child.locator(".webui-project-child-session-title");
   const action = childRow.locator(".webui-session-row-actions");
-  const titleBounds = await title.boundingBox();
-  const actionBounds = await action.boundingBox();
   await expect(avatar).toBeVisible();
   await expect(action.getByRole("button", { name: "子任务 C 更多操作" })).toBeVisible();
   expect(await avatar.evaluate((element) => getComputedStyle(element).clipPath)).toBe("none");
-  expect(await title.evaluate((element) => getComputedStyle(element).clipPath)).toBe("inset(0px 28px 0px 0px)");
+  await expect.poll(() => title.evaluate((element) => getComputedStyle(element).clipPath)).toBe("inset(0px 28px 0px 0px)");
+  const { titleBounds, actionBounds } = await childRow.evaluate((row) => {
+    const rect = (selector) => {
+      const { x, width } = row.querySelector(selector).getBoundingClientRect();
+      return { x, width };
+    };
+    return { titleBounds: rect(".webui-project-child-session-title"), actionBounds: rect(".webui-session-row-actions") };
+  });
   expect(titleBounds).not.toBeNull();
   expect(actionBounds).not.toBeNull();
   expect(titleBounds.x + titleBounds.width - 28).toBeLessThanOrEqual(actionBounds.x);

@@ -231,6 +231,8 @@ test("a contained unified diff keeps long lines horizontally scrollable", async 
   const code = page.getByTestId("workspace-review").locator(".webui-turn-review-code");
   await expect(code).toBeVisible();
   await expect(code).toContainText("x".repeat(800));
+  await code.scrollIntoViewIfNeeded();
+  await expect.poll(() => code.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
   const geometry = await code.evaluate((element) => {
     element.scrollLeft = 200;
     return { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, scrollLeft: element.scrollLeft };

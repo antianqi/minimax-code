@@ -180,6 +180,10 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   });
   expect(stageBox).not.toBeNull();
   expect(frameBox).not.toBeNull();
+  expect(stageBox.width).toBeGreaterThan(0);
+  expect(stageBox.height).toBeGreaterThan(0);
+  expect(frameBox.width).toBeGreaterThan(0);
+  expect(frameBox.height).toBeGreaterThan(0);
   expect(Math.abs(frameBox.width - stageBox.width)).toBeLessThanOrEqual(1);
   expect(Math.abs(frameBox.height - stageBox.height)).toBeLessThanOrEqual(1);
 

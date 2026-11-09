@@ -21,6 +21,24 @@ import { configureFixture, finishCapturedTransition, openApp, openLauncherTile, 
 // performance budget. Capture failure screenshots after the measurement.
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
+let timelineClient;
+let timelineEvents;
+test.beforeEach(async ({ page }, info) => {
+  if (!/a long reply|workspace review stays responsive/.test(info.title)) return;
+  timelineEvents = [];
+  timelineClient = await page.context().newCDPSession(page);
+  timelineClient.on("Tracing.dataCollected", ({ value }) => timelineEvents.push(...value));
+  await timelineClient.send("Tracing.start", { categories: "devtools.timeline,toplevel,blink.user_timing,v8", transferMode: "ReportEvents" });
+});
+test.afterEach(async () => {
+  if (!timelineClient) return;
+  const completed = new Promise((resolve) => timelineClient.once("Tracing.tracingComplete", resolve));
+  await timelineClient.send("Tracing.end");
+  await completed;
+  await test.info().attach("renderer-timeline.json", { body: JSON.stringify(timelineEvents), contentType: "application/json" });
+  timelineClient = undefined;
+});
+
 /** Open the browser panel, choose 查看文件, and wait for the tree it loads. */
 async function openFilePanel(page) {
   await page

@@ -49,7 +49,7 @@ jobs:
           packages/webui/test/browser/surface-appearance.spec.mjs
           packages/webui/test/browser/responsive-baselines.spec.mjs
           packages/webui/test/browser/visual-baselines.spec.mjs
-          --grep 'a streamed reply|a long reply|frame calibration|continuous chunks|workspace review stays responsive|contained unified diff|browser page fills|hovering a child session|calendar tip is drawn|the workspace panel at (1440|1024|768)px|embedded browser panel layout baseline'
+          --grep 'a long reply|workspace review stays responsive'
           ${{ matrix.headed && '--headed' || '' }}
           --repeat-each=3
       - name: Retain diagnostic artifacts

@@ -195,7 +195,10 @@ waits for real overflow before checking actual horizontal scrolling; DOM text al
 Performance cases disable tracing during measurement and capture screenshots only on failure:
 Chromium CPU profiles showed Playwright's injected snapshot walker inside the drag measurement,
 and trace screenshots also occupy the renderer/compositor. The drag still runs through real pointer
-input and retains the 50 ms long-task budget. Disclosure cases capture all coupled CSS transitions,
+input, waits two frames after pointer release, and retains the 50 ms long-task budget. Locator-based
+geometry assertions run after the observer stops, so their injected queries are not charged to the
+application. Raw task durations are attached as `workspace-drag-long-tasks.json`.
+Disclosure cases capture all coupled CSS transitions,
 inspect their interpolated midpoint and
 finish it before checking the final geometry, instead of racing a fixed delay against driver latency.
 Tests that deliberately freeze the browser clock advance it explicitly for the initial layout frames.

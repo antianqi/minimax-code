@@ -205,11 +205,15 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width / 2 + 96, bounds.y + bounds.height / 2, { steps: 12 });
   await page.mouse.up();
-  await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
-  const dragLongTasks = await page.evaluate(() => {
+  const dragLongTasks = await page.evaluate(async () => {
+    // 等待 pointerup 的提交和布局；定位器查找及断言在性能窗口外执行。
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const tasks = [...window.__reviewLongTasks, ...window.__reviewLongTaskObserver.takeRecords().map((entry) => entry.duration)];
     window.__reviewLongTaskObserver.disconnect();
-    return [...window.__reviewLongTasks, ...window.__reviewLongTaskObserver.takeRecords().map((entry) => entry.duration)];
+    return tasks;
   });
+  await test.info().attach("workspace-drag-long-tasks.json", { body: JSON.stringify(dragLongTasks), contentType: "application/json" });
+  await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
   expect(dragLongTasks.filter((duration) => duration >= 50), `workspace panel drag produced ${dragLongTasks} ms long tasks`).toEqual([]);
   const lastFile = review.locator('[data-testid="turn-review-diff-file"]').last();
   await lastFile.scrollIntoViewIfNeeded();

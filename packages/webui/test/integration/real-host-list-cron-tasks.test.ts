@@ -12,11 +12,11 @@
  * own DTO, and the validator accepting the envelope the panel actually sends. Each of those rots
  * independently, so the assertion runs through all of them.
  */
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createWebuiRuntimeHost } from "../../src/runtime/assembly.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
@@ -25,13 +25,23 @@ import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 const disposers: Array<() => Promise<void> | void> = [];
 
 afterEach(async () => {
-  for (const dispose of disposers.splice(0).reverse()) await dispose();
-}, 30_000);
+  try {
+    for (const dispose of disposers.splice(0).reverse()) await dispose();
+  } finally {
+    vi.unstubAllEnvs();
+    (await import("@mavis/config")).resetConfig();
+  }
+});
 
 async function bootWebuiHost() {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-list-cron-tasks-"));
   disposers.push(() => removeRealHostDataDir(dataDir));
   await mkdir(join(dataDir, "workspace"), { recursive: true });
+  await writeFile(join(dataDir, "config.yaml"), "{}\n", { mode: 0o600 });
+  vi.stubEnv("MINIMAX_DATA_DIR", dataDir);
+  const config = await import("@mavis/config");
+  config.resetConfig();
+  expect(config.getConfig().dataDir).toBe(dataDir);
   const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "list-cron-tasks" });
   disposers.push(() => assembled.host.apiHost.close());
   return assembled;

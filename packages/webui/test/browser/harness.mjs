@@ -104,13 +104,17 @@ export async function pauseNextTransition(locator, property) {
     const capture = (event) => {
       if (event.target !== element || event.propertyName !== property) return;
       element.removeEventListener("transitionrun", capture);
-      const transition = element.getAnimations().find((animation) => animation instanceof CSSTransition && animation.transitionProperty === property);
-      if (!transition) throw new Error(`The ${property} transition did not start`);
-      const duration = transition.effect.getTiming().duration;
-      if (typeof duration !== "number" || duration <= 0) throw new Error("The transition must have a finite positive duration");
-      transition.pause();
-      transition.currentTime = duration / 2;
-      element.__webuiTestTransition = transition;
+      const transitions = element.getAnimations().filter((animation) => animation instanceof CSSTransition);
+      if (!transitions.some((animation) => animation.transitionProperty === property)) throw new Error(`The ${property} transition did not start`);
+      // Width and flex-basis jointly determine the used size. Sample every
+      // coupled property at the same progress instead of freezing only width.
+      for (const transition of transitions) {
+        const duration = transition.effect.getTiming().duration;
+        if (typeof duration !== "number" || duration <= 0) throw new Error("The transition must have a finite positive duration");
+        transition.pause();
+        transition.currentTime = duration / 2;
+      }
+      element.__webuiTestTransition = transitions;
     };
     element.addEventListener("transitionrun", capture);
   }, property);
@@ -125,8 +129,8 @@ export async function finishCapturedTransition(locator) {
   await locator.evaluate(async (element) => {
     const transition = element.__webuiTestTransition;
     if (!transition) throw new Error("No captured transition to finish");
-    transition.finish();
-    await transition.finished;
+    for (const animation of transition) animation.finish();
+    await Promise.all(transition.map((animation) => animation.finished));
   });
 }
 

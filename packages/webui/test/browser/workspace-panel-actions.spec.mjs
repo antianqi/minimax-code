@@ -17,9 +17,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { configureFixture, finishCapturedTransition, openApp, openLauncherTile, pauseNextTransition, switchSession, test, transitionMidpointSize } from "./harness.mjs";
 
-// The performance case in this file must not measure tracing's injected DOM
-// snapshot walker. Retain screenshots, sources and action logs for diagnostics.
-test.use({ trace: { mode: "retain-on-failure", snapshots: false, screenshots: true, sources: true } });
+// Neither injected DOM snapshots nor trace screenshots belong to the client's
+// performance budget. Capture failure screenshots after the measurement.
+test.use({ trace: "off", screenshot: "only-on-failure" });
 
 /** Open the browser panel, choose 查看文件, and wait for the tree it loads. */
 async function openFilePanel(page) {

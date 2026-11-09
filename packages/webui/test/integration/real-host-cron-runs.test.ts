@@ -12,12 +12,12 @@
  * are counted, and a real host would try to deliver a turn to a model.
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DatabaseClient } from "../../../local-runtime-v2/src/infra/db/client.js";
 import { initializeDatabase } from "../../../local-runtime-v2/src/infra/db/initialize.js";
@@ -31,8 +31,13 @@ import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 const disposers: Array<() => Promise<void> | void> = [];
 
 afterEach(async () => {
-  for (const dispose of disposers.splice(0).reverse()) await dispose();
-}, 30_000);
+  try {
+    for (const dispose of disposers.splice(0).reverse()) await dispose();
+  } finally {
+    vi.unstubAllEnvs();
+    (await import("@mavis/config")).resetConfig();
+  }
+});
 
 async function temporaryDataDir(prefix: string): Promise<string> {
   const dataDir = await mkdtemp(join(tmpdir(), prefix));
@@ -44,6 +49,11 @@ async function temporaryDataDir(prefix: string): Promise<string> {
 describe("run now and run history over the real host", () => {
   it("runs a task immediately and shows the run in its history", async () => {
     const dataDir = await temporaryDataDir("webui-cron-runs-");
+    await writeFile(join(dataDir, "config.yaml"), "{}\n", { mode: 0o600 });
+    vi.stubEnv("MINIMAX_DATA_DIR", dataDir);
+    const config = await import("@mavis/config");
+    config.resetConfig();
+    expect(config.getConfig().dataDir).toBe(dataDir);
     const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "cron-runs" });
     disposers.push(() => assembled.host.apiHost.close());
     const registry = createOperationRegistry(assembled.harnessPort);

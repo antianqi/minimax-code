@@ -60,7 +60,11 @@ function trackOutsideModalFocus(ownerDocument: Document): HTMLElement {
   ownerDocument.addEventListener("focusin", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.closest("[data-webui-dialog-mask], .webui-settings-mask, [data-overlay-layer]")) return;
+    // A dropdown's trigger wrapper is also an overlay layer. Its surviving
+    // trigger is a valid return target; only the popup itself is excluded.
+    if (target.closest("[data-webui-dialog-mask], .webui-dialog-mask, .webui-settings-mask, .webui-dropdown-popup")) return;
+    const layer = target.closest("[data-overlay-layer]");
+    if (layer && !layer.hasAttribute("data-webui-dropdown")) return;
     if (target.closest(LIVE_SURFACE_SELECTOR)) return;
     recordOutsideModalFocus(ownerDocument, target);
   }, true);

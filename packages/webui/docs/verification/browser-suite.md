@@ -166,10 +166,11 @@ Headless Chromium runs without the virtual display's frame-rate limiter. Frame-g
 budgets are still measured in elapsed milliseconds, with their original thresholds. This separates
 the client workload from a VM compositor's presentation clock rather than accepting dropped frames.
 
-The workspace-panel performance cases retain action traces, screenshots and sources without DOM
-snapshot collection: Chromium CPU profiles showed Playwright's injected snapshot walker inside the
-drag measurement. The drag still runs through real pointer input and retains the 50 ms long-task
-budget. Disclosure cases capture the actual CSS transition, inspect its interpolated midpoint and
+Performance cases disable tracing during measurement and capture screenshots only on failure:
+Chromium CPU profiles showed Playwright's injected snapshot walker inside the drag measurement,
+and trace screenshots also occupy the renderer/compositor. The drag still runs through real pointer
+input and retains the 50 ms long-task budget. Disclosure cases capture all coupled CSS transitions,
+inspect their interpolated midpoint and
 finish it before checking the final geometry, instead of racing a fixed delay against driver latency.
 Tests that deliberately freeze the browser clock advance it explicitly for the initial layout frames.
 

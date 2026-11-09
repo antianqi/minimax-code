@@ -330,17 +330,18 @@ test("the shared modal frame keeps its header and actions fixed around a scrolli
 
 test("closing a modal returns focus to the control that opened it, never the body", async ({ page }) => {
   // The settings sheet is opened from an entry inside the user menu. Focus has
-  // to come back to that entry — a keyboard user who closes the sheet resumes
-  // where they were, not at the top of the document. The platform keeps a short
+  // to come back to the surviving menu trigger once that entry unmounts — a
+  // keyboard user resumes where they were. The platform keeps a short
   // history of what was focused outside a modal precisely because an opener that
   // lives in a popup is not guaranteed to survive the modal it opened.
   await page.getByTestId("sidebar-user-menu-trigger").click();
   await page.getByTestId("user-menu-settings").click();
   await expect(page.getByRole("dialog", { name: "设置" })).toBeVisible();
+  await expect(page.getByTestId("user-menu-settings")).toHaveCount(0);
 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "设置" })).toHaveCount(0);
-  await expect(page.getByTestId("user-menu-settings")).toBeFocused();
+  await expect(page.getByTestId("sidebar-user-menu-trigger")).toBeFocused();
 
   const focused = await page.evaluate(() => {
     const element = document.activeElement;
@@ -354,5 +355,5 @@ test("closing a modal returns focus to the control that opened it, never the bod
   expect(focused.isBody).toBe(false);
   expect(focused.connected).toBe(true);
   expect(focused.tag).toBe("BUTTON");
-  expect(focused.testId).toBe("user-menu-settings");
+  expect(focused.testId).toBe("sidebar-user-menu-trigger");
 });

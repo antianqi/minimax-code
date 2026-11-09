@@ -120,7 +120,8 @@ export const WebuiPage = forwardRef<HTMLElement, WebuiPageProps>(
       if (
         event.target === event.currentTarget &&
         exiting &&
-        hasExitAnimation
+        hasExitAnimation &&
+        isWebuiMotionExitAnimation(event.animationName, motion?.kind)
       ) {
         setMounted(false);
         onExitComplete?.();
@@ -266,6 +267,12 @@ export function WebuiMotionSlot({
       .filter(Boolean)
       .join(" "),
   });
+}
+
+/** Ignore a previous entrance finishing after a surface has begun leaving. */
+export function isWebuiMotionExitAnimation(animationName: string, kind: WebuiMotionKind | undefined): boolean {
+  if (kind === "panel") return animationName === "webui-motion-panel-exit";
+  return (kind === "surface" || kind === "card") && animationName === "webui-motion-surface-exit";
 }
 
 export interface WebuiMotionProps extends HTMLAttributes<HTMLElement> {

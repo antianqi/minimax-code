@@ -6,306 +6,188 @@
   </picture>
 </p>
 
-<h1 align="center">MiniMax Code</h1>
-<p align="center">把一句话，做成能运行的东西。用 MiniMax 或自己的模型，在终端里构建、验证、继续改进。</p>
+<h1 align="center">MiniMax Code WebUI</h1>
+<p align="center">把一句话，做成能运行的东西。用 MiniMax 或自己的模型，在浏览器里构建、审阅、继续改进。</p>
 <p align="center">
-  <a href="#快速开始">Get started</a> ·
-  <a href="docs/README.md">Documentation</a> ·
-  <a href="docs/examples.md">Examples</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="#快速开始">快速开始</a> ·
+  <a href="packages/webui/README.md">使用文档</a> ·
+  <a href="#可以做什么">功能介绍</a> ·
+  <a href="CONTRIBUTING.md">参与贡献</a>
 </p>
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 <p align="center">
-  <img src="docs/assets/source-preview.svg" alt="Source preview">
-  <img src="docs/assets/node.svg" alt="Compatibility: Node.js 22.19+, 24.2+, 25, and 26">
-  <a href="LICENSE-STATUS.md"><img src="docs/assets/license.svg" alt="First-party default license: MIT"></a>
+  <img src="docs/assets/source-preview.svg" alt="源码预览">
+  <img src="docs/assets/node.svg" alt="兼容 Node.js 22.19+、24.2+、25 和 26">
+  <a href="LICENSE-STATUS.md"><img src="docs/assets/license.svg" alt="第一方代码默认许可：MIT"></a>
 </p>
 
-给一个会眨眼的小宠物加上番茄钟，再追问一句：“长按才能暂停，结束时跳舞。”看代码变成可以亲手操作的结果。
+选择项目文件夹，描述任务，在同一个浏览器工作区里跟进 Agent 的执行。把对话、文件、终端、代码变更与预览放在一起，边看结果，边继续修改。
 
-[![Pocket Pet：从会眨眼到会陪你专注](docs/assets/pocket-pet-demo.png)](docs/demo.md)
+![MiniMax Code WebUI 首页与任务输入框](docs/assets/webui/home.png)
 
-<p align="center"><a href="docs/demo.md">看真实修改与浏览器演示 →</a> · <a href="examples/pocket-pet">自己做一次 →</a></p>
+<p align="center"><a href="#快速开始">在本地运行 →</a> · <a href="packages/webui/README.md">配置与部署 →</a></p>
 
-**无需硬件。** 示例在本地浏览器运行，不需要前端依赖。让 CLI 修改代码需要 MiniMax 账号及可用额度，或你自己的兼容模型 API；模型调用可能产生费用。完成版可直接运行，无需模型账号。
+**浏览器界面，本地运行时。** 服务运行在你的电脑或自行管理的机器上，浏览器连接该服务。模型调用使用你的 MiniMax 账号或已配置的模型服务，可能产生费用。本仓库是 [MiniMax Code](https://github.com/MiniMax-AI/minimax-code) 的 WebUI 分支，同时保留 TUI、无界面 CLI 和 ACP 源码。
 
 ## 快速开始
 
-### 1. 安装 MCode
+### 1. 安装 WebUI
 
-按操作系统选择官方安装器。安装器会安装最新版 CLI，并在需要时准备兼容的 Node.js，无需 `sudo` 或管理员权限；目前不支持 Alpine / musl Linux。
-
-**macOS / Linux / WSL**
+先安装支持的 **Node.js 版本：22.19+（22.x）、24.2+（24.x）、25 或 26**，然后运行：
 
 ```bash
-curl -fsSL https://filecdn.minimax.chat/public/install.sh | bash
+npm install --global @minimax-webui/minimax-code
+mcode-webui
 ```
 
-**Windows（PowerShell）**
-
-```powershell
-irm https://filecdn.minimax.chat/public/install.ps1 | iex
-```
-
-脚本在 macOS / Linux / WSL 上默认安装到 `~/.minimax-code`，在 Windows 上默认安装到 `%USERPROFILE%\.minimax-code`。POSIX 启动器为 `bin/mcode` 和 `bin/mcode-tools`；Windows 启动器为 `mcode.cmd` / `mcode.ps1` 和 `mcode-tools.cmd` / `mcode-tools.ps1`。安装前设置 `MCODE_INSTALL_DIR` 可更改安装位置。移除 CLI 的方法见[卸载](#卸载)。
-
-**npm**：适用于已安装 **Node.js 22.19+（22.x）、24.2+（24.x）、25 或 26** 的环境。
+使用 **npm 12 及以上版本**时，需要显式允许原生依赖的安装脚本：
 
 ```bash
-npm install -g @minimax-ai/code@latest --registry=https://registry.npmjs.org/ --ignore-scripts=false --include=optional --allow-scripts=@minimax-ai/code,better-sqlite3
+npm install --global @minimax-webui/minimax-code --allow-scripts=better-sqlite3,bufferutil,node-pty,utf-8-validate
 ```
 
-该 npm 命令使用公共 registry，包含可选的 SQLite 依赖，并允许执行主包和 SQLite 的安装脚本。固定版本和 Node.js 兼容范围见[安装指南](docs/installation.md)。
+服务默认监听 `http://127.0.0.1:2233/`，在交互式终端启动时会打开默认浏览器。如果没有自动打开，使用终端打印的地址。使用期间保持服务进程运行，按 **Ctrl+C** 停止。
 
-重新打开终端后检查安装：
+以下命令可查看版本和帮助，不会启动运行时：
 
 ```bash
-mcode --version
-mcode --help
+mcode-webui --version
+mcode-webui --help
 ```
 
-参阅官网的[快速开始](https://agent.minimaxi.com/docs/cli/quick-start)、[功能与配置](https://agent.minimaxi.com/docs/cli/features)和[故障排查](https://agent.minimaxi.com/docs/cli/faq)。
+WebUI 使用独立的 npm 包和启动命令。上游 CLI 安装器安装的是 `mcode`；安装 WebUI 请使用上面的安装方式。
 
-### 2. 登录账号或配置 API Key
+### 2. 登录账号或配置自己的模型
 
-中国大陆账号运行：
+打开左下角账号菜单，登录 MiniMax。WebUI 与 CLI 使用同一个数据目录时，可以复用已有的 CLI 登录状态。账号模型与托管服务需要相应的账号权限及可用额度。
 
-```bash
-mcode login
-```
+使用自己的模型时，进入 **设置 → 用量与模型 → 自定义模型**，添加服务商，填写接口地址与 API Key，再选择模型。支持 `openai-completions`、`openai-responses` 和 `anthropic-messages` 等 API 格式，也可以在模型设置中切换到官方 MiniMax API 来源。
 
-Global 账号运行：
+在输入框中选择模型；模型支持时，还可以调整思考设置和上下文窗口：
 
-```bash
-mcode login --region global
-```
+![模型选择、思考设置与上下文窗口](docs/assets/webui/model-controls.png)
 
-在浏览器中完成登录，再启动 `mcode`，通过 `/status` 检查账号、通过 `/provider` 选择模型。退出登录使用 `mcode logout`。
+默认数据目录为 `~/.minimax`，与 CLI 共用，保存账号状态、模型配置和会话历史。需要独立目录时，在启动服务前设置 `MINIMAX_DATA_DIR`。
 
-Token Plan 需要账号与可用额度。从本仓库构建的版本与已发布的 npm CLI `@minimax-ai/code@0.6.9` 均默认将用户数据保存在 `~/.minimax`（选择 profile 时为 `~/.minimax-<profile>`）。`MINIMAX_DATA_DIR` 或 `MAVIS_DATA_DIR` 可以覆盖数据目录。安装脚本使用的 `~/.minimax-code` 安装目录与数据目录的选择是两回事。查找或删除配置和会话前，请参阅[账号与数据](docs/installation.md#accounts-and-data)。
+### 3. 在自己的项目中使用
 
-<details>
-<summary>使用自己的 API Key（BYOK）</summary>
+点击 **选择文件夹**，选择运行服务的机器上的项目，然后描述任务，例如：
 
-BYOK 无需先登录 MiniMax。先在当前 shell 中设置 `MCODE_PROVIDER_API_KEY`，再添加提供方；将下方示例地址和模型名替换为实际配置：
+> 找一个失败的测试，解释原因，修复实现，并运行相关测试。
 
-```bash
-mcode provider add --name my-provider --base-url https://example.com/v1 \
-  --api-format openai-completions --model my-model \
-  --api-key-env MCODE_PROVIDER_API_KEY --use
-mcode
-```
+跟进回复与工具执行，审阅文件变更，并在工作区面板中查看文件、Diff、终端和预览。在输入框中选择权限模式，控制 Agent 如何请求操作批准。
 
-`--use` 会先测试第一个模型，成功后保存并设为默认模型；连接测试失败时不保存。省略 `--use` 则仅保存，不测试，也不改变默认模型。对于自定义或本地模型，可添加 `--context-limit 32768 --output-limit 4096`（请填写服务器的实际限制）。两个值都必须是正安全整数，并应用于所有重复指定的 `--model`。可通过 `mcode provider list --json` 查看已配置的限制。省略这两个参数时保持现有的模型限制默认值。
-
-支持 `openai-completions`、`openai-responses` 和 `anthropic-messages`。连接测试、单次模型切换及环境变量设置见 [模型示例](docs/examples.md#2-choose-your-own-model)。
-
-通过该命令添加的提供方保存在当前 profile `config.yaml` 的 `custom_provider` 下；第三方或自建端点一律走这条路径，`minimax_api` 保留给官方 MiniMax API。若中转端点只提供 Anthropic 兼容接口且要求 `Authorization: Bearer` 鉴权，可在 `config.yaml` 中为提供方配置自定义 headers；见[第三方中转与自定义鉴权头](docs/examples.md#third-party-relays-and-custom-auth-headers)。
-
-</details>
-
-### 3. 做一个自己的桌面宠物
-
-克隆仓库，把起始工程复制到独立目录：
-
-```bash
-git clone https://github.com/MiniMax-AI/minimax-code.git
-cd minimax-code
-node examples/pocket-pet/setup.mjs ../my-pocket-pet
-cd ../my-pocket-pet
-node serve.mjs
-```
-
-打开 `http://127.0.0.1:4173`。另开一个终端，在 `my-pocket-pet` 目录运行 `mcode`，依次粘贴[第一条提示词](examples/pocket-pet/README.md#first-request)和[追加需求](examples/pocket-pet/README.md#change-the-requirement)，每次修改后刷新浏览器。
-
-想先体验成品？在仓库根目录运行 `node examples/pocket-pet/serve.mjs finished`，打开同一地址。加上 `?demo=1` 可体验有明确标识的 10 秒演示模式。
-
-[完整教程与使用条件](examples/pocket-pet) · [小型代码修复示例](examples/clamp) · [模型、搜索与工具](docs/examples.md)
-
-
-### 在自己的项目中使用
-
-进入要处理的项目目录：
-
-```bash
-cd /path/to/your/project
-mcode
-```
-
-在 TUI 中描述任务，也可以在启动时直接提交：
-
-```bash
-mcode "Find a failing test, fix the implementation, and run the relevant tests."
-```
-
-使用 `mcode init .` 生成或更新 `AGENTS.md` 项目指导。任务中应说明期望结果、修改边界和验证方式。
-
-| 入口 | 命令 | 适用场景 |
-| --- | --- | --- |
-| 交互式 TUI | `mcode [prompt]` | 探索代码、持续对话、审阅修改与权限确认。 |
-| Headless | `mcode exec [prompt]` | Shell、CI、批处理与评测。 |
-| ACP | `mcode acp` | 支持 Agent Client Protocol 的编辑器与客户端。 |
-
-### 轻量对话
-
-对于简单对话或通用知识问答，可用 `--mode lightweight` 创建新会话：
-
-```bash
-mcode --mode lightweight "解释 DNS 缓存的工作原理。"
-mcode exec --mode lightweight "概述 CAP 定理。"
-```
-
-轻量模式只发送精简的对话系统提示词，不发送工具 schema，并从提供方上下文中省略工作区
-指令、Skills、memory 块、MCP schema 和完整环境块，因此不能检查或修改本地文件。需要编程或工具能力时，请使用
-`mcode --mode standard` 或 `mcode exec --mode standard` 创建新的标准会话；省略 `--mode`
-与标准模式完全一致。
-
-模式在根会话创建时固定，因此 `--mode lightweight` 不能与 `--session` 或 `--continue`
-同时使用。子代理/子会话不会继承轻量模式，`/compact` 仍使用标准压缩上下文，ACP 与桌面端
-会话也始终使用标准模式。重新打开轻量会话时会保留该模式，并在 TUI 状态栏显示
-`Lightweight`；从轻量模式启动的 TUI 打开标准会话时仍保持标准模式，且不显示该标记。
+从其他电脑连接时，项目文件夹和终端都属于**运行服务的机器**。
 
 ### 继续之前的工作
 
-```bash
-# 恢复当前工作区最近的会话
-mcode --continue
+在侧栏重新打开项目和对话，导入会话包，排队发送后续消息，并查看任务进度。通过 **定时任务** 创建周期性或一次性工作；定时执行期间需要保持 WebUI 运行时在线。
 
-# 打开会话选择器
-mcode --session
-```
+### 从其他设备连接
 
-在 TUI 中输入 `/sessions` 查找历史会话，输入 `/help` 查看完整命令与快捷键。
-
-| 操作 | 快捷键 |
-| --- | --- |
-| 发送消息，或在任务运行中调整当前响应 | `Enter` |
-| 在任务运行中将后续消息加入队列 | `Alt+Enter` |
-| 在输入框中换行 | `Shift+Enter` |
-| 引用工作区文件或目录 | `@` |
-| 切换 Plan Mode | `Shift+Tab` |
-| 切换权限模式 | `Alt+M` |
-| 关闭面板或中断正在运行的任务；在模型回复之前中断会把消息放回输入框 | `Esc` |
-
-## 卸载
-
-卸载前请关闭正在运行的 MCode 会话，包括编辑器中的集成。先通过 `command -v mcode`（macOS / Linux / WSL）或 `Get-Command mcode -All`（PowerShell）定位命令，再按对应的安装方式操作。当前官方安装脚本**不提供卸载参数**。
-
-### 通过脚本安装
-
-以下命令会删除默认安装目录，包括两个启动器、下载的版本，以及安装器管理的 Node.js 运行时。如果使用过 `MCODE_INSTALL_DIR`，请替换为实际安装目录。删除前请先检查：早期源码构建曾将用户数据保存在 `~/.minimax-code`，自定义数据目录也可能与安装目录重合。请先备份需要保留的配置和会话。
+服务默认只监听本机回环地址。需要在局域网访问时：
 
 **macOS / Linux / WSL**
 
 ```bash
-rm -rf -- "$HOME/.minimax-code"
+WEBUI_HOST=0.0.0.0 WEBUI_OPEN_BROWSER=0 mcode-webui
 ```
-
-从安装器修改的 shell 配置文件中删除 `# MiniMax Code CLI` 注释及其下一行 PATH 配置：zsh 使用 `~/.zshrc`；bash 依次选择 `~/.bashrc`、`~/.bash_profile`、`~/.profile` 中第一个已存在的文件，均不存在时创建 `~/.bashrc`；fish 使用 `~/.config/fish/config.fish`；其他 shell 使用 `~/.profile`。对应配置为 `export PATH="/absolute/install/path/bin:$PATH"`，fish 则为 `fish_add_path -g "/absolute/install/path/bin"`。只移除 MCode 对应的条目，保留其他 PATH 设置。如果设置了 `MCODE_NO_MODIFY_PATH` 或路径已存在，安装器会跳过此修改。
 
 **Windows（PowerShell）**
 
 ```powershell
-Remove-Item -LiteralPath "$env:USERPROFILE\.minimax-code" -Recurse -Force
+$env:WEBUI_HOST = "0.0.0.0"
+$env:WEBUI_OPEN_BROWSER = "0"
+mcode-webui
 ```
 
-打开“编辑账户的环境变量”，编辑用户 **Path**，仅删除安装目录对应的条目（默认为 `%USERPROFILE%\.minimax-code`，也可能显示为展开后的绝对路径）。Windows 安装器修改的是用户 Path，不是 PowerShell 配置文件；设置 `MCODE_NO_MODIFY_PATH` 会跳过此持久化修改。
+打开终端打印的局域网地址，并保留本次启动生成的 token。远程使用 Mini App 时，还需要让共享 Mini App 端口可访问。完整配置见 [启动与访问示例](packages/webui/README.md#startup-examples)。
 
-### 通过 npm 或源码安装
+**远程** 页面还提供 MiniMax App 配对和 IM 接入，具体取决于账号及服务是否可用：
 
-全局 npm 安装请使用当初安装 MCode 时的同一套 npm 和安装前缀：
+![MiniMax Code WebUI 远程连接页面](docs/assets/webui/remote-control.png)
+
+## 卸载
+
+先按 **Ctrl+C** 停止正在运行的 WebUI，再使用安装时的同一个 npm 环境卸载：
 
 ```bash
-npm uninstall -g @minimax-ai/code
+npm uninstall --global @minimax-webui/minimax-code
 ```
 
-源码构建请先保存工作，再仅删除自己创建的源码目录，详见[更新或移除](docs/installation.md#update-or-remove)。
-
-卸载后重新打开终端（编辑器集成终端需要完全重启编辑器），再次运行 `command -v mcode` 或 `Get-Command mcode -All`。没有结果表示 PATH 中已找不到该命令。如果出现另一份安装，请先确认它的安装方式再移除。
-
-### 可选：删除用户数据
-
-移除程序会保留单独存储的用户数据。如果还要删除本地登录状态、提供方配置、缓存和会话，请先按[账号与数据](docs/installation.md#accounts-and-data)确认实际数据目录，并备份需要保留的内容。其他 MCode 安装可能共用该目录。以下命令仅适用于默认的 `~/.minimax`：
-
-```bash
-# macOS / Linux / WSL — 永久删除默认用户数据
-rm -rf -- "$HOME/.minimax"
-```
-
-```powershell
-# Windows — 永久删除默认用户数据
-Remove-Item -LiteralPath "$env:USERPROFILE\.minimax" -Recurse -Force
-```
-
-profile 使用 `~/.minimax-<profile>`；`MINIMAX_DATA_DIR` 或 `MAVIS_DATA_DIR` 可以指定其他位置。只删除确定不再需要的具体目录，不要使用通配符批量删除。如果不再需要自行添加的 MCode 环境变量，也请从 shell 配置或用户环境变量设置中移除对应赋值。
+卸载程序会保留运行时数据目录。删除数据前，请备份账号配置与会话，核对 `MINIMAX_DATA_DIR`，并确认是否有其他 CLI 或 WebUI 安装共用该目录。
 
 ## 可以做什么
 
-| 场景 | 使用方式 |
+| 任务 | 能力 |
 | --- | --- |
-| **修改与验证代码** | 读取文件、编辑 diff、执行 Shell 和测试；通过权限与沙箱控制工具执行。 |
-| **选择模型** | MiniMax 账号 / Token Plan，或兼容 OpenAI、Anthropic 格式的自定义提供方。 |
-| **搜索与多模态** | 内置搜索、`mcode-tools` 媒体工具、MCP 和托管连接器；按账号权限和服务额度使用。 |
-| **延续工作** | 会话恢复、任务规划、子 Agent、官方 / 本地 / GitHub 插件与内置 Skills。 |
-| **接入工作流** | Headless CLI 用于脚本任务，ACP 用于兼容的编辑器和客户端。 |
+| **修改并验证代码** | 让 Agent 查看项目、修改文件、运行命令与测试，并展示变更供你审阅。 |
+| **结合上下文审阅工作** | 在对话旁查看文件、Diff、终端、渲染后的文档和预览。 |
+| **选择自己的模型** | 使用 MiniMax 账号模型、官方 MiniMax API、自定义兼容接口及支持的 OAuth 服务，调整各模型提供的控制项。 |
+| **扩展工作区** | 安装和管理插件、Skills、MCP 服务及可在浏览器运行的 Mini App。 |
+| **使用浏览器工具** | 配置隔离 Chromium 或配对 Chrome/Edge 扩展；可用能力取决于所选浏览器提供方及配置。 |
+| **持续推进任务** | 继续历史对话、使用子 Agent、排队发送后续消息，并创建定时任务。 |
+| **远程连接** | 从浏览器访问部署在另一台机器上的 WebUI，或通过远程页面使用支持的手机与 IM 集成。 |
 
-账号、更新、反馈与诊断能力也在。托管工具需要网络和相应授权，详细边界见 [能力与服务边界](docs/tui-capabilities.md)。
+![插件与技能市场](docs/assets/webui/plugins.png)
 
+插件与 Mini App 可能需要特定平台能力、额外配置或外部账号。托管搜索、媒体与连接器工具需要相应的 beta 设置、授权和服务权限。当前限制见 [已知能力缺口与服务边界](packages/webui/docs/known-gaps.md)。
 
 ## 从源码构建
 
-开发 MCode 或运行本仓库源码需要 Git、Node.js **22.19+（22 系列）、24.2+（24 系列）、25 或 26**，以及 **pnpm 9.12.0**。在 Windows 上，请将源码放在本地 NTFS 卷上，并避开云同步目录；下面的预检命令会在 pnpm 创建 workspace link 前检查卷类型。
+需要 Git、支持的 Node.js 版本以及 **pnpm 9.12.0**。Windows 上请把仓库放在本地 NTFS 卷中，并避开云同步目录。
+
 ```bash
-git clone https://github.com/MiniMax-AI/minimax-code.git
+git clone https://github.com/mcode-webui/minimax-code.git
 cd minimax-code
+git switch webui
 node scripts/check-windows-source-location.mjs
 pnpm install --frozen-lockfile
-pnpm build
-pnpm mcode
+pnpm build:webui
+pnpm --filter @mavis/webui dev:server
 ```
 
-首次构建需要联网；依赖和经过校验的 `mcode-tools` 均来自公共 npm。pnpm 安装、系统依赖和更新方法见[源码安装指南](docs/installation.md)。
+打开服务打印的地址，默认通过 `2233` 端口访问构建后的客户端。首次构建需要联网下载依赖和构建资源。
 
-从源码目录运行时，将上方示例中的 `mcode` 替换为 `pnpm mcode`。要在自己的项目中工作，先切换到项目目录，再运行构建产物：
+开发时如需客户端热更新，保持运行时服务在线，并在第二个终端运行：
 
 ```bash
-node /absolute/path/to/minimax-code/dist/cli.js
+pnpm dev:webui
 ```
 
-本仓库目标为 **0.6.3 源码预览**。安装已发布的包与构建本仓库是两条独立路径，版本一致不代表构建来源完全相同，详见[版本与证据基线](docs/open-source-status.md#version-and-evidence-baseline)。
+打开 `http://localhost:5173/`。端口调整与本地 npm 包构建方法见 [WebUI 开发指南](packages/webui/README.md#run-from-source)。
+
+### 配置
+
+| 环境变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `WEBUI_HOST` | `127.0.0.1` | 服务监听地址。 |
+| `WEBUI_SERVER_PORT` | `2233` | WebUI HTTP 与 WebSocket 端口。 |
+| `WEBUI_MINIAPP_PORT` | `49152` | 共享 Mini App HTTP 与 WebSocket 端口。 |
+| `MINIMAX_DATA_DIR` | `~/.minimax` | 账号、配置与会话数据目录。 |
+| `WEBUI_OPEN_BROWSER` | 标准输出为终端时打开 | 设置为 `0` 可关闭自动打开浏览器。 |
+
+安装包启动器还支持 `--full-access`，用于关闭 WebUI HTTP、WebSocket 和 Mini App 服务的 token 验证；任何能访问这些服务的人都可以使用相应的 WebUI 操作。它不改变 Agent 工具权限或监听地址。不加该参数即可保留默认 token 策略，详见 [访问选项](packages/webui/README.md#access-without-a-webui-token)。
 
 ## 文档与贡献
 
-- [安装与更新](docs/installation.md) · [使用示例](docs/examples.md) · [TUI 状态栏](packages/tui/docs/status-line-config.md)
-- [贡献指南](CONTRIBUTING.md) · [报告 Bug / 提出建议](https://github.com/MiniMax-AI/minimax-code/issues/new/choose) · [报告安全问题](SECURITY.md)
-- [全部文档](docs/README.md)：架构、能力对照、验证记录、源码同步和发布流程。
+- [WebUI 安装、配置和运行](packages/webui/README.md)
+- [WebUI 架构与技术文档](packages/webui/docs/README.md)
+- [贡献指南](CONTRIBUTING.md) · [WebUI 开发规范](packages/webui/AGENTS.md)
+- [上游 CLI 与共享运行时文档](docs/README.md)
 
-项目文档以英文为主，本页为首页的简体中文译文。
+英文是主要文档语言，本页与 [英文 README](README.md) 对应。贡献和审阅要求见贡献指南。
 
-目前仅接受仓库协作者提交代码和文档 Pull Request。如果你不是协作者，但有想法或方案，欢迎先通过 [Issue](https://github.com/MiniMax-AI/minimax-code/issues/new/choose) 讨论。请在报告中移除密钥、账号信息和私人项目内容。
+## 反馈与联系
 
-## 桌面版与问题反馈
-
-<a href="https://agent.minimaxi.com/download" title="下载 MiniMax Code">
-  <img src="https://filecdn.minimax.chat/public/c3ebbd2e-f55b-48d7-adff-030abb63e06d.png" alt="MiniMax Code 桌面版 — 点击下载" width="100%" />
-</a>
-
-[下载 macOS 或 Windows 桌面版](https://agent.minimaxi.com/download) · [报告问题或提问](https://github.com/MiniMax-AI/minimax-code/issues/new/choose)
-
-本仓库也承接 MiniMax Code 桌面版的问题反馈。公开源码范围为终端 TUI、Headless CLI 和 ACP，不包含桌面应用源码。提交 Issue 时请选择对应产品。桌面版问题请注明应用版本、操作系统，以及「设置 → 通用 → 上传日志」生成的日志上传 ID（如可用）；CLI 问题请注明 `mcode --version`、运行入口与最小复现。报告中请移除凭据和私人项目内容。
-
-## 反馈与联系我们
-
-| 渠道 | 适用场景 |
+| 渠道 | 用途 |
 | --- | --- |
-| [GitHub Issues](https://github.com/MiniMax-AI/minimax-code/issues/new/choose) | 公开报告 CLI 或桌面版的 Bug、提出功能建议与使用问题。 |
-| [MiniMaxCode@minimax.io](mailto:MiniMaxCode@minimax.io) | 一般反馈与支持咨询。 |
-| [security.mcode@minimax.io](mailto:security.mcode@minimax.io) | 私密报告安全漏洞。请通过此邮箱发送复现步骤和脱敏证据，详见[安全报告指南](SECURITY.md)。 |
-| [Discord](https://minimax.io/discord) | 社区交流与反馈。 |
-| [飞书反馈群二维码](https://cdn.hailuoai.com/hailuo-video-web/public_assets/minimax_code_feishu_group_url.png) | 中文社区反馈。使用飞书扫码，或在中文版桌面应用的用户菜单 → **联系我们 → 飞书** 中查看二维码。 |
+| [WebUI GitHub Issues](https://github.com/mcode-webui/minimax-code/issues) | WebUI 问题反馈、功能建议和使用问题。 |
+| [上游 MiniMax Code](https://github.com/MiniMax-AI/minimax-code) | 上游 CLI、桌面产品信息与原项目。 |
+| [安全政策](SECURITY.md) | 漏洞报告方式；请勿在公开 Issue 中披露利用细节和凭证。 |
 
-也可关注 [MiniMax 的 X 账号](https://x.com/MiniMaxAgent) 获取动态。请勿在公开 Issue 或社区聊天中发布漏洞细节、凭据和私人项目内容。
+报告 WebUI 问题时，请提供 `mcode-webui --version`、操作系统与 Node.js 版本、安装方式以及最小复现步骤。请移除凭证、账号信息与私有项目内容。
 
 ## 许可
 
-第一方代码默认采用 [MIT](LICENSE)；文件或子包已有独立声明时保留原许可。依赖、资源与 `mcode-tools` 的许可分别见 [第三方声明](THIRD_PARTY_NOTICES.md) 和 [许可状态](LICENSE-STATUS.md)。
+第一方代码默认采用 [MIT](LICENSE)。现有文件级和包级许可继续保留。依赖、素材与 `mcode-tools` 的说明见 [第三方声明](THIRD_PARTY_NOTICES.md) 和 [许可状态](LICENSE-STATUS.md)。

@@ -26,6 +26,29 @@ import { extensionIdFromPublicKey, parseExtensionIdList, readStoreExtensionIds }
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
+test('public WebUI CI runs only WebUI checks and cannot publish packages', () => {
+  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/webui-ci.yml', import.meta.url), 'utf8'));
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  assert.ok(Object.hasOwn(workflow.on, 'pull_request'));
+  assert.ok(Object.hasOwn(workflow.on, 'workflow_dispatch'));
+  assert.deepEqual(workflow.permissions, { contents: 'read' });
+  assert.deepEqual(Object.keys(workflow.jobs), ['webui']);
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const job = workflow.jobs.webui;
+  assert.deepEqual(job.strategy.matrix.os, ['ubuntu-latest', 'macos-latest']);
+  const commands = job.steps.filter(step => step.run).map(step => step.run);
+  for (const command of commands) {
+    if (command === 'pnpm install --frozen-lockfile' || command === 'pnpm exec playwright install-deps chromium') continue;
+    assert.match(command, /^pnpm (?:typecheck|check|build|install|test):webui(?:-[a-z]+)?$/);
+    assert.ok(Object.hasOwn(manifest.scripts, command.slice('pnpm '.length)), command);
+  }
+  for (const command of ['pnpm typecheck:webui', 'pnpm build:webui', 'pnpm test:webui', 'pnpm test:webui-browser', 'pnpm test:webui-package']) {
+    assert.ok(commands.includes(command), `Missing ${command}`);
+  }
+  assert.ok(commands.indexOf('pnpm build:webui') < commands.indexOf('pnpm test:webui-browser'));
+  assert.equal(job.steps.find(step => step.run === 'pnpm test:webui-browser').if, "runner.os == 'Linux'");
+});
+
 test('coverage review distinguishes declared browser scenarios from executed evidence', () => {
   const output = execFileSync(process.execPath, ['scripts/coverage-review.mjs', '--check'], { encoding: 'utf8' });
   const evidence = JSON.parse(readFileSync(new URL('../scripts/lib/webui-browser-coverage-evidence.json', import.meta.url), 'utf8'));

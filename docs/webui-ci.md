@@ -21,18 +21,20 @@ skip the browser or package suites on macOS or Windows. This coverage declaratio
 does not establish a passing run; platform and visual-baseline failures remain
 visible and require diagnosis rather than relaxed assertions.
 
-## Repository settings
+## Active and archived workflows
 
-The following inherited workflows are disabled in the public repository's Actions
-settings: Source verification, CLI release, Node compatibility, Performance,
+Only `webui-ci.yml` remains in `.github/workflows/`. The following inherited
+workflows are archived under `.github/legacy-workflows/`: Source verification,
+CLI release, Node compatibility, Performance,
 Release audit, Source candidate, Label issue product, Sync GitHub issues to
-Feishu, and WebUI npm preview. Their files remain in Git for recovery and for
-the existing local workflow-contract tests. In particular, npm publishing is
-disabled, including manual runs of the preview workflow.
+Feishu, and WebUI npm preview. GitHub does not discover workflows in that
+directory. Their content is preserved for recovery and the existing local
+workflow-contract tests. npm publishing has no active workflow entry point.
 
-GitHub workflow disablement is repository configuration, not a YAML change.
-Copying the repository to another GitHub repository does not copy that setting;
-configure the active workflows there before pushing or publishing tags.
+The legacy workflows also remain disabled in repository settings, but the
+source archive is what makes this scope portable to a new checkout or repository.
+Restoring a legacy YAML file to `.github/workflows/` would restore its triggers;
+the workflow-contract test rejects additional active YAML files.
 Dependabot can still create dependency-update PRs; those PRs run WebUI CI.
 
 The local `pnpm verify`, its profiles, all existing gate scripts and package

@@ -7,7 +7,13 @@ publishes a new preview version. No tag, no version edit, no manual step.
 
 ## How a release happens
 
-`.github/workflows/webui-npm-preview.yml` runs on `push` to `webui` and on
+The npm publishing workflow is archived at
+`.github/legacy-workflows/webui-npm-preview.yml` and disabled in the public
+repository. The description below records its behavior if explicitly restored;
+there is currently no automatic or manual npm publishing workflow. See
+[`WebUI-only CI`](../../../docs/webui-ci.md) for the active verification scope.
+
+The archived workflow was configured to run on `push` to `webui` and on
 `workflow_dispatch`. It:
 
 1. installs the workspace with a frozen lockfile;

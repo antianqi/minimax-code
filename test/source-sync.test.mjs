@@ -27,6 +27,9 @@ import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
 test('public WebUI CI runs only WebUI checks and cannot publish packages', () => {
+  const activeWorkflows = readdirSync(new URL('../.github/workflows/', import.meta.url))
+    .filter(name => /\.ya?ml$/.test(name)).sort();
+  assert.deepEqual(activeWorkflows, ['webui-ci.yml']);
   const workflow = parseYaml(readFileSync(new URL('../.github/workflows/webui-ci.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.ok(Object.hasOwn(workflow.on, 'pull_request'));
@@ -341,7 +344,7 @@ test('performance defaults to the 100-round suite; long history requires explici
   assert.deepEqual(selectScenarios(config, { scenario: 'startup' }).map(s => s.id), ['startup']);
   assert.throws(() => selectScenarios(config, { suite: 'typo' }));
   assert.throws(() => selectScenarios(config, { scenario: 'typo' }));
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   assert.equal(workflow.on.workflow_dispatch.inputs.suite.default, 'full');
   assert.deepEqual(workflow.on.workflow_dispatch.inputs.suite.options, ['full', 'basic']);
   const compare = workflow.jobs.performance.steps.find(s => s.name === 'Compare on this runner');
@@ -350,7 +353,7 @@ test('performance defaults to the 100-round suite; long history requires explici
 });
 
 test('performance labels select full coverage without interrupting checks for unrelated labels', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   const job = workflow.jobs.performance;
   assert.deepEqual(workflow.on.pull_request.types, ['opened', 'synchronize', 'reopened', 'labeled', 'unlabeled']);
   assert.equal(job.strategy.matrix.suite, `\${{ fromJSON((inputs.suite == 'full' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'perf:full'))) && '["full"]' || '["basic"]') }}`);
@@ -441,7 +444,7 @@ test('performance exit codes fail regressions and errors but not inconclusive no
 });
 
 test('performance workflow warns on basic inconclusive runs but fails full inconclusive runs', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   const compare = workflow.jobs.performance.steps.find(s => s.name === 'Compare on this runner');
   assert.match(compare.run, /\|\| status=\$\?/);
   assert.match(compare.run, /if \[ "\$status" -eq 2 \]/);
@@ -507,7 +510,7 @@ test('performance measurements require complete successful tool execution', () =
 });
 
 test('performance workflow uses pinned mock input and an unprivileged PR job', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   const config = JSON.parse(readFileSync(new URL('../scripts/perf/config.json', import.meta.url), 'utf8'));
   assert.ok(Object.hasOwn(workflow.on, 'pull_request'));
   assert.ok(!Object.hasOwn(workflow.on, 'pull_request_target'));
@@ -665,7 +668,7 @@ test('CLI publication requires every supported installation receipt for the exac
 });
 
 test('CLI release publishes only tag pushes after full verification and archive installation', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/cli-release.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/cli-release.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on.push, { tags: ['v*'] });
   assert.equal(workflow.on.workflow_dispatch.inputs.tag.required, false);
   assert.equal(workflow.permissions.contents, 'read');
@@ -949,7 +952,7 @@ test('change classification is conservative for mixed changes, metadata and miss
 
 test('CI aggregate rejects failed, cancelled, missing and unexpectedly skipped checks', { skip: process.platform === 'win32' }, () => {
   // This shell step only runs on the aggregate job's Ubuntu runner.
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/ci.yml', import.meta.url), 'utf8'));
   const script = workflow.jobs.verification.steps[0].run;
   const full = { CLASSIFICATION: 'success', DOCS_ONLY: 'false', DOCS_RESULT: 'skipped', MATRIX_RESULT: 'success' };
   const docs = { CLASSIFICATION: 'success', DOCS_ONLY: 'true', DOCS_RESULT: 'success', MATRIX_RESULT: 'skipped' };
@@ -971,7 +974,7 @@ test('CI aggregate rejects failed, cancelled, missing and unexpectedly skipped c
 });
 
 test('ordinary CI runs a focused Windows contract while compatibility remains macOS/Linux', () => {
-  const readWorkflow = name => parseYaml(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
+  const readWorkflow = name => parseYaml(readFileSync(new URL(`../.github/legacy-workflows/${name}.yml`, import.meta.url), 'utf8'));
   const ci = readWorkflow('ci');
   assert.ok(Object.hasOwn(ci.on, 'pull_request'));
   assert.deepEqual(ci.on.push.branches, ['main']);
@@ -997,7 +1000,7 @@ test('ordinary CI runs a focused Windows contract while compatibility remains ma
   assert.ok(audit.jobs['source-history-artifact'].steps.some(step => step.run?.includes('gitleaks dir dist')));
 });
 test('manual source candidates pin every checkout and receipt to the selected revision', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/source-candidate.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/source-candidate.yml', import.meta.url), 'utf8'));
   assert.deepEqual(Object.keys(workflow.on).sort(), ['workflow_call', 'workflow_dispatch']);
   assert.equal(workflow.on.workflow_call.inputs.revision.required, true);
   assert.equal(workflow.env.MCODE_CANDIDATE_REVISION, '${{ inputs.revision || github.sha }}');
@@ -1256,7 +1259,7 @@ test('public support forms preserve destination URLs and separate Desktop from C
 });
 
 test('issue product labels follow current form answers without replacing unrelated labels', async () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/label-issue-product.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/label-issue-product.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on, { issues: { types: ['opened', 'edited'] } });
   assert.deepEqual(workflow.permissions, { issues: 'write' });
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
@@ -1322,7 +1325,7 @@ test('issue forms label incoming reports for triage and retain collaborator-only
 });
 
 test('issue notification is restricted to public destination events and builds payloads offline', t => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/sync-issue-to-feishu.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/sync-issue-to-feishu.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on, { issues: { types: ['opened'] } });
   assert.deepEqual(workflow.permissions, { contents: 'read', issues: 'read' });
   const job = workflow.jobs['notify-feishu'];

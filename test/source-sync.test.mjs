@@ -36,7 +36,7 @@ test('public WebUI CI runs only WebUI checks and cannot publish packages', () =>
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const job = workflow.jobs.webui;
   assert.equal(job.env, undefined);
-  assert.deepEqual(job.strategy.matrix.os, ['ubuntu-latest', 'macos-latest']);
+  assert.deepEqual(job.strategy.matrix.os, ['ubuntu-latest', 'macos-latest', 'windows-latest']);
   const directories = job.steps.find(step => step.name === 'Set isolated WebUI output directories');
   assert.equal(directories.shell, 'bash');
   assert.match(directories.run, /MCODE_WEBUI_VERIFY_DIR=\$RUNNER_TEMP\//);
@@ -51,7 +51,9 @@ test('public WebUI CI runs only WebUI checks and cannot publish packages', () =>
     assert.ok(commands.includes(command), `Missing ${command}`);
   }
   assert.ok(commands.indexOf('pnpm build:webui') < commands.indexOf('pnpm test:webui-browser'));
-  assert.equal(job.steps.find(step => step.run === 'pnpm test:webui-browser').if, "runner.os == 'Linux'");
+  for (const command of ['pnpm test:webui', 'pnpm test:webui-browser', 'pnpm test:webui-package']) {
+    assert.equal(job.steps.find(step => step.run === command).if, undefined, `${command} must run on every platform`);
+  }
 });
 
 test('coverage review distinguishes declared browser scenarios from executed evidence', () => {

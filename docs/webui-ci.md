@@ -5,17 +5,21 @@ The public `mcode-webui/minimax-code` repository uses
 runs. It executes existing WebUI commands directly. It does not invoke the
 repository-wide `pnpm verify` pipeline or publish packages.
 
-| Coverage | Linux / Node 24 | macOS / Node 24 |
-| --- | --- | --- |
-| WebUI server, client and test types | Yes | Yes |
-| Dependency, presentation, motion, overlay and feedback rules | Yes | Yes |
-| WebUI build and bundle boundaries | Yes | Yes |
-| WebUI unit and integration tests | Yes | Yes |
-| Playwright browser scenarios | Yes | No |
-| npm package build, installation and launcher verification | Yes | Yes |
+| Coverage | Linux / Node 24 | macOS / Node 24 | Windows / Node 24 |
+| --- | --- | --- | --- |
+| WebUI server, client and test types | Yes | Yes | Yes |
+| Dependency, presentation, motion, overlay and feedback rules | Yes | Yes | Yes |
+| WebUI build and bundle boundaries | Yes | Yes | Yes |
+| WebUI unit and integration tests | Yes | Yes | Yes |
+| Playwright browser scenarios | Yes | Yes | Yes |
+| npm package build, installation and launcher verification | Yes | Yes | Yes |
 
 Package verification uses an isolated installation and does not publish to npm.
 Browser failure diagnostics are retained as Actions artifacts for seven days.
+Only installation of Linux system dependencies is platform-gated. CI does not
+skip the browser or package suites on macOS or Windows. This coverage declaration
+does not establish a passing run; platform and visual-baseline failures remain
+visible and require diagnosis rather than relaxed assertions.
 
 ## Repository settings
 

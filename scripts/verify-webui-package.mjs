@@ -109,7 +109,7 @@ try {
       MAVIS_BROWSER_STORE_CHROME_EXTENSION_IDS: SELF_HOSTED_EXTENSION_ID,
       MAVIS_BROWSER_CHROME_EXTENSION_IDS: DEVELOPMENT_EXTENSION_ID,
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let output = "";
   child.stdout.on("data", (chunk) => { output = (output + chunk).slice(-32_768); });
@@ -177,7 +177,8 @@ try {
   const refused = await bridgeUpgrade(port, DEVELOPMENT_EXTENSION_ID);
   if (refused) throw new Error("The installed WebUI accepted a development extension identity");
   const exited = once(child, "exit");
-  child.kill("SIGTERM");
+  if (process.platform === "win32") child.send({ type: "mcode-webui:shutdown" });
+  else child.kill("SIGTERM");
   const [code, signal] = await Promise.race([exited, new Promise((_, reject) => setTimeout(() => reject(new Error("Installed WebUI shutdown timed out")), 10_000).unref())]);
   if (code !== 0 || signal !== null) throw new Error(`Installed WebUI shutdown failed: ${code ?? signal}`);
   child = undefined;

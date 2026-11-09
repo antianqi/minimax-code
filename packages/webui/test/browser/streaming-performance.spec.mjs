@@ -23,6 +23,10 @@ import { expect } from "@playwright/test";
 
 import { openApp, startTurn, test } from "./harness.mjs";
 
+// Keep trace diagnostics without charging Playwright's injected DOM snapshot
+// traversal to the real client's frame and long-task budgets.
+test.use({ trace: { mode: "retain-on-failure", snapshots: false, screenshots: true, sources: true } });
+
 /** A reply body that exercises the markdown path: prose, a list and a fence. */
 function replyChunk(index) {
   return [

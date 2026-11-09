@@ -245,9 +245,22 @@ test("the left rail 应用 entry opens a frosted task-card panel with loaded ico
   await expect.poll(() => icon.evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(iconWidthBeforeHover * 1.05);
   expect(previewBox.width).toBeGreaterThan(105);
   expect(previewBox.width).toBeLessThan(130);
+  await launcher.evaluate((element) => {
+    window.__miniappLauncherExit = undefined;
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute("data-webui-motion-state") !== "exit") return;
+      window.__miniappLauncherExit = {
+        state: element.getAttribute("data-webui-motion-state"),
+        animation: getComputedStyle(element).animationName,
+      };
+      observer.disconnect();
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ["data-webui-motion-state"] });
+  });
   await launcher.getByRole("button", { name: "关闭应用面板" }).click();
-  await expect(launcher).toHaveAttribute("data-webui-motion-state", "exit");
-  await expect(launcher).toHaveCSS("animation-name", "webui-motion-surface-exit");
+  await expect.poll(() => page.evaluate(() => window.__miniappLauncherExit)).toEqual({
+    state: "exit", animation: "webui-motion-surface-exit",
+  });
   await expect(launcher).toHaveCount(0);
 });
 

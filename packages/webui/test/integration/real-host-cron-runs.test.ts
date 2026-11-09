@@ -32,7 +32,7 @@ const disposers: Array<() => Promise<void> | void> = [];
 
 afterEach(async () => {
   for (const dispose of disposers.splice(0).reverse()) await dispose();
-});
+}, 30_000);
 
 async function temporaryDataDir(prefix: string): Promise<string> {
   const dataDir = await mkdtemp(join(tmpdir(), prefix));

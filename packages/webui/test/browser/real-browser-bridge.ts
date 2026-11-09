@@ -78,11 +78,11 @@ export async function buildExtension(
     readonly publicKey?: string;
   } = {},
 ): Promise<void> {
-  const args = ["--filter", "@mavis/browser-extension", "build"];
+  const args = [join(repoRoot, "packages/browser-extension/scripts/build.mjs")];
   if (options.store) args.push("--store", options.store);
   if (options.out) args.push("--out", options.out);
-  await run("pnpm", args, {
-    cwd: repoRoot,
+  await run(process.execPath, args, {
+    cwd: join(repoRoot, "packages/browser-extension"),
     timeout: 120_000,
     env: options.store && options.publicKey
       ? {

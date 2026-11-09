@@ -75,7 +75,7 @@ test.afterEach(async ({ page }) => {
   expect(await page.evaluate(() => window.__WEBUI_TEST_SERVER_ID__)).toBe(expectedServerId());
 });
 
-export async function openApp(page, hash = "#session=A") {
+export async function openApp(page, hash = "#session=A", options = {}) {
   await page.goto(`/${hash}`);
   await assertHarnessServer(page);
   await expect(page.locator("#webui-root")).toBeVisible();
@@ -86,11 +86,48 @@ export async function openApp(page, hash = "#session=A") {
       document.fonts.load('14px "Hack"'),
     ]);
     await document.fonts.ready;
-    // Let ResizeObserver and its React commit finish before reading geometry.
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     return faces.map((fonts) => fonts.length);
   });
   expect(loadedFonts, "both pinned browser fonts must load before measuring the client").toEqual([1, 1]);
+  // Register the frame wait before advancing a deliberately frozen test clock.
+  await page.evaluate(() => {
+    window.__webuiInitialLayoutReady = new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  if (options.advanceClockForLayout) await page.clock.runFor(34);
+  await page.evaluate(() => window.__webuiInitialLayoutReady);
+}
+
+/** Capture real CSS interpolation before driver round trips can consume it. */
+export async function pauseNextTransition(locator, property) {
+  await locator.evaluate((element, property) => {
+    element.__webuiTestTransition = undefined;
+    const capture = (event) => {
+      if (event.target !== element || event.propertyName !== property) return;
+      element.removeEventListener("transitionrun", capture);
+      const transition = element.getAnimations().find((animation) => animation instanceof CSSTransition && animation.transitionProperty === property);
+      if (!transition) throw new Error(`The ${property} transition did not start`);
+      const duration = transition.effect.getTiming().duration;
+      if (typeof duration !== "number" || duration <= 0) throw new Error("The transition must have a finite positive duration");
+      transition.pause();
+      transition.currentTime = duration / 2;
+      element.__webuiTestTransition = transition;
+    };
+    element.addEventListener("transitionrun", capture);
+  }, property);
+}
+
+export async function transitionMidpointSize(locator, dimension) {
+  await expect.poll(() => locator.evaluate((element) => Boolean(element.__webuiTestTransition))).toBe(true);
+  return locator.evaluate((element, dimension) => element.getBoundingClientRect()[dimension], dimension);
+}
+
+export async function finishCapturedTransition(locator) {
+  await locator.evaluate(async (element) => {
+    const transition = element.__webuiTestTransition;
+    if (!transition) throw new Error("No captured transition to finish");
+    transition.finish();
+    await transition.finished;
+  });
 }
 
 export async function switchSession(page, sessionId) {

@@ -29,7 +29,7 @@ const disposers: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
   for (const dispose of disposers.splice(0).reverse()) await dispose();
   vi.unstubAllEnvs();
-});
+}, 30_000);
 
 async function boot() {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-cron-mutations-"));

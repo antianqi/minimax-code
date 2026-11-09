@@ -166,6 +166,13 @@ Headless Chromium runs without the virtual display's frame-rate limiter. Frame-g
 budgets are still measured in elapsed milliseconds, with their original thresholds. This separates
 the client workload from a VM compositor's presentation clock rather than accepting dropped frames.
 
+The workspace-panel performance cases retain action traces, screenshots and sources without DOM
+snapshot collection: Chromium CPU profiles showed Playwright's injected snapshot walker inside the
+drag measurement. The drag still runs through real pointer input and retains the 50 ms long-task
+budget. Disclosure cases capture the actual CSS transition, inspect its interpolated midpoint and
+finish it before checking the final geometry, instead of racing a fixed delay against driver latency.
+Tests that deliberately freeze the browser clock advance it explicitly for the initial layout frames.
+
 That also removes the trap the previous arrangement carried. The gate used to depend on the CJK
 fonts that `playwright install --with-deps chromium` pulled in, so the installed set changed with
 the CI image and a runner without them rendered tofu boxes — a baseline change that was not a

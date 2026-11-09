@@ -340,6 +340,7 @@ test("closing a modal returns focus to the control that opened it, never the bod
 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "设置" })).toHaveCount(0);
+  await expect(page.getByTestId("user-menu-settings")).toBeFocused();
 
   const focused = await page.evaluate(() => {
     const element = document.activeElement;

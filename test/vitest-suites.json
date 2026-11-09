@@ -111,6 +111,7 @@
       "packages/agent-modules/mcp/test/name-registry.test.ts",
       "packages/agent-modules/mcp/test/stdio-max-message-bytes.test.ts",
       "packages/agent-modules/mcp/test/tool-name.test.ts",
+      "packages/agent-modules/skills/test/directory-watcher.test.ts",
       "packages/agent-modules/runaway-guard/test/guard.test.ts",
       "packages/local-runtime-v2/src/service/model-system/catalog/agent-model-selection.test.ts",
       "packages/local-runtime-v2/src/service/model-system/catalog/catalog.test.ts",

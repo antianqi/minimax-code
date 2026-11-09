@@ -851,8 +851,8 @@ importers:
         specifier: 8.18.0
         version: 8.18.0
       chalk:
-        specifier: ^5
-        version: 5.6.2
+        specifier: ^6
+        version: 6.0.1
       cli-highlight:
         specifier: ^2.1.11
         version: 2.1.11
@@ -957,6 +957,9 @@ importers:
       '@xterm/xterm':
         specifier: 6.0.0
         version: 6.0.0
+      better-sqlite3:
+        specifier: 12.11.1
+        version: 12.11.1
       highlight.js:
         specifier: 10.7.3
         version: 10.7.3
@@ -975,9 +978,6 @@ importers:
       node-pty:
         specifier: 1.1.0
         version: 1.1.0
-      better-sqlite3:
-        specifier: 12.11.1
-        version: 12.11.1
       qrcode.react:
         specifier: 4.2.0
         version: 4.2.0(react@18.3.1)
@@ -1120,8 +1120,8 @@ importers:
         specifier: 0.3.4
         version: 0.3.4
       chalk:
-        specifier: 5.6.2
-        version: 5.6.2
+        specifier: 6.0.1
+        version: 6.0.1
       cross-spawn:
         specifier: 7.0.6
         version: 7.0.6
@@ -1204,8 +1204,8 @@ importers:
         specifier: 5.5.0
         version: 5.5.0
       chalk:
-        specifier: 5.6.2
-        version: 5.6.2
+        specifier: 6.0.1
+        version: 6.0.1
 
   third_party/sandbox-runtime:
     dependencies:
@@ -2178,6 +2178,9 @@ packages:
   '@smithy/core@3.33.3':
     resolution: {integrity: sha512-CsOeKq/9kA3y6VJHt+/+VTCtBaxJ4OTFpgrjIUhPpDIKxBci1k2bJaQASF2h/ELWrulGp+t97DZ0mevfAD8idg==}
     engines: {node: '>=18.0.0'}
+    deprecated: |-
+      Deprecated due to a bug in custom logger data redaction. Upgrade to the latest version. If you used a custom logger with this
+        version, review your logs and rotate any credentials or other secrets. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.5.2':
     resolution: {integrity: sha512-A9uSdn72ozbRUSit0eib0TW7nXuNPlaeM0zcGkJ+nE6tFcSDbnmtwoxbTCFBukVQcszDAyvsd7+rTduPTXpygg==}
@@ -2865,9 +2868,9 @@ packages:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
     engines: {node: '>=10'}
 
-  chalk@5.6.2:
-    resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
-    engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
+  chalk@6.0.1:
+    resolution: {integrity: sha512-/Ce6KNm3vIbWdMlNna6RVIZ/ICQxnJxCicet5LBKK9ZffBkqzDw0xh9EiKSljdRtiIQ1S1z4YgcscUUGzNCWrA==}
+    engines: {node: '>=22'}
 
   chevrotain@13.2.0:
     resolution: {integrity: sha512-GTouk5YzgBxlTPCaDn5q0q2EJKkrYmnPF+HmF8v0Qo4r3iyPG7HJivkN1wthCXZcm3sIcZFpGTRovLPNdJNRCA==}
@@ -6772,7 +6775,7 @@ snapshots:
       obug: 2.2.1
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@20.19.43)(@vitest/coverage-v8@4.1.11)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
+      vitest: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@20.19.43)(@vitest/coverage-v8@4.1.11)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   '@vitest/expect@4.1.11':
     dependencies:
@@ -7186,7 +7189,7 @@ snapshots:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
 
-  chalk@5.6.2: {}
+  chalk@6.0.1: {}
 
   chevrotain@13.2.0:
     dependencies:

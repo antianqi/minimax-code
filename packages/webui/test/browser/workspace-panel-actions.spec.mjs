@@ -193,6 +193,10 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   if (!bounds) throw new Error("workspace panel resize handle is not laid out");
   const panelWidthBefore = await page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width);
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Profiler.enable");
+  await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
+  await cdp.send("Profiler.start");
   // Resolve the handle before observing the drag: selector discovery is not a
   // pointer gesture, and can walk the whole expanded accessibility tree.
   await page.evaluate(() => {
@@ -210,6 +214,17 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
     window.__reviewLongTaskObserver.disconnect();
     return [...window.__reviewLongTasks, ...window.__reviewLongTaskObserver.takeRecords().map((entry) => entry.duration)];
   });
+  const { profile } = await cdp.send("Profiler.stop");
+  await test.info().attach("drag-cpu-profile.json", { body: JSON.stringify(profile), contentType: "application/json" });
+  const byId = new Map(profile.nodes.map((node) => [node.id, node]));
+  const self = new Map();
+  for (let index = 0; index < (profile.samples ?? []).length; index += 1) {
+    const frame = byId.get(profile.samples[index])?.callFrame;
+    if (!frame) continue;
+    const key = `${frame.functionName} @ ${frame.url}:${frame.lineNumber + 1}`;
+    self.set(key, (self.get(key) ?? 0) + (profile.timeDeltas[index] ?? 0));
+  }
+  console.info("DRAG CPU TOP", [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20));
   expect(dragLongTasks.filter((duration) => duration >= 50), `workspace panel drag produced ${dragLongTasks} ms long tasks`).toEqual([]);
   const lastFile = review.locator('[data-testid="turn-review-diff-file"]').last();
   await lastFile.scrollIntoViewIfNeeded();

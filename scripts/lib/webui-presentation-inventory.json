@@ -257,7 +257,7 @@
     "features/transcript/ui/TranscriptPrimitives.tsx": "710f935727950fee",
     "features/transcript/ui/TranscriptSkeletons.tsx": "cd9ed7922014279d",
     "features/transcript/ui/TurnNavigator.tsx": "3e3dbee1a59deed8",
-    "features/transcript/ui/markdown.public.tsx": "0b67429c899771d5",
+    "features/transcript/ui/markdown.public.tsx": "08cb6f9e3ea1e719",
     "features/transcript/ui/webui-mermaid.tsx": "fc1aab96c48f3a3d",
     "features/workspace/ui/WebuiWorkspaceDirectoryBrowser.public.tsx": "25ae2bc524e495b7",
     "features/workspace/ui/WebuiWorkspaceTabStrip.public.tsx": "70a32a14d51fa43a",

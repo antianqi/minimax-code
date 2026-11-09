@@ -90,7 +90,7 @@ function renderActivityParts(
       }
       index = cursor - 1;
     } else if (part.type === "text") {
-      rows.push({ messageId, element: <div className="webui-assistant-answer" key={`${messageId}-ordered-text-${index}`} data-webui-message-kind="assistant"><WebuiMarkdown source={part.text} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /></div> });
+      rows.push({ messageId, element: <div className="webui-assistant-answer" key={`${messageId}-ordered-text-${index}`} data-webui-message-kind="assistant"><WebuiMarkdown source={part.text} streaming={streaming} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /></div> });
     } else if (part.type === "cognitive" || part.type === "compaction") {
       rows.push({ messageId, element: <WebuiThinkingBlock key={`${messageId}-${part.type}-${index}`} text={part.text} streaming={streaming} processingStartedAtMs={processingStartedAtMs} summaryLabel={part.type === "compaction" ? "上下文整理" : "思考过程"} showDetailHeading={part.type !== "compaction"} showStreamingStatus={false} initiallyExpanded={part.type === "cognitive"} /> });
     } else if (part.type === "delegation") {
@@ -345,7 +345,7 @@ export function WebuiAssistantBody({
           children={renderProcessContent}
           collapsedContent={(expanded) => !expanded && (primaryAnswerPart || deliveredEntries.length > 0)
             ? <WebuiStack gap="roomy">
-                {primaryAnswerPart ? <div className="mt-2 webui-assistant-answer" data-webui-message-kind="assistant"><WebuiMarkdown source={primaryAnswerPart.text} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /></div> : null}
+                {primaryAnswerPart ? <div className="mt-2 webui-assistant-answer" data-webui-message-kind="assistant"><WebuiMarkdown source={primaryAnswerPart.text} streaming={streaming} onOpenFile={onOpenFile} workspaceDir={workspaceDir} /></div> : null}
                 {deliveredEntries.map((entry, index) => <WebuiDeliveredAssets key={`${entry.messageId}-delivered-${index}`} assets={entry.assets} workspaceDir={workspaceDir} onOpenFile={onOpenFile} />)}
               </WebuiStack>
             : null}
@@ -353,7 +353,7 @@ export function WebuiAssistantBody({
       ) : null}
       {primaryAnswerPart && !hasExpandableProcessContent ? (
         <div className="webui-assistant-answer" data-webui-message-kind="assistant">
-          <WebuiMarkdown source={primaryAnswerPart.text} onOpenFile={onOpenFile} workspaceDir={workspaceDir} />
+          <WebuiMarkdown source={primaryAnswerPart.text} streaming={streaming} onOpenFile={onOpenFile} workspaceDir={workspaceDir} />
         </div>
       ) : processTextParts.length > 0 ? null : answers.map((answer, index) => (
         <div
@@ -361,7 +361,7 @@ export function WebuiAssistantBody({
           className="webui-assistant-answer"
           data-webui-message-kind="assistant"
         >
-          <WebuiMarkdown source={answer} onOpenFile={onOpenFile} workspaceDir={workspaceDir} />
+          <WebuiMarkdown source={answer} streaming={streaming} onOpenFile={onOpenFile} workspaceDir={workspaceDir} />
         </div>
       ))}
       {/* The diff card sits after the assistant body so the

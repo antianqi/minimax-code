@@ -59,6 +59,13 @@ and runs in the browser gate, after the client build and Chromium installation.
 Live and completed turn visibility is asserted from controlled stream frames while the indicator
 remains unmodified.
 
+Live assistant Markdown coalesces arriving chunks at the next animation frame, retaining the latest
+complete source without restarting a pending frame. Static content, replacements and completion
+render immediately. The streaming responsiveness cases keep the existing 50 ms jank and long-task
+budgets; a separate continuous-stream case verifies visible progress before completion and retains
+the final chunk when `[DONE]` arrives in the same task. These are built-client fixture checks, not
+measurements of a live model provider.
+
 The composer spec selects `/compact` from the slash palette, adds an instruction, and asserts the
 `runCommand` request body at the fixture transport. This checks built-client behavior only; a
 production command-runner journey is not currently covered by `agent-transcript.test.ts` or another

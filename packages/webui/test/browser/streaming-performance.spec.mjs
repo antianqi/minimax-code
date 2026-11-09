@@ -304,3 +304,37 @@ test("a long reply in a long conversation does not drop frames", async ({ page }
     `the streamed reply produced ${summary.longTaskCount} long tasks`,
   ).toBe(0);
 });
+
+test("continuous chunks remain visible before the stream ends and the final chunk is retained", async ({ page }) => {
+  await openApp(page);
+  await startTurn(page, "A", "Stream a progressively visible answer");
+  const progress = await page.evaluate(async () => {
+    const snapshots = [];
+    for (let index = 0; index < 80; index += 1) {
+      window.__fixture.emitStream("A", {
+        dataJson: JSON.stringify({
+          type: "agent_message_chunk",
+          agent_message_chunk: { msg_id: "progressive-answer", msg_content: `Visible chunk ${index}.\n\n` },
+        }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 4));
+      if (index === 20 || index === 40 || index === 60) {
+        const text = document.querySelector('[data-webui-assistant-body="progressive-answer"]')?.textContent ?? "";
+        snapshots.push(text.includes(`Visible chunk ${index - 10}.`));
+      }
+    }
+    return snapshots;
+  });
+  expect(progress).toEqual([true, true, true]);
+  await expect(page.locator('[data-webui-assistant-body="progressive-answer"]')).toContainText("Visible chunk 79.");
+  await page.evaluate(() => {
+    window.__fixture.emitStream("A", {
+      dataJson: JSON.stringify({
+        type: "agent_message_chunk",
+        agent_message_chunk: { msg_id: "progressive-answer", msg_content: "Final chunk before DONE." },
+      }),
+    });
+    window.__fixture.emitStream("A", { dataJson: "[DONE]" });
+  });
+  await expect(page.locator('[data-webui-assistant-body="progressive-answer"]')).toContainText("Final chunk before DONE.");
+});

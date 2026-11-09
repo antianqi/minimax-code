@@ -286,9 +286,13 @@ describe("the real host, the capability surface a turn offers", () => {
         content: "what can you do?",
       });
       expect(sent.ok).toBe(true);
-
-      await expect.poll(() => stub.requests.length, { timeout: 120_000 }).toBeGreaterThan(0);
-      const request = JSON.parse(stub.requests[0]?.body ?? "{}") as ModelRequest;
+      if (sent.ok) for await (const _frame of sent.source) void _frame;
+      // 后台标题请求也使用该端点，不能把先到的请求当成用户 turn。
+      const turnRequests = stub.requests
+        .map((request) => JSON.parse(request.body) as ModelRequest)
+        .filter((request) => !extractToolNames(request).includes("submit_session_title"));
+      expect(turnRequests).toHaveLength(1);
+      const request = turnRequests[0]!;
       const skills = extractSkillIds(request).sort();
       const tools = extractToolNames(request).sort();
 

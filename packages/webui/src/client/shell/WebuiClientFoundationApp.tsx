@@ -153,12 +153,6 @@ export interface WebuiClientFoundationAppProps {
   readonly initialUsageQuota?: WebuiUsageQuotaResult;
   readonly locationHash?: string;
   readonly dataDir?: string;
-  /**
-   * What the identity row shows under the product name. The signed-in
-   * account's plan would go there; the WebUI is loopback-only and has no account, so it reports
-   * the scope it actually runs in. `main.tsx` passes the page's host.
-   */
-  readonly hostLabel?: string;
 }
 
 /**
@@ -214,7 +208,6 @@ export function WebuiClientFoundationApp(
     version,
     locationHash,
     dataDir,
-    hostLabel,
   } = props;
   // The assembly's slices: cut once by the application, published on it and
   // provided to the screens below. The shell holds no capability to cut its own
@@ -1135,7 +1128,7 @@ export function WebuiClientFoundationApp(
               }}
               footer={!railCollapsed ? <div className="relative flex-shrink-0 border-t-[0.5px] border-border_default">
                 <UserMenu
-                  collapsed={railCollapsed} hostLabel={hostLabel} dataDir={dataDir}
+                  collapsed={railCollapsed} dataDir={dataDir}
                   version={runtimeVersion} sessionId={selectedSessionId}
                   workspaceDir={selectedSession?.workspaceDir}
                   onOpenFileLine={(path, line) => {

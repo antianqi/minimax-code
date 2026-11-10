@@ -22,14 +22,49 @@ test.beforeAll(async () => {
     once(child, "exit").then(([code]) => { throw new Error(`Native host exited ${code}: ${logs}`); }),
   ]);
 });
+/**
+ * Waits for a promise, and says what the host was doing when it does not
+ * arrive.
+ */
+async function within(promise, ms, makeError) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(makeError()), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 test.afterAll(async () => {
   if (!child || child.exitCode !== null || !child.connected) return;
   const stopped = once(child, "message");
   child.send("close");
-  const [message] = await stopped;
+  // The host's own trace of where it is in the shutdown is the only thing
+  // that says which step stopped answering, so a shutdown that does not
+  // finish has to carry it.
+  const [message] = await within(
+    stopped,
+    30_000,
+    () => new Error(`the native host did not finish closing\n${logs}`),
+  );
   expect(message).toMatchObject({ closed: true, terminals: 0 });
   expect(message.exited).toBeGreaterThanOrEqual(6);
-  await once(child, "exit");
+  // Once the host has said it closed, it has nothing left to do and it must
+  // be gone. Node-pty's Windows console-list helper cannot attach to a
+  // ConPTY shell, so every terminal it kills leaves a five-second fallback
+  // timer behind, and that timer used to keep the host alive long after the
+  // acceptance was over — long enough for this hook to miss its deadline on a
+  // loaded machine.
+  await within(
+    once(child, "exit"),
+    2_000,
+    () => new Error(`the native host did not exit\n${logs}`),
+  );
 });
 
 async function rpc(page, operation, body = operation === "listTerminals" ? {} : undefined) {

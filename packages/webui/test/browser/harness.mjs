@@ -56,6 +56,27 @@ export const PIXEL_BUDGET = { maxDiffPixels: 8 };
 /** Screenshot options shared by every baseline comparison. */
 export const screenshotOptions = { animations: "disabled", ...PIXEL_BUDGET };
 
+/**
+ * Waits for the shell's own asset images to settle before a baseline is
+ * taken.
+ *
+ * A screenshot records whatever is painted at that instant, and the shell
+ * draws its composer mascot from a `<picture>`: the browser starts on the
+ * poster PNG and upgrades to the WebP, and the upgrade aborts the first
+ * request. A frame taken inside that window shows the browser's broken-image
+ * placeholder instead of the picture, which is a few thousand pixels of
+ * difference that says nothing about the layout under review.
+ *
+ * The wait is on the settled state rather than on a deadline: an image that
+ * is still being fetched is not settled, and one that failed to load fails
+ * the poll with a legible message instead of a cryptic pixel diff.
+ */
+export async function waitForLocalImages(page) {
+  await expect.poll(() => page.locator('img[src^="/assets/"]').evaluateAll((images) =>
+    images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
+  )).toBe(true);
+}
+
 export async function configureFixture(page, setup) {
   await page.addInitScript({ content: `window.__WEBUI_FIXTURE_SETUP__ ??= []; window.__WEBUI_FIXTURE_SETUP__.push((${setup.toString()}));` });
 }

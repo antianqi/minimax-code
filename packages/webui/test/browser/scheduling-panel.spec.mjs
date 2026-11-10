@@ -10,7 +10,13 @@
 // is in when they click the rail.
 import { expect } from "@playwright/test";
 
-import { configureFixture, openApp, screenshotOptions, test } from "./harness.mjs";
+import {
+  configureFixture,
+  openApp,
+  screenshotOptions,
+  test,
+  waitForLocalImages,
+} from "./harness.mjs";
 
 test.describe("the scheduled-task panel", () => {
   test("opens from the rail and lists what is scheduled", async ({ page }) => {
@@ -47,6 +53,7 @@ test.describe("the scheduled-task panel", () => {
     // The panel is a surface, not an overlay: the transcript is gone while it is open.
     await expect(page.locator('[data-webui-component="composer"]')).toHaveCount(0);
 
+    await waitForLocalImages(page);
     await expect(panel).toHaveScreenshot("scheduling-panel.png", screenshotOptions);
 
     // Closing returns to the conversation, and the panel's own control is what does it — the rail
@@ -92,6 +99,7 @@ test.describe("the scheduled-task panel", () => {
     await page.locator('[data-webui-model-list-row="fixture/stub-model/"]').click();
     await expect(modelField).toContainText("Stub Model");
     await editor.locator('[data-webui-scheduling-field="prompt"]').fill("Summarize the day.");
+    await waitForLocalImages(page);
     await expect(editor).toHaveScreenshot("scheduling-editor.png", screenshotOptions);
     // The editor's submit control is the dialog footer's, so it is not inside the
     // editor's own element.
@@ -160,6 +168,7 @@ test.describe("the scheduled-task panel", () => {
       runs.locator('[data-webui-scheduling-run-session="A"]').first(),
     ).toContainText("打开会话");
 
+    await waitForLocalImages(page);
     await expect(panel).toHaveScreenshot("scheduling-panel-runs.png", screenshotOptions);
 
     // Opening the session a run produced leaves the panel and lands on that session.

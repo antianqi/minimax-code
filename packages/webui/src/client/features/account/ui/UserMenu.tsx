@@ -26,6 +26,7 @@ import { createPortal } from "react-dom";
 import {
   IconCalendarEvent,
   IconChevronRight,
+  IconPower,
   IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react";
@@ -38,6 +39,8 @@ import type { WebuiVersionInfo } from "../../../../shared/contracts/version.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import { WebuiMenuItem, WebuiMenuSeparator } from "../../../ui/menu-item.js";
 import { WebuiButton, WebuiIconButton } from "../../../ui/button.js";
+import { WebuiDialog } from "../../../ui/dialog.js";
+import { useWebuiShutdown } from "../../../bindings/use-webui-shutdown.js";
 import { FeedbackSkeleton } from "../../../ui/feedback.js";
 import { WebuiMotionSlot, WebuiPage } from "../../../ui/page.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
@@ -160,6 +163,7 @@ export function UserMenu({
   onCreateMemorySession,
 }: UserMenuProps): ReactElement {
   const { dom } = useWebuiBrowserCapabilities();
+  const shutdown = useWebuiShutdown();
   // The account, usage, check-in and login answers all come from the one
   // application owner. This component submits commands and reads the snapshot;
   // it holds no transport method for them.
@@ -181,6 +185,27 @@ export function UserMenu({
   const [loginOpen, setLoginOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
   const [signinOpen, setSigninOpen] = useState(false);
+  // The shutdown request belongs to the menu that offers it: the item opens
+  // the confirmation, and the confirmation is what asks the server to stop.
+  const [shutdownOpen, setShutdownOpen] = useState(false);
+  const [shutdownBusy, setShutdownBusy] = useState(false);
+  const [shutdownError, setShutdownError] = useState<string | undefined>(
+    undefined,
+  );
+  const confirmShutdown = useCallback(async () => {
+    setShutdownBusy(true);
+    setShutdownError(undefined);
+    try {
+      await shutdown();
+      // The service answers before it stops, so the page is still alive here;
+      // the connection drop is what tells the person the server is gone.
+      setShutdownOpen(false);
+    } catch (error: unknown) {
+      setShutdownError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setShutdownBusy(false);
+    }
+  }, [shutdown]);
   const panelCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -517,9 +542,60 @@ export function UserMenu({
                 }}
               />
             </div>
+            <WebuiMenuSeparator />
+            <WebuiMenuItem
+              className="webui-user-menu-item"
+              icon={<IconPower aria-hidden="true" size={18} stroke={1.7} />}
+              data-testid="user-menu-shutdown"
+              onClick={() => {
+                setOpen(false);
+                setShutdownOpen(true);
+              }}
+            >
+              关闭本地服务
+            </WebuiMenuItem>
           </div>
         </WebuiDropdown>
       </div>
+      <WebuiDialog
+        id="webui-shutdown-dialog"
+        open={shutdownOpen}
+        role="alertdialog"
+        title="关闭本地 WebUI 服务"
+        description="关闭后这个页面会断开连接，需要重新启动服务才能继续使用。"
+        dismissOnEscape
+        width="compact"
+        portalTarget={portalTarget}
+        onClose={() => {
+          if (!shutdownBusy) setShutdownOpen(false);
+        }}
+        footer={
+          <>
+            <WebuiButton
+              variant="secondary"
+              size="dialog"
+              disabled={shutdownBusy}
+              onClick={() => setShutdownOpen(false)}
+            >
+              取消
+            </WebuiButton>
+            <WebuiButton
+              variant="primary"
+              size="dialog"
+              disabled={shutdownBusy}
+              onClick={() => {
+                void confirmShutdown();
+              }}
+            >
+              关闭服务
+            </WebuiButton>
+          </>
+        }
+      >
+        {shutdownError ? (
+          <p className="text-sm text-text_default_tertiary">{shutdownError}</p>
+        ) : null}
+      </WebuiDialog>
       <AccountLoginPage
         open={loginOpen}
         mode="sign-in"

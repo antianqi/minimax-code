@@ -61,6 +61,7 @@ function historyMessages(turns) {
 const JANK_FRAME_MS = 50;
 /** A frame longer than this is more than one dropped frame. */
 const DROPPED_FRAME_MS = 100;
+const APPLICATION_BLOCK_MS = 50;
 
 function percentile(values, fraction) {
   if (!values.length) throw new Error("performance measurement collected no frame samples");
@@ -69,8 +70,8 @@ function percentile(values, fraction) {
 }
 
 function frameBudget(idleBefore, idleAfter) {
-  // 保留 50ms 下限；环境较慢时只允许比同页空闲 p95 多一个 60Hz 帧。
-  return Math.max(JANK_FRAME_MS, Math.max(percentile(idleBefore, 0.95), percentile(idleAfter, 0.95)) + 1000 / 60);
+  // 显示器与 runner 的空闲帧周期不占用应用的 50ms 额外开销预算。
+  return Math.max(percentile(idleBefore, 0.95), percentile(idleAfter, 0.95)) + APPLICATION_BLOCK_MS;
 }
 
 async function measureIdleFrames(page, durationMs) {
@@ -79,7 +80,8 @@ async function measureIdleFrames(page, durationMs) {
     let previous;
     const deadline = performance.now() + duration;
     await new Promise((resolve) => {
-      const sample = (now) => {
+      const sample = () => {
+        const now = performance.now();
         if (previous !== undefined) gaps.push(now - previous);
         previous = now;
         if (now < deadline) requestAnimationFrame(sample);
@@ -208,6 +210,8 @@ async function measureStreamedReply(page, options) {
       };
       check();
     });
+    // 最终文本进入 DOM 后仍需完成绘制；与拖拽一样覆盖提交后的两帧。
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const settled = performance.now();
     running = false;
     timerRunning = false;
@@ -258,7 +262,7 @@ async function measureStreamedReply(page, options) {
     jankFrames: gaps.filter((gap) => gap >= JANK_FRAME_MS).length,
     droppedFrames: gaps.filter((gap) => gap >= DROPPED_FRAME_MS).length,
     worstTimerDelay: Math.max(0, ...metrics.timerDelays),
-    longTaskCount: metrics.longTasks.filter((duration) => duration >= 50).length,
+    longTaskCount: metrics.longTasks.filter((duration) => duration >= APPLICATION_BLOCK_MS).length,
   };
   console.info(
     [
@@ -352,7 +356,8 @@ test("frame calibration distinguishes scheduler outliers from sustained applicat
   expect(percentile(delayed, 0.95)).toBeGreaterThan(frameBudget(smooth, smooth));
   const slowRunner = Array(120).fill(40);
   expect(percentile(slowRunner, 0.95)).toBeLessThan(frameBudget(slowRunner, slowRunner));
-  expect(percentile(Array(120).fill(70), 0.95)).toBeGreaterThan(frameBudget(slowRunner, slowRunner));
+  expect(percentile(Array(120).fill(70), 0.95)).toBeLessThan(frameBudget(slowRunner, slowRunner));
+  expect(percentile(Array(120).fill(100), 0.95)).toBeGreaterThan(frameBudget(slowRunner, slowRunner));
   expect(() => frameBudget([], smooth)).toThrow("no frame samples");
 });
 

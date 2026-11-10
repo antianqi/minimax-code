@@ -31,8 +31,8 @@ Hosted macOS sets `WEBUI_BROWSER_HEADED=1` for the browser suite and runs full
 Chromium in a window. Native blank-page controls reproduced headless frame-source
 stalls without the WebUI; windowed mode improves pacing but does not eliminate
 hosted-runner pauses. Streaming frame p95 is compared with the same page's idle
-samples before and after streaming, allowing one 60 Hz frame above idle p95 with
-a 50 ms floor. Raw frame gaps, timers and tasks are retained for investigation.
+samples before and after streaming, allowing at most 50 ms of additional application
+overhead above idle p95. Raw frame gaps, timers and tasks are retained for investigation.
 Application long tasks retain the absolute 50 ms budget, and interaction budgets
 are unchanged. Linux, Windows and local runs remain headless by default. To reproduce
 the macOS CI browser mode locally, run `WEBUI_BROWSER_HEADED=1 pnpm test:webui-browser`

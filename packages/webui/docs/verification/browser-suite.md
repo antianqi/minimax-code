@@ -173,12 +173,15 @@ Chromium uses its normal frame scheduling and graphics path. Live Markdown coale
 is measured at the browser's paint opportunities rather than an artificially unbounded frame rate.
 Application long tasks retain an absolute 50 ms budget. Frame pacing uses the same page's
 idle samples before and after streaming: active p95 must stay below the larger idle p95 plus
-one 60 Hz frame (16.67 ms), with a 50 ms floor. Using p95 distinguishes sustained application
+the 50 ms application overhead budget. The environment's own idle frame interval is not charged
+to that budget. Using p95 distinguishes sustained application
 delay from isolated hosted-runner scheduling pauses; raw maximum gaps, 50/100 ms outlier counts,
 timer delays and every frame/long-task sample remain recorded in `stream-performance-raw.json`.
 Raw task details and Long Animation Frame attribution are included for triage; they do not replace
 the absolute long-task assertion.
 An empty sample set fails. Both conversation sizes and rendered-content assertions remain intact.
+Idle and active loops sample callback arrival with the same `performance.now()` clock. The active
+window includes two paint opportunities after the final text reaches the DOM.
 The plugin scroll case waits for populated rows and the hover action's layout stability before
 recording its pre-wheel pinned geometry.
 

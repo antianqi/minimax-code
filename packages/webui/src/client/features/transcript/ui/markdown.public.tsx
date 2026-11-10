@@ -111,6 +111,15 @@ function codeFenceGutter(text: string): number[] {
   return lines.length > 1 ? lines.map((_line, index) => index + 1) : [];
 }
 
+/**
+ * Chinese characters and the punctuation that comes with them.
+ *
+ * Used to tell prose that merely contains dollars from a formula: a formula
+ * is not written in Chinese, so a dollar-delimited run that carries Chinese
+ * is prose.
+ */
+const WEBUI_MATH_CJK_PATTERN = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]/u;
+
 marked.use({
   extensions: [
     {
@@ -134,6 +143,12 @@ marked.use({
           (body.includes("\n") || /^\d/u.test(body))
         )
           return undefined;
+        // A run between two dollars that carries Chinese words is prose that
+        // happens to contain dollars — a shell variable, a price, a stray
+        // symbol. Read as math it swallowed the paragraph, and KaTeX then
+        // complained about every Chinese character in it. Math is not written
+        // in Chinese, so a body that carries it is not math.
+        if (WEBUI_MATH_CJK_PATTERN.test(body)) return undefined;
         return {
           type: "webuiMath",
           raw: match[0],
@@ -524,6 +539,7 @@ interface WebuiMarkdownBlockCache {
 
 interface WebuiMarkdownViewProps {
   readonly source: string;
+  readonly streaming?: boolean;
   readonly onOpenFile?: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void;
   readonly workspaceDir?: string;
 }
@@ -555,10 +571,37 @@ function WebuiMarkdownView({ source, onOpenFile, workspaceDir }: WebuiMarkdownVi
   );
 }
 
-export const WebuiMarkdown = memo(
+const WebuiMarkdownContent = memo(
   WebuiMarkdownView,
   (previous, next) =>
     previous.source === next.source &&
     previous.workspaceDir === next.workspaceDir &&
     previous.onOpenFile === next.onOpenFile,
 );
+
+export const WebuiMarkdown = memo(function WebuiMarkdown({ streaming = false, ...props }: WebuiMarkdownViewProps): ReactElement {
+  const [paintedSource, setPaintedSource] = useState(props.source);
+  const latestSource = useRef(props.source);
+  const pendingFrame = useRef<number>();
+  latestSource.current = props.source;
+  useEffect(() => {
+    if (!streaming) {
+      if (pendingFrame.current !== undefined) cancelAnimationFrame(pendingFrame.current);
+      pendingFrame.current = undefined;
+      setPaintedSource(props.source);
+    } else if (pendingFrame.current === undefined) {
+      // 同一绘制机会内合并网络分片；新分片不重置待执行帧，持续输出也不会饿死渲染。
+      pendingFrame.current = requestAnimationFrame(() => {
+        pendingFrame.current = undefined;
+        setPaintedSource(latestSource.current);
+      });
+    }
+  }, [props.source, streaming]);
+  useEffect(() => () => {
+    if (pendingFrame.current !== undefined) cancelAnimationFrame(pendingFrame.current);
+    pendingFrame.current = undefined;
+  }, []);
+  // 完成、替换和截断立即显示权威文本，不等待下一次绘制。
+  const source = streaming && props.source.startsWith(paintedSource) ? paintedSource : props.source;
+  return <WebuiMarkdownContent {...props} source={source} />;
+});

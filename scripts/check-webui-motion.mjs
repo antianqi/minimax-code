@@ -420,12 +420,13 @@ function animationAssetImports(file, text) {
   return assets;
 }
 
-async function checkMotionOwnership(inventory) {
+export async function checkMotionOwnership(inventory, enumerate = glob) {
   const problems = [];
   let approvedStylesheets = 0;
   let rawUtilityClasses = 0;
   const importedAnimationAssets = new Map();
-  for await (const file of glob("**/*.css", { cwd: clientRoot })) {
+  for await (const entry of enumerate("**/*.css", { cwd: clientRoot })) {
+    const file = entry.replaceAll("\\", "/");
     const text = readFileSync(path.join(clientRoot, file), "utf8");
     const stylesheet = text.replace(/\/\*[\s\S]*?\*\//gu, "");
     if (file !== "styles/motion.css" && /[^{}]*\.webui-skeleton(?:[\s.#:[>+~]|$)[^{}]*\{/u.test(stylesheet)) {
@@ -458,7 +459,8 @@ async function checkMotionOwnership(inventory) {
     }
   }
 
-  for await (const file of glob("**/*.{ts,tsx}", { cwd: clientRoot })) {
+  for await (const entry of enumerate("**/*.{ts,tsx}", { cwd: clientRoot })) {
+    const file = entry.replaceAll("\\", "/");
     const text = readFileSync(path.join(clientRoot, file), "utf8");
     const fileProblems = sourceMotionOwnershipProblems(file, text);
     rawUtilityClasses += fileProblems.filter((problem) => problem.includes("raw source motion utility")).length;

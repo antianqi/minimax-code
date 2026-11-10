@@ -1,18 +1,17 @@
 import os from "node:os";
 import process from "node:process";
-import { createRequire } from "node:module";
+import { loadWebuiPty } from "./native-pty.js";
 
 import type { WebuiTerminalProcessPort } from "./port.js";
 
 type Pty = { readonly pid: number; write(data: string): void; resize(cols: number, rows: number): void; kill(): void; onData(listener: (data: string) => void): void; onExit(listener: () => void): void };
 type PtyModule = { spawn(shell: string, args: string[], options: Record<string, unknown>): Pty };
-const require = createRequire(import.meta.url);
 
 type Terminal = { readonly id: string; readonly workspaceTabId?: string; readonly pty: Pty; readonly output: string[]; readonly listeners: Set<(data: string) => void>; exited: boolean };
 
 export class WebuiTerminalManager implements WebuiTerminalProcessPort {
   private readonly terminals = new Map<string, Terminal>();
-  constructor(private readonly loadPty: () => PtyModule = () => require("node-pty") as PtyModule) {}
+  constructor(private readonly loadPty: () => PtyModule = loadWebuiPty) {}
   create(workspaceDir: string, cols = 80, rows = 24, workspaceTabId?: string) {
     if (this.terminals.size >= 5) throw new Error("最多可以打开 5 个终端");
     const id = `terminal-${crypto.randomUUID()}`;

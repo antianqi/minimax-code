@@ -387,7 +387,7 @@ describe("the new tab page", () => {
     }
     expect(
       webuiWorkspaceLauncherTileCommand(
-        webuiWorkspaceLauncherTiles()[0]!,
+        webuiWorkspaceLauncherTiles().find((tile) => tile.kind === "review")!,
         "tab-3",
         { sessionId: "session-1", workspaceDir: "/work" },
       ),
@@ -404,7 +404,7 @@ describe("the new tab page", () => {
     // it has nothing to open, so it is not rendered rather than rendered dead.
     expect(
       webuiWorkspaceLauncherTileCommand(
-        webuiWorkspaceLauncherTiles()[0]!,
+        webuiWorkspaceLauncherTiles().find((tile) => tile.kind === "review")!,
         "tab-3",
         { sessionId: "session-1" },
       ),

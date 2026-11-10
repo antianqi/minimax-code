@@ -9,7 +9,7 @@
  * definition's schedule generation and next fire time belong to the shared row, and an operation
  * that answered with its own request would pass this test while the task ran on the wrong schedule.
  */
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -22,21 +22,39 @@ import { createOperationRegistry } from "../../src/server/operation/operations.j
 import { WebuiService } from "../../src/server/service.js";
 import { webuiCronDraftFromTask, webuiCronUpdateRequest } from "../../src/client/features/scheduling/projection/scheduling-panel.js";
 import type { WebuiCronTask } from "../../src/shared/contracts/cron.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 const disposers: Array<() => Promise<void> | void> = [];
 
 afterEach(async () => {
-  for (const dispose of disposers.splice(0).reverse()) await dispose();
-  vi.unstubAllEnvs();
+  try {
+    for (const dispose of disposers.splice(0).reverse()) await dispose();
+  } finally {
+    vi.unstubAllEnvs();
+    (await import("@mavis/config")).resetConfig();
+  }
 });
 
 async function boot() {
   const dataDir = await mkdtemp(join(tmpdir(), "webui-cron-mutations-"));
   vi.stubEnv("MINIMAX_DATA_DIR", dataDir);
-  disposers.push(() => rm(dataDir, { recursive: true, force: true }));
+  disposers.push(() => removeRealHostDataDir(dataDir));
   await mkdir(join(dataDir, "workspace"), { recursive: true });
+  await writeFile(join(dataDir, "config.yaml"), JSON.stringify({
+    defaultModel: "custom_provider:synthetic/stub-model",
+    custom_provider: {
+      synthetic: {
+        name: "Synthetic", api: "openai-completions",
+        options: { baseURL: "http://127.0.0.1:1/v1", apiKey: "synthetic-test-key" },
+        models: { "stub-model": { id: "stub-model", name: "Synthetic Model" } },
+      },
+    },
+  }), { mode: 0o600 });
+  const config = await import("@mavis/config");
+  config.resetConfig();
+  expect(config.getConfig().dataDir).toBe(dataDir);
   const assembled = await createWebuiRuntimeHost({ dataDir, appVersion: "cron-mutations" });
-  disposers.push(() => assembled.host.apiHost.close().catch(() => undefined));
+  disposers.push(() => assembled.host.apiHost.close());
   const registry = createOperationRegistry(assembled.harnessPort);
   const call = async (name: string, body: unknown): Promise<unknown> => {
     const entry = registry.get(name);
@@ -67,7 +85,7 @@ describe("scheduled-task mutations over the real service and the real host", () 
     };
     const created = await callWire("createCronTask", {
       name: "synthetic edit", agentName: "agent-one", prompt: "Do nothing.",
-      project: "/synthetic/project", model: "minimax/MiniMax-M3",
+      project: "/synthetic/project", model: "custom_provider:synthetic/stub-model",
       schedule: { kind: "recurring", expression: "0 9 * * *", timezone: "Asia/Shanghai", maxRuns: 7 },
       sessionTarget: { mode: "new" },
     }) as WebuiCronTask;

@@ -9,7 +9,7 @@ import { useDialogLayer } from "./overlay-listeners.js";
 import { ManagedOverlayBoundary } from "./overlay-listeners.js";
 import { useOverlayCoordinator } from "./overlay-coordinator.js";
 import { WebuiIconButton } from "./button.js";
-import { WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
+import { isWebuiMotionExitAnimation, WebuiMotion, WebuiPage, WebuiSkeletonProjection } from "./page.js";
 
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -205,7 +205,7 @@ export function WebuiDialog({
   if (!present || !portalTarget) return null;
 
   const finishExit = (event: React.AnimationEvent<HTMLDivElement>) => {
-    if (event.currentTarget !== event.target || motionState !== "exit" || open) return;
+    if (event.currentTarget !== event.target || !isWebuiMotionExitAnimation(event.animationName, "surface") || motionState !== "exit" || open) return;
     setPresent(false);
     onExitComplete?.();
   };

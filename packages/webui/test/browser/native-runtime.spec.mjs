@@ -1,7 +1,7 @@
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect } from "@playwright/test";
 import { test } from "./harness.mjs";
 
@@ -11,8 +11,8 @@ let ready;
 let logs = "";
 test.beforeAll(async () => {
   child = fork(path.join(root, "packages/webui/test/browser/support/native-browser-host.ts"), [], {
-    execArgv: ["--import", path.join(root, "packages/webui/node_modules/tsx/dist/loader.mjs")],
-    env: { ...process.env, TSX_TSCONFIG_PATH: path.join(root, "tsconfig.standalone.json"), SHELL: "/bin/sh" },
+    execArgv: ["--import", pathToFileURL(path.join(root, "packages/webui/node_modules/tsx/dist/loader.mjs")).href],
+    env: { ...process.env, TSX_TSCONFIG_PATH: path.join(root, "tsconfig.standalone.json"), SHELL: process.platform === "win32" ? "powershell.exe" : "/bin/sh" },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   child.stdout.on("data", (data) => { logs += data; });
@@ -83,7 +83,7 @@ test("V04/V06: native PTYs survive another page, reload and a full five-slot ros
   await expect(second.locator(".webui-xterm-host")).toBeVisible();
   await second.getByRole("button", { name: "关闭面板" }).click();
   await second.close();
-  await rpc(page, "writeTerminal", { terminalId: terminal.terminalId, data: "printf 'WEBUI_NATIVE_%s\\n' ALIVE\r" });
+  await rpc(page, "writeTerminal", { terminalId: terminal.terminalId, data: process.platform === "win32" ? "Write-Output ('WEBUI_NATIVE_' + 'ALIVE')\r" : "printf 'WEBUI_NATIVE_%s\\n' ALIVE\r" });
   await expect.poll(async () => (await rpc(page, "listTerminals"))[0].output).toContain("WEBUI_NATIVE_ALIVE");
   for (let index = 1; index < 5; index += 1) await rpc(page, "createTerminal", { workspaceDir: ready.workspaceDir });
   await page.reload();
@@ -113,7 +113,7 @@ test("V04/V06: native PTYs survive another page, reload and a full five-slot ros
   const survivors = await rpc(page, "listTerminals");
   expect(survivors).toHaveLength(5);
   const latest = survivors.at(-1);
-  await rpc(page, "writeTerminal", { terminalId: latest.terminalId, data: "printf 'WEBUI_LATE_%s\\n' ALIVE\r" });
+  await rpc(page, "writeTerminal", { terminalId: latest.terminalId, data: process.platform === "win32" ? "Write-Output ('WEBUI_LATE_' + 'ALIVE')\r" : "printf 'WEBUI_LATE_%s\\n' ALIVE\r" });
   await expect.poll(async () => (await rpc(page, "listTerminals")).find((entry) => entry.terminalId === latest.terminalId).output)
     .toContain("WEBUI_LATE_ALIVE");
   await rpc(page, "disposeTerminal", { terminalId: latest.terminalId });

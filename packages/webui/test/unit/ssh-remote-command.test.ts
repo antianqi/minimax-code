@@ -10,7 +10,7 @@
  * answer is pinned and not only its syntax.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -102,7 +102,8 @@ describe("the remote commands", () => {
       .split(String.fromCharCode(0))
       .filter((field) => field.length > 0);
     expect(fields[0]).toBe("status=ready");
-    expect(fields[1]).toBe(`path=${root}`);
+    const canonicalRoot = realpathSync(root);
+    expect(fields[1]).toBe(`path=${canonicalRoot}`);
     // The entries follow as a kind and a path, one pair each — the reader walks them two at
     // a time.
     const entries = fields.slice(2);
@@ -111,7 +112,7 @@ describe("the remote commands", () => {
     for (let index = 0; index + 1 < entries.length; index += 2) {
       pairs.push(`${entries[index]} ${entries[index + 1]}`);
     }
-    expect(pairs).toContain(`directory ${path.join(root, "src")}`);
-    expect(pairs).toContain(`file ${path.join(root, "readme.md")}`);
+    expect(pairs).toContain(`directory ${path.join(canonicalRoot, "src")}`);
+    expect(pairs).toContain(`file ${path.join(canonicalRoot, "readme.md")}`);
   });
 });

@@ -21,11 +21,12 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildSshArgs, SSH_PROBE_MARKER } from "../../src/runtime/ssh/command.js";
+import type { SshDiscoveryDependencies } from "../../src/runtime/ssh/host-discovery.js";
 import { createSshRuntime } from "../../src/runtime/ssh/index.js";
 import type { SshTransport } from "../../src/runtime/ssh/transport.js";
 import { normalizeSshIdentityFile } from "../../src/runtime/ssh/validators.js";
 
-const HOME = "/home/tester";
+const HOME = process.platform === "win32" ? "C:\\Users\\tester" : "/home/tester";
 const directories: string[] = [];
 
 function temporaryDataDir(): string {
@@ -63,10 +64,28 @@ afterEach(() => {
   }
 });
 
+/**
+ * A config file that declares one host, read without touching the machine's own.
+ *
+ * The runtime asks the discovery whether the config still declares an alias before it
+ * saves a host that is reached by that alias alone. Without an injected discovery the
+ * runtime reads the machine's real `~/.ssh/config`, so this file's claim — that a host
+ * named in the config file keeps its alias — would hold only on a machine that happens
+ * to declare this alias. The dependency is what makes the claim true everywhere.
+ */
+function syntheticDiscovery(alias: string): SshDiscoveryDependencies {
+  return {
+    readTextFile: async () => `Host ${alias}\n  HostName example.com\n  User builder\n`,
+    listFiles: async () => [],
+    runCommand: async () => ({ stdout: "", stderr: "" }),
+    homeDirectory: () => HOME,
+  };
+}
+
 describe("a key path", () => {
   it("expands the tilde the way OpenSSH writes it", () => {
-    expect(normalizeSshIdentityFile("~/.ssh/id_ed25519", HOME)).toBe("/home/tester/.ssh/id_ed25519");
-    expect(normalizeSshIdentityFile("~", HOME)).toBe("/home/tester");
+    expect(normalizeSshIdentityFile("~/.ssh/id_ed25519", HOME)).toBe(path.join(HOME, ".ssh", "id_ed25519"));
+    expect(normalizeSshIdentityFile("~", HOME)).toBe(HOME);
   });
 
   it("keeps a path that is already absolute", () => {
@@ -111,6 +130,7 @@ describe("a saved host", () => {
       dataDir: temporaryDataDir(),
       transport,
       homeDirectory: () => HOME,
+      discovery: syntheticDiscovery("textvision.top"),
     });
 
     const saved = await runtime.connections.save({
@@ -147,7 +167,7 @@ describe("a saved host", () => {
     });
 
     expect(saved.success).toBe(true);
-    expect(saved.connection?.endpoint.identityFile).toBe("/home/tester/.ssh/id_ed25519");
+    expect(saved.connection?.endpoint.identityFile).toBe(path.join(HOME, ".ssh", "id_ed25519"));
   });
 
   it("refuses a key path that is not a path at all", async () => {

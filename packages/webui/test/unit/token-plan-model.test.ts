@@ -227,7 +227,7 @@ describe("context panel — hover names it, click opens it", () => {
     expect(indicator).toContain("onOpen={() => {");
     expect(indicator).toContain("onClose={() => setOpen(false)}");
     expect(dropdown).toContain("if (open) onClose();");
-    expect(dropdown).toContain("else onOpen();");
+    expect(dropdown).toMatch(/else\s*\{[\s\S]*?triggerRef\.current\?\.focus\(\);\s*onOpen\(\);/u);
   });
 
   it("carries a hover label naming the ring, hidden from assistive tech", () => {

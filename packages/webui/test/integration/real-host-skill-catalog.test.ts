@@ -246,9 +246,21 @@ async function runTurnAndReadCatalog(betaMcodeTools: boolean | undefined): Promi
 
   const sent = await port.sendMessage({ id: sessionId as string, content: "hello stub" });
   expect(sent.ok).toBe(true);
-
-  await expect.poll(() => stub.requests.length, { timeout: 60_000 }).toBeGreaterThan(0);
-  const body = stub.requests[0]?.body ?? "";
+  // The turn's own stream is consumed before anything is asserted: the request this file
+  // reads is the turn's, and the turn is not over until the runtime has sent it.
+  if (sent.ok) for await (const _frame of sent.source) void _frame;
+  // The runtime sends the background title request to the same model endpoint, and it can
+  // win the race to it. The title request carries `submit_session_title`; the user's turn
+  // does not. Reading the first request therefore reads whichever arrived first, which on
+  // a machine where the title wins is not the turn whose skill catalog this file reads.
+  const turnRequests = stub.requests.filter((request) => {
+    const body = JSON.parse(request.body) as {
+      readonly tools?: ReadonlyArray<{ readonly function?: { readonly name?: string } }>;
+    };
+    return !body.tools?.some((tool) => tool.function?.name === "submit_session_title");
+  });
+  expect(turnRequests).toHaveLength(1);
+  const body = turnRequests[0]!.body;
   const catalog = extractSkillCatalog(body);
   return { catalog, requested, ready: false };
 }

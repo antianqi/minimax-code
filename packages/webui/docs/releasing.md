@@ -1,13 +1,19 @@
 # WebUI package on the npm registry
 
-The WebUI is packaged as `@minimax-webui/minimax-code` and published to
-`https://registry.npmjs.org` under the `preview` dist-tag. Publishing is fully
-automatic: every push to the `webui` branch builds the standalone package and
-publishes a new preview version. No tag, no version edit, no manual step.
+The WebUI is packaged as `@minimax-webui/minimax-code`. Automatic npm publishing
+has been retired from this repository. CI still verifies package installation;
+it does not publish to `https://registry.npmjs.org`. The archived preview workflow
+and local packaging commands are documented below for reference.
 
-## How a release happens
+## Archived preview release workflow
 
-`.github/workflows/webui-npm-preview.yml` runs on `push` to `webui` and on
+The npm publishing workflow is archived at
+`.github/legacy-workflows/webui-npm-preview.yml` and disabled in the public
+repository. The description below records its behavior if explicitly restored;
+there is currently no automatic or manual npm publishing workflow. See
+[`WebUI-only CI`](../../../docs/webui-ci.md) for the active verification scope.
+
+The archived workflow was configured to run on `push` to `webui` and on
 `workflow_dispatch`. It:
 
 1. installs the workspace with a frozen lockfile;

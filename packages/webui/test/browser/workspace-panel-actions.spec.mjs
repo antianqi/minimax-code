@@ -15,7 +15,11 @@
 import { expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-import { configureFixture, openApp, openLauncherTile, switchSession, test } from "./harness.mjs";
+import { attachJsonEvidence, configureFixture, finishCapturedTransition, openApp, openLauncherTile, pauseNextTransition, switchSession, test, transitionMidpointSize } from "./harness.mjs";
+
+// Neither injected DOM snapshots nor trace screenshots belong to the client's
+// performance budget. Capture failure screenshots after the measurement.
+test.use({ trace: "off", screenshot: "only-on-failure" });
 
 /** Open the browser panel, choose 查看文件, and wait for the tree it loads. */
 async function openFilePanel(page) {
@@ -172,6 +176,9 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   const review = page.getByTestId("workspace-review");
   await expect(review.locator('[data-testid="turn-review-diff-file"]')).toHaveCount(70);
   await expect(review.locator(".webui-turn-review-code")).toHaveCount(70);
+  await expect(review.locator(".webui-turn-review-code").first()).toBeVisible();
+  // DOM 数量不代表初始布局已绘制；用户能看到 review 后再测工具栏交互。
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   const elapsed = await page.evaluate(async () => {
     const button = document.querySelector('[data-testid="workspace-review-toolbar-context"]');
@@ -184,6 +191,13 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   console.info(`70-file review interaction: ${elapsed.toFixed(1)} ms`);
   expect(elapsed, `70-file review interaction took ${elapsed.toFixed(1)} ms`).toBeLessThan(100);
 
+  const handle = page.getByRole("separator", { name: "调整工作区面板宽度" });
+  const bounds = await handle.boundingBox();
+  if (!bounds) throw new Error("workspace panel resize handle is not laid out");
+  const panelWidthBefore = await page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width);
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  // Resolve the handle before observing the drag: selector discovery is not a
+  // pointer gesture, and can walk the whole expanded accessibility tree.
   await page.evaluate(() => {
     window.__reviewLongTasks = [];
     window.__reviewLongTaskObserver = new PerformanceObserver((entries) => {
@@ -191,24 +205,47 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
     });
     window.__reviewLongTaskObserver.observe({ type: "longtask" });
   });
-  const handle = page.getByRole("separator", { name: "调整工作区面板宽度" });
-  const bounds = await handle.boundingBox();
-  if (!bounds) throw new Error("workspace panel resize handle is not laid out");
-  const panelWidthBefore = await page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width);
-  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width / 2 + 96, bounds.y + bounds.height / 2, { steps: 12 });
   await page.mouse.up();
-  await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
-  const dragLongTasks = await page.evaluate(() => {
+  const dragLongTasks = await page.evaluate(async () => {
+    // 等待 pointerup 的提交和布局；定位器查找及断言在性能窗口外执行。
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const tasks = [...window.__reviewLongTasks, ...window.__reviewLongTaskObserver.takeRecords().map((entry) => entry.duration)];
     window.__reviewLongTaskObserver.disconnect();
-    return [...window.__reviewLongTasks, ...window.__reviewLongTaskObserver.takeRecords().map((entry) => entry.duration)];
+    return tasks;
   });
+  await attachJsonEvidence("workspace-drag-long-tasks.json", dragLongTasks);
+  await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
   expect(dragLongTasks.filter((duration) => duration >= 50), `workspace panel drag produced ${dragLongTasks} ms long tasks`).toEqual([]);
   const lastFile = review.locator('[data-testid="turn-review-diff-file"]').last();
   await lastFile.scrollIntoViewIfNeeded();
   await expect(lastFile.locator(".webui-turn-review-line")).toHaveCount(81);
   expect(await lastFile.locator(".webui-turn-review-code").evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(1000);
+});
+
+test("a contained unified diff keeps long lines horizontally scrollable", async ({ page }) => {
+  await configureFixture(page, () => {
+    const file = { fileId: "src/long.ts", path: "src/long.ts", additions: 1, deletions: 0, status: "modified" };
+    window.__fixture.setWorkspaceReview({
+      repositoryId: "repo-1", reviewSnapshotId: "long-line-snapshot", files: [file],
+      totals: { files: 1, additions: 1, deletions: 0 },
+    }, [{ fileId: file.fileId, diff: { type: "text", diff: `diff --git a/src/long.ts b/src/long.ts\n--- a/src/long.ts\n+++ b/src/long.ts\n@@ -0,0 +1 @@\n+${"x".repeat(800)}` } }]);
+  });
+  await openApp(page);
+  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
+  await openLauncherTile(page, "review");
+  const code = page.getByTestId("workspace-review").locator(".webui-turn-review-code");
+  await expect(code).toBeVisible();
+  await expect(code).toContainText("x".repeat(800));
+  await code.scrollIntoViewIfNeeded();
+  await expect.poll(() => code.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  const geometry = await code.evaluate((element) => {
+    element.scrollLeft = 200;
+    return { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, scrollLeft: element.scrollLeft };
+  });
+  expect(geometry.scrollWidth).toBeGreaterThan(geometry.clientWidth);
+  expect(geometry.scrollLeft).toBe(200);
 });
 
 test("the workspace file tree uses the shared disclosure transition when a directory opens and closes", async ({ page }) => {
@@ -228,22 +265,26 @@ test("the workspace file tree uses the shared disclosure transition when a direc
   expect(await disclosure.getAttribute("aria-hidden")).toBe("true");
   expect(await disclosure.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.16s");
 
+  await pauseNextTransition(disclosure, "grid-template-rows");
   await directory.click();
   await expect(chevron).toHaveClass(/is-rotated-90/u);
   expect(await chevron.evaluate((element) => getComputedStyle(element).transform)).not.toBe("none");
   await expect(disclosure).toHaveAttribute("data-webui-motion-state", "expand");
   await expect(disclosure).not.toHaveAttribute("aria-hidden", "true");
-  await page.waitForTimeout(70);
-  expect(await disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
+  expect(await transitionMidpointSize(disclosure, "height")).toBeGreaterThan(0);
+  await finishCapturedTransition(disclosure);
+  const expandedHeight = await disclosure.evaluate((element) => element.getBoundingClientRect().height);
 
+  await pauseNextTransition(disclosure, "grid-template-rows");
   await directory.click();
   await expect(chevron).not.toHaveClass(/is-rotated-90/u);
   expect(await chevron.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.16s");
   await expect(disclosure).toHaveAttribute("data-webui-motion-state", "collapse");
   await expect(disclosure).toHaveAttribute("aria-hidden", "true");
-  await page.waitForTimeout(70);
-  expect(await disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
-  await page.waitForTimeout(130);
+  const collapsingHeight = await transitionMidpointSize(disclosure, "height");
+  expect(collapsingHeight).toBeGreaterThan(0);
+  expect(collapsingHeight).toBeLessThan(expandedHeight);
+  await finishCapturedTransition(disclosure);
   expect(await disclosure.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
 });
 
@@ -319,20 +360,24 @@ test("the file tree uses the shared horizontal disclosure while its workspace pa
   expect(await fileTreePanel.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.16s");
   const fileTreeWidth = await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width);
 
+  await pauseNextTransition(fileTreePanel, "width");
   await page.getByRole("button", { name: "隐藏文件树" }).click();
   await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "collapse");
   await expect(fileTreePanel).toHaveAttribute("aria-hidden", "true");
-  await page.waitForTimeout(70);
-  const fileTreeWidthDuringCollapse = await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width);
+  const fileTreeWidthDuringCollapse = await transitionMidpointSize(fileTreePanel, "width");
   expect(fileTreeWidthDuringCollapse).toBeGreaterThan(0);
   expect(fileTreeWidthDuringCollapse).toBeLessThan(fileTreeWidth);
-  await page.waitForTimeout(130);
-  expect(await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width)).toBe(0);
+  await finishCapturedTransition(fileTreePanel);
+  await expect.poll(() => fileTreePanel.evaluate((element) => element.getBoundingClientRect().width)).toBe(0);
 
+  await pauseNextTransition(fileTreePanel, "width");
   await page.getByRole("button", { name: "显示文件树" }).click();
   await expect(fileTreePanel).toHaveAttribute("data-webui-motion-state", "expand");
-  await page.waitForTimeout(200);
-  expect(await fileTreePanel.evaluate((element) => element.getBoundingClientRect().width)).toBe(fileTreeWidth);
+  const expandingWidth = await transitionMidpointSize(fileTreePanel, "width");
+  expect(expandingWidth).toBeGreaterThan(0);
+  expect(expandingWidth).toBeLessThan(fileTreeWidth);
+  await finishCapturedTransition(fileTreePanel);
+  await expect.poll(() => fileTreePanel.evaluate((element) => element.getBoundingClientRect().width)).toBe(fileTreeWidth);
 
   await page.getByRole("button", { name: "关闭面板" }).click();
   await expect(workspacePanel).toHaveAttribute("data-webui-motion-state", "exit");

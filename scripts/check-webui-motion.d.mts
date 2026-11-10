@@ -41,3 +41,7 @@ export function featureRotationOwnershipProblems(file: string, text: string): st
 export function featureSmoothScrollOwnershipProblems(file: string, text: string): string[];
 export function featureInteractionTransformOwnershipProblems(file: string, text: string): string[];
 export function scanClient(root?: string): Promise<Record<string, ScannedStylesheet>>;
+export function checkMotionOwnership(
+  inventory: MotionInventory,
+  enumerate?: (pattern: string, options: { cwd: string }) => AsyncIterable<string>,
+): Promise<{ problems: string[]; approvedStylesheets: number; rawUtilityClasses: number }>;

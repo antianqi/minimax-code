@@ -149,7 +149,11 @@ test.describe("the external bridge, against a real browser and a real page", () 
             await waitForConnected(started.bridge, surface, true);
 
             // And the bridge works again: a command against the live tab answers.
-            const title = await evaluate(provider!, target, "document.title");
+            // A restarted worker announces a fresh target generation.
+            const reconnectedProvider = started.bridge.createProvider(surface);
+            expect(reconnectedProvider).toBeDefined();
+            const reconnectedTarget = await waitForTarget(reconnectedProvider!);
+            const title = await evaluate(reconnectedProvider!, reconnectedTarget, "document.title");
             expect(typeof title).toBe("string");
           },
         );

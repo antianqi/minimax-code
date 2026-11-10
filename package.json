@@ -55,6 +55,7 @@
     "@typescript-eslint/parser": "7.18.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "axe-core": "4.14.0",
+    "cross-spawn": "7.0.6",
     "esbuild": "0.28.2",
     "eslint": "8.57.1",
     "eslint-config-airbnb-base": "15.0.0",

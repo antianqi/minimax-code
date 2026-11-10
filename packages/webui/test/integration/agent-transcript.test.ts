@@ -171,6 +171,9 @@ it.each(["transcript", "cross-client", "external-active-mutation", "external-act
   const crossClientHoldGate = new Promise<void>((resolve) => { releaseCrossClientHold = resolve; });
   let releaseImmediateAnswer: () => void = () => undefined;
   const immediateAnswerGate = new Promise<void>((resolve) => { releaseImmediateAnswer = resolve; });
+  let releaseGoalFollowUp: () => void = () => undefined;
+  const goalFollowUpGate = new Promise<void>((resolve) => { releaseGoalFollowUp = resolve; });
+  let goalAnswers = 0;
   let retryModelAttempts = 0;
   let allowModelRetryRecovery = false;
   const modelRequests: { url: string | undefined; authorization: string | undefined; body: string }[] = [];
@@ -223,6 +226,10 @@ it.each(["transcript", "cross-client", "external-active-mutation", "external-act
         // This branch has to precede the Ask User one below: both read the whole
         // history, and the earlier Ask User turn stays in it, so whichever comes
         // first answers every later kickoff turn.
+        // Keep subsequent automatic turns behind the active-goal assertions.
+        // Otherwise identical follow-up answers race the unique text locator
+        // and the runaway guard can pause the goal before it is inspected.
+        if (goalAnswers++ > 0) await goalFollowUpGate;
         response.write(frame({ role: "assistant", content: "Synthetic goal progress acknowledged." }));
       } else if (serializedMessages.includes("Ask User continuation.")) {
         const askUserCompleted = serializedMessages.includes("call-ask-user-e2e");
@@ -1291,6 +1298,7 @@ it.each(["transcript", "cross-client", "external-active-mutation", "external-act
     });
     const goalCreate = requests.find((request) => request.operation === "createGoal");
     expect(goalCreate?.body).toMatchObject({ objective: "Keep this synthetic goal active." });
+    releaseGoalFollowUp();
 
     const goalBanner = page.getByTestId("thread-goal-banner");
     await browserExpect.poll(() => goalBanner.getAttribute("data-goal-status"), { timeout: 30_000 })
@@ -1884,6 +1892,7 @@ it.each(["transcript", "cross-client", "external-active-mutation", "external-act
     releaseStoppedAnswer();
     releaseCrossClientHold();
     releaseImmediateAnswer();
+    releaseGoalFollowUp();
     await browser?.close();
     await service?.close().catch(() => undefined);
     await browserAdapter?.close().catch(() => undefined);

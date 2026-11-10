@@ -60,7 +60,11 @@ function trackOutsideModalFocus(ownerDocument: Document): HTMLElement {
   ownerDocument.addEventListener("focusin", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.closest("[data-webui-dialog-mask], .webui-settings-mask, [data-overlay-layer]")) return;
+    // A dropdown's trigger wrapper is also an overlay layer. Its surviving
+    // trigger is a valid return target; only the popup itself is excluded.
+    if (target.closest("[data-webui-dialog-mask], .webui-dialog-mask, .webui-settings-mask, .webui-dropdown-popup")) return;
+    const layer = target.closest("[data-overlay-layer]");
+    if (layer && !layer.hasAttribute("data-webui-dropdown")) return;
     if (target.closest(LIVE_SURFACE_SELECTOR)) return;
     recordOutsideModalFocus(ownerDocument, target);
   }, true);
@@ -91,6 +95,14 @@ export interface WebuiBrowserDom {
   readonly portalTarget: () => HTMLElement | null;
   readonly listenForMouseDown: (listener: (event: MouseEvent) => void) => () => void;
   readonly listenForPointerDown: (listener: (event: PointerEvent) => void, capture?: boolean) => () => void;
+  /**
+   * A click anywhere in the document.
+   *
+   * A rail row is a plain anchor, so the surface that owns the shell hears
+   * the clicks the row cannot report itself. The listener is the document's,
+   * and it is the platform's: a surface does not reach for the document.
+   */
+  readonly listenForClick: (listener: (event: MouseEvent) => void, capture?: boolean) => () => void;
   readonly listenForKeyDown: (listener: (event: KeyboardEvent) => void) => () => void;
   /**
    * The viewport was resized.
@@ -237,6 +249,7 @@ export function createWebuiBrowserDom(
     portalTarget: () => documentObject?.body ?? null,
     listenForMouseDown: (listener) => listen("mousedown", listener),
     listenForPointerDown: (listener, capture) => listen("pointerdown", listener, capture),
+    listenForClick: (listener, capture) => listen("click", listener, capture),
     listenForKeyDown: (listener) => listen("keydown", listener),
     listenForResize: (listener) => {
       if (!windowObject) return () => undefined;

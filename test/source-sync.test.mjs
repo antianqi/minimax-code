@@ -26,6 +26,52 @@ import { extensionIdFromPublicKey, parseExtensionIdList, readStoreExtensionIds }
 import { validateExceptionLedger, sourceFingerprint } from '../scripts/lib/webui-dependency-rules.mjs';
 import { acceptanceRecordFiles, restoreAcceptanceRecords } from '../scripts/lib/acceptance-records.mjs';
 
+test('public WebUI CI runs only WebUI checks and cannot publish packages', () => {
+  const activeWorkflows = readdirSync(new URL('../.github/workflows/', import.meta.url))
+    .filter(name => /\.ya?ml$/.test(name)).sort();
+  assert.deepEqual(activeWorkflows, ['webui-ci.yml']);
+  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/webui-ci.yml', import.meta.url), 'utf8'));
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  assert.ok(Object.hasOwn(workflow.on, 'pull_request'));
+  assert.ok(Object.hasOwn(workflow.on, 'workflow_dispatch'));
+  assert.deepEqual(workflow.permissions, { contents: 'read' });
+  assert.deepEqual(Object.keys(workflow.jobs), ['webui']);
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const job = workflow.jobs.webui;
+  assert.equal(job.env, undefined);
+  assert.deepEqual(job.strategy.matrix.os, ['ubuntu-latest', 'macos-latest', 'windows-latest']);
+  const directories = job.steps.find(step => step.name === 'Set isolated WebUI output directories');
+  assert.equal(directories.shell, 'bash');
+  assert.match(directories.run, /MCODE_WEBUI_VERIFY_DIR=\$RUNNER_TEMP\//);
+  assert.match(directories.run, /WEBUI_BROWSER_OUTPUT_DIR=\$RUNNER_TEMP\//);
+  const commands = job.steps.filter(step => step.run && step !== directories).map(step => step.run);
+  for (const command of commands) {
+    if (command === 'pnpm install --frozen-lockfile' || command === 'pnpm exec playwright install-deps chromium') continue;
+    assert.match(command, /^pnpm (?:typecheck|check|build|install|test):webui(?:-[a-z]+)?$/);
+    assert.ok(Object.hasOwn(manifest.scripts, command.slice('pnpm '.length)), command);
+  }
+  for (const command of ['pnpm typecheck:webui', 'pnpm build:webui', 'pnpm test:webui', 'pnpm test:webui-browser', 'pnpm test:webui-package']) {
+    assert.ok(commands.includes(command), `Missing ${command}`);
+  }
+  assert.ok(commands.indexOf('pnpm build:webui') < commands.indexOf('pnpm test:webui-browser'));
+  assert.equal(job.steps.find(step => step.run === 'pnpm build:webui').id, 'build');
+  assert.equal(job.steps.find(step => step.run === 'pnpm install:webui-browsers').id, 'browsers');
+  const testConditions = {
+    'pnpm test:webui': undefined,
+    'pnpm test:webui-browser': "${{ !cancelled() && steps.build.outcome == 'success' && steps.browsers.outcome == 'success' }}",
+    'pnpm test:webui-package': "${{ !cancelled() && steps.build.outcome == 'success' }}",
+  };
+  for (const [command, condition] of Object.entries(testConditions)) {
+    const step = job.steps.find(step => step.run === command);
+    assert.equal(step.if, condition, `${command} must run on every platform and preserve independent failures`);
+    assert.equal(step['continue-on-error'], undefined, `${command} must fail the job on a regression`);
+  }
+  assert.equal(job['continue-on-error'], undefined);
+  const diagnostics = job.steps.find(step => step.name === 'Upload WebUI browser diagnostics');
+  assert.equal(diagnostics.if, '${{ !cancelled() }}', 'Successful runs must retain raw performance samples too');
+  assert.equal(diagnostics.with['retention-days'], 7);
+});
+
 test('coverage review distinguishes declared browser scenarios from executed evidence', () => {
   const output = execFileSync(process.execPath, ['scripts/coverage-review.mjs', '--check'], { encoding: 'utf8' });
   const evidence = JSON.parse(readFileSync(new URL('../scripts/lib/webui-browser-coverage-evidence.json', import.meta.url), 'utf8'));
@@ -311,7 +357,7 @@ test('performance defaults to the 100-round suite; long history requires explici
   assert.deepEqual(selectScenarios(config, { scenario: 'startup' }).map(s => s.id), ['startup']);
   assert.throws(() => selectScenarios(config, { suite: 'typo' }));
   assert.throws(() => selectScenarios(config, { scenario: 'typo' }));
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   assert.equal(workflow.on.workflow_dispatch.inputs.suite.default, 'full');
   assert.deepEqual(workflow.on.workflow_dispatch.inputs.suite.options, ['full', 'basic']);
   const compare = workflow.jobs.performance.steps.find(s => s.name === 'Compare on this runner');
@@ -320,7 +366,7 @@ test('performance defaults to the 100-round suite; long history requires explici
 });
 
 test('performance labels select full coverage without interrupting checks for unrelated labels', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   const job = workflow.jobs.performance;
   assert.deepEqual(workflow.on.pull_request.types, ['opened', 'synchronize', 'reopened', 'labeled', 'unlabeled']);
   assert.equal(job.strategy.matrix.suite, `\${{ fromJSON((inputs.suite == 'full' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'perf:full'))) && '["full"]' || '["basic"]') }}`);
@@ -411,7 +457,7 @@ test('performance exit codes fail regressions and errors but not inconclusive no
 });
 
 test('performance workflow warns on basic inconclusive runs but fails full inconclusive runs', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   const compare = workflow.jobs.performance.steps.find(s => s.name === 'Compare on this runner');
   assert.match(compare.run, /\|\| status=\$\?/);
   assert.match(compare.run, /if \[ "\$status" -eq 2 \]/);
@@ -477,7 +523,7 @@ test('performance measurements require complete successful tool execution', () =
 });
 
 test('performance workflow uses pinned mock input and an unprivileged PR job', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/performance.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/performance.yml', import.meta.url), 'utf8'));
   const config = JSON.parse(readFileSync(new URL('../scripts/perf/config.json', import.meta.url), 'utf8'));
   assert.ok(Object.hasOwn(workflow.on, 'pull_request'));
   assert.ok(!Object.hasOwn(workflow.on, 'pull_request_target'));
@@ -635,7 +681,7 @@ test('CLI publication requires every supported installation receipt for the exac
 });
 
 test('CLI release publishes only tag pushes after full verification and archive installation', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/cli-release.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/cli-release.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on.push, { tags: ['v*'] });
   assert.equal(workflow.on.workflow_dispatch.inputs.tag.required, false);
   assert.equal(workflow.permissions.contents, 'read');
@@ -919,7 +965,7 @@ test('change classification is conservative for mixed changes, metadata and miss
 
 test('CI aggregate rejects failed, cancelled, missing and unexpectedly skipped checks', { skip: process.platform === 'win32' }, () => {
   // This shell step only runs on the aggregate job's Ubuntu runner.
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/ci.yml', import.meta.url), 'utf8'));
   const script = workflow.jobs.verification.steps[0].run;
   const full = { CLASSIFICATION: 'success', DOCS_ONLY: 'false', DOCS_RESULT: 'skipped', MATRIX_RESULT: 'success' };
   const docs = { CLASSIFICATION: 'success', DOCS_ONLY: 'true', DOCS_RESULT: 'success', MATRIX_RESULT: 'skipped' };
@@ -941,7 +987,7 @@ test('CI aggregate rejects failed, cancelled, missing and unexpectedly skipped c
 });
 
 test('ordinary CI runs a focused Windows contract while compatibility remains macOS/Linux', () => {
-  const readWorkflow = name => parseYaml(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
+  const readWorkflow = name => parseYaml(readFileSync(new URL(`../.github/legacy-workflows/${name}.yml`, import.meta.url), 'utf8'));
   const ci = readWorkflow('ci');
   assert.ok(Object.hasOwn(ci.on, 'pull_request'));
   assert.deepEqual(ci.on.push.branches, ['main']);
@@ -967,7 +1013,7 @@ test('ordinary CI runs a focused Windows contract while compatibility remains ma
   assert.ok(audit.jobs['source-history-artifact'].steps.some(step => step.run?.includes('gitleaks dir dist')));
 });
 test('manual source candidates pin every checkout and receipt to the selected revision', () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/source-candidate.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/source-candidate.yml', import.meta.url), 'utf8'));
   assert.deepEqual(Object.keys(workflow.on).sort(), ['workflow_call', 'workflow_dispatch']);
   assert.equal(workflow.on.workflow_call.inputs.revision.required, true);
   assert.equal(workflow.env.MCODE_CANDIDATE_REVISION, '${{ inputs.revision || github.sha }}');
@@ -1197,10 +1243,27 @@ test('suite runner pins its locale, preserves gate arguments and canonicalizes W
         language: child.language,
         lcAll: child.lcAll,
         lcMessages: child.lcMessages,
-        locale: child.locale,
       },
-      { lang: 'C', language: 'C', lcAll: 'C', lcMessages: 'C', locale: 'en-US' },
+      { lang: 'C', language: 'C', lcAll: 'C', lcMessages: 'C' },
     );
+    // The runner pins the POSIX locale variables, and that is what it can
+    // promise: Node derives its ICU default locale from those variables on
+    // POSIX, so `LC_ALL=C` lands on `en-US`. Windows has no such variables —
+    // Node reads the OS user default locale, and no environment variable
+    // overrides it (`LC_ALL`, `LANG`, `NODE_ICU_DATA` and `ICU_DEFAULT_LOCALE`
+    // were all measured to leave the locale unchanged). So the ICU locale
+    // follows the host there.
+    //
+    // The key is the *host* platform, not the simulated one: the loop fakes
+    // `process.platform` for the runner, but the child is a real process on
+    // this machine, so its ICU locale is the host's whatever the runner was
+    // told to believe.
+    if (process.platform === 'win32') {
+      assert.ok(typeof child.locale === 'string' && child.locale.length > 0,
+        'the child reports a locale');
+    } else {
+      assert.equal(child.locale, 'en-US');
+    }
   }
 });
 
@@ -1226,7 +1289,7 @@ test('public support forms preserve destination URLs and separate Desktop from C
 });
 
 test('issue product labels follow current form answers without replacing unrelated labels', async () => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/label-issue-product.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/label-issue-product.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on, { issues: { types: ['opened', 'edited'] } });
   assert.deepEqual(workflow.permissions, { issues: 'write' });
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
@@ -1292,7 +1355,7 @@ test('issue forms label incoming reports for triage and retain collaborator-only
 });
 
 test('issue notification is restricted to public destination events and builds payloads offline', t => {
-  const workflow = parseYaml(readFileSync(new URL('../.github/workflows/sync-issue-to-feishu.yml', import.meta.url), 'utf8'));
+  const workflow = parseYaml(readFileSync(new URL('../.github/legacy-workflows/sync-issue-to-feishu.yml', import.meta.url), 'utf8'));
   assert.deepEqual(workflow.on, { issues: { types: ['opened'] } });
   assert.deepEqual(workflow.permissions, { contents: 'read', issues: 'read' });
   const job = workflow.jobs['notify-feishu'];
@@ -1401,7 +1464,12 @@ function filesWritingVersion(repositoryRoot, version) {
       if (entry.isDirectory()) walk(full);
       else if (!/\.(?:ts|tsx|mts|mjs|cjs|js|jsx)$/u.test(entry.name)) continue;
       else {
-        const relative = path.relative(repositoryRoot, full);
+        // `path.relative` hands back the platform separator, but every
+        // comparison below — the test-file filter and the shared-module
+        // exclusion — is written in POSIX shape. Normalizing once here keeps
+        // the check meaningful on Windows, where the un-normalized path never
+        // matched and the shared module was reported as its own offender.
+        const relative = path.relative(repositoryRoot, full).split(path.sep).join("/");
         if (isTestFile(relative)) continue;
         if (withoutComments(readFileSync(full, 'utf8')).includes(version)) offenders.push(relative);
       }

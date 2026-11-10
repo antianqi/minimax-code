@@ -4701,6 +4701,7 @@
     "packages/webui/test/browser/rail-archive.spec.mjs",
     "packages/webui/test/browser/rail-pin.spec.mjs",
     "packages/webui/test/browser/rail-search.spec.mjs",
+    "packages/webui/test/browser/rail-session-navigation.spec.mjs",
     "packages/webui/test/browser/rail-transfer.spec.mjs",
     "packages/webui/test/browser/real-browser-bridge.ts",
     "packages/webui/test/browser/recovered-surfaces.spec.mjs",

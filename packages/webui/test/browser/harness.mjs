@@ -20,6 +20,7 @@ import { dirname } from "node:path";
 export const test = base;
 
 export async function attachJsonEvidence(name, value) {
+  // list reporter 不落盘 body 附件；显式写入 outputDir 供 CI artifact 保留。
   const path = test.info().outputPath(name);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value, null, 2));

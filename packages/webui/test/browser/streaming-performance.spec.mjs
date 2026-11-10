@@ -24,24 +24,6 @@ import { attachJsonEvidence, openApp, startTurn, test } from "./harness.mjs";
 // a failure screenshot is taken only after the performance assertions.
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
-let timelineClient;
-let timelineEvents;
-test.beforeEach(async ({ page }, info) => {
-  if (!/a long reply|workspace review stays responsive/.test(info.title)) return;
-  timelineEvents = [];
-  timelineClient = await page.context().newCDPSession(page);
-  timelineClient.on("Tracing.dataCollected", ({ value }) => timelineEvents.push(...value));
-  await timelineClient.send("Tracing.start", { categories: "devtools.timeline,toplevel,blink.user_timing,v8", transferMode: "ReportEvents" });
-});
-test.afterEach(async () => {
-  if (!timelineClient) return;
-  const completed = new Promise((resolve) => timelineClient.once("Tracing.tracingComplete", resolve));
-  await timelineClient.send("Tracing.end");
-  await completed;
-  await attachJsonEvidence("renderer-timeline.json", timelineEvents);
-  timelineClient = undefined;
-});
-
 /** A reply body that exercises the markdown path: prose, a list and a fence. */
 function replyChunk(index) {
   return [
@@ -232,10 +214,7 @@ async function measureStreamedReply(page, options) {
     };
   }, chunkTexts);
   const idleAfter = await measureIdleFrames(page, Math.max(2000, metrics.settled));
-  await test.info().attach("stream-performance-raw.json", {
-    body: JSON.stringify({ historyTurns, chunks, idleBefore, active: metrics, idleAfter }, null, 2),
-    contentType: "application/json",
-  });
+  await attachJsonEvidence("stream-performance-raw.json", { historyTurns, chunks, idleBefore, active: metrics, idleAfter });
 
   if (cdp) {
     const { profile } = await cdp.send("Profiler.stop");

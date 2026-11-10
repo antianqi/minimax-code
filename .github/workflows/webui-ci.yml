@@ -16,18 +16,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-26
+          - runner: macos-26-intel
             channel: chromium
             mode: headed
             headed: true
             caffeinate: false
             inlineContain: "0"
-          - runner: macos-26
-            channel: chromium
-            mode: inline-containment
-            headed: true
-            caffeinate: false
-            inlineContain: "1"
     env:
       WEBUI_BROWSER_HEADED: "1"
       WEBUI_DIAG_INLINE_CONTAIN: ${{ matrix.inlineContain }}
@@ -57,9 +51,9 @@ jobs:
           packages/webui/test/browser/surface-appearance.spec.mjs
           packages/webui/test/browser/responsive-baselines.spec.mjs
           packages/webui/test/browser/visual-baselines.spec.mjs
-          --grep 'workspace review stays responsive'
+          --grep 'a streamed reply|a long reply|frame calibration|continuous chunks|workspace review stays responsive|contained unified diff|browser page fills|hovering a child session|calendar tip is drawn|the workspace panel at (1440|1024|768)px|embedded browser panel layout baseline'
           ${{ matrix.headed && '--headed' || '' }}
-          --repeat-each=10
+          --repeat-each=3
       - name: Retain diagnostic artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

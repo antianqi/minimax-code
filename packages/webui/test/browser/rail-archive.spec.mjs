@@ -39,6 +39,27 @@ test("the rail context-menu flyout uses the shared surface exit lifecycle", asyn
   await configureFixture(page, () => undefined);
   await openApp(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
+  // The exit animation is read from the event it fires, the way the other
+  // surfaces read theirs. The shared exit runs for 120ms and the flyout is
+  // unmounted when it ends, so a style read that lands after that sees an
+  // element with nothing left on it and says nothing about whether the
+  // shared exit ran at all.
+  await page.evaluate(() => {
+    window.__railSubmenuExitAnimation = "";
+    document.addEventListener(
+      "animationstart",
+      (event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.classList.contains("webui-context-menu-submenu") &&
+          event.animationName === "webui-motion-surface-exit"
+        ) {
+          window.__railSubmenuExitAnimation = event.animationName;
+        }
+      },
+      { capture: true },
+    );
+  });
   await sessionRow(page, "B").first().click({ button: "right", position: { x: 40, y: 16 } });
 
   const submenu = page.locator(".webui-context-menu-submenu");
@@ -49,8 +70,10 @@ test("the rail context-menu flyout uses the shared surface exit lifecycle", asyn
 
   await menuItem(page, "归档").hover();
   await expect(submenu).toHaveAttribute("data-webui-motion-state", "exit");
-  expect(await submenu.evaluate((node) => getComputedStyle(node).animationName)).toBe("webui-motion-surface-exit");
-  await expect(submenu).toHaveCount(0, { timeout: 500 });
+  await expect
+    .poll(() => page.evaluate(() => window.__railSubmenuExitAnimation))
+    .toBe("webui-motion-surface-exit");
+  await expect(submenu).toHaveCount(0);
 });
 
 /** Opens settings the way a user does: the user menu, then 设置. */

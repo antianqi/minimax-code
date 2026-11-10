@@ -576,9 +576,13 @@ export const WebuiMarkdown = memo(function WebuiMarkdown({ streaming = false, ..
       setPaintedSource(props.source);
     } else if (pendingFrame.current === undefined) {
       // 同一绘制机会内合并网络分片；新分片不重置待执行帧，持续输出也不会饿死渲染。
-      pendingFrame.current = requestAnimationFrame(() => {
+      const paint = () => {
         pendingFrame.current = undefined;
         setPaintedSource(latestSource.current);
+      };
+      pendingFrame.current = requestAnimationFrame(() => {
+        if ((window as Window & { __WEBUI_DIAG_DOUBLE_FRAME__?: boolean }).__WEBUI_DIAG_DOUBLE_FRAME__) pendingFrame.current = requestAnimationFrame(paint);
+        else paint();
       });
     }
   }, [props.source, streaming]);

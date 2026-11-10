@@ -36,8 +36,9 @@ p95 plus 50 ms. The frame gate requires main-thread CPU p95 between consecutive
 animation callbacks to stay below 50 ms, capturing cumulative work across tasks.
 Raw frame gaps, timers and tasks are retained for investigation.
 Application execution retains the absolute 50 ms budget: lightweight Chromium tracing
-measures main-thread task CPU time, and Long Animation Frame script duration also
-rejects JavaScript blocking (including synchronous waits). Raw LongTask wall durations
+measures main-thread task CPU time, adding browser-recorded Long Animation Frame
+script pauses to their owning tasks to reject synchronous JavaScript waits as well.
+Raw script and LongTask wall durations
 remain diagnostic because they can include hosted-runner descheduling. Missing timing
 capabilities or required task/frame CPU samples fail explicitly. Real idle, busy-script,
 forced-layout and synchronous-wait controls verify attribution in the browser suite.

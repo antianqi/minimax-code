@@ -181,8 +181,11 @@ time descheduled by the runner. Raw maximum gaps, 50/100 ms outlier counts,
 timer delays and every frame/long-task sample remain recorded in `stream-performance-raw.json`.
 Raw task wall durations remain diagnostic. Lightweight CDP tracing (`toplevel,blink.user_timing`)
 records root tasks intersecting measurement markers on the page's main thread; any task with
-at least 50 ms of thread CPU time fails. Long Animation Frame script duration separately fails
-at 50 ms, retaining coverage of JavaScript blocking that spends time in synchronous waits.
+at least 50 ms of thread CPU time fails. Long Animation Frame `pauseDuration` is mapped
+to the owning root task by the measurement marker's page/trace clock offset. Task CPU plus
+its recorded synchronous pauses also fails at 50 ms, retaining coverage of JavaScript
+blocking that uses little CPU. Script wall duration remains diagnostic because it also
+includes time descheduled by the runner. Missing pause attribution or clock mapping fails.
 This distinguishes actual execution from time descheduled by the runner without exempting
 expensive layout or painting. Missing markers, CPU timings or observer support fail explicitly.
 Tasks shorter than 50 ms without a CPU field use their wall duration as a conservative upper

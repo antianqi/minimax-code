@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "@playwright/test";
 
-import { openApp, screenshotOptions, test } from "./harness.mjs";
+import { openApp, screenshotOptions, test, waitForLocalImages } from "./harness.mjs";
 
 test("marketplace and management keep vertical categories pinned on the left", async ({ page }) => {
   await page.addInitScript(() => {
@@ -430,6 +430,7 @@ async function expectCenteredDialog(dialog, page, fieldsSelector, expectedFields
     insideViewport: true,
     ...(fieldsSelector ? { fieldsDisplay: expectedFieldsDisplay } : {}),
   });
+  await waitForLocalImages(page);
   await expect(page.locator('[data-webui-dialog-scrim="true"]')).toHaveScreenshot(screenshotOptions);
 }
 

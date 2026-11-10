@@ -4,13 +4,14 @@
 import { expect } from "@playwright/test";
 
 import {
+  openApp,
+  screenshotOptions,
+  test,
+  waitForLocalImages,
   assistantBody,
   emitAgentMessage,
   emitStream,
-  openApp,
-  screenshotOptions,
   startTurn,
-  test,
 } from "./harness.mjs";
 
 /**
@@ -54,9 +55,7 @@ test("shell and session rail layout baseline", async ({ page }) => {
   await expect(rail).toBeVisible();
   await expect(rail.getByText("Synthetic session A")).toBeVisible();
   await expect(rail.getByText("Synthetic session B")).toBeVisible();
-  await expect.poll(() => page.locator('img[src^="/assets/"]').evaluateAll((images) =>
-    images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
-  )).toBe(true);
+  await waitForLocalImages(page);
   await expect(shell).toHaveScreenshot("shell-and-rail.png", screenshotOptions);
 });
 
@@ -104,6 +103,7 @@ test("transcript and composer layout baseline", async ({ page }) => {
   const transcript = page.locator('[data-webui-transcript="A"]');
   await assertInViewport(transcript, page);
   await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeVisible();
+  await waitForLocalImages(page);
   await expect(page.locator("#webui-root")).toHaveScreenshot("transcript-and-composer.png", screenshotOptions);
 });
 
@@ -120,6 +120,7 @@ test("settings dialog layout baseline", async ({ page }) => {
   // same wait the browser panel case uses, over the whole subtree, so this
   // records the settled frame rather than a lucky one.
   await settleAnimations(dialog);
+  await waitForLocalImages(page);
   await expect(dialog).toHaveScreenshot("settings-dialog.png", screenshotOptions);
 });
 
@@ -145,6 +146,7 @@ test("progress panel layout baseline", async ({ page }) => {
   const panel = page.getByTestId("progress-overview-panel");
   await expect(panel).toContainText("Synthetic visual todo");
   await assertInViewport(panel, page);
+  await waitForLocalImages(page);
   await expect(panel).toHaveScreenshot("progress-panel.png", screenshotOptions);
 });
 
@@ -159,6 +161,7 @@ test("embedded browser panel layout baseline", async ({ page }) => {
   });
   await assertInViewport(panel, page);
   await expect(page.getByTestId("workspace-launcher")).toBeVisible();
+  await waitForLocalImages(page);
   await expect(panel).toHaveScreenshot("embedded-browser-panel.png", screenshotOptions);
 });
 
@@ -171,6 +174,7 @@ test("composer command overlay layout baseline", async ({ page }) => {
   const overlay = page.locator('[data-webui-command-menu="true"]');
   await expect(overlay).toBeVisible();
   await assertInViewport(overlay, page);
+  await waitForLocalImages(page);
   await expect(overlay).toHaveScreenshot("composer-command-overlay.png", screenshotOptions);
 });
 
@@ -205,11 +209,13 @@ test("plugin marketplace and skills catalogue layout baselines", async ({ page }
   const grid = await pluginGrid.first().evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
   expect(grid).toBe(2);
   await assertInViewport(pluginGrid.first(), page);
+  await waitForLocalImages(page);
   await expect(surface).toHaveScreenshot("plugin-marketplace.png", screenshotOptions);
 
   await surface.getByRole("button", { name: "技能", exact: true }).click();
   await expect(surface.locator(".webui-plugin-grid .webui-plugin-row")).toHaveCount(2);
   await expect(surface.getByText("Release notes")).toBeVisible();
+  await waitForLocalImages(page);
   await expect(surface).toHaveScreenshot("skill-marketplace.png", screenshotOptions);
 });
 
@@ -240,6 +246,7 @@ test("plugin management skill and MCP rows layout baselines", async ({ page }) =
   await expect(surface.getByText("Local checklist")).toBeVisible();
   await expect(surface.getByLabel("启用 disabled-review")).toBeVisible();
   await assertInViewport(surface.locator(".webui-plugin-list"), page);
+  await waitForLocalImages(page);
   await expect(surface).toHaveScreenshot("skill-management.png", screenshotOptions);
 
   await surface.locator('.webui-plugin-category-filter button', { hasText: "MCP" }).click();
@@ -247,5 +254,6 @@ test("plugin management skill and MCP rows layout baselines", async ({ page }) =
   // removed with the row redesign, so the baseline shows the rows and their actions.
   await expect(surface.getByText("local-http")).toBeVisible();
   await expect(surface.getByText("missing-binary")).toBeVisible();
+  await waitForLocalImages(page);
   await expect(surface).toHaveScreenshot("mcp-management.png", screenshotOptions);
 });

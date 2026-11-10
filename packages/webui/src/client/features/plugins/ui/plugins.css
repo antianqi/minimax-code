@@ -218,9 +218,11 @@
     overflow: visible;
     padding-top: 0;
   }
+  /* The controls sit inside the page's grouped surface. The primary surface
+   * painted a second, darker band around the search in the dark theme. */
   .webui-plugin-page-controls {
     flex: 0 0 auto;
-    background: var(--bg_default_primary);
+    background: var(--bg_grouped_secondary);
     padding: 0 0 var(--spacing_16);
   }
   .webui-plugin-page-scroll {

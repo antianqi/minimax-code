@@ -69,6 +69,10 @@ test("marketplace and management keep vertical categories pinned on the left", a
   });
   expect(managementGeometry.searchWidth).toBeLessThanOrEqual(768);
   const scrollRegion = layout.locator(".webui-plugin-page-scroll");
+  await expect(layout.locator(".webui-plugin-row")).toHaveCount(30);
+  // Hover waits for the viewport to become stable and may scroll its ancestors
+  // into view. Capture the pinned position after that preparation, before wheel.
+  await scrollRegion.hover();
   const pinnedGeometry = await layout.evaluate((element) => ({
     searchTop: element.querySelector(".webui-plugin-page-controls").getBoundingClientRect().top,
     scrollHeight: element.querySelector(".webui-plugin-page-scroll").scrollHeight,
@@ -78,7 +82,6 @@ test("marketplace and management keep vertical categories pinned on the left", a
   }));
   expect(pinnedGeometry.mainHeight).toBe(pinnedGeometry.layoutHeight);
   expect(pinnedGeometry.scrollHeight).toBeGreaterThan(pinnedGeometry.clientHeight);
-  await scrollRegion.hover();
   await page.mouse.wheel(0, 500);
   await expect.poll(() => scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   // The controls stay where they were while the list scrolls under them.

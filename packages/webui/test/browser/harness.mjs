@@ -13,9 +13,19 @@
 // process happens to answer on the harness port.
 
 import { expect, test as base } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 /** The suite's `test`, carrying the harness-server guard for every test. */
 export const test = base;
+
+export async function attachJsonEvidence(name, value) {
+  // list reporter 不落盘 body 附件；显式写入 outputDir 供 CI artifact 保留。
+  const path = test.info().outputPath(name);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(value, null, 2));
+  await test.info().attach(name, { path, contentType: "application/json" });
+}
 
 /**
  * The pixel budget for a screenshot comparison, shared by every spec that
@@ -23,12 +33,16 @@ export const test = base;
  *
  * The committed baselines are recorded under the pinned font environment in
  * `packages/webui/test/browser/fonts/`, so the glyphs are the same on every
- * machine. What remains is the rasterizer's own rounding at a rounded
- * corner: a bubble's right edge lands on a fractional pixel, and whether that
- * edge rounds up or down shifts a handful of antialiased pixels from run to
- * run. Measured over repeated runs of the browser suite, the widest such
- * shift is seven pixels on the transcript surface and one on the plugin
- * management list.
+ * machine. The pixels are not: every platform rasterizes those glyphs its own
+ * way, so each baseline is recorded on the platform that compares it, and two
+ * machines of one platform still differ by a handful of pixels.
+ *
+ * Within a platform, what remains is the rasterizer's own rounding at a
+ * rounded corner: a bubble's right edge lands on a fractional pixel, and
+ * whether that edge rounds up or down shifts a handful of antialiased pixels
+ * from run to run. Measured over repeated runs of the browser suite, the
+ * widest such shift is seven pixels on the transcript surface and one on the
+ * plugin management list.
  *
  * The budget is therefore seven pixels plus a little headroom, on a capture
  * of well over a million pixels — under 0.001% of the image. A real layout
@@ -75,11 +89,63 @@ test.afterEach(async ({ page }) => {
   expect(await page.evaluate(() => window.__WEBUI_TEST_SERVER_ID__)).toBe(expectedServerId());
 });
 
-export async function openApp(page, hash = "#session=A") {
+export async function openApp(page, hash = "#session=A", options = {}) {
   await page.goto(`/${hash}`);
   await assertHarnessServer(page);
   await expect(page.locator("#webui-root")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "listSessions"))).toBe(true);
+  const loadedFonts = await page.evaluate(async () => {
+    const faces = await Promise.all([
+      document.fonts.load('14px "HarmonyOS Sans"'),
+      document.fonts.load('14px "Hack"'),
+    ]);
+    await document.fonts.ready;
+    return faces.map((fonts) => fonts.length);
+  });
+  expect(loadedFonts, "both pinned browser fonts must load before measuring the client").toEqual([1, 1]);
+  // Register the frame wait before advancing a deliberately frozen test clock.
+  await page.evaluate(() => {
+    window.__webuiInitialLayoutReady = new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  if (options.advanceClockForLayout) await page.clock.runFor(34);
+  await page.evaluate(() => window.__webuiInitialLayoutReady);
+}
+
+/** Capture real CSS interpolation before driver round trips can consume it. */
+export async function pauseNextTransition(locator, property) {
+  await locator.evaluate((element, property) => {
+    element.__webuiTestTransition = undefined;
+    const capture = (event) => {
+      if (event.target !== element || event.propertyName !== property) return;
+      element.removeEventListener("transitionrun", capture);
+      const transitions = element.getAnimations().filter((animation) => animation instanceof CSSTransition);
+      if (!transitions.some((animation) => animation.transitionProperty === property)) throw new Error(`The ${property} transition did not start`);
+      // Width and flex-basis jointly determine the used size. Sample every
+      // coupled property at the same progress instead of freezing only width.
+      for (const transition of transitions) {
+        const duration = transition.effect.getTiming().duration;
+        if (typeof duration !== "number" || duration <= 0) throw new Error("The transition must have a finite positive duration");
+        transition.pause();
+        transition.currentTime = duration / 2;
+      }
+      element.__webuiTestTransition = transitions;
+    };
+    element.addEventListener("transitionrun", capture);
+  }, property);
+}
+
+export async function transitionMidpointSize(locator, dimension) {
+  await expect.poll(() => locator.evaluate((element) => Boolean(element.__webuiTestTransition))).toBe(true);
+  return locator.evaluate((element, dimension) => element.getBoundingClientRect()[dimension], dimension);
+}
+
+export async function finishCapturedTransition(locator) {
+  await locator.evaluate(async (element) => {
+    const transition = element.__webuiTestTransition;
+    if (!transition) throw new Error("No captured transition to finish");
+    for (const animation of transition) animation.finish();
+    await Promise.all(transition.map((animation) => animation.finished));
+  });
 }
 
 export async function switchSession(page, sessionId) {

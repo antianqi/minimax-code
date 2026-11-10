@@ -286,9 +286,18 @@ describe("the real host, the capability surface a turn offers", () => {
         content: "what can you do?",
       });
       expect(sent.ok).toBe(true);
-
-      await expect.poll(() => stub.requests.length, { timeout: 120_000 }).toBeGreaterThan(0);
-      const request = JSON.parse(stub.requests[0]?.body ?? "{}") as ModelRequest;
+      // The turn's own stream is consumed before anything is asserted: the request this
+      // file reads is the turn's, and the turn is not over until the runtime has sent it.
+      if (sent.ok) for await (const _frame of sent.source) void _frame;
+      // The runtime sends the background title request to the same model endpoint, and it can
+      // win the race to it. The title request carries `submit_session_title`; the user's turn
+      // does not. Reading the first request therefore reads whichever arrived first, which on
+      // a machine where the title wins is not the turn whose skills and tools this file reads.
+      const turnRequests = stub.requests
+        .map((request) => JSON.parse(request.body) as ModelRequest)
+        .filter((request) => !extractToolNames(request).includes("submit_session_title"));
+      expect(turnRequests).toHaveLength(1);
+      const request = turnRequests[0]!;
       const skills = extractSkillIds(request).sort();
       const tools = extractToolNames(request).sort();
 

@@ -208,9 +208,12 @@ describe("the real WebUI host", () => {
       // The stub served a real turn, so the request body it recorded is the
       // tool table this client's agent actually works with.
       expect(stub.requests.length).toBeGreaterThan(0);
-      const body = JSON.parse(stub.requests[0]?.body ?? "{}") as {
+      // Title generation shares the endpoint and may arrive before the turn.
+      const turnRequests = stub.requests.map((request) => JSON.parse(request.body) as {
         readonly tools?: ReadonlyArray<{ readonly function?: { readonly name?: string } }>;
-      };
+      }).filter((request) => !request.tools?.some((tool) => tool.function?.name === "submit_session_title"));
+      expect(turnRequests).toHaveLength(1);
+      const body = turnRequests[0]!;
       const toolNames = (body.tools ?? []).map((tool) => tool.function?.name);
       expect(toolNames).toContain("miniapp");
     },

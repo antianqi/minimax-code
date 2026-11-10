@@ -537,7 +537,10 @@ describe("V02 · independent owners' pending IO cannot commit after disposal", (
     const pending = Promise.all([
       application.modelsWorkflows.loadModels(SESSION),
       application.settingsWorkflows.loadInstructions(),
-      application.composerPluginCatalogue.installedPlugins(),
+      application.composerPluginCatalogue.installedPlugins().then(
+        () => { throw new Error("A disposed catalogue must refuse its late answer"); },
+        (error: unknown) => { expect(error).toEqual(new Error("插件目录读取已失效，请重试。")); },
+      ),
       application.turnReview.load({ sessionId: SESSION, turnId: "turn-1" }),
       application.transcriptHistory.loadPage(SESSION),
       Promise.resolve(application.workspaceQueries.files.loadFileTree("/repo")),

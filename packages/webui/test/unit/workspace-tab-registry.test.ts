@@ -108,27 +108,24 @@ describe("the registry answers for the whole closed set", () => {
   it("offers the launcher's tiles in one order, and only where a tile exists", () => {
     const tiles = webuiWorkspaceLauncherTiles();
     expect(tiles.map((tile) => tile.kind)).toEqual([
+      "miniapp-picker",
       "review",
       "terminal",
       "canvas",
-      "miniapp-picker",
       "files",
     ]);
     expect(tiles.map((tile) => tile.label)).toEqual([
+      "应用",
       "变更",
       "终端",
       "画布",
-      "应用",
       "查看文件",
     ]);
     expect(tiles.map((tile) => tile.opens)).toEqual([
+      { type: "open-tab", kind: "miniapp-picker" },
       { type: "open-workspace-review" },
       { type: "open-tab", kind: "terminal" },
       { type: "open-tab", kind: "canvas" },
-      // The Mini App tile opens the Mini App tool page: which Mini App a tab
-      // shows is chosen from the runtime's listing, so this tile carries no
-      // plugin id and the page it opens is the one the choice is made in.
-      { type: "open-tab", kind: "miniapp-picker" },
       { type: "open-tab", kind: "files" },
     ]);
     // Every tile names a declared kind, and the order names each one once.

@@ -28,6 +28,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
 
@@ -48,7 +49,7 @@ const SUITE = "real-packaged";
 
 /** The development build's manifest, for the build comparison. */
 const developmentDist = resolve(
-  new URL("../../../browser-extension/dist/manifest.json", import.meta.url).pathname,
+  fileURLToPath(new URL("../../../browser-extension/dist/manifest.json", import.meta.url)),
 );
 
 /**
@@ -66,7 +67,7 @@ const STORES = [
 /** Where a store build is built. It is not `dist/`: the two cannot share. */
 function storeDistOf(store: "chrome" | "edge"): string {
   return resolve(
-    new URL(`../../../browser-extension/dist-store-${store}`, import.meta.url).pathname,
+    fileURLToPath(new URL(`../../../browser-extension/dist-store-${store}`, import.meta.url)),
   );
 }
 

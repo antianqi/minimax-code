@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
+import { loadWebuiPty } from "../../../src/runtime/native-pty.js";
 import { createWebuiRuntimeHost } from "../../../src/runtime/assembly.js";
 import { createHarnessPortFromHost } from "../../../src/runtime/harness/adapter.js";
 import { WebuiTerminalManager } from "../../../src/runtime/terminal.js";
@@ -41,7 +41,7 @@ const initialSession = await port.createSession({ name: "main", workspaceDir });
 const sessionId = initialSession.session?.sessionId;
 if (!sessionId) throw new Error("Native acceptance session was not created");
 type NativePtyModule = ReturnType<NonNullable<ConstructorParameters<typeof WebuiTerminalManager>[0]>>;
-const native = createRequire(import.meta.url)("node-pty") as NativePtyModule;
+const native: NativePtyModule = loadWebuiPty();
 const exits: Promise<void>[] = [];
 const terminal = new WebuiTerminalManager(() => ({ spawn: (shell, args, options) => {
   const pty = native.spawn(shell, args, options);

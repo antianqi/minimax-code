@@ -10,7 +10,8 @@ import { execFile } from "node:child_process";
 import { createServer, type IncomingMessage } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { Duplex } from "node:stream";
 
@@ -25,7 +26,7 @@ const run = promisify(execFile);
 
 // The spec lives at packages/webui/test/browser/, so the repository root is
 // four levels up from the file's directory.
-const repoRoot = resolve(new URL("../../../..", import.meta.url).pathname);
+const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
 const extensionDist = join(repoRoot, "packages/browser-extension/dist");
 
 /** The storage keys the extension keeps its configuration under. */
@@ -77,11 +78,11 @@ export async function buildExtension(
     readonly publicKey?: string;
   } = {},
 ): Promise<void> {
-  const args = ["--filter", "@mavis/browser-extension", "build"];
+  const args = [join(repoRoot, "packages/browser-extension/scripts/build.mjs")];
   if (options.store) args.push("--store", options.store);
   if (options.out) args.push("--out", options.out);
-  await run("pnpm", args, {
-    cwd: repoRoot,
+  await run(process.execPath, args, {
+    cwd: join(repoRoot, "packages/browser-extension"),
     timeout: 120_000,
     env: options.store && options.publicKey
       ? {

@@ -77,16 +77,16 @@ describe("the web tab kind", () => {
     }
   });
 
-  it("is exactly the five tool views, in the ADR's order", () => {
+  it("is exactly the five tool views, with Mini Apps first", () => {
     // The new tab page is a launcher over the tool views, and the browser tool
-    // view is not one of them: the tiles are 变更, 终端, 画布, 应用 and 查看文件.
+    // view is not one of them: the tiles are 应用, 变更, 终端, 画布 and 查看文件.
     // 应用 opens the Mini App tool page, because which Mini App a tab shows is
     // chosen from the runtime's listing rather than from the tile.
     expect(webuiWorkspaceLauncherTiles().map((tile) => tile.kind)).toEqual([
+      "miniapp-picker",
       "review",
       "terminal",
       "canvas",
-      "miniapp-picker",
       "files",
     ]);
   });

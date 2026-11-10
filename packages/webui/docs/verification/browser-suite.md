@@ -176,6 +176,8 @@ idle samples before and after streaming: active p95 must stay below the larger i
 one 60 Hz frame (16.67 ms), with a 50 ms floor. Using p95 distinguishes sustained application
 delay from isolated hosted-runner scheduling pauses; raw maximum gaps, 50/100 ms outlier counts,
 timer delays and every frame/long-task sample remain recorded in `stream-performance-raw.json`.
+Raw task details and Long Animation Frame attribution are included for triage; they do not replace
+the absolute long-task assertion.
 An empty sample set fails. Both conversation sizes and rendered-content assertions remain intact.
 The plugin scroll case waits for populated rows and the hover action's layout stability before
 recording its pre-wheel pinned geometry.
@@ -198,6 +200,11 @@ and trace screenshots also occupy the renderer/compositor. The drag still runs t
 input, waits two frames after pointer release, and retains the 50 ms long-task budget. Locator-based
 geometry assertions run after the observer stops, so their injected queries are not charged to the
 application. Raw task durations are attached as `workspace-drag-long-tasks.json`.
+The review must paint its initial layout before the toolbar measurement begins. The panel's
+`--webui-workspace-width` is a non-inherited registered property: it controls the panel's own
+overlap margin, and inheriting each pointer sample into thousands of diff descendants caused
+unnecessary style recalculation. The browser regression checks both actual panel resizing and
+the child's independent default value.
 Disclosure cases capture all coupled CSS transitions,
 inspect their interpolated midpoint and
 finish it before checking the final geometry, instead of racing a fixed delay against driver latency.

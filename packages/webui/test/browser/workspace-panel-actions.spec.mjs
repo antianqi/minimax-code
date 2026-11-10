@@ -176,6 +176,9 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   const review = page.getByTestId("workspace-review");
   await expect(review.locator('[data-testid="turn-review-diff-file"]')).toHaveCount(70);
   await expect(review.locator(".webui-turn-review-code")).toHaveCount(70);
+  await expect(review.locator(".webui-turn-review-code").first()).toBeVisible();
+  // DOM 数量不代表初始布局已绘制；用户能看到 review 后再测工具栏交互。
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   const elapsed = await page.evaluate(async () => {
     const button = document.querySelector('[data-testid="workspace-review-toolbar-context"]');

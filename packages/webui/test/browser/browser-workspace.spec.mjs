@@ -202,6 +202,12 @@ test("the browser page fills the workspace body and the workspace edge resizes h
     .poll(async () => (await panel.boundingBox()).width)
     .toBeGreaterThan(before.width + 40);
   const after = await panel.boundingBox();
+  const widthScopes = await panel.evaluate((element) => ({
+    panel: getComputedStyle(element).getPropertyValue("--webui-workspace-width").trim(),
+    frame: getComputedStyle(element.querySelector('[data-testid="browser-panel-frame"]')).getPropertyValue("--webui-workspace-width").trim(),
+  }));
+  expect(widthScopes.panel).toMatch(/px$/u);
+  expect(widthScopes.frame).toBe("50%");
   await expect(handle).toBeVisible();
   await handle.focus();
   await page.keyboard.press("ArrowLeft");

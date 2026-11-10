@@ -41,6 +41,9 @@ importers:
       axe-core:
         specifier: 4.14.0
         version: 4.14.0
+      cross-spawn:
+        specifier: 7.0.6
+        version: 7.0.6
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -957,6 +960,9 @@ importers:
       '@xterm/xterm':
         specifier: 6.0.0
         version: 6.0.0
+      better-sqlite3:
+        specifier: 12.11.1
+        version: 12.11.1
       highlight.js:
         specifier: 10.7.3
         version: 10.7.3
@@ -975,9 +981,6 @@ importers:
       node-pty:
         specifier: 1.1.0
         version: 1.1.0
-      better-sqlite3:
-        specifier: 12.11.1
-        version: 12.11.1
       qrcode.react:
         specifier: 4.2.0
         version: 4.2.0(react@18.3.1)
@@ -6772,7 +6775,7 @@ snapshots:
       obug: 2.2.1
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@20.19.43)(@vitest/coverage-v8@4.1.11)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
+      vitest: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@20.19.43)(@vitest/coverage-v8@4.1.11)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   '@vitest/expect@4.1.11':
     dependencies:

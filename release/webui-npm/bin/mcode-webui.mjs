@@ -315,6 +315,16 @@ try {
   console.log("Press Ctrl+C to stop the server.");
   process.once("SIGINT", () => void close().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void close().finally(() => process.exit(0)));
+  // Windows process.kill cannot deliver a catchable POSIX signal. A Node
+  // parent can request the same graceful teardown over its private IPC pipe.
+  if (process.send) process.on("message", (message) => {
+    if (message?.type === "mcode-webui:shutdown") {
+      void close().then(() => process.exit(0), (error) => {
+        console.error(error);
+        process.exit(1);
+      });
+    }
+  });
 } catch (error) {
   await close();
   throw error;

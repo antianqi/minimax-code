@@ -133,14 +133,22 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   await openLauncher(page);
 
   const brand = page.getByTestId("workspace-launcher-brand");
-  const omnibox = page.locator(".webui-workspace-launcher-omnibox");
-  const launcher = page.getByTestId("workspace-launcher");
-  const tiles = page.locator(".webui-workspace-launcher-tiles");
   await expect(brand).toBeVisible();
-  const brandBox = await brand.boundingBox();
-  const omniboxBox = await omnibox.boundingBox();
-  const launcherBox = await launcher.boundingBox();
-  const tilesBox = await tiles.boundingBox();
+  // Compare related boxes in one layout snapshot while the panel can resize.
+  const { brandBox, omniboxBox, launcherBox, tilesBox, contentOffset } = await page.evaluate(() => {
+    const rect = (selector) => {
+      const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    const transform = getComputedStyle(document.querySelector(".webui-workspace-launcher-content")).transform;
+    return {
+      brandBox: rect(".webui-workspace-launcher-brand"),
+      omniboxBox: rect(".webui-workspace-launcher-omnibox"),
+      launcherBox: rect(".webui-workspace-launcher"),
+      tilesBox: rect(".webui-workspace-launcher-tiles"),
+      contentOffset: transform === "none" ? 0 : new DOMMatrixReadOnly(transform).m42,
+    };
+  });
   expect(Math.abs(brandBox.x + brandBox.width / 2 - (omniboxBox.x + omniboxBox.width / 2))).toBeLessThanOrEqual(1);
   expect(brandBox.y + brandBox.height).toBeLessThan(omniboxBox.y);
   // The launcher's content is centred in the panel body and then nudged up by
@@ -150,12 +158,6 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   // first and last children, so the midpoint between them is the content's own
   // centre -- and the nudge is the content's own transform, so the group is
   // measured against the line the layout put it on rather than a copy of it.
-  const contentOffset = await page
-    .locator(".webui-workspace-launcher-content")
-    .evaluate((element) => {
-      const transform = getComputedStyle(element).transform;
-      return transform === "none" ? 0 : new DOMMatrixReadOnly(transform).m42;
-    });
   const groupCentre = (brandBox.y + tilesBox.y + tilesBox.height) / 2;
   const launcherCentre = launcherBox.y + launcherBox.height / 2;
   expect(Math.abs(groupCentre - (launcherCentre + contentOffset))).toBeLessThanOrEqual(1);
@@ -169,12 +171,20 @@ test("the browser page fills the workspace body and the workspace edge resizes h
   // panel: a gesture started before it finished is lost with the old tree.
   await expect(page.getByTestId("browser-toolbar")).toBeVisible();
 
-  const stage = page.locator(".webui-browser-stage");
-  const frame = page.getByTestId("browser-panel-frame");
-  const stageBox = await stage.boundingBox();
-  const frameBox = await frame.boundingBox();
+  await expect(page.getByTestId("browser-panel-frame")).toBeVisible();
+  const { stageBox, frameBox } = await page.evaluate(() => {
+    const rect = (selector) => {
+      const { width, height } = document.querySelector(selector).getBoundingClientRect();
+      return { width, height };
+    };
+    return { stageBox: rect(".webui-browser-stage"), frameBox: rect('[data-testid="browser-panel-frame"]') };
+  });
   expect(stageBox).not.toBeNull();
   expect(frameBox).not.toBeNull();
+  expect(stageBox.width).toBeGreaterThan(0);
+  expect(stageBox.height).toBeGreaterThan(0);
+  expect(frameBox.width).toBeGreaterThan(0);
+  expect(frameBox.height).toBeGreaterThan(0);
   expect(Math.abs(frameBox.width - stageBox.width)).toBeLessThanOrEqual(1);
   expect(Math.abs(frameBox.height - stageBox.height)).toBeLessThanOrEqual(1);
 
@@ -192,6 +202,12 @@ test("the browser page fills the workspace body and the workspace edge resizes h
     .poll(async () => (await panel.boundingBox()).width)
     .toBeGreaterThan(before.width + 40);
   const after = await panel.boundingBox();
+  const widthScopes = await panel.evaluate((element) => ({
+    panel: getComputedStyle(element).getPropertyValue("--webui-workspace-width").trim(),
+    frame: getComputedStyle(element.querySelector('[data-testid="browser-panel-frame"]')).getPropertyValue("--webui-workspace-width").trim(),
+  }));
+  expect(widthScopes.panel).toMatch(/px$/u);
+  expect(widthScopes.frame).toBe("50%");
   await expect(handle).toBeVisible();
   await handle.focus();
   await page.keyboard.press("ArrowLeft");

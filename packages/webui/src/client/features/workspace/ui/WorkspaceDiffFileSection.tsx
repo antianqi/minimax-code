@@ -44,7 +44,12 @@ function WebuiDiffFileSectionView({ file, selected, loading = false, error, onSe
     }
     return highlighted;
   }, [allLines, language]);
-  return <section className="webui-turn-review-file" data-expanded={expanded} data-testid="turn-review-diff-file">
+  // Keep offscreen file headings and their intrinsic-width diff layout out of
+  // panel resize work. Preserve the estimated scroll extent until first paint.
+  const offscreenSize = expanded && lines.length > 0 && !loading && !error
+    ? { contentVisibility: "auto" as const, containIntrinsicSize: `auto ${40 + lines.length * 19.8}px` }
+    : undefined;
+  return <section className="webui-turn-review-file" style={offscreenSize} data-expanded={expanded} data-testid="turn-review-diff-file">
     <WebuiButton variant="plain" size="regular" type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(file.file); setExpanded((value) => !value); }}>
       <WebuiMotionSlot kind="disclosure-transform" rotation={expanded ? 90 : 0}>
         <WebuiIconChevronRight className="webui-turn-review-chevron" />

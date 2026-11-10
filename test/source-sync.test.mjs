@@ -54,9 +54,22 @@ test('public WebUI CI runs only WebUI checks and cannot publish packages', () =>
     assert.ok(commands.includes(command), `Missing ${command}`);
   }
   assert.ok(commands.indexOf('pnpm build:webui') < commands.indexOf('pnpm test:webui-browser'));
-  for (const command of ['pnpm test:webui', 'pnpm test:webui-browser', 'pnpm test:webui-package']) {
-    assert.equal(job.steps.find(step => step.run === command).if, undefined, `${command} must run on every platform`);
+  assert.equal(job.steps.find(step => step.run === 'pnpm build:webui').id, 'build');
+  assert.equal(job.steps.find(step => step.run === 'pnpm install:webui-browsers').id, 'browsers');
+  const testConditions = {
+    'pnpm test:webui': undefined,
+    'pnpm test:webui-browser': "${{ !cancelled() && steps.build.outcome == 'success' && steps.browsers.outcome == 'success' }}",
+    'pnpm test:webui-package': "${{ !cancelled() && steps.build.outcome == 'success' }}",
+  };
+  for (const [command, condition] of Object.entries(testConditions)) {
+    const step = job.steps.find(step => step.run === command);
+    assert.equal(step.if, condition, `${command} must run on every platform and preserve independent failures`);
+    assert.equal(step['continue-on-error'], undefined, `${command} must fail the job on a regression`);
   }
+  assert.equal(job['continue-on-error'], undefined);
+  const diagnostics = job.steps.find(step => step.name === 'Upload WebUI browser diagnostics');
+  assert.equal(diagnostics.if, '${{ !cancelled() }}', 'Successful runs must retain raw performance samples too');
+  assert.equal(diagnostics.with['retention-days'], 7);
 });
 
 test('coverage review distinguishes declared browser scenarios from executed evidence', () => {

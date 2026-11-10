@@ -246,9 +246,16 @@ async function runTurnAndReadCatalog(betaMcodeTools: boolean | undefined): Promi
 
   const sent = await port.sendMessage({ id: sessionId as string, content: "hello stub" });
   expect(sent.ok).toBe(true);
-
-  await expect.poll(() => stub.requests.length, { timeout: 60_000 }).toBeGreaterThan(0);
-  const body = stub.requests[0]?.body ?? "";
+  if (sent.ok) for await (const _frame of sent.source) void _frame;
+  // The background title request can win the race to the same model endpoint.
+  const turnRequests = stub.requests.filter((request) => {
+    const body = JSON.parse(request.body) as {
+      readonly tools?: ReadonlyArray<{ readonly function?: { readonly name?: string } }>;
+    };
+    return !body.tools?.some((tool) => tool.function?.name === "submit_session_title");
+  });
+  expect(turnRequests).toHaveLength(1);
+  const body = turnRequests[0]!.body;
   const catalog = extractSkillCatalog(body);
   return { catalog, requested, ready: false };
 }

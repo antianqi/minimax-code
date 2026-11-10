@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 
@@ -33,7 +33,7 @@ const SOCKET_FILE = 'owner.sock';
 const RECORD_FILE = 'owner.json';
 const WINDOWS_PIPE_PREFIX = '\\\\.\\pipe\\mcode-miniapp-owner-';
 
-/** A socket file on POSIX, a named pipe on Windows — named from the plugin id, never from the directory. */
+/** A directory-scoped socket on POSIX, a plugin-scoped named pipe on Windows. */
 export function resolveMiniAppOwnerEndpoint(
   pluginDataDir: string,
   pluginId: string,
@@ -43,7 +43,11 @@ export function resolveMiniAppOwnerEndpoint(
     const digest = createHash('sha256').update(pluginId).digest('hex').slice(0, 16);
     return `${WINDOWS_PIPE_PREFIX}${digest}`;
   }
-  return path.join(pluginDataDir, SOCKET_FILE);
+  const endpoint = path.join(pluginDataDir, SOCKET_FILE);
+  // macOS limits sockaddr_un.sun_path to 104 bytes, including its terminator.
+  if (Buffer.byteLength(endpoint) < 104) return endpoint;
+  const digest = createHash('sha256').update(path.resolve(pluginDataDir)).digest('hex').slice(0, 32);
+  return path.join('/tmp', `mcode-miniapp-owner-${process.getuid!()}`, `${digest}.sock`);
 }
 
 /**
@@ -59,8 +63,17 @@ export async function acquireMiniAppOwner(
 ): Promise<MiniAppOwnerAcquisition> {
   const nowMs = input.nowMs ?? Date.now;
   const platform = input.platform ?? process.platform;
-  const endpoint = resolveMiniAppOwnerEndpoint(input.pluginDataDir, input.pluginId, platform);
   if (platform !== 'win32') await mkdir(input.pluginDataDir, { recursive: true });
+  const dataDir = platform === 'win32' ? input.pluginDataDir : await realpath(input.pluginDataDir);
+  const endpoint = resolveMiniAppOwnerEndpoint(dataDir, input.pluginId, platform);
+  if (platform !== 'win32' && path.dirname(endpoint) !== dataDir) {
+    const socketDirectory = path.dirname(endpoint);
+    await mkdir(socketDirectory, { recursive: true, mode: 0o700 });
+    const metadata = await lstat(socketDirectory);
+    if (!metadata.isDirectory() || metadata.uid !== process.getuid!() || (metadata.mode & 0o077) !== 0) {
+      throw new Error(`Mini App owner socket directory is not private: ${socketDirectory}`);
+    }
+  }
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const server = net.createServer((socket) => socket.destroy());

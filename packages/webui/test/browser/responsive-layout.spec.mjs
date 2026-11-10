@@ -13,7 +13,7 @@
 
 import { expect } from "@playwright/test";
 
-import { configureFixture, openApp, test } from "./harness.mjs";
+import { configureFixture, finishCapturedTransition, openApp, pauseNextTransition, test, transitionMidpointSize } from "./harness.mjs";
 
 /** The widths the contract's matrix covers. */
 const VIEWPORTS = [
@@ -116,6 +116,7 @@ test.describe("the layout adapts to the width it has", () => {
     expect(await rail.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain("transform");
     expect(await rail.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.18s");
     expect(await rail.evaluate((element) => getComputedStyle(element).transform)).not.toBe("none");
+    await pauseNextTransition(rail, "transform");
     await page.getByRole("button", { name: "展开导航栏" }).click();
     const scrim = page.getByRole("button", { name: "关闭导航栏" });
     await expect(scrim).toHaveAttribute("data-webui-motion", "surface");
@@ -123,13 +124,13 @@ test.describe("the layout adapts to the width it has", () => {
     await expect(rail).toHaveAttribute("data-webui-page-visible", "true");
     await expect(rail).not.toHaveAttribute("aria-hidden", "true");
     expect(await rail.evaluate((element) => element.hasAttribute("inert"))).toBe(false);
-    await page.waitForTimeout(70);
+    await transitionMidpointSize(rail, "width");
     const openTransform = await rail.evaluate((element) => getComputedStyle(element).transform);
     const openX = Number(openTransform.match(/^matrix\([^,]+,[^,]+,[^,]+,[^,]+,([^,]+)/u)?.[1] ?? NaN);
     expect(openX).toBeGreaterThan(-drawerWidth);
     expect(openX).toBeLessThan(0);
-    await page.waitForTimeout(140);
-    expect(await rail.evaluate((element) => getComputedStyle(element).transform)).toBe("matrix(1, 0, 0, 1, 0, 0)");
+    await finishCapturedTransition(rail);
+    await expect.poll(() => rail.evaluate((element) => getComputedStyle(element).transform)).toBe("matrix(1, 0, 0, 1, 0, 0)");
 
     await page.evaluate(() => {
       window.__railScrimExitAnimation = undefined;
@@ -142,19 +143,20 @@ test.describe("the layout adapts to the width it has", () => {
         }
       }, { capture: true });
     });
+    await pauseNextTransition(rail, "transform");
     await page.mouse.click(400, 400);
     await expect(rail).toHaveAttribute("data-webui-page-visible", "false");
     await expect(rail).toHaveAttribute("aria-hidden", "true");
     expect(await rail.evaluate((element) => element.hasAttribute("inert"))).toBe(true);
-    await page.waitForTimeout(70);
+    await transitionMidpointSize(rail, "width");
     const closeTransform = await rail.evaluate((element) => getComputedStyle(element).transform);
     const closeX = Number(closeTransform.match(/^matrix\([^,]+,[^,]+,[^,]+,[^,]+,([^,]+)/u)?.[1] ?? NaN);
     expect(closeX).toBeLessThan(0);
     expect(closeX).toBeGreaterThan(-drawerWidth);
     await expect.poll(() => page.evaluate(() => window.__railScrimExitAnimation)).toBe("webui-motion-surface-exit");
     await expect(scrim).toHaveCount(0);
-    await page.waitForTimeout(140);
-    expect(await rail.evaluate((element) => getComputedStyle(element).transform)).toBe(`matrix(1, 0, 0, 1, ${-drawerWidth}, 0)`);
+    await finishCapturedTransition(rail);
+    await expect.poll(() => rail.evaluate((element) => getComputedStyle(element).transform)).toBe(`matrix(1, 0, 0, 1, ${-drawerWidth}, 0)`);
   });
 
   test("the wide navigation rail uses the shared disclosure transition when collapsed", async ({ page }) => {
@@ -167,14 +169,14 @@ test.describe("the layout adapts to the width it has", () => {
     expect(await rail.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain("width");
     expect(await rail.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe("0.16s");
     const expandedWidth = await rail.evaluate((element) => element.getBoundingClientRect().width);
+    await pauseNextTransition(rail, "width");
     await page.getByRole("button", { name: "收起导航栏" }).click();
     await expect(rail).toHaveAttribute("data-webui-rail-width", "64");
-    await page.waitForTimeout(70);
-    const widthDuringCollapse = await rail.evaluate((element) => element.getBoundingClientRect().width);
+    const widthDuringCollapse = await transitionMidpointSize(rail, "width");
     expect(widthDuringCollapse).toBeLessThan(expandedWidth);
     expect(widthDuringCollapse).toBeGreaterThan(64);
-    await page.waitForTimeout(130);
-    expect(await rail.evaluate((element) => element.getBoundingClientRect().width)).toBe(64);
+    await finishCapturedTransition(rail);
+    await expect.poll(() => rail.evaluate((element) => element.getBoundingClientRect().width)).toBe(64);
   });
 
   test("the header row's parts do not overlap each other", async ({ page }) => {

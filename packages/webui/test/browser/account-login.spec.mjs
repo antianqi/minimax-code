@@ -156,9 +156,17 @@ test("usage loading applies the shared pulse animation to each skeleton shape", 
 
   await page.evaluate(() => window.__fixture.resolveAllPending("getUsageQuota", {}, { signedIn: false }));
   await expect(page.locator('[data-testid="usage-sign-in-button"]')).toBeVisible();
+  await popover.evaluate((element) => {
+    window.__usageExitAnimation = undefined;
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute("data-webui-motion-state") !== "exit") return;
+      window.__usageExitAnimation = getComputedStyle(element).animationName;
+      observer.disconnect();
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ["data-webui-motion-state"] });
+  });
   await page.mouse.move(1, 1);
-  await expect(popover).toHaveAttribute("data-webui-motion-state", "exit");
-  expect(await popover.evaluate((element) => getComputedStyle(element).animationName)).toBe("webui-motion-surface-exit");
+  await expect.poll(() => page.evaluate(() => window.__usageExitAnimation)).toBe("webui-motion-surface-exit");
   await expect(popover).toHaveCount(0, { timeout: 500 });
 });
 

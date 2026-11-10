@@ -531,7 +531,12 @@ export function WebuiDropdown({
 
   const handleTriggerClick = useCallback(() => {
     if (open) onClose();
-    else onOpen();
+    else {
+      // Pointer activation does not focus buttons consistently across systems.
+      // Record the surviving trigger before a menu opens a modal and unmounts.
+      triggerRef.current?.focus();
+      onOpen();
+    }
   }, [onClose, onOpen, open]);
 
   const handleTriggerKeyDown = useCallback(

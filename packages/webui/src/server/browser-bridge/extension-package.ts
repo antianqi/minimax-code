@@ -59,7 +59,7 @@ export class WebuiBrowserExtensionPackage {
     const version = await readExtensionVersion(built);
     const fileName = `minimax-code-browser-extension-${version}.zip`;
     const bytes = await zipDirectory(built, fileName, this.options.scratchDir);
-    return bytes ? { fileName, bytes } : undefined;
+    return { fileName, bytes };
   }
 
   /** The directory holding the built extension, after making sure it is current. */
@@ -118,7 +118,7 @@ async function zipDirectory(
   directory: string,
   fileName: string,
   scratchDir: string | undefined,
-): Promise<Uint8Array | undefined> {
+): Promise<Uint8Array> {
   // The scratch directory is the host's, and a host may hand us one it has not
   // created yet: a packaged host derives it from its data directory, which on a
   // fresh machine does not exist until something writes there. Creating it here
@@ -128,8 +128,17 @@ async function zipDirectory(
   const scratch = await mkdtemp(path.join(scratchParent, "webui-extension-"));
   const archivePath = path.join(scratch, fileName);
   try {
-    const code = await run("zip", ["-r", "-q", archivePath, "."], directory);
-    if (code !== 0) return undefined;
+    // Windows ships libarchive's bsdtar, including ZIP creation; POSIX hosts
+    // use their existing zip tool. Both archive the built directory's contents.
+    let code: number;
+    if (process.platform === "win32") {
+      const systemRoot = process.env.SystemRoot;
+      if (!systemRoot) throw new Error("Windows SystemRoot is required to locate the ZIP archive tool.");
+      code = await run(path.join(systemRoot, "System32", "tar.exe"), ["-a", "-c", "-f", archivePath, "."], directory);
+    } else {
+      code = await run("zip", ["-r", "-q", archivePath, "."], directory);
+    }
+    if (code !== 0) throw new Error(`The browser extension archive failed (exit ${code}).`);
     return await readFile(archivePath);
   } finally {
     await rm(scratch, { recursive: true, force: true });

@@ -130,6 +130,11 @@ if (store) {
   // store, so the two artifacts cannot be confused for one another.
   const archive = join(packageRoot, `dist-${store}.zip`);
   await rm(archive, { force: true });
-  await run("zip", ["-r", "-q", archive, "."], { cwd: outDir });
+  if (process.platform === "win32") {
+    if (!process.env.SystemRoot) throw new Error("Windows SystemRoot is required to locate the ZIP archive tool.");
+    await run(join(process.env.SystemRoot, "System32", "tar.exe"), ["-a", "-c", "-f", archive, "."], { cwd: outDir });
+  } else {
+    await run("zip", ["-r", "-q", archive, "."], { cwd: outDir });
+  }
   process.stdout.write(`Packaged the ${store} build as ${archive}\n`);
 }

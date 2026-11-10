@@ -59,6 +59,13 @@ and runs in the browser gate, after the client build and Chromium installation.
 Live and completed turn visibility is asserted from controlled stream frames while the indicator
 remains unmodified.
 
+Live assistant Markdown coalesces arriving chunks at the next animation frame, retaining the latest
+complete source without restarting a pending frame. Static content, replacements and completion
+render immediately. The streaming responsiveness cases keep the existing 50 ms jank and long-task
+budgets; a separate continuous-stream case verifies visible progress before completion and retains
+the final chunk when `[DONE]` arrives in the same task. These are built-client fixture checks, not
+measurements of a live model provider.
+
 The composer spec selects `/compact` from the slash palette, adds an instruction, and asserts the
 `runCommand` request body at the fixture transport. This checks built-client behavior only; a
 production command-runner journey is not currently covered by `agent-transcript.test.ts` or another
@@ -136,7 +143,7 @@ The shell case asserts that built
 image assets finish loading successfully. The tests also assert relevant DOM state and viewport
 geometry; screenshots are not the sole oracle. These are deterministic fixture renders with
 synthetic session content, not user workspace or account data. Review image diffs on the pinned
-Linux Chromium revision before accepting baseline changes.
+Chromium revision on the recorded platform before accepting baseline changes.
 
 `pnpm test:webui-browser` uses the already installed Playwright Chromium directly. It does not
 download a browser or install system packages. On a new machine, run `pnpm install:webui-browsers`
@@ -154,15 +161,71 @@ pnpm build:webui
 pnpm test:webui-browser
 ```
 
-The screenshots are comparable across machines, because the gate does not read the host's fonts.
-The font files under `packages/webui/test/browser/fonts/` are committed to this repository, and
-`scripts/lib/webui-font-environment.mjs` writes a fontconfig that exposes only those files. The
-browser is launched with `FONTCONFIG_FILE` pointing at it, so every name in the client's font
-stack resolves to a committed face. The fontconfig also selects grayscale antialiasing, because
-LCD subpixel rendering colours the glyph edges and that fringe depends on the display's subpixel
-layout and on the host's fontconfig version. A machine with no CJK font installed and a machine
-with a full set of them therefore render the same bytes: the recorded baseline is a property of
-this repository, not of the runner.
+The font files under `packages/webui/test/browser/fonts/` are committed to this repository.
+The fixture server exposes those files as web fonts under the client's first sans and monospace
+family names, and `openApp` waits for both faces and the initial layout observation before a test
+measures geometry. This also pins macOS and Windows, whose font engines do not use fontconfig.
+On Linux, `scripts/lib/webui-font-environment.mjs` additionally sets `FONTCONFIG_FILE` to expose
+only the committed files and selects grayscale antialiasing. Native rasterization can still differ,
+so screenshot baselines are platform-specific; review actual native captures before adding them.
+
+Chromium uses its normal frame scheduling and graphics path. Live Markdown coalescing
+is measured at the browser's paint opportunities rather than an artificially unbounded frame rate.
+Application work retains an absolute 50 ms budget. Frame pacing diagnostics compare active
+p95 with the larger same-page idle p95 before/after streaming plus 50 ms. The comparison and
+whether it exceeds that budget are saved in `frame-budget-comparison.json`; raw wall-clock
+frame intervals do not decide application acceptance. The frame gate uses CPU timestamps on
+consecutive animation-callback trace markers: main-thread CPU p95 per frame must stay below
+50 ms. This includes cumulative work across small tasks without charging the application for
+time descheduled by the runner. Raw maximum gaps, 50/100 ms outlier counts,
+timer delays and every frame/long-task sample remain recorded in `stream-performance-raw.json`.
+Raw task wall durations remain diagnostic. Lightweight CDP tracing (`toplevel,blink.user_timing`)
+records root tasks intersecting measurement markers on the page's main thread; any task with
+at least 50 ms of thread CPU time fails. Long Animation Frame `pauseDuration` is mapped
+to the owning root task by the measurement marker's page/trace clock offset. Task CPU plus
+its recorded synchronous pauses also fails at 50 ms, retaining coverage of JavaScript
+blocking that uses little CPU. Script wall duration remains diagnostic because it also
+includes time descheduled by the runner. Missing pause attribution or clock mapping fails.
+This distinguishes actual execution from time descheduled by the runner without exempting
+expensive layout or painting. Missing markers, CPU timings or observer support fail explicitly.
+Tasks shorter than 50 ms without a CPU field use their wall duration as a conservative upper
+bound; at least one real CPU sample is required, and an over-budget wall task with missing CPU
+timing fails. The JSON evidence retains both task wall/CPU timings and script attribution.
+Real browser controls require an idle page to pass, 80 ms busy-script/forced-layout work to fail,
+and a synchronous request delayed by 120 ms to fail even when it uses little CPU.
+An empty sample set fails. Both conversation sizes and rendered-content assertions remain intact.
+Idle and active loops sample callback arrival with the same `performance.now()` clock. The active
+window includes two paint opportunities after the final text reaches the DOM.
+The plugin scroll case waits for populated rows and the hover action's layout stability before
+recording its pre-wheel pinned geometry.
+
+Hosted macOS CI sets `WEBUI_BROWSER_HEADED=1` and selects full Chromium in a window;
+Linux, Windows and local runs stay headless by default. Blank-page controls on native macOS
+reproduced long headless frame intervals without any client work. On the same image and browser
+build, windowed mode improved frame pacing, but repeated runs still exposed isolated scheduler
+pauses. Windowed mode therefore complements the idle calibration rather than proving stability
+on its own. Use the same environment flag locally to reproduce
+the macOS CI mode; no frame-rate override or software-compositing override is used.
+
+Related launcher boxes are read in one DOM snapshot, and hover-dependent styles are polled for
+their exact final values. The long-line diff case scrolls the contained viewport into view and
+waits for real overflow before checking actual horizontal scrolling; DOM text alone is insufficient.
+
+Performance cases disable tracing during measurement and capture screenshots only on failure:
+Chromium CPU profiles showed Playwright's injected snapshot walker inside the drag measurement,
+and trace screenshots also occupy the renderer/compositor. The drag still runs through real pointer
+input, waits two frames after pointer release, and retains the 50 ms long-task budget. Locator-based
+geometry assertions run after the observer stops, so their injected queries are not charged to the
+application. Raw task durations are attached as `workspace-drag-long-tasks.json`.
+The review must paint its initial layout before the toolbar measurement begins. The panel's
+`--webui-workspace-width` is a non-inherited registered property: it controls the panel's own
+overlap margin, and inheriting each pointer sample into thousands of diff descendants caused
+unnecessary style recalculation. The browser regression checks both actual panel resizing and
+the child's independent default value.
+Disclosure cases capture all coupled CSS transitions,
+inspect their interpolated midpoint and
+finish it before checking the final geometry, instead of racing a fixed delay against driver latency.
+Tests that deliberately freeze the browser clock advance it explicitly for the initial layout frames.
 
 That also removes the trap the previous arrangement carried. The gate used to depend on the CJK
 fonts that `playwright install --with-deps chromium` pulled in, so the installed set changed with

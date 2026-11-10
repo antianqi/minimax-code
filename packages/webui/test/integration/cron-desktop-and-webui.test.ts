@@ -10,7 +10,7 @@
  * `packages/webui/test/integration/real-host-cron-runs.test.ts` (one run, one delivery). Stating the
  * split is what keeps each claim reviewable instead of a single test that gestures at everything.
  */
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,6 +18,7 @@ import type { CreatedLocalRuntimeHost, LocalRuntimeConfig } from "@mavis/local-r
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createLocalRuntimeHostV2ForTest } from "../../../local-runtime-v2/src/runtime.js";
+import { removeRealHostDataDir } from "./remove-real-host-data-dir.js";
 
 type HostWithCron = CreatedLocalRuntimeHost & {
   readonly cliService?: {
@@ -37,8 +38,8 @@ const hosts: HostWithCron[] = [];
 const dataDirs: string[] = [];
 
 afterEach(async () => {
-  for (const host of hosts.splice(0)) await host.apiHost.close().catch(() => undefined);
-  for (const dir of dataDirs.splice(0)) await rm(dir, { recursive: true, force: true });
+  for (const host of hosts.splice(0)) await host.apiHost.close();
+  for (const dir of dataDirs.splice(0)) await removeRealHostDataDir(dir);
 });
 
 async function boot(dataDir: string, runtimeOwnerKind: "webui" | "electron"): Promise<HostWithCron> {
@@ -164,7 +165,7 @@ describe("two scheduler hosts on one data directory", () => {
     expect(paused?.nextRunAtMs).toBeUndefined();
     expect((await cron(webui).listCronTasks({})).items[0]).toMatchObject({ enabled: false, armed: false });
 
-    await peer.apiHost.close().catch(() => undefined);
+    await peer.apiHost.close();
     hosts.splice(hosts.indexOf(peer), 1);
 
     const restartedPeer = await boot(dataDir, "electron");

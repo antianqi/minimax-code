@@ -524,6 +524,7 @@ interface WebuiMarkdownBlockCache {
 
 interface WebuiMarkdownViewProps {
   readonly source: string;
+  readonly streaming?: boolean;
   readonly onOpenFile?: (reference: NonNullable<ReturnType<typeof parseWebuiMessageFileReference>>) => void;
   readonly workspaceDir?: string;
 }
@@ -555,10 +556,37 @@ function WebuiMarkdownView({ source, onOpenFile, workspaceDir }: WebuiMarkdownVi
   );
 }
 
-export const WebuiMarkdown = memo(
+const WebuiMarkdownContent = memo(
   WebuiMarkdownView,
   (previous, next) =>
     previous.source === next.source &&
     previous.workspaceDir === next.workspaceDir &&
     previous.onOpenFile === next.onOpenFile,
 );
+
+export const WebuiMarkdown = memo(function WebuiMarkdown({ streaming = false, ...props }: WebuiMarkdownViewProps): ReactElement {
+  const [paintedSource, setPaintedSource] = useState(props.source);
+  const latestSource = useRef(props.source);
+  const pendingFrame = useRef<number>();
+  latestSource.current = props.source;
+  useEffect(() => {
+    if (!streaming) {
+      if (pendingFrame.current !== undefined) cancelAnimationFrame(pendingFrame.current);
+      pendingFrame.current = undefined;
+      setPaintedSource(props.source);
+    } else if (pendingFrame.current === undefined) {
+      // 同一绘制机会内合并网络分片；新分片不重置待执行帧，持续输出也不会饿死渲染。
+      pendingFrame.current = requestAnimationFrame(() => {
+        pendingFrame.current = undefined;
+        setPaintedSource(latestSource.current);
+      });
+    }
+  }, [props.source, streaming]);
+  useEffect(() => () => {
+    if (pendingFrame.current !== undefined) cancelAnimationFrame(pendingFrame.current);
+    pendingFrame.current = undefined;
+  }, []);
+  // 完成、替换和截断立即显示权威文本，不等待下一次绘制。
+  const source = streaming && props.source.startsWith(paintedSource) ? paintedSource : props.source;
+  return <WebuiMarkdownContent {...props} source={source} />;
+});

@@ -75,7 +75,7 @@ test("V29 protocol incompatibility is a startup failure before business ingress"
 
 test("V28 search-only changes issue zero probes after the initial read", async ({ page }) => {
   await pausedClock(page);
-  await openApp(page);
+  await openApp(page, "#session=A", { advanceClockForLayout: true });
   await expect.poll(() => requestCount(page, "getActiveTurn")).toBeGreaterThan(0);
   await expect(page.locator('[data-webui-session-link="B"]')).toBeVisible();
   const before = await requestCount(page, "getActiveTurn");
@@ -100,7 +100,7 @@ test("V31/V34 inspection and authorization progress through a saturated activity
     window.__fixture.setResponse("getAccountStatus", { email: "before@example.invalid" });
     window.__fixture.setModels([{ providerId: "p", modelId: "before", displayName: "Before" }]);
   });
-  await openApp(page);
+  await openApp(page, "#session=A", { advanceClockForLayout: true });
   await expect.poll(() => page.evaluate(() => window.__fixture.pending.filter(r => r.operation === "getActiveTurn").length)).toBe(8);
   await expect(page.locator("[data-webui-model-selector]").getByRole("button").first()).toBeEnabled();
   await expect.poll(() => requestCount(page, "getAccountStatus")).toBeGreaterThan(0);

@@ -2,7 +2,7 @@ import { once } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import * as pty from "node-pty";
+import { loadWebuiPty } from "../../src/runtime/native-pty.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
@@ -164,7 +164,7 @@ describe("remote resource lifetime through the production seams", () => {
       const transport: SshTransport = {
         run: async () => ({ stdout: SSH_PROBE_MARKER, stderr: "", code: 0, timedOut: false }),
         spawnTerminal: (_args, dimensions) => {
-          const child = pty.spawn("/bin/sh", ["-c", "printf READY; cat"], { ...dimensions, name: "xterm", env: process.env });
+          const child = loadWebuiPty().spawn(process.execPath, ["-e", "process.stdin.on('data', data => process.stdout.write(data))"], { ...dimensions, name: "xterm", env: process.env });
           terminalAlive = true;
           child.onExit(() => { terminalAlive = false; });
           return { write: (value) => child.write(value), resize: (cols, rows) => child.resize(cols, rows), kill: () => child.kill(), onData: (listener) => { child.onData(listener); }, onExit: (listener) => { child.onExit(({ exitCode }) => listener({ code: exitCode })); } };
@@ -173,7 +173,9 @@ describe("remote resource lifetime through the production seams", () => {
       const runtime = await createSshRuntime({ dataDir: dataDir(), transport });
       cleanup.push(() => runtime.dispose());
       await runtime.connections.save({ alias: "local", endpoint: { kind: "manual", host: "synthetic.invalid" } });
-      terminalId = (await runtime.terminals.open({ alias: "local" })).session.terminalId;
+      const opened = await runtime.terminals.open({ alias: "local" });
+      expect(opened.session.error).toBeUndefined();
+      terminalId = opened.session.terminalId;
       const watch = runtime.terminals.watch.bind(runtime.terminals);
       runtime.terminals.watch = async function* (id, signal) {
         subscribed.resolve();
@@ -193,6 +195,9 @@ describe("remote resource lifetime through the production seams", () => {
     }));
     socket.send(JSON.stringify({ kind: "request", protocolVersion: info.protocolVersion, requestId: "quiet", operation: kind === "ssh" ? "watchSshTerminal" : "watchRemoteControlStatus", body: kind === "ssh" ? { terminalId } : {} }));
     await subscribed.promise;
+    // Send through the real PTY after its watcher is attached, rather than
+    // depending on shell startup output arriving after subscription.
+    if (kind === "ssh") expect(await port.writeSshTerminal({ terminalId, data: "READY\r" })).toEqual({ accepted: true });
     await initial;
     socket.close();
     await once(socket, "close");

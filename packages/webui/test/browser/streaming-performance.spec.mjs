@@ -79,7 +79,8 @@ async function measureIdleFrames(page, durationMs) {
     let previous;
     const deadline = performance.now() + duration;
     await new Promise((resolve) => {
-      const sample = (now) => {
+      const sample = () => {
+        const now = performance.now();
         if (previous !== undefined) gaps.push(now - previous);
         previous = now;
         if (now < deadline) requestAnimationFrame(sample);
@@ -110,6 +111,7 @@ async function measureStreamedReply(page, options) {
     );
   }, historyMessages(historyTurns));
   await openApp(page);
+  await page.addStyleTag({ content: `.webui-code-block { contain: ${test.info().project.name.startsWith("paint") ? "paint" : "none"}; }` });
   await startTurn(page, "A", "Stream a long answer");
 
   // The runtime replays the user's own message on the stream before the
@@ -208,6 +210,8 @@ async function measureStreamedReply(page, options) {
       };
       check();
     });
+    // 最终文本进入 DOM 后仍需完成绘制；与拖拽一样覆盖提交后的两帧。
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const settled = performance.now();
     running = false;
     timerRunning = false;

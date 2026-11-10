@@ -21,6 +21,7 @@ import { attachJsonEvidence, configureFixture, finishCapturedTransition, openApp
 // performance budget. Capture failure screenshots after the measurement.
 test.use({ trace: "off", screenshot: "only-on-failure" });
 
+
 /** Open the browser panel, choose 查看文件, and wait for the tree it loads. */
 async function openFilePanel(page) {
   await page
@@ -176,6 +177,7 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   const review = page.getByTestId("workspace-review");
   await expect(review.locator('[data-testid="turn-review-diff-file"]')).toHaveCount(70);
   await expect(review.locator(".webui-turn-review-code")).toHaveCount(70);
+  if (process.env.WEBUI_DIAG_INLINE_CONTAIN === "1") await page.addStyleTag({ content: '@property --webui-workspace-width { syntax: "<length-percentage>"; inherits: false; initial-value: 50%; }' });
 
   const elapsed = await page.evaluate(async () => {
     const button = document.querySelector('[data-testid="workspace-review-toolbar-context"]');
@@ -193,6 +195,9 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
   if (!bounds) throw new Error("workspace panel resize handle is not laid out");
   const panelWidthBefore = await page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width);
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Performance.enable");
+  const beforeMetrics = (await cdp.send("Performance.getMetrics")).metrics;
   // Resolve the handle before observing the drag: selector discovery is not a
   // pointer gesture, and can walk the whole expanded accessibility tree.
   await page.evaluate(() => {
@@ -212,7 +217,10 @@ test("the workspace review stays responsive with 70 expanded diff files", async 
     window.__reviewLongTaskObserver.disconnect();
     return tasks;
   });
-  await attachJsonEvidence("workspace-drag-long-tasks.json", dragLongTasks);
+  const afterMetrics = (await cdp.send("Performance.getMetrics")).metrics;
+  const duration = (name) => 1000 * (afterMetrics.find((metric) => metric.name === name).value - beforeMetrics.find((metric) => metric.name === name).value);
+  console.info("DRAG LAYOUT METRICS", { layoutMs: duration("LayoutDuration"), styleMs: duration("RecalcStyleDuration"), tasks: dragLongTasks });
+  await test.info().attach("workspace-drag-long-tasks.json", { body: JSON.stringify(dragLongTasks), contentType: "application/json" });
   await expect.poll(() => page.getByTestId("workspace-panel").evaluate((element) => element.getBoundingClientRect().width)).not.toBe(panelWidthBefore);
   expect(dragLongTasks.filter((duration) => duration >= 50), `workspace panel drag produced ${dragLongTasks} ms long tasks`).toEqual([]);
   const lastFile = review.locator('[data-testid="turn-review-diff-file"]').last();

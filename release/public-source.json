@@ -3240,6 +3240,7 @@
     "packages/shared/src/watch-interval.ts",
     "packages/shared/src/web-source-evidence.ts",
     "packages/shared/src/windows-file-system.ts",
+    "packages/shared/test/windows-file-system.test.ts",
     "packages/tui/CHANGELOG.md",
     "packages/tui/CHANGELOG.zh-CN.md",
     "packages/tui/THIRD_PARTY_NOTICES.md",

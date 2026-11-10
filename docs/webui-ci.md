@@ -33,8 +33,14 @@ stalls without the WebUI; windowed mode improves pacing but does not eliminate
 hosted-runner pauses. Streaming frame p95 is compared with the same page's idle
 samples before and after streaming, allowing at most 50 ms of additional application
 overhead above idle p95. Raw frame gaps, timers and tasks are retained for investigation.
-Application long tasks retain the absolute 50 ms budget, and interaction budgets
-are unchanged. Linux, Windows and local runs remain headless by default. To reproduce
+Application execution retains the absolute 50 ms budget: lightweight Chromium tracing
+measures main-thread task CPU time, and Long Animation Frame script duration also
+rejects JavaScript blocking (including synchronous waits). Raw LongTask wall durations
+remain diagnostic because they can include hosted-runner descheduling. Missing timing
+capabilities or required task CPU samples fail explicitly. Real idle, busy-script, forced-layout
+and synchronous-wait
+controls verify attribution in the browser suite. Other interaction budgets are unchanged.
+Linux, Windows and local runs remain headless by default. To reproduce
 the macOS CI browser mode locally, run `WEBUI_BROWSER_HEADED=1 pnpm test:webui-browser`
 after building the client and installing Chromium.
 

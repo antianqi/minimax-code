@@ -171,14 +171,23 @@ so screenshot baselines are platform-specific; review actual native captures bef
 
 Chromium uses its normal frame scheduling and graphics path. Live Markdown coalescing
 is measured at the browser's paint opportunities rather than an artificially unbounded frame rate.
-Application long tasks retain an absolute 50 ms budget. Frame pacing uses the same page's
+Application work retains an absolute 50 ms budget. Frame pacing uses the same page's
 idle samples before and after streaming: active p95 must stay below the larger idle p95 plus
 the 50 ms application overhead budget. The environment's own idle frame interval is not charged
 to that budget. Using p95 distinguishes sustained application
 delay from isolated hosted-runner scheduling pauses; raw maximum gaps, 50/100 ms outlier counts,
 timer delays and every frame/long-task sample remain recorded in `stream-performance-raw.json`.
-Raw task details and Long Animation Frame attribution are included for triage; they do not replace
-the absolute long-task assertion.
+Raw task wall durations remain diagnostic. Lightweight CDP tracing (`toplevel,blink.user_timing`)
+records root tasks intersecting measurement markers on the page's main thread; any task with
+at least 50 ms of thread CPU time fails. Long Animation Frame script duration separately fails
+at 50 ms, retaining coverage of JavaScript blocking that spends time in synchronous waits.
+This distinguishes actual execution from time descheduled by the runner without exempting
+expensive layout or painting. Missing markers, CPU timings or observer support fail explicitly.
+Tasks shorter than 50 ms without a CPU field use their wall duration as a conservative upper
+bound; at least one real CPU sample is required, and an over-budget wall task with missing CPU
+timing fails. The JSON evidence retains both task wall/CPU timings and script attribution.
+Real browser controls require an idle page to pass, 80 ms busy-script/forced-layout work to fail,
+and a synchronous request delayed by 120 ms to fail even when it uses little CPU.
 An empty sample set fails. Both conversation sizes and rendered-content assertions remain intact.
 Idle and active loops sample callback arrival with the same `performance.now()` clock. The active
 window includes two paint opportunities after the final text reaches the DOM.

@@ -4653,6 +4653,7 @@
     "packages/webui/test/browser/account-login.spec.mjs",
     "packages/webui/test/browser/api-key-feedback.spec.mjs",
     "packages/webui/test/browser/application-observation.spec.mjs",
+    "packages/webui/test/browser/application-performance.mjs",
     "packages/webui/test/browser/architecture-acceptance.spec.mjs",
     "packages/webui/test/browser/browser-bridge-real-browser.spec.ts",
     "packages/webui/test/browser/browser-bridge-real-external.spec.ts",

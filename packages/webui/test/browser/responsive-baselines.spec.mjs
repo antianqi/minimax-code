@@ -17,7 +17,13 @@
 
 import { expect } from "@playwright/test";
 
-import { configureFixture, openApp, screenshotOptions, test } from "./harness.mjs";
+import {
+  configureFixture,
+  openApp,
+  screenshotOptions,
+  test,
+  waitForLocalImages,
+} from "./harness.mjs";
 
 /** The widths the contract's matrix covers. */
 const WIDTHS = [1440, 1280, 1024, 900, 768, 640, 480];
@@ -35,6 +41,7 @@ for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await configureFixture(page, () => undefined);
     await openApp(page, "#session=A");
+    await waitForLocalImages(page);
     await expect(page.locator("#webui-root")).toHaveScreenshot(`shell-at-${width}.png`, screenshotOptions);
   });
 }
@@ -46,6 +53,7 @@ for (const width of PANEL_WIDTHS) {
     await openApp(page, "#session=A");
     await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
     await expect(page.getByTestId("workspace-panel")).toBeVisible();
+    await waitForLocalImages(page);
     await expect(page.locator("#webui-root")).toHaveScreenshot(`workspace-panel-at-${width}.png`, screenshotOptions);
   });
 }

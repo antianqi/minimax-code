@@ -1063,7 +1063,25 @@ it.each(["transcript", "cross-client", "external-active-mutation", "external-act
     await page.getByTestId("workspace-launcher-url").fill(pageUrl);
     await page.getByTestId("workspace-launcher-url-submit").click();
     const browserFrame = page.getByTestId("browser-panel-frame");
-    await browserExpect(browserFrame).toBeVisible({ timeout: 30_000 });
+    // The panel can only render a frame after the isolated Chromium has
+    // booted, opened the page and streamed its first picture back over the
+    // event channel. That whole pipeline -- not the product's own
+    // responsiveness -- is what this wait covers, and on a loaded CI runner
+    // it can outlast the 30s window this test used to give it. Give the wait
+    // its own budget, and keep the failure readable: if the panel still
+    // shows its empty placeholder the frame never arrived, and if a
+    // capability notice is on screen the host could not serve a browser at
+    // all. Those are different faults and deserve different fixes.
+    try {
+      await browserExpect(browserFrame).toBeVisible({ timeout: 60_000 });
+    } catch (error) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)}\n${JSON.stringify({
+        emptyFrameStillShowing: await page.getByTestId("browser-panel-frame-empty").count(),
+        capabilityNotices: await page.locator(
+          '[data-testid="browser-panel-unknown"], [data-testid="browser-panel-unauthorized"]',
+        ).allTextContents(),
+      })}`);
+    }
     const browserGeometry = await browserFrame.evaluate((node) => {
       const frame = node.getBoundingClientRect();
       const panel = node.closest(".webui-browser-panel")?.getBoundingClientRect();

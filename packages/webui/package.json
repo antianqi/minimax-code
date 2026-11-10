@@ -37,7 +37,7 @@
     "katex": "0.18.7",
     "lottie-web": "^5.13.0",
     "marked": "18.0.12",
-    "mermaid": "12.1.0",
+    "mermaid": "12.3.0",
     "node-pty": "1.1.0",
     "better-sqlite3": "12.11.1",
     "qrcode.react": "4.2.0",

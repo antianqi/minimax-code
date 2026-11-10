@@ -1,4 +1,11 @@
 /* workspace — moved out of styles/shell.css; rules kept in their original relative order. */
+/* The panel owns this geometry; descendants must not recalculate styles on every drag sample. */
+@property --webui-workspace-width {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+
 @layer components {
 
   /* The project row under the composer. It is a LAYOUT element only — the

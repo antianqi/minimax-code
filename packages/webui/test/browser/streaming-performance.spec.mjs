@@ -139,10 +139,19 @@ async function measureStreamedReply(page, options) {
   const metrics = await page.evaluate(async (chunkTextsIn) => {
     const count = chunkTextsIn.length;
     const longTasks = [];
+    const longTaskDetails = [];
     const observer = new PerformanceObserver((entries) => {
-      for (const entry of entries.getEntries()) longTasks.push(entry.duration);
+      for (const entry of entries.getEntries()) {
+        longTasks.push(entry.duration);
+        longTaskDetails.push(entry.toJSON());
+      }
     });
     observer.observe({ type: "longtask" });
+    const longAnimationFrames = [];
+    const frameObserver = new PerformanceObserver((entries) => {
+      longAnimationFrames.push(...entries.getEntries().map((entry) => entry.toJSON()));
+    });
+    frameObserver.observe({ type: "long-animation-frame" });
 
     // A rAF loop records the frame pacing the reader actually sees.
     const frameGaps = [];
@@ -202,12 +211,17 @@ async function measureStreamedReply(page, options) {
     const settled = performance.now();
     running = false;
     timerRunning = false;
-    const records = observer.takeRecords().map((entry) => entry.duration);
+    const records = observer.takeRecords();
+    longTaskDetails.push(...records.map((entry) => entry.toJSON()));
     observer.disconnect();
+    longAnimationFrames.push(...frameObserver.takeRecords().map((entry) => entry.toJSON()));
+    frameObserver.disconnect();
     return {
       emitted: emitted - started,
       settled: settled - started,
-      longTasks: [...longTasks, ...records],
+      longTasks: [...longTasks, ...records.map((entry) => entry.duration)],
+      longTaskDetails,
+      longAnimationFrames,
       frameGaps: frameGaps.slice(1),
       timerDelays,
       liveBodyFound: Boolean(document.querySelector('[data-webui-assistant-body="a-turn-1"]')),

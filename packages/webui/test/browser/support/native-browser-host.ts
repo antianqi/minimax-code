@@ -65,13 +65,34 @@ let closing: Promise<void> | undefined;
 async function close() {
   if (closing) return closing;
   closing = (async () => {
+    // Each step says where it is before it runs: a shutdown that does not
+    // finish is otherwise a silence, and the suite cannot tell which step
+    // stopped answering.
+    const step = (name: string) => { process.stderr.write(`[native-host] ${name}\n`); };
+    step("service.close");
     await service.close();
+    step("terminals exited");
     await Promise.all(exits);
+    step("apiHost.close");
     await assembled.host.apiHost.close();
+    step("terminals checked");
     if (terminal.list().length !== 0) throw new Error("Native terminal service leaked processes");
+    step("data dir removed");
     await rm(directory, { recursive: true, force: true });
-    process.send?.({ closed: true, terminals: 0, exited: exits.length });
-    process.disconnect?.();
+    step("reported");
+    // The acceptance is over and the host has said so, so it goes: the exit is
+    // taken here rather than left to the event loop. Node-pty's Windows
+    // console-list helper cannot attach to a ConPTY shell — the shell has a
+    // pseudo-console, not a console — so every terminal it kills leaves a
+    // five-second fallback timer behind in this process. Waiting for that
+    // timer kept the host alive long after there was nothing left to do, and
+    // under load that was enough for the suite's shutdown hook to miss its
+    // deadline. The callback runs once the message has been flushed, so the
+    // report is not lost by exiting here.
+    process.send?.({ closed: true, terminals: 0, exited: exits.length }, () => {
+      process.disconnect?.();
+      process.exit(0);
+    });
   })();
   return closing;
 }

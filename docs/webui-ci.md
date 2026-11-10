@@ -30,16 +30,18 @@ visible and require diagnosis rather than relaxed assertions.
 Hosted macOS sets `WEBUI_BROWSER_HEADED=1` for the browser suite and runs full
 Chromium in a window. Native blank-page controls reproduced headless frame-source
 stalls without the WebUI; windowed mode improves pacing but does not eliminate
-hosted-runner pauses. Streaming frame p95 is compared with the same page's idle
-samples before and after streaming, allowing at most 50 ms of additional application
-overhead above idle p95. Raw frame gaps, timers and tasks are retained for investigation.
+hosted-runner pauses. Streaming frame p95 is compared diagnostically with the same
+page's idle samples before and after streaming, recording whether it exceeds idle
+p95 plus 50 ms. The frame gate requires main-thread CPU p95 between consecutive
+animation callbacks to stay below 50 ms, capturing cumulative work across tasks.
+Raw frame gaps, timers and tasks are retained for investigation.
 Application execution retains the absolute 50 ms budget: lightweight Chromium tracing
 measures main-thread task CPU time, and Long Animation Frame script duration also
 rejects JavaScript blocking (including synchronous waits). Raw LongTask wall durations
 remain diagnostic because they can include hosted-runner descheduling. Missing timing
-capabilities or required task CPU samples fail explicitly. Real idle, busy-script, forced-layout
-and synchronous-wait
-controls verify attribution in the browser suite. Other interaction budgets are unchanged.
+capabilities or required task/frame CPU samples fail explicitly. Real idle, busy-script,
+forced-layout and synchronous-wait controls verify attribution in the browser suite.
+Other interaction budgets are unchanged.
 Linux, Windows and local runs remain headless by default. To reproduce
 the macOS CI browser mode locally, run `WEBUI_BROWSER_HEADED=1 pnpm test:webui-browser`
 after building the client and installing Chromium.

@@ -21,9 +21,11 @@ import { expect } from "@playwright/test";
 import { attachJsonEvidence, openApp, startTurn, test } from "./harness.mjs";
 import {
   APPLICATION_BLOCK_MS,
+  FRAME_MARK,
   MEASURE_END,
   MEASURE_START,
   attributeApplicationWork,
+  attributeFrameWork,
   startApplicationTrace,
 } from "./application-performance.mjs";
 
@@ -150,7 +152,7 @@ async function measureStreamedReply(page, options) {
   let metrics;
   try {
     metrics = await page.evaluate(
-      async ({ chunkTextsIn, measureStart, measureEnd }) => {
+      async ({ chunkTextsIn, measureStart, measureEnd, frameMark }) => {
         if (
           !["longtask", "long-animation-frame"].every((type) => PerformanceObserver.supportedEntryTypes.includes(type))
         ) {
@@ -178,6 +180,7 @@ async function measureStreamedReply(page, options) {
         let running = true;
         const sample = () => {
           if (!running) return;
+          performance.mark(frameMark);
           const now = performance.now();
           frameGaps.push(now - previousFrame);
           previousFrame = now;
@@ -254,6 +257,7 @@ async function measureStreamedReply(page, options) {
         chunkTextsIn: chunkTexts,
         measureStart: MEASURE_START,
         measureEnd: MEASURE_END,
+        frameMark: FRAME_MARK,
       },
     );
   } finally {
@@ -262,8 +266,15 @@ async function measureStreamedReply(page, options) {
   await attachJsonEvidence("application-task-trace.json", traceEvents);
   const idleAfter = await measureIdleFrames(page, Math.max(2000, metrics.settled));
   // 即使归因数据不完整也先保留原始样本，便于定位采样失败。
-  await attachJsonEvidence("stream-performance-samples.json", { historyTurns, chunks, idleBefore, active: metrics, idleAfter });
+  await attachJsonEvidence("stream-performance-samples.json", {
+    historyTurns,
+    chunks,
+    idleBefore,
+    active: metrics,
+    idleAfter,
+  });
   const applicationWork = attributeApplicationWork(traceEvents, metrics.longAnimationFrames);
+  const frameWork = attributeFrameWork(traceEvents);
   await attachJsonEvidence("stream-performance-raw.json", {
     historyTurns,
     chunks,
@@ -271,6 +282,7 @@ async function measureStreamedReply(page, options) {
     active: metrics,
     idleAfter,
     applicationWork,
+    frameWork,
   });
 
   if (cdp) {
@@ -303,7 +315,20 @@ async function measureStreamedReply(page, options) {
     worstTimerDelay: Math.max(0, ...metrics.timerDelays),
     longTaskCount: metrics.longTasks.filter((duration) => duration >= APPLICATION_BLOCK_MS).length,
     applicationOverBudget: applicationWork.cpuOverBudget.length + applicationWork.scriptsOverBudget.length,
+    p95FrameCpu: percentile(
+      frameWork.map((frame) => frame.cpuMs),
+      0.95,
+    ),
   };
+  await attachJsonEvidence("frame-budget-comparison.json", {
+    idleBeforeP95: percentile(idleBefore, 0.95),
+    idleAfterP95: percentile(idleAfter, 0.95),
+    rawActiveP95: summary.p95FrameGap,
+    rawAllowedP95: summary.allowedP95FrameGap,
+    rawBudgetExceeded: summary.p95FrameGap >= summary.allowedP95FrameGap,
+    applicationFrameCpuP95: summary.p95FrameCpu,
+    applicationBudget: APPLICATION_BLOCK_MS,
+  });
   console.info(
     [
       `streamed reply: ${chunks} frames over ${summary.emitted.toFixed(0)} ms`,
@@ -317,7 +342,8 @@ async function measureStreamedReply(page, options) {
       `worst timer delay: ${summary.worstTimerDelay.toFixed(1)} ms`,
       `long tasks: ${summary.longTaskCount}`,
       `application tasks/scripts over budget: ${summary.applicationOverBudget}`,
-      `max task CPU: ${(Math.max(...applicationWork.tasks.map((task) => Number.isFinite(task.tdur) ? task.tdur : task.dur)) / 1000).toFixed(1)} ms`,
+      `p95 frame CPU: ${summary.p95FrameCpu.toFixed(1)} ms`,
+      `max task CPU: ${(Math.max(...applicationWork.tasks.map((task) => (Number.isFinite(task.tdur) ? task.tdur : task.dur))) / 1000).toFixed(1)} ms`,
       `max script: ${Math.max(0, ...applicationWork.scripts.map((script) => script.duration)).toFixed(1)} ms`,
     ].join(" | "),
   );
@@ -357,9 +383,9 @@ test("a streamed reply keeps the page responsive", async ({ page }) => {
   expect(summary.liveBodyFound, "the live reply did not render its own assistant body").toBe(true);
   await expectRenderedAnswer(page, Number(process.env.WEBUI_PERF_CHUNKS ?? 120));
   expect(
-    summary.p95FrameGap,
-    `stream p95 ${summary.p95FrameGap} ms exceeds same-page idle budget ${summary.allowedP95FrameGap} ms`,
-  ).toBeLessThan(summary.allowedP95FrameGap);
+    summary.p95FrameCpu,
+    `stream frame CPU p95 ${summary.p95FrameCpu} ms exceeds application budget ${APPLICATION_BLOCK_MS} ms`,
+  ).toBeLessThan(APPLICATION_BLOCK_MS);
   // 原始停顿保留诊断；实际主线程执行与脚本阻塞分别执行 50ms 预算。
   expect(
     summary.applicationOverBudget,
@@ -379,9 +405,9 @@ test("a long reply in a long conversation does not drop frames", async ({ page }
   expect(summary.liveBodyFound, "the live reply did not render its own assistant body").toBe(true);
   await expectRenderedAnswer(page, Number(process.env.WEBUI_PERF_HEAVY_CHUNKS ?? 400));
   expect(
-    summary.p95FrameGap,
-    `stream p95 ${summary.p95FrameGap} ms exceeds same-page idle budget ${summary.allowedP95FrameGap} ms`,
-  ).toBeLessThan(summary.allowedP95FrameGap);
+    summary.p95FrameCpu,
+    `stream frame CPU p95 ${summary.p95FrameCpu} ms exceeds application budget ${APPLICATION_BLOCK_MS} ms`,
+  ).toBeLessThan(APPLICATION_BLOCK_MS);
   expect(
     summary.applicationOverBudget,
     `the streamed reply produced ${summary.applicationOverBudget} application tasks/scripts over budget`,
@@ -461,10 +487,22 @@ for (const scenario of ["idle", "javascript", "layout", "synchronous-wait"]) {
 test("missing application timing fails instead of passing with zero work", async ({ page }) => {
   await openApp(page);
   expect(() => attributeApplicationWork([], [])).toThrow("markers are missing");
+  expect(() => attributeFrameWork([])).toThrow("frame markers are missing");
   const markers = [
     { name: MEASURE_START, ts: 1, pid: 1, tid: 1 },
     { name: MEASURE_END, ts: 100, pid: 1, tid: 1 },
   ];
+  expect(() => attributeFrameWork(markers)).toThrow("frame CPU timing is unavailable");
+  const frameEvents = [
+    { name: MEASURE_START, ts: 0, pid: 1, tid: 1 },
+    { name: MEASURE_END, ts: 100_000, pid: 1, tid: 1 },
+    { name: FRAME_MARK, ts: 100, tts: 10, pid: 1, tid: 1 },
+    { name: FRAME_MARK, ts: 90_000, tts: 60_010, pid: 1, tid: 1 },
+  ];
+  expect(attributeFrameWork(frameEvents)).toEqual([{ wallMs: 89.9, cpuMs: 60 }]);
+  expect(() => attributeFrameWork(frameEvents.map((event) => ({ ...event, tts: undefined })))).toThrow(
+    "frame CPU timing is unavailable",
+  );
   expect(() => attributeApplicationWork(markers, [])).toThrow("CPU timing is unavailable");
   expect(() =>
     attributeApplicationWork(

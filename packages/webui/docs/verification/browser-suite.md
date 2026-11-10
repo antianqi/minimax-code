@@ -171,11 +171,13 @@ so screenshot baselines are platform-specific; review actual native captures bef
 
 Chromium uses its normal frame scheduling and graphics path. Live Markdown coalescing
 is measured at the browser's paint opportunities rather than an artificially unbounded frame rate.
-Application work retains an absolute 50 ms budget. Frame pacing uses the same page's
-idle samples before and after streaming: active p95 must stay below the larger idle p95 plus
-the 50 ms application overhead budget. The environment's own idle frame interval is not charged
-to that budget. Using p95 distinguishes sustained application
-delay from isolated hosted-runner scheduling pauses; raw maximum gaps, 50/100 ms outlier counts,
+Application work retains an absolute 50 ms budget. Frame pacing diagnostics compare active
+p95 with the larger same-page idle p95 before/after streaming plus 50 ms. The comparison and
+whether it exceeds that budget are saved in `frame-budget-comparison.json`; raw wall-clock
+frame intervals do not decide application acceptance. The frame gate uses CPU timestamps on
+consecutive animation-callback trace markers: main-thread CPU p95 per frame must stay below
+50 ms. This includes cumulative work across small tasks without charging the application for
+time descheduled by the runner. Raw maximum gaps, 50/100 ms outlier counts,
 timer delays and every frame/long-task sample remain recorded in `stream-performance-raw.json`.
 Raw task wall durations remain diagnostic. Lightweight CDP tracing (`toplevel,blink.user_timing`)
 records root tasks intersecting measurement markers on the page's main thread; any task with

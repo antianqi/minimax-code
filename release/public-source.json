@@ -408,6 +408,7 @@
     "packages/agent-modules/skills/src/index.ts",
     "packages/agent-modules/skills/src/registry.ts",
     "packages/agent-modules/skills/src/types.ts",
+    "packages/agent-modules/skills/test/directory-watcher.test.ts",
     "packages/agent-modules/system-reminder/package.json",
     "packages/agent-modules/system-reminder/src/blocks.ts",
     "packages/agent-modules/system-reminder/src/collaborators.ts",
